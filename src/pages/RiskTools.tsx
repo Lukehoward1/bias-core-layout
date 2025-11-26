@@ -65,6 +65,22 @@ export default function RiskTools() {
                     <Input id="target" type="number" defaultValue="1.0910" step="0.0001" />
                   </div>
 
+                  <div>
+                    <Label htmlFor="leverage">Leverage</Label>
+                    <Select defaultValue="100">
+                      <SelectTrigger id="leverage">
+                        <SelectValue placeholder="Select leverage" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="30">1:30</SelectItem>
+                        <SelectItem value="50">1:50</SelectItem>
+                        <SelectItem value="100">1:100</SelectItem>
+                        <SelectItem value="200">1:200</SelectItem>
+                        <SelectItem value="500">1:500</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <Button className="w-full">Calculate</Button>
                 </div>
 
@@ -110,6 +126,24 @@ export default function RiskTools() {
                       <span className="font-semibold">Tip:</span> A 2:1 reward-to-risk ratio is considered good practice for swing trading.
                     </p>
                   </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                    <div className="p-4 bg-muted/50 rounded-lg">
+                      <h3 className="font-semibold text-foreground mb-2">Conservative</h3>
+                      <p className="text-2xl font-bold text-foreground mb-1">0.5-1%</p>
+                      <p className="text-xs text-muted-foreground">Risk per trade for capital preservation</p>
+                    </div>
+                    <div className="p-4 bg-muted/50 rounded-lg">
+                      <h3 className="font-semibold text-foreground mb-2">Moderate</h3>
+                      <p className="text-2xl font-bold text-foreground mb-1">1-2%</p>
+                      <p className="text-xs text-muted-foreground">Balanced risk for steady growth</p>
+                    </div>
+                    <div className="p-4 bg-muted/50 rounded-lg">
+                      <h3 className="font-semibold text-foreground mb-2">Aggressive</h3>
+                      <p className="text-2xl font-bold text-foreground mb-1">2-3%</p>
+                      <p className="text-xs text-muted-foreground">Higher risk for faster returns</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -117,24 +151,56 @@ export default function RiskTools() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Quick Risk Guidelines</CardTitle>
+              <CardTitle>Quick Calculator (Linked to Account)</CardTitle>
+              <p className="text-sm text-muted-foreground">Uses your connected account and current chart (coming soon)</p>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <h3 className="font-semibold text-foreground mb-2">Conservative</h3>
-                  <p className="text-2xl font-bold text-foreground mb-1">0.5-1%</p>
-                  <p className="text-xs text-muted-foreground">Risk per trade for capital preservation</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="p-4 bg-muted/30 rounded-lg space-y-3">
+                    <h3 className="text-sm font-medium text-muted-foreground mb-3">Account Info (Auto-detected)</h3>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Current Pair</span>
+                      <span className="text-sm font-medium text-foreground">EURUSD</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Account Balance</span>
+                      <span className="text-sm font-medium text-foreground">£10,000</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Current Price</span>
+                      <span className="text-sm font-medium text-foreground">1.08450</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Spread</span>
+                      <span className="text-sm font-medium text-foreground">0.8</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="quick-risk">Risk % per Trade</Label>
+                    <Input id="quick-risk" type="number" defaultValue="2" step="0.1" />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="quick-stop">Stop Size (pips)</Label>
+                    <Input id="quick-stop" type="number" defaultValue="30" />
+                  </div>
+
+                  <Button className="w-full">Calculate</Button>
                 </div>
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <h3 className="font-semibold text-foreground mb-2">Moderate</h3>
-                  <p className="text-2xl font-bold text-foreground mb-1">1-2%</p>
-                  <p className="text-xs text-muted-foreground">Balanced risk for steady growth</p>
-                </div>
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <h3 className="font-semibold text-foreground mb-2">Aggressive</h3>
-                  <p className="text-2xl font-bold text-foreground mb-1">2-3%</p>
-                  <p className="text-xs text-muted-foreground">Higher risk for faster returns</p>
+
+                <div className="flex flex-col justify-center">
+                  <div className="p-6 bg-muted/50 rounded-lg border border-border">
+                    <h3 className="text-sm font-medium text-muted-foreground mb-4">Calculated Position</h3>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Lot Size</span>
+                      <span className="text-3xl font-bold text-primary">0.67 lots</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-4 text-center">
+                    Live linking to your broker account and open chart will be enabled in a future update.
+                  </p>
                 </div>
               </div>
             </CardContent>

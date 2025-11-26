@@ -1,6 +1,7 @@
 import { AppHeader } from "@/components/AppHeader";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -8,9 +9,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Play } from "lucide-react";
+import { Play, BarChart3 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function StrategyTester() {
+  const navigate = useNavigate();
+
   return (
     <div className="flex flex-col h-full">
       <AppHeader title="Strategy Tester" />
@@ -72,7 +76,23 @@ export default function StrategyTester() {
           </Card>
 
           <Card>
-            <CardContent className="pt-6">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Strategy Results</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">Last run: 2 mins ago</Badge>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => navigate('/journal')}
+                  >
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    View Detailed Report
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                 <div className="text-center">
                   <div className="text-sm text-muted-foreground mb-1">Net Profit</div>

@@ -2,7 +2,15 @@ import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, TrendingUp, TrendingDown } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Plus, TrendingUp, TrendingDown, BarChart3 } from "lucide-react";
 
 const trades = [
   { date: '2025-01-15', pair: 'EURUSD', type: 'Long', entry: 1.0850, exit: 1.0910, lots: 1.0, pnl: 600, status: 'closed' },
@@ -19,7 +27,14 @@ export default function Journal() {
       
       <div className="flex-1 overflow-y-auto bg-background p-6">
         <div className="max-w-7xl mx-auto space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          <Tabs defaultValue="journal" className="w-full">
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="journal">Journal</TabsTrigger>
+              <TabsTrigger value="reports">Reports</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="journal" className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Total Trades</CardTitle>
@@ -134,6 +149,101 @@ export default function Journal() {
               </div>
             </CardContent>
           </Card>
+            </TabsContent>
+
+            <TabsContent value="reports" className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Select defaultValue="performance">
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Report type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="performance">Performance Overview</SelectItem>
+                      <SelectItem value="by-pair">By Pair</SelectItem>
+                      <SelectItem value="by-session">By Session</SelectItem>
+                      <SelectItem value="by-day">By Day of Week</SelectItem>
+                      <SelectItem value="strategy">Strategy Comparison</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Select defaultValue="live">
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Data source" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="live">Live Account</SelectItem>
+                      <SelectItem value="backtests">Backtests</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-foreground">68%</div>
+                    <p className="text-xs text-success mt-1">+3% from last period</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Average R</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-foreground">2.1</div>
+                    <p className="text-xs text-success mt-1">+0.2 from last period</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Max Drawdown</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-destructive">-8.5%</div>
+                    <p className="text-xs text-muted-foreground mt-1">Within acceptable limits</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Best Pair</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-foreground">EURUSD</div>
+                    <p className="text-xs text-success mt-1">+$12,450</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Equity Curve</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-64 bg-muted/30 rounded-lg flex items-center justify-center border border-border">
+                    <p className="text-muted-foreground">Equity curve visualization (Performance Overview)</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Performance by Pair</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-64 bg-muted/30 rounded-lg flex items-center justify-center border border-border">
+                    <p className="text-muted-foreground">Bar chart showing P&L by trading pair</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>
