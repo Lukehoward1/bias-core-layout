@@ -1,8 +1,16 @@
+import { useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
+import { LockScreen } from "@/components/LockScreen";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, Clock, Calendar as CalendarIcon, Activity } from "lucide-react";
 
 export default function Dashboard() {
+  const [isUnlocked, setIsUnlocked] = useState(false);
+
+  if (!isUnlocked) {
+    return <LockScreen onUnlock={() => setIsUnlocked(true)} />;
+  }
+
   return (
     <div className="flex flex-col h-full">
       <AppHeader title="Dashboard" />

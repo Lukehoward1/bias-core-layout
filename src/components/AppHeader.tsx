@@ -1,5 +1,6 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, User, LogOut } from "lucide-react";
+import { ChevronDown, User, LogOut, Sparkles } from "lucide-react";
 
 interface AppHeaderProps {
   title: string;
@@ -16,10 +17,21 @@ interface AppHeaderProps {
 
 export function AppHeader({ title }: AppHeaderProps) {
   return (
-    <header className="h-16 border-b border-border bg-card flex items-center justify-between px-6">
-      <h1 className="text-2xl font-bold text-foreground">{title}</h1>
+    <header className="h-16 border-b border-border bg-card flex items-center justify-between px-6 gap-4">
+      <h1 className="text-2xl font-bold text-foreground shrink-0">{title}</h1>
       
-      <div className="flex items-center gap-3">
+      {/* Global Smart Search */}
+      <div className="relative flex-1 max-w-2xl hidden md:block">
+        <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="text"
+          placeholder="Smart Search (Coming Soon)"
+          disabled
+          className="pl-10 bg-muted/50 border-muted"
+        />
+      </div>
+      
+      <div className="flex items-center gap-3 shrink-0">
         <Badge variant="secondary" className="text-xs font-medium">
           Pro
         </Badge>
