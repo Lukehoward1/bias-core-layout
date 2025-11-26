@@ -30,7 +30,7 @@ const mainItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Markets", url: "/markets", icon: TrendingUp },
   { title: "Calendar", url: "/calendar", icon: Calendar },
-  { title: "News & Timers", url: "/news-timers", icon: Bell },
+  { title: "Alerts", url: "/alerts", icon: Bell },
   { title: "Risk Tools", url: "/risk-tools", icon: Calculator },
   { title: "Journal", url: "/journal", icon: BookOpen },
   { title: "Strategy Tester", url: "/strategy-tester", icon: Beaker },

@@ -24,10 +24,10 @@ const alerts = [
   { type: 'Session Timer', what: 'London Open', when: 'In 2h 15m', delivery: 'Push', status: 'active' },
 ];
 
-export default function NewsTimers() {
+export default function Alerts() {
   return (
     <div className="flex flex-col h-full">
-      <AppHeader title="News & Timers" />
+      <AppHeader title="Alerts" />
       
       <div className="flex-1 overflow-y-auto bg-background p-6">
         <div className="max-w-7xl mx-auto space-y-6">

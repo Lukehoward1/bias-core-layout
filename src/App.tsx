@@ -8,7 +8,7 @@ import { AppLayout } from "@/layouts/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Markets from "./pages/Markets";
 import Calendar from "./pages/Calendar";
-import NewsTimers from "./pages/NewsTimers";
+import Alerts from "./pages/Alerts";
 import RiskTools from "./pages/RiskTools";
 import Journal from "./pages/Journal";
 import StrategyTester from "./pages/StrategyTester";
@@ -34,7 +34,7 @@ const App = () => (
               <Route path="/" element={<Dashboard />} />
               <Route path="/markets" element={<Markets />} />
               <Route path="/calendar" element={<Calendar />} />
-              <Route path="/news-timers" element={<NewsTimers />} />
+              <Route path="/alerts" element={<Alerts />} />
               <Route path="/risk-tools" element={<RiskTools />} />
               <Route path="/journal" element={<Journal />} />
               <Route path="/strategy-tester" element={<StrategyTester />} />
