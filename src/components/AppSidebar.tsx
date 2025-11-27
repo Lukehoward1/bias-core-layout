@@ -102,7 +102,7 @@ export function AppSidebar() {
       {/* Logo */}
       <div className="p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img src={sbLogo} alt="StreamBias" className={`${collapsed ? 'h-8' : 'h-10'} w-auto flex-shrink-0`} />
+          <img src={sbLogo} alt="StreamBias" className={`${collapsed ? 'h-10' : 'h-12'} w-auto flex-shrink-0`} />
           {!collapsed && (
             <span className="text-lg font-bold text-foreground">StreamBias</span>
           )}
