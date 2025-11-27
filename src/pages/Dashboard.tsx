@@ -17,6 +17,9 @@ export default function Dashboard() {
       
       <div className="flex-1 overflow-y-auto bg-background p-6">
         <div className="max-w-7xl mx-auto space-y-6">
+          {/* Welcome Header */}
+          <h1 className="text-4xl font-bold text-foreground">Welcome, Trader</h1>
+          
           {/* Key Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
