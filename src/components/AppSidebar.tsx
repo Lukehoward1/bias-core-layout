@@ -9,6 +9,7 @@ import {
   Users, 
   GraduationCap, 
   Video, 
+  FileText,
   Link2, 
   Settings, 
   CreditCard,
@@ -40,12 +41,13 @@ const mainItems = [
 const learningItems = [
   { title: "Education", url: "/education", icon: GraduationCap },
   { title: "Webinars", url: "/webinars", icon: Video },
+  { title: "Articles/Guides", url: "/articles", icon: FileText },
 ];
 
 const accountItems = [
   { title: "Broker Connections", url: "/broker-connections", icon: Link2 },
   { title: "Settings", url: "/settings", icon: Settings },
-  { title: "Billing & Subscription", url: "/billing", icon: CreditCard },
+  { title: "Billing", url: "/billing", icon: CreditCard },
 ];
 
 export function AppSidebar() {
@@ -99,58 +101,73 @@ export function AppSidebar() {
         flex flex-col h-screen transition-all duration-300 relative
       `}
     >
-      {/* Logo */}
-      <div className={`${collapsed ? 'p-2' : 'p-4'} flex items-center justify-between`}>
-        <div className={`flex items-center ${collapsed ? 'justify-center h-12 w-12' : 'gap-3'}`}>
-          <img src={sbLogo} alt="StreamBias" className={`${collapsed ? 'h-10' : 'h-12'} w-auto flex-shrink-0`} />
+      {/* TOP SECTION: Logo, Collapse Button, Main Nav */}
+      <div className="flex-shrink-0">
+        {/* Logo */}
+        <div className={`${collapsed ? 'p-2' : 'p-4'} flex items-center justify-between`}>
+          <div className={`flex items-center ${collapsed ? 'justify-center h-12 w-12' : 'gap-3'}`}>
+            <img src={sbLogo} alt="StreamBias" className={`${collapsed ? 'h-10' : 'h-12'} w-auto flex-shrink-0`} />
+            {!collapsed && (
+              <span className="text-lg font-bold text-foreground">StreamBias</span>
+            )}
+          </div>
+        </div>
+
+        <Separator className="bg-sidebar-border" />
+
+        {/* Collapse Button */}
+        <div className="px-3 py-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleCollapsed}
+            className="w-full justify-center hover:bg-sidebar-accent"
+          >
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </Button>
+        </div>
+
+        {/* Main Navigation */}
+        <nav className="px-2 py-2">
+          <NavSection title="MAIN" items={mainItems} />
+        </nav>
+      </div>
+
+      {/* MIDDLE SECTION: Learning (centered vertically) */}
+      <div className="flex-1 flex items-center">
+        <nav className="px-2 w-full">
+          <NavSection title="LEARNING" items={learningItems} />
+        </nav>
+      </div>
+
+      {/* BOTTOM SECTION: Account + Theme/Upgrade */}
+      <div className="flex-shrink-0">
+        <nav className="px-2 py-2">
+          <NavSection title="ACCOUNT" items={accountItems} />
+        </nav>
+
+        {/* Footer */}
+        <div className="p-3 border-t border-sidebar-border space-y-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleTheme}
+            className={`w-full ${collapsed ? 'justify-center' : 'justify-start'} hover:bg-sidebar-accent`}
+          >
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {!collapsed && <span className="ml-2">Theme</span>}
+          </Button>
+          
           {!collapsed && (
-            <span className="text-lg font-bold text-foreground">StreamBias</span>
+            <Button
+              size="sm"
+              className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90"
+            >
+              <Zap className="h-4 w-4 mr-2" />
+              Upgrade
+            </Button>
           )}
         </div>
-      </div>
-
-      <Separator className="bg-sidebar-border" />
-
-      {/* Collapse Button */}
-      <div className="px-3 py-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={toggleCollapsed}
-          className="w-full justify-center hover:bg-sidebar-accent"
-        >
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-        </Button>
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 px-2 py-4 overflow-y-auto">
-        <NavSection title="MAIN" items={mainItems} />
-        <NavSection title="LEARNING" items={learningItems} />
-        <NavSection title="ACCOUNT" items={accountItems} />
-      </nav>
-
-      {/* Footer */}
-      <div className="p-3 border-t border-sidebar-border space-y-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={toggleTheme}
-          className={`w-full ${collapsed ? 'justify-center' : 'justify-start'} hover:bg-sidebar-accent`}
-        >
-          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          {!collapsed && <span className="ml-2">Theme</span>}
-        </Button>
-        
-        {!collapsed && (
-          <Button
-            size="sm"
-            className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90"
-          >
-            <Zap className="h-4 w-4 mr-2" />
-            Upgrade
-          </Button>
-        )}
       </div>
     </aside>
   );
