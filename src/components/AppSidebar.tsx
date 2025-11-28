@@ -57,13 +57,13 @@ export function AppSidebar() {
   const currentPath = location.pathname;
 
   const NavSection = ({ title, items }: { title: string; items: typeof mainItems }) => (
-    <div className="mb-6">
+    <div className="space-y-1">
       {!collapsed && (
-        <div className="px-3 mb-2">
-          <h2 className="text-xs font-semibold text-muted-foreground tracking-wider">{title}</h2>
+        <div className="px-3 pb-2">
+          <h2 className="text-[11px] font-semibold text-muted-foreground tracking-wider uppercase">{title}</h2>
         </div>
       )}
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         {items.map((item) => {
           const isActive = currentPath === item.url;
           const Icon = item.icon;
@@ -73,8 +73,8 @@ export function AppSidebar() {
               key={item.url}
               to={item.url}
               className={`
-                flex items-center px-3 py-2 rounded-lg transition-all relative
-                ${collapsed ? 'justify-center' : 'justify-start'}
+                flex items-center px-3 py-2.5 rounded-lg transition-all relative
+                ${collapsed ? 'justify-center mx-1' : 'justify-start'}
                 ${isActive 
                   ? 'bg-sidebar-accent text-sidebar-primary' 
                   : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
@@ -82,9 +82,9 @@ export function AppSidebar() {
               `}
             >
               {isActive && !collapsed && (
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full" />
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full" />
               )}
-              <Icon className={`${collapsed ? '' : 'mr-3'} h-5 w-5 flex-shrink-0`} />
+              <Icon className={`${collapsed ? '' : 'mr-3'} h-[18px] w-[18px] flex-shrink-0`} />
               {!collapsed && <span className="text-sm font-medium">{item.title}</span>}
             </NavLink>
           );
@@ -96,7 +96,7 @@ export function AppSidebar() {
   return (
     <aside 
       className={`
-        ${collapsed ? 'w-16' : 'w-64'} 
+        ${collapsed ? 'w-16' : 'w-60'} 
         bg-sidebar border-r border-sidebar-border 
         flex flex-col h-screen transition-all duration-300 relative
       `}
@@ -104,64 +104,64 @@ export function AppSidebar() {
       {/* TOP SECTION: Logo, Collapse Button, Main Nav */}
       <div className="flex-shrink-0">
         {/* Logo */}
-        <div className={`${collapsed ? 'p-2' : 'p-4'} flex items-center justify-between`}>
-          <div className={`flex items-center ${collapsed ? 'justify-center h-12 w-12' : 'gap-3'}`}>
-            <img src={sbLogo} alt="StreamBias" className={`${collapsed ? 'h-10' : 'h-12'} w-auto flex-shrink-0`} />
+        <div className={`${collapsed ? 'p-3' : 'px-4 py-5'} flex items-center justify-between`}>
+          <div className={`flex items-center ${collapsed ? 'justify-center h-10 w-10' : 'gap-3'}`}>
+            <img src={sbLogo} alt="StreamBias" className={`${collapsed ? 'h-8' : 'h-10'} w-auto flex-shrink-0`} />
             {!collapsed && (
               <span className="text-lg font-bold text-foreground">StreamBias</span>
             )}
           </div>
         </div>
 
-        <Separator className="bg-sidebar-border" />
+        <Separator className="bg-sidebar-border mx-3" />
 
         {/* Collapse Button */}
-        <div className="px-3 py-2">
+        <div className="px-3 py-3">
           <Button
             variant="ghost"
             size="sm"
             onClick={toggleCollapsed}
-            className="w-full justify-center hover:bg-sidebar-accent"
+            className={`w-full justify-center hover:bg-sidebar-accent h-9 ${collapsed ? 'px-0' : ''}`}
           >
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </Button>
         </div>
 
         {/* Main Navigation */}
-        <nav className="px-2 py-2">
+        <nav className="px-3 pt-1 pb-4">
           <NavSection title="MAIN" items={mainItems} />
         </nav>
       </div>
 
       {/* MIDDLE SECTION: Learning (centered vertically) */}
       <div className="flex-1 flex items-center">
-        <nav className="px-2 w-full">
+        <nav className="px-3 w-full">
           <NavSection title="LEARNING" items={learningItems} />
         </nav>
       </div>
 
       {/* BOTTOM SECTION: Account + Theme/Upgrade */}
       <div className="flex-shrink-0">
-        <nav className="px-2 py-2">
+        <nav className="px-3 py-4">
           <NavSection title="ACCOUNT" items={accountItems} />
         </nav>
 
         {/* Footer */}
-        <div className="p-3 border-t border-sidebar-border space-y-2">
+        <div className="px-3 py-4 border-t border-sidebar-border space-y-2">
           <Button
             variant="ghost"
             size="sm"
             onClick={toggleTheme}
-            className={`w-full ${collapsed ? 'justify-center' : 'justify-start'} hover:bg-sidebar-accent`}
+            className={`w-full h-9 ${collapsed ? 'justify-center px-0' : 'justify-start px-3'} hover:bg-sidebar-accent`}
           >
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            {!collapsed && <span className="ml-2">Theme</span>}
+            {!collapsed && <span className="ml-3 text-sm">Theme</span>}
           </Button>
           
           {!collapsed && (
             <Button
               size="sm"
-              className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90"
+              className="w-full h-9 bg-gradient-to-r from-primary to-accent hover:opacity-90"
             >
               <Zap className="h-4 w-4 mr-2" />
               Upgrade

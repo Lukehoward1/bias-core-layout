@@ -47,7 +47,7 @@ export default function Markets() {
       <div className="flex-1 overflow-y-auto bg-background p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <p className="text-muted-foreground">Real-time market bias and sentiment analysis</p>
+            <p className="text-sm text-muted-foreground">Real-time market bias and sentiment analysis</p>
             <Badge variant="outline" className="text-xs">Updated 2 mins ago</Badge>
           </div>
 
@@ -59,26 +59,26 @@ export default function Markets() {
                 variant={selectedType === type ? "default" : "outline"}
                 size="sm"
                 onClick={() => setSelectedType(type)}
-                className="rounded-full"
+                className="rounded-full h-8 px-4 text-xs"
               >
                 {type}
               </Button>
             ))}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filteredPairs.map((pair) => (
               <Card key={pair.name} className="hover:shadow-lg transition-shadow cursor-pointer">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between mb-2">
-                    <CardTitle className="text-xl">{pair.name}</CardTitle>
-                    <div className={`flex items-center gap-1 ${getBiasColor(pair.bias)}`}>
+                    <CardTitle className="text-lg">{pair.name}</CardTitle>
+                    <div className={`flex items-center gap-1.5 ${getBiasColor(pair.bias)}`}>
                       {getBiasIcon(pair.bias)}
                       <span className="text-sm font-medium">{pair.bias}</span>
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-2xl font-bold text-foreground">{pair.price}</span>
+                    <span className="text-xl font-bold text-foreground">{pair.price}</span>
                     <span className={`text-sm font-medium ${pair.change.startsWith('+') ? 'text-success' : 'text-destructive'}`}>
                       {pair.change}
                     </span>
@@ -86,40 +86,40 @@ export default function Markets() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="flex items-center justify-between p-2 bg-muted/30 rounded">
+                    <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
                       <span className="text-muted-foreground">Spread</span>
                       <span className="font-medium text-foreground">{pair.spread}</span>
                     </div>
-                    <div className="flex items-center justify-between p-2 bg-muted/30 rounded">
+                    <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
                       <span className="text-muted-foreground">Vol</span>
                       <span className="font-medium text-foreground">{pair.volume}</span>
                     </div>
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-muted-foreground">Confidence</span>
-                      <span className="text-sm font-medium text-foreground">{pair.confidence}%</span>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs text-muted-foreground">Confidence</span>
+                      <span className="text-xs font-medium text-foreground">{pair.confidence}%</span>
                     </div>
-                    <div className="w-full bg-muted rounded-full h-2">
+                    <div className="w-full bg-muted rounded-full h-1.5">
                       <div 
-                        className="bg-primary rounded-full h-2 transition-all" 
+                        className="bg-primary rounded-full h-1.5 transition-all" 
                         style={{ width: `${pair.confidence}%` }}
                       />
                     </div>
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-muted-foreground">Sentiment</span>
-                      <span className={`text-sm font-medium ${pair.sentiment > 0 ? 'text-success' : pair.sentiment < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs text-muted-foreground">Sentiment</span>
+                      <span className={`text-xs font-medium ${pair.sentiment > 0 ? 'text-success' : pair.sentiment < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
                         {pair.sentiment > 0 ? '+' : ''}{pair.sentiment}
                       </span>
                     </div>
-                    <div className="w-full bg-muted rounded-full h-2 relative">
-                      <div className="absolute left-1/2 top-0 w-0.5 h-2 bg-border" />
+                    <div className="w-full bg-muted rounded-full h-1.5 relative">
+                      <div className="absolute left-1/2 top-0 w-px h-1.5 bg-border" />
                       <div 
-                        className={`${pair.sentiment > 0 ? 'bg-success' : 'bg-destructive'} rounded-full h-2 transition-all`}
+                        className={`${pair.sentiment > 0 ? 'bg-success' : 'bg-destructive'} rounded-full h-1.5 transition-all`}
                         style={{ 
                           width: `${Math.abs(pair.sentiment) / 2}%`,
                           marginLeft: pair.sentiment > 0 ? '50%' : `${50 - Math.abs(pair.sentiment) / 2}%`
@@ -128,9 +128,9 @@ export default function Markets() {
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-border">
+                  <div className="pt-3 border-t border-border">
                     <div className="flex items-start gap-2">
-                      <Calendar className="h-3 w-3 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <Calendar className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
                       <p className="text-xs text-muted-foreground line-clamp-2">{pair.news}</p>
                     </div>
                   </div>
