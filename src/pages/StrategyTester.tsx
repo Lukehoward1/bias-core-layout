@@ -20,12 +20,12 @@ export default function StrategyTester() {
       <AppHeader title="Strategy Tester" />
       
       <div className="flex-1 overflow-y-auto bg-background p-6">
-        <div className="max-w-7xl mx-auto space-y-4">
+        <div className="max-w-7xl mx-auto space-y-6">
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-wrap items-center gap-4">
+            <CardContent className="py-4">
+              <div className="flex flex-wrap items-center gap-3">
                 <Select defaultValue="eurusd">
-                  <SelectTrigger className="w-[150px]">
+                  <SelectTrigger className="w-[140px] h-9">
                     <SelectValue placeholder="Pair" />
                   </SelectTrigger>
                   <SelectContent>
@@ -37,7 +37,7 @@ export default function StrategyTester() {
                 </Select>
 
                 <Select defaultValue="h1">
-                  <SelectTrigger className="w-[150px]">
+                  <SelectTrigger className="w-[140px] h-9">
                     <SelectValue placeholder="Timeframe" />
                   </SelectTrigger>
                   <SelectContent>
@@ -49,7 +49,7 @@ export default function StrategyTester() {
                 </Select>
 
                 <Select defaultValue="ma-cross">
-                  <SelectTrigger className="w-[200px]">
+                  <SelectTrigger className="w-[180px] h-9">
                     <SelectValue placeholder="Strategy" />
                   </SelectTrigger>
                   <SelectContent>
@@ -59,7 +59,7 @@ export default function StrategyTester() {
                   </SelectContent>
                 </Select>
 
-                <Button className="ml-auto">
+                <Button className="ml-auto h-9">
                   <Play className="h-4 w-4 mr-2" />
                   Run Backtest
                 </Button>
@@ -69,8 +69,8 @@ export default function StrategyTester() {
 
           <Card className="flex-1">
             <CardContent className="p-0">
-              <div className="h-[600px] bg-muted/30 flex items-center justify-center border-b border-border">
-                <p className="text-muted-foreground text-lg">TradingView-style chart placeholder</p>
+              <div className="h-[500px] bg-muted/30 flex items-center justify-center border-b border-border">
+                <p className="text-muted-foreground">TradingView-style chart placeholder</p>
               </div>
             </CardContent>
           </Card>
@@ -79,11 +79,12 @@ export default function StrategyTester() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Strategy Results</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">Last run: 2 mins ago</Badge>
+                <div className="flex items-center gap-3">
+                  <Badge variant="secondary" className="text-xs">Last run: 2 mins ago</Badge>
                   <Button 
                     size="sm" 
                     variant="outline"
+                    className="h-8"
                     onClick={() => navigate('/journal')}
                   >
                     <BarChart3 className="h-4 w-4 mr-2" />
@@ -96,19 +97,19 @@ export default function StrategyTester() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                 <div className="text-center">
                   <div className="text-sm text-muted-foreground mb-1">Net Profit</div>
-                  <div className="text-2xl font-bold text-success">+$12,450</div>
+                  <div className="text-xl font-bold text-success">+$12,450</div>
                 </div>
                 <div className="text-center">
                   <div className="text-sm text-muted-foreground mb-1">Total Trades</div>
-                  <div className="text-2xl font-bold text-foreground">184</div>
+                  <div className="text-xl font-bold text-foreground">184</div>
                 </div>
                 <div className="text-center">
                   <div className="text-sm text-muted-foreground mb-1">Percent Profitable</div>
-                  <div className="text-2xl font-bold text-foreground">64.7%</div>
+                  <div className="text-xl font-bold text-foreground">64.7%</div>
                 </div>
                 <div className="text-center">
                   <div className="text-sm text-muted-foreground mb-1">Profit Factor</div>
-                  <div className="text-2xl font-bold text-primary">1.85</div>
+                  <div className="text-xl font-bold text-primary">1.85</div>
                 </div>
               </div>
             </CardContent>

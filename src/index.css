@@ -4,6 +4,14 @@
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
+
+Spacing System:
+- page-padding: 1.5rem (24px) - Main content area padding
+- section-gap: 1.5rem (24px) - Vertical gap between major sections
+- card-padding: 1.5rem (24px) - Internal card padding
+- grid-gap-lg: 1.5rem (24px) - Large grid gaps
+- grid-gap-md: 1rem (16px) - Medium grid gaps
+- item-gap: 0.75rem (12px) - Gap between list items
 */
 
 @layer base {

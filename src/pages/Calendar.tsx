@@ -41,10 +41,10 @@ export default function Calendar() {
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Filters */}
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-wrap items-center gap-4">
+            <CardContent className="py-4">
+              <div className="flex flex-wrap items-center gap-3">
                 <Select defaultValue="today">
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-[160px] h-9">
                     <SelectValue placeholder="Date Range" />
                   </SelectTrigger>
                   <SelectContent>
@@ -55,7 +55,7 @@ export default function Calendar() {
                 </Select>
 
                 <Select defaultValue="all">
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-[160px] h-9">
                     <SelectValue placeholder="Impact" />
                   </SelectTrigger>
                   <SelectContent>
@@ -67,7 +67,7 @@ export default function Calendar() {
                 </Select>
 
                 <Select defaultValue="all">
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-[160px] h-9">
                     <SelectValue placeholder="Currency" />
                   </SelectTrigger>
                   <SelectContent>
@@ -79,7 +79,7 @@ export default function Calendar() {
                   </SelectContent>
                 </Select>
 
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" className="h-9">
                   <Filter className="h-4 w-4 mr-2" />
                   More Filters
                 </Button>
@@ -116,23 +116,23 @@ export default function Calendar() {
               <CardTitle>All Events</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto -mx-5">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Time</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Currency</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Event</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Previous</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Forecast</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Actual</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Impact</th>
+                      <th className="text-left py-3 px-5 text-xs font-medium text-muted-foreground">Time</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Currency</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Event</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Previous</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Forecast</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Actual</th>
+                      <th className="text-left py-3 px-5 text-xs font-medium text-muted-foreground">Impact</th>
                     </tr>
                   </thead>
                   <tbody>
                     {events.map((event, i) => (
                       <tr key={i} className="border-b border-border hover:bg-muted/50 transition-colors">
-                        <td className="py-3 px-4 text-sm text-foreground">{event.time}</td>
+                        <td className="py-3 px-5 text-sm text-foreground">{event.time}</td>
                         <td className="py-3 px-4">
                           <Badge variant="outline" className="text-xs">{event.currency}</Badge>
                         </td>
@@ -140,7 +140,7 @@ export default function Calendar() {
                         <td className="py-3 px-4 text-sm text-muted-foreground">{event.previous}</td>
                         <td className="py-3 px-4 text-sm text-muted-foreground">{event.forecast}</td>
                         <td className="py-3 px-4 text-sm text-muted-foreground">{event.actual}</td>
-                        <td className="py-3 px-4">
+                        <td className="py-3 px-5">
                           <Badge variant={getImpactColor(event.impact)} className="text-xs">
                             {event.impact.toUpperCase()}
                           </Badge>

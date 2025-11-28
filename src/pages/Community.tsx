@@ -26,23 +26,23 @@ export default function Community() {
                 {ideas.map((idea, i) => (
                   <Card key={i} className="hover:shadow-lg transition-all cursor-pointer group">
                     <CardHeader className="pb-3">
-                      <div className="h-32 bg-muted/50 rounded-lg mb-3 flex items-center justify-center border border-border group-hover:border-primary/50 transition-colors">
-                        <TrendingUp className="h-12 w-12 text-muted-foreground" />
+                      <div className="h-28 bg-muted/50 rounded-lg mb-3 flex items-center justify-center border border-border group-hover:border-primary/50 transition-colors">
+                        <TrendingUp className="h-10 w-10 text-muted-foreground" />
                       </div>
-                      <CardTitle className="text-base line-clamp-2">{idea.title}</CardTitle>
+                      <CardTitle className="text-sm line-clamp-2">{idea.title}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                      <p className="text-sm text-muted-foreground">by {idea.author}</p>
+                      <p className="text-xs text-muted-foreground">by {idea.author}</p>
                       
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-1.5">
                         {idea.tags.map((tag) => (
-                          <Badge key={tag} variant="secondary" className="text-xs">
+                          <Badge key={tag} variant="secondary" className="text-xs px-2 py-0.5">
                             {tag}
                           </Badge>
                         ))}
                       </div>
 
-                      <div className="flex items-center justify-between pt-2 border-t border-border text-sm text-muted-foreground">
+                      <div className="flex items-center justify-between pt-3 border-t border-border text-xs text-muted-foreground">
                         <div className="flex items-center gap-1">
                           <Heart className="h-3 w-3" />
                           <span>{idea.likes}</span>
@@ -65,13 +65,13 @@ export default function Community() {
             <div className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Trending Ideas</CardTitle>
+                  <CardTitle>Trending Ideas</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {['EURUSD Breakout Setup', 'Gold at Key Level', 'USD Strength Analysis'].map((title, i) => (
                     <div key={i} className="p-3 bg-muted/50 rounded-lg hover:bg-muted cursor-pointer transition-colors">
                       <div className="text-sm font-medium text-foreground mb-1">{title}</div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <Heart className="h-3 w-3" />
                         <span>{150 - i * 20}</span>
                       </div>
@@ -82,18 +82,18 @@ export default function Community() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Featured Traders</CardTitle>
+                  <CardTitle>Featured Traders</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {['TradePro', 'ForexMaster', 'ChartWizard'].map((trader, i) => (
                     <div key={i} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2.5">
                         <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
                           {trader.charAt(0)}
                         </div>
                         <span className="text-sm font-medium text-foreground">{trader}</span>
                       </div>
-                      <Button variant="outline" size="sm">Follow</Button>
+                      <Button variant="outline" size="sm" className="h-7 text-xs">Follow</Button>
                     </div>
                   ))}
                 </CardContent>
@@ -101,7 +101,7 @@ export default function Community() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Community Guidelines</CardTitle>
+                  <CardTitle>Community Guidelines</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-2 text-sm text-muted-foreground">

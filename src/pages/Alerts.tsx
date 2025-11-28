@@ -41,8 +41,8 @@ export default function Alerts() {
                   {news.map((item, i) => (
                     <div key={i} className="p-4 bg-muted/50 rounded-lg border border-border hover:bg-muted transition-colors cursor-pointer">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-foreground mb-2">{item.title}</h3>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-sm text-foreground mb-2">{item.title}</h3>
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className="text-xs">{item.currency}</Badge>
                             <Badge 
@@ -66,18 +66,18 @@ export default function Alerts() {
                 <CardTitle>Session Timers</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {sessions.map((session) => (
                     <div key={session.name} className="p-4 bg-muted/50 rounded-lg border border-border">
                       <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-semibold text-foreground">{session.name}</h3>
+                        <h3 className="font-medium text-sm text-foreground">{session.name}</h3>
                         <Badge variant={session.status === 'open' ? 'default' : 'secondary'} className="text-xs">
                           {session.status}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        <span>{session.time}</span>
+                        <Clock className="h-3.5 w-3.5" />
+                        <span className="text-xs">{session.time}</span>
                       </div>
                     </div>
                   ))}
@@ -87,30 +87,30 @@ export default function Alerts() {
           </div>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle>My Alerts & Timers</CardTitle>
-              <Button size="sm">
+              <Button size="sm" className="h-8">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Alert
               </Button>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto -mx-5">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Type</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">What</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">When</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Delivery</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Actions</th>
+                      <th className="text-left py-3 px-5 text-xs font-medium text-muted-foreground">Type</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">What</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">When</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Delivery</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Status</th>
+                      <th className="text-left py-3 px-5 text-xs font-medium text-muted-foreground">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {alerts.map((alert, i) => (
                       <tr key={i} className="border-b border-border hover:bg-muted/50 transition-colors">
-                        <td className="py-3 px-4 text-sm text-foreground">{alert.type}</td>
+                        <td className="py-3 px-5 text-sm text-foreground">{alert.type}</td>
                         <td className="py-3 px-4 text-sm text-foreground font-medium">{alert.what}</td>
                         <td className="py-3 px-4 text-sm text-muted-foreground">{alert.when}</td>
                         <td className="py-3 px-4">
@@ -121,8 +121,8 @@ export default function Alerts() {
                             {alert.status}
                           </Badge>
                         </td>
-                        <td className="py-3 px-4">
-                          <Button variant="ghost" size="sm">Edit</Button>
+                        <td className="py-3 px-5">
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">Edit</Button>
                         </td>
                       </tr>
                     ))}

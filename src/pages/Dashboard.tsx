@@ -18,12 +18,12 @@ export default function Dashboard() {
       <div className="flex-1 overflow-y-auto bg-background p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Welcome Header */}
-          <h1 className="text-4xl font-bold text-foreground">Welcome, Trader</h1>
+          <h1 className="text-3xl font-bold text-foreground">Welcome, Trader</h1>
           
           {/* Key Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Today's Bias</CardTitle>
                 <TrendingUp className="h-4 w-4 text-success" />
               </CardHeader>
@@ -34,7 +34,7 @@ export default function Dashboard() {
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Active Trades</CardTitle>
                 <Activity className="h-4 w-4 text-primary" />
               </CardHeader>
@@ -45,7 +45,7 @@ export default function Dashboard() {
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Next Session</CardTitle>
                 <Clock className="h-4 w-4 text-accent" />
               </CardHeader>
@@ -56,7 +56,7 @@ export default function Dashboard() {
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">High Impact Events</CardTitle>
                 <CalendarIcon className="h-4 w-4 text-destructive" />
               </CardHeader>
@@ -74,7 +74,7 @@ export default function Dashboard() {
                 <CardTitle>Today's Bias Snapshot</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {['EURUSD', 'GBPUSD', 'USDJPY'].map((pair) => (
                     <div key={pair} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                       <div className="flex items-center gap-3">
@@ -124,7 +124,7 @@ export default function Dashboard() {
                     { time: '14:00', event: 'GBP Interest Rate', impact: 'high' },
                   ].map((event, i) => (
                     <div key={i} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                      <div className="text-sm font-medium text-muted-foreground min-w-[50px]">{event.time}</div>
+                      <div className="text-sm font-medium text-muted-foreground min-w-[48px]">{event.time}</div>
                       <div className="flex-1">
                         <div className="text-sm font-medium text-foreground">{event.event}</div>
                         <div className={`text-xs mt-1 ${event.impact === 'high' ? 'text-destructive' : 'text-accent'}`}>
