@@ -28,13 +28,13 @@ export default function Journal() {
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           <Tabs defaultValue="journal" className="w-full">
-            <TabsList className="grid w-full max-w-xs grid-cols-2 h-9">
+            <TabsList className="grid w-full max-w-xs grid-cols-2">
               <TabsTrigger value="journal" className="text-sm">Journal</TabsTrigger>
               <TabsTrigger value="reports" className="text-sm">Reports</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="journal" className="space-y-6 mt-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <TabsContent value="journal" className="space-y-6 mt-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Total Trades</CardTitle>
@@ -148,7 +148,7 @@ export default function Journal() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="reports" className="space-y-6 mt-6">
+            <TabsContent value="reports" className="space-y-6 mt-5">
               <div className="flex flex-wrap items-center gap-3">
                 <Select defaultValue="performance">
                   <SelectTrigger className="w-[180px] h-9">
@@ -174,7 +174,7 @@ export default function Journal() {
                 </Select>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>

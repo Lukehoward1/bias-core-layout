@@ -66,7 +66,7 @@ export default function Markets() {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {filteredPairs.map((pair) => (
               <Card key={pair.name} className="hover:shadow-lg transition-shadow cursor-pointer">
                 <CardHeader className="pb-3">

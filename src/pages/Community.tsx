@@ -20,9 +20,9 @@ export default function Community() {
       
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
             <div className="lg:col-span-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                 {ideas.map((idea, i) => (
                   <Card key={i} className="hover:shadow-lg transition-all cursor-pointer group">
                     <CardHeader className="pb-3">
