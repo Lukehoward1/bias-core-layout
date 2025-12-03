@@ -13,10 +13,10 @@ import {
 
 export default function RiskTools() {
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col min-h-full bg-background">
       <AppHeader title="Risk Tools" />
       
-      <div className="flex-1 overflow-y-auto bg-background p-6">
+      <div className="flex-1 p-6">
         <div className="max-w-5xl mx-auto space-y-6">
           <Card>
             <CardHeader>
