@@ -87,8 +87,21 @@ export default function Billing() {
     <div className="flex flex-col h-full">
       <AppHeader title="Subscriptions" />
       <div className="flex-1 overflow-y-auto bg-background">
+        {/* Launch Offer Banner - Top of Page */}
+        <section className="px-6 pt-6 pb-4">
+          <div className="max-w-5xl mx-auto">
+            <div className="flex items-center justify-center gap-2.5 rounded-lg border border-primary/20 bg-primary/5 px-5 py-3 text-center">
+              <Flame className="h-4 w-4 shrink-0 text-orange-500" />
+              <p className="text-sm text-foreground">
+                <span className="font-semibold">Launch Offer:</span>{" "}
+                <span className="text-muted-foreground">First 100 users get Premium for £29.99/month equivalent — billed annually (£359.88/year). Lifetime locked-in pricing.</span>
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* Hero Section */}
-        <section className="px-6 py-10 md:py-12">
+        <section className="px-6 py-8 md:py-10">
           <div className="max-w-5xl mx-auto text-center">
             <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
               Subscriptions & Pricing
@@ -110,19 +123,6 @@ export default function Billing() {
               <Button size="sm" className="w-full sm:w-auto">
                 Join Waiting List
               </Button>
-            </div>
-          </div>
-        </section>
-
-        {/* Launch Offer Banner */}
-        <section className="px-6 pb-8">
-          <div className="max-w-5xl mx-auto">
-            <div className="flex items-center justify-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-2.5 text-center">
-              <Flame className="h-4 w-4 shrink-0 text-orange-500" />
-              <p className="text-sm text-foreground">
-                <span className="font-semibold">Launch Offer:</span>{" "}
-                <span className="text-muted-foreground">First 100 users get Premium for £29.99/month equivalent — billed annually (£359.88/year). Lifetime locked-in pricing.</span>
-              </p>
             </div>
           </div>
         </section>
