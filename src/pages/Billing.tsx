@@ -84,9 +84,9 @@ export default function Billing() {
   ];
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col min-h-full bg-background">
       <AppHeader title="Subscriptions" />
-      <div className="flex-1 overflow-y-auto bg-background">
+      <div className="flex-1">
         {/* Launch Offer Banner - Top of Page */}
         <section className="px-6 pt-6 pb-4">
           <div className="max-w-5xl mx-auto">

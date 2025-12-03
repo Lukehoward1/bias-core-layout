@@ -10,7 +10,7 @@ function AppLayoutContent() {
       <AppSidebar />
       {/* Spacer div to account for fixed sidebar */}
       <div className={`${collapsed ? 'w-16' : 'w-60'} flex-shrink-0 transition-all duration-300`} />
-      <main className="flex-1 flex flex-col min-h-screen overflow-hidden">
+      <main className="flex-1 flex flex-col h-screen overflow-y-auto">
         <Outlet />
       </main>
     </div>

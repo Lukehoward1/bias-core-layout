@@ -41,10 +41,10 @@ export default function Markets() {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col min-h-full bg-background">
       <AppHeader title="Markets" />
       
-      <div className="flex-1 overflow-y-auto bg-background p-6">
+      <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">Real-time market bias and sentiment analysis</p>
