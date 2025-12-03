@@ -15,7 +15,7 @@ import StrategyTester from "./pages/StrategyTester";
 import Community from "./pages/Community";
 import Education from "./pages/Education";
 import Webinars from "./pages/Webinars";
-import Articles from "./pages/Articles";
+
 import BrokerConnections from "./pages/BrokerConnections";
 import Settings from "./pages/Settings";
 import Billing from "./pages/Billing";
@@ -43,7 +43,7 @@ const App = () => (
               <Route path="/community" element={<Community />} />
               <Route path="/education" element={<Education />} />
               <Route path="/webinars" element={<Webinars />} />
-              <Route path="/articles" element={<Articles />} />
+              
               <Route path="/broker-connections" element={<BrokerConnections />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/billing" element={<Billing />} />
