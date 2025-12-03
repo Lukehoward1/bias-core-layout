@@ -19,6 +19,7 @@ import Articles from "./pages/Articles";
 import BrokerConnections from "./pages/BrokerConnections";
 import Settings from "./pages/Settings";
 import Billing from "./pages/Billing";
+import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -47,6 +48,7 @@ const App = () => (
               <Route path="/settings" element={<Settings />} />
               <Route path="/billing" element={<Billing />} />
             </Route>
+            <Route path="/pricing" element={<Pricing />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
