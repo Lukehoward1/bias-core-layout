@@ -93,7 +93,7 @@ export default function Calendar() {
               <CardTitle>Key Events Today</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 {keyEvents.map((event, i) => (
                   <div key={i} className="p-4 bg-muted/50 rounded-lg border border-border">
                     <div className="flex items-center justify-between mb-2">

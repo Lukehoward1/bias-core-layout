@@ -21,7 +21,7 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold text-foreground">Welcome, Trader</h1>
           
           {/* Key Metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Today's Bias</CardTitle>
@@ -68,7 +68,7 @@ export default function Dashboard() {
           </div>
 
           {/* Main Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle>Today's Bias Snapshot</CardTitle>
@@ -111,7 +111,7 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <Card>
               <CardHeader>
                 <CardTitle>Upcoming Events</CardTitle>

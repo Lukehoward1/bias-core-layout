@@ -31,7 +31,7 @@ export default function Alerts() {
       
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle>Top News</CardTitle>

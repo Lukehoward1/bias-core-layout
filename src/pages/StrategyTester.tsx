@@ -94,7 +94,7 @@ export default function StrategyTester() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
                 <div className="text-center">
                   <div className="text-sm text-muted-foreground mb-1">Net Profit</div>
                   <div className="text-xl font-bold text-success">+$12,450</div>
