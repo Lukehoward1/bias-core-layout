@@ -47,7 +47,7 @@ const learningItems = [
 const accountItems = [
   { title: "Broker Connections", url: "/broker-connections", icon: Link2 },
   { title: "Settings", url: "/settings", icon: Settings },
-  { title: "Billing", url: "/billing", icon: CreditCard },
+  { title: "Subscriptions", url: "/billing", icon: CreditCard },
 ];
 
 export function AppSidebar() {
