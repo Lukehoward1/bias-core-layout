@@ -8,8 +8,7 @@ import {
   Beaker, 
   Users, 
   GraduationCap, 
-  Video, 
-  FileText,
+  Video,
   Link2, 
   Settings, 
   CreditCard,
@@ -41,7 +40,6 @@ const mainItems = [
 const learningItems = [
   { title: "Education", url: "/education", icon: GraduationCap },
   { title: "Webinars", url: "/webinars", icon: Video },
-  { title: "Articles/Guides", url: "/articles", icon: FileText },
 ];
 
 const accountItems = [
