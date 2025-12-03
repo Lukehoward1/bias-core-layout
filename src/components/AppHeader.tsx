@@ -17,7 +17,7 @@ interface AppHeaderProps {
 
 export function AppHeader({ title }: AppHeaderProps) {
   return (
-    <header className="h-14 border-b border-border bg-card flex items-center justify-between px-6 gap-6 shrink-0">
+    <header className="h-14 border-b border-border bg-card flex items-center justify-between px-6 gap-6 shrink-0 sticky top-0 z-30">
       <h1 className="text-xl font-semibold text-foreground shrink-0">{title}</h1>
       
       {/* Global Smart Search */}
