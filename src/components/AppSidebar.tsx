@@ -95,7 +95,7 @@ export function AppSidebar() {
     <aside 
       className={`
         ${collapsed ? 'w-16' : 'w-60'} 
-        bg-sidebar border-r border-sidebar-border 
+        bg-sidebar
         flex flex-col h-screen transition-all duration-300
         fixed left-0 top-0 z-40 overflow-y-auto
       `}
