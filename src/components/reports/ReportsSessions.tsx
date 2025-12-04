@@ -1,0 +1,205 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { TrendingUp, TrendingDown, Target, AlertCircle } from "lucide-react";
+
+interface Trade {
+  id: string;
+  date: string;
+  pair: string;
+  type: 'Long' | 'Short';
+  entry: number;
+  exit: number;
+  lots: number;
+  pnl: number;
+  status: string;
+  notes?: string;
+  rating?: number;
+}
+
+interface ReportsSessionsProps {
+  trades: Trade[];
+}
+
+export function ReportsSessions({ trades }: ReportsSessionsProps) {
+  // Session performance data (placeholder - would need trade timestamps)
+  const sessionData = [
+    { 
+      name: 'London', 
+      winRate: 71, 
+      pnl: 8450, 
+      avgRR: 2.3, 
+      trades: 45,
+      hours: '08:00 - 16:00 GMT'
+    },
+    { 
+      name: 'New York', 
+      winRate: 65, 
+      pnl: 5200, 
+      avgRR: 1.9, 
+      trades: 38,
+      hours: '13:00 - 21:00 GMT'
+    },
+    { 
+      name: 'Asian', 
+      winRate: 58, 
+      pnl: 1850, 
+      avgRR: 1.5, 
+      trades: 22,
+      hours: '00:00 - 08:00 GMT'
+    },
+  ];
+
+  const strongest = sessionData.reduce((best, s) => 
+    s.pnl > best.pnl ? s : best, sessionData[0]);
+  const weakest = sessionData.reduce((worst, s) => 
+    s.pnl < worst.pnl ? s : worst, sessionData[0]);
+
+  const chartData = sessionData.map(s => ({
+    name: s.name,
+    winRate: s.winRate,
+    pnl: s.pnl,
+    avgRR: s.avgRR * 100, // scale for visibility
+  }));
+
+  return (
+    <div className="space-y-6">
+      {/* Session Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {sessionData.map((session) => (
+          <Card 
+            key={session.name}
+            className={session.name === strongest.name ? 'border-success/50 bg-success/5' : ''}
+          >
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">{session.name} Session</CardTitle>
+                {session.name === strongest.name && (
+                  <Badge className="bg-success/20 text-success text-xs">Strongest</Badge>
+                )}
+                {session.name === weakest.name && (
+                  <Badge variant="destructive" className="text-xs">Weakest</Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">{session.hours}</p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Win Rate</p>
+                  <p className="text-lg font-bold text-foreground">{session.winRate}%</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Total P&L</p>
+                  <p className={`text-lg font-bold ${session.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {session.pnl >= 0 ? '+' : ''}£{session.pnl.toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Avg R:R</p>
+                  <p className="text-lg font-bold text-foreground">{session.avgRR}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Trades</p>
+                  <p className="text-lg font-bold text-foreground">{session.trades}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Comparison Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Session Performance Comparison</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--card))', 
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                  formatter={(value: number, name: string) => {
+                    if (name === 'winRate') return [`${value}%`, 'Win Rate'];
+                    if (name === 'pnl') return [`£${value.toLocaleString()}`, 'P&L'];
+                    if (name === 'avgRR') return [`${(value / 100).toFixed(1)}`, 'Avg R:R'];
+                    return [value, name];
+                  }}
+                />
+                <Bar dataKey="winRate" name="winRate" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* P&L by Session */}
+      <Card>
+        <CardHeader>
+          <CardTitle>P&L by Session</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} layout="vertical">
+                <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={70} />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'hsl(var(--card))', 
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px'
+                  }}
+                  formatter={(value: number) => [`£${value.toLocaleString()}`, 'P&L']}
+                />
+                <Bar dataKey="pnl" fill="hsl(var(--success))" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Recommendations */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="border-success/30 bg-success/5">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-success" />
+              <CardTitle className="text-base">Recommended to Trade More</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-foreground font-medium">{strongest.name} Session</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Your highest win rate ({strongest.winRate}%) and best P&L (£{strongest.pnl.toLocaleString()}).
+              Consider increasing position sizes during this session.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              <CardTitle className="text-base">Consider Reducing Exposure</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-foreground font-medium">{weakest.name} Session</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Lowest win rate ({weakest.winRate}%) and P&L (£{weakest.pnl.toLocaleString()}).
+              Review your setups for this session or reduce size.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
