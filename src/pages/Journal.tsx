@@ -20,8 +20,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Star } from "lucide-react";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, addMonths, subMonths } from "date-fns";
+import { Plus, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Star, Download } from "lucide-react";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, addMonths, subMonths, isWithinInterval, parseISO } from "date-fns";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { ReportsOverview } from "@/components/reports/ReportsOverview";
 import { ReportsPerformance } from "@/components/reports/ReportsPerformance";
@@ -31,6 +31,8 @@ import { ReportsSetupQuality } from "@/components/reports/ReportsSetupQuality";
 import { ReportsPsychology } from "@/components/reports/ReportsPsychology";
 import { ReportsRiskManagement } from "@/components/reports/ReportsRiskManagement";
 import { ReportsTradeLog } from "@/components/reports/ReportsTradeLog";
+import { ReportDateRangeFilter, DateRange } from "@/components/reports/ReportDateRangeFilter";
+import { usePdfExport } from "@/hooks/use-pdf-export";
 
 interface Trade {
   id: string;
@@ -173,6 +175,31 @@ export default function Journal() {
   const [trades, setTrades] = useState<Trade[]>(initialTrades);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [noteValue, setNoteValue] = useState('');
+  const { exportAllReports } = usePdfExport();
+
+  // Date range filter for Reports
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
+    label: "This Month"
+  });
+
+  // Calculate first and last trade dates
+  const { firstTradeDate, lastTradeDate } = useMemo(() => {
+    if (trades.length === 0) return { firstTradeDate: undefined, lastTradeDate: undefined };
+    const sortedDates = trades.map(t => parseISO(t.date)).sort((a, b) => a.getTime() - b.getTime());
+    return { firstTradeDate: sortedDates[0], lastTradeDate: sortedDates[sortedDates.length - 1] };
+  }, [trades]);
+
+  // Filter trades by date range for reports
+  const filteredTrades = useMemo(() => {
+    return trades.filter(t => {
+      const tradeDate = parseISO(t.date);
+      return isWithinInterval(tradeDate, { start: dateRange.from, end: dateRange.to });
+    });
+  }, [trades, dateRange]);
+
+  const dateRangeLabel = `${format(dateRange.from, 'MMM d, yyyy')} - ${format(dateRange.to, 'MMM d, yyyy')}`;
 
   // New trade form state
   const [newTrade, setNewTrade] = useState({
@@ -182,6 +209,21 @@ export default function Journal() {
     exit: '',
     lots: '',
   });
+
+  const handleExportAllReports = () => {
+    exportAllReports(
+      [
+        { id: 'reports-overview', title: 'Overview' },
+        { id: 'reports-performance', title: 'Performance' },
+        { id: 'reports-sessions', title: 'Sessions' },
+        { id: 'reports-assets', title: 'Assets' },
+        { id: 'reports-setup', title: 'Setup Quality' },
+        { id: 'reports-psychology', title: 'Psychology' },
+        { id: 'reports-risk', title: 'Risk Management' },
+      ],
+      { filename: `StreamBias-Full-Report-${format(new Date(), 'yyyy-MM-dd')}`, dateRange: dateRangeLabel }
+    );
+  };
 
   // Helper to get daily summary
   function getDailySummary(date: Date) {
@@ -583,40 +625,61 @@ export default function Journal() {
 
             <TabsContent value="reports" className="space-y-6 mt-5">
               <Tabs defaultValue="overview" className="w-full">
-                <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 h-auto gap-1 p-1">
-                  <TabsTrigger value="overview" className="text-xs px-2 py-1.5">Overview</TabsTrigger>
-                  <TabsTrigger value="performance" className="text-xs px-2 py-1.5">Performance</TabsTrigger>
-                  <TabsTrigger value="sessions" className="text-xs px-2 py-1.5">Sessions</TabsTrigger>
-                  <TabsTrigger value="assets" className="text-xs px-2 py-1.5">Assets</TabsTrigger>
-                  <TabsTrigger value="setup" className="text-xs px-2 py-1.5">Setup Quality</TabsTrigger>
-                  <TabsTrigger value="psychology" className="text-xs px-2 py-1.5">Psychology</TabsTrigger>
-                  <TabsTrigger value="risk" className="text-xs px-2 py-1.5">Risk Mgmt</TabsTrigger>
-                  <TabsTrigger value="tradelog" className="text-xs px-2 py-1.5">Trade Log</TabsTrigger>
-                </TabsList>
+                {/* Header with tabs and date range filter */}
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
+                  <TabsList className="grid w-full lg:w-auto grid-cols-4 lg:grid-cols-8 h-auto gap-1 p-1">
+                    <TabsTrigger value="overview" className="text-xs px-2 py-1.5">Overview</TabsTrigger>
+                    <TabsTrigger value="performance" className="text-xs px-2 py-1.5">Performance</TabsTrigger>
+                    <TabsTrigger value="sessions" className="text-xs px-2 py-1.5">Sessions</TabsTrigger>
+                    <TabsTrigger value="assets" className="text-xs px-2 py-1.5">Assets</TabsTrigger>
+                    <TabsTrigger value="setup" className="text-xs px-2 py-1.5">Setup Quality</TabsTrigger>
+                    <TabsTrigger value="psychology" className="text-xs px-2 py-1.5">Psychology</TabsTrigger>
+                    <TabsTrigger value="risk" className="text-xs px-2 py-1.5">Risk Mgmt</TabsTrigger>
+                    <TabsTrigger value="tradelog" className="text-xs px-2 py-1.5">Trade Log</TabsTrigger>
+                  </TabsList>
+                  
+                  <div className="flex items-center gap-3">
+                    <ReportDateRangeFilter 
+                      dateRange={dateRange}
+                      onDateRangeChange={setDateRange}
+                      firstTradeDate={firstTradeDate}
+                      lastTradeDate={lastTradeDate}
+                    />
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-8 gap-1.5 text-xs"
+                      onClick={handleExportAllReports}
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Export All
+                    </Button>
+                  </div>
+                </div>
 
                 <TabsContent value="overview" className="mt-5">
-                  <ReportsOverview trades={trades} />
+                  <ReportsOverview trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
                 </TabsContent>
                 <TabsContent value="performance" className="mt-5">
-                  <ReportsPerformance trades={trades} />
+                  <ReportsPerformance trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
                 </TabsContent>
                 <TabsContent value="sessions" className="mt-5">
-                  <ReportsSessions trades={trades} />
+                  <ReportsSessions trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
                 </TabsContent>
                 <TabsContent value="assets" className="mt-5">
-                  <ReportsAssets trades={trades} />
+                  <ReportsAssets trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
                 </TabsContent>
                 <TabsContent value="setup" className="mt-5">
-                  <ReportsSetupQuality trades={trades} />
+                  <ReportsSetupQuality trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
                 </TabsContent>
                 <TabsContent value="psychology" className="mt-5">
-                  <ReportsPsychology trades={trades} />
+                  <ReportsPsychology trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
                 </TabsContent>
                 <TabsContent value="risk" className="mt-5">
-                  <ReportsRiskManagement trades={trades} />
+                  <ReportsRiskManagement trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
                 </TabsContent>
                 <TabsContent value="tradelog" className="mt-5">
-                  <ReportsTradeLog trades={trades} />
+                  <ReportsTradeLog trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
                 </TabsContent>
               </Tabs>
             </TabsContent>

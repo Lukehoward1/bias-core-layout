@@ -1,6 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Brain, AlertTriangle, ThumbsUp, Target, TrendingUp, Heart } from "lucide-react";
+import { PdfExportButton } from "./PdfExportButton";
+import { usePdfExport } from "@/hooks/use-pdf-export";
 
 interface Trade {
   id: string;
@@ -18,12 +20,22 @@ interface Trade {
 
 interface ReportsPsychologyProps {
   trades: Trade[];
+  dateRangeLabel: string;
 }
 
 const POSITIVE_KEYWORDS = ['patient', 'perfect', 'confident', 'disciplined', 'calm', 'good setup', 'followed plan', 'great'];
 const NEGATIVE_KEYWORDS = ['fear', 'fomo', 'hesitation', 'revenge', 'late entry', 'early exit', 'overtrading', 'impatient', 'greedy', 'emotional'];
 
-export function ReportsPsychology({ trades }: ReportsPsychologyProps) {
+export function ReportsPsychology({ trades, dateRangeLabel }: ReportsPsychologyProps) {
+  const { exportToPdf } = usePdfExport();
+
+  const handleExport = () => {
+    exportToPdf('reports-psychology', {
+      filename: `StreamBias-Psychology-${new Date().toISOString().split('T')[0]}`,
+      title: 'Psychology Report',
+      dateRange: dateRangeLabel,
+    });
+  };
   // Sentiment analysis
   const tradesWithNotes = trades.filter(t => t.notes && t.notes.trim().length > 0);
   
@@ -81,7 +93,12 @@ export function ReportsPsychology({ trades }: ReportsPsychologyProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div id="reports-psychology" className="space-y-6">
+      {/* Header with export */}
+      <div className="flex items-center justify-end" data-pdf-exclude>
+        <PdfExportButton onClick={handleExport} />
+      </div>
+
       {/* Sentiment Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>

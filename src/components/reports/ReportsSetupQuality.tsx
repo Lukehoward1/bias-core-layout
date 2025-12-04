@@ -2,6 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import { Star, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
+import { PdfExportButton } from "./PdfExportButton";
+import { usePdfExport } from "@/hooks/use-pdf-export";
 
 interface Trade {
   id: string;
@@ -19,11 +21,21 @@ interface Trade {
 
 interface ReportsSetupQualityProps {
   trades: Trade[];
+  dateRangeLabel: string;
 }
 
 const KEYWORDS = ['late entry', 'fear', 'hesitation', 'fomo', 'missed level', 'early exit', 'overtrading', 'revenge', 'perfect', 'patient'];
 
-export function ReportsSetupQuality({ trades }: ReportsSetupQualityProps) {
+export function ReportsSetupQuality({ trades, dateRangeLabel }: ReportsSetupQualityProps) {
+  const { exportToPdf } = usePdfExport();
+
+  const handleExport = () => {
+    exportToPdf('reports-setup', {
+      filename: `StreamBias-SetupQuality-${new Date().toISOString().split('T')[0]}`,
+      title: 'Setup Quality Report',
+      dateRange: dateRangeLabel,
+    });
+  };
   // Group by rating
   const ratingGroups = [1, 2, 3, 4, 5].map(rating => {
     const ratedTrades = trades.filter(t => t.rating === rating);
@@ -80,7 +92,12 @@ export function ReportsSetupQuality({ trades }: ReportsSetupQualityProps) {
     }, [] as { trade: number; cumPnl: number; date: string }[]);
 
   return (
-    <div className="space-y-6">
+    <div id="reports-setup" className="space-y-6">
+      {/* Header with export */}
+      <div className="flex items-center justify-end" data-pdf-exclude>
+        <PdfExportButton onClick={handleExport} />
+      </div>
+
       {/* Best & Worst Setup */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="border-success/30 bg-success/5">

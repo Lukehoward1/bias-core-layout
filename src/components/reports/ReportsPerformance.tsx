@@ -1,6 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { format, parseISO, getDay } from "date-fns";
+import { PdfExportButton } from "./PdfExportButton";
+import { usePdfExport } from "@/hooks/use-pdf-export";
 
 interface Trade {
   id: string;
@@ -18,12 +20,22 @@ interface Trade {
 
 interface ReportsPerformanceProps {
   trades: Trade[];
+  dateRangeLabel: string;
 }
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--success))', 'hsl(var(--destructive))', 'hsl(var(--accent))'];
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export function ReportsPerformance({ trades }: ReportsPerformanceProps) {
+export function ReportsPerformance({ trades, dateRangeLabel }: ReportsPerformanceProps) {
+  const { exportToPdf } = usePdfExport();
+
+  const handleExport = () => {
+    exportToPdf('reports-performance', {
+      filename: `StreamBias-Performance-${new Date().toISOString().split('T')[0]}`,
+      title: 'Performance Report',
+      dateRange: dateRangeLabel,
+    });
+  };
   // Win rate by day of week
   const dayStats = DAYS.map((day, idx) => {
     const dayTrades = trades.filter(t => getDay(parseISO(t.date)) === idx);
@@ -73,11 +85,14 @@ export function ReportsPerformance({ trades }: ReportsPerformanceProps) {
   const monthlyHeatmap = Object.values(monthlyData);
 
   return (
-    <div className="space-y-6">
+    <div id="reports-performance" className="space-y-6">
       {/* Win Rate by Day */}
       <Card>
         <CardHeader>
-          <CardTitle>Win Rate by Day of Week</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Win Rate by Day of Week</CardTitle>
+            <PdfExportButton onClick={handleExport} data-pdf-exclude />
+          </div>
         </CardHeader>
         <CardContent>
           <div className="h-64">
