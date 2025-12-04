@@ -17,40 +17,92 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, TrendingUp, TrendingDown, ChevronLeft, ChevronRight } from "lucide-react";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Star } from "lucide-react";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, addMonths, subMonths } from "date-fns";
 
-const trades = [
-  { date: '2025-01-15', pair: 'EURUSD', type: 'Long', entry: 1.0850, exit: 1.0910, lots: 1.0, pnl: 600, status: 'closed' },
-  { date: '2025-01-14', pair: 'GBPUSD', type: 'Short', entry: 1.2650, exit: 1.2620, lots: 0.5, pnl: 150, status: 'closed' },
-  { date: '2025-01-14', pair: 'USDJPY', type: 'Long', entry: 148.20, exit: 148.80, lots: 2.0, pnl: 1200, status: 'closed' },
-  { date: '2025-01-13', pair: 'XAUUSD', type: 'Long', entry: 2025.50, exit: 2018.20, lots: 0.1, pnl: -73, status: 'closed' },
-  { date: '2025-01-12', pair: 'EURUSD', type: 'Short', entry: 1.0880, exit: 1.0920, lots: 1.0, pnl: -400, status: 'closed' },
-  { date: '2025-01-10', pair: 'GBPUSD', type: 'Long', entry: 1.2580, exit: 1.2640, lots: 0.8, pnl: 480, status: 'closed' },
-  { date: '2025-01-08', pair: 'EURUSD', type: 'Long', entry: 1.0820, exit: 1.0780, lots: 1.0, pnl: -400, status: 'closed' },
-  { date: '2025-01-06', pair: 'XAUUSD', type: 'Short', entry: 2040.00, exit: 2025.00, lots: 0.2, pnl: 300, status: 'closed' },
-  { date: '2025-01-03', pair: 'USDJPY', type: 'Short', entry: 149.50, exit: 149.20, lots: 1.5, pnl: 450, status: 'closed' },
+interface Trade {
+  id: string;
+  date: string;
+  pair: string;
+  type: 'Long' | 'Short';
+  entry: number;
+  exit: number;
+  lots: number;
+  pnl: number;
+  status: string;
+  notes?: string;
+  rating?: number;
+}
+
+const initialTrades: Trade[] = [
+  { id: '1', date: '2025-01-15', pair: 'EURUSD', type: 'Long', entry: 1.0850, exit: 1.0910, lots: 1.0, pnl: 600, status: 'closed', notes: '', rating: 4 },
+  { id: '2', date: '2025-01-14', pair: 'GBPUSD', type: 'Short', entry: 1.2650, exit: 1.2620, lots: 0.5, pnl: 150, status: 'closed', notes: 'Good setup', rating: 5 },
+  { id: '3', date: '2025-01-14', pair: 'USDJPY', type: 'Long', entry: 148.20, exit: 148.80, lots: 2.0, pnl: 1200, status: 'closed', notes: '', rating: 0 },
+  { id: '4', date: '2025-01-13', pair: 'XAUUSD', type: 'Long', entry: 2025.50, exit: 2018.20, lots: 0.1, pnl: -73, status: 'closed', notes: 'Stopped out early', rating: 2 },
+  { id: '5', date: '2025-01-12', pair: 'EURUSD', type: 'Short', entry: 1.0880, exit: 1.0920, lots: 1.0, pnl: -400, status: 'closed', notes: '', rating: 0 },
+  { id: '6', date: '2025-01-10', pair: 'GBPUSD', type: 'Long', entry: 1.2580, exit: 1.2640, lots: 0.8, pnl: 480, status: 'closed', notes: '', rating: 3 },
+  { id: '7', date: '2025-01-08', pair: 'EURUSD', type: 'Long', entry: 1.0820, exit: 1.0780, lots: 1.0, pnl: -400, status: 'closed', notes: '', rating: 0 },
+  { id: '8', date: '2025-01-06', pair: 'XAUUSD', type: 'Short', entry: 2040.00, exit: 2025.00, lots: 0.2, pnl: 300, status: 'closed', notes: '', rating: 4 },
+  { id: '9', date: '2025-01-03', pair: 'USDJPY', type: 'Short', entry: 149.50, exit: 149.20, lots: 1.5, pnl: 450, status: 'closed', notes: '', rating: 0 },
 ];
 
-// Helper to get daily summary
-function getDailySummary(date: Date) {
-  const dateStr = format(date, 'yyyy-MM-dd');
-  const dayTrades = trades.filter(t => t.date === dateStr);
-  const totalPnl = dayTrades.reduce((sum, t) => sum + t.pnl, 0);
-  return { trades: dayTrades, totalPnl, tradeCount: dayTrades.length };
+// Star Rating Component
+function StarRating({ rating, onRatingChange }: { rating: number; onRatingChange: (rating: number) => void }) {
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          onClick={() => onRatingChange(star === rating ? 0 : star)}
+          className="p-0.5 hover:scale-110 transition-transform"
+        >
+          <Star
+            className={`h-4 w-4 ${
+              star <= rating
+                ? 'fill-yellow-400 text-yellow-400'
+                : 'text-muted-foreground/40'
+            }`}
+          />
+        </button>
+      ))}
+    </div>
+  );
 }
 
 export default function Journal() {
-  const [currentMonth, setCurrentMonth] = useState(new Date(2025, 0, 1)); // January 2025
+  const [currentMonth, setCurrentMonth] = useState(new Date(2025, 0, 1));
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isAddTradeOpen, setIsAddTradeOpen] = useState(false);
+  const [trades, setTrades] = useState<Trade[]>(initialTrades);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [noteValue, setNoteValue] = useState('');
+
+  // New trade form state
+  const [newTrade, setNewTrade] = useState({
+    pair: '',
+    type: 'Long' as 'Long' | 'Short',
+    entry: '',
+    exit: '',
+    lots: '',
+  });
+
+  // Helper to get daily summary
+  function getDailySummary(date: Date) {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const dayTrades = trades.filter(t => t.date === dateStr);
+    const totalPnl = dayTrades.reduce((sum, t) => sum + t.pnl, 0);
+    return { trades: dayTrades, totalPnl, tradeCount: dayTrades.length };
+  }
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
-  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 }); // Monday start
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
 
-  // Generate calendar days
   const calendarDays: Date[] = [];
   let day = calendarStart;
   while (day <= calendarEnd) {
@@ -59,14 +111,55 @@ export default function Journal() {
   }
 
   const handleDayClick = (date: Date) => {
-    const summary = getDailySummary(date);
-    if (summary.tradeCount > 0) {
-      setSelectedDay(date);
-      setIsDialogOpen(true);
-    }
+    setSelectedDay(date);
+    setIsDialogOpen(true);
   };
 
   const selectedDayTrades = selectedDay ? getDailySummary(selectedDay).trades : [];
+
+  const handleRatingChange = (tradeId: string, rating: number) => {
+    setTrades(trades.map(t => t.id === tradeId ? { ...t, rating } : t));
+  };
+
+  const handleNoteClick = (tradeId: string, currentNote: string) => {
+    setEditingNoteId(tradeId);
+    setNoteValue(currentNote || '');
+  };
+
+  const handleNoteSave = (tradeId: string) => {
+    setTrades(trades.map(t => t.id === tradeId ? { ...t, notes: noteValue } : t));
+    setEditingNoteId(null);
+    setNoteValue('');
+  };
+
+  const handleAddTrade = () => {
+    if (!selectedDay || !newTrade.pair || !newTrade.entry || !newTrade.exit || !newTrade.lots) return;
+    
+    const entry = parseFloat(newTrade.entry);
+    const exit = parseFloat(newTrade.exit);
+    const lots = parseFloat(newTrade.lots);
+    const pnl = newTrade.type === 'Long' 
+      ? Math.round((exit - entry) * lots * 10000)
+      : Math.round((entry - exit) * lots * 10000);
+
+    const trade: Trade = {
+      id: Date.now().toString(),
+      date: format(selectedDay, 'yyyy-MM-dd'),
+      pair: newTrade.pair.toUpperCase(),
+      type: newTrade.type,
+      entry,
+      exit,
+      lots,
+      pnl,
+      status: 'closed',
+      notes: '',
+      rating: 0,
+    };
+
+    setTrades([trade, ...trades]);
+    setNewTrade({ pair: '', type: 'Long', entry: '', exit: '', lots: '' });
+    setIsAddTradeOpen(false);
+  };
 
   return (
     <div className="flex flex-col min-h-full bg-background">
@@ -197,12 +290,12 @@ export default function Journal() {
                       return (
                         <div
                           key={idx}
-                          onClick={() => hasTrades && handleDayClick(date)}
+                          onClick={() => isCurrentMonth && handleDayClick(date)}
                           className={`
                             min-h-[80px] p-2 rounded-lg border border-border/50 flex flex-col
                             ${bgClass}
-                            ${!isCurrentMonth ? 'opacity-30' : ''}
-                            ${hasTrades ? 'cursor-pointer transition-colors' : ''}
+                            ${!isCurrentMonth ? 'opacity-30' : 'cursor-pointer'}
+                            transition-colors
                           `}
                         >
                           <span className={`text-xs ${isCurrentMonth ? 'text-foreground' : 'text-muted-foreground'}`}>
@@ -227,35 +320,43 @@ export default function Journal() {
 
               {/* Day Detail Dialog */}
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="max-w-4xl">
+                <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
                   <DialogHeader>
-                    <DialogTitle>
-                      Trades for {selectedDay ? format(selectedDay, 'EEEE, MMMM d, yyyy') : ''}
-                    </DialogTitle>
+                    <div className="flex items-center justify-between pr-8">
+                      <DialogTitle>
+                        Trades for {selectedDay ? format(selectedDay, 'EEEE, MMMM d, yyyy') : ''}
+                      </DialogTitle>
+                      <Button size="sm" className="h-8" onClick={() => setIsAddTradeOpen(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Trade
+                      </Button>
+                    </div>
                   </DialogHeader>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto flex-1">
                     {selectedDayTrades.length > 0 ? (
                       <table className="w-full">
                         <thead>
                           <tr className="border-b border-border">
-                            <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Date</th>
-                            <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Pair</th>
-                            <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Type</th>
-                            <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Entry</th>
-                            <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Exit</th>
-                            <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Lots</th>
-                            <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">P&L</th>
-                            <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Status</th>
+                            <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Date</th>
+                            <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Pair</th>
+                            <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Type</th>
+                            <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Entry</th>
+                            <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Exit</th>
+                            <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Lots</th>
+                            <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">P&L</th>
+                            <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Status</th>
+                            <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground min-w-[140px]">Notes</th>
+                            <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Rating</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {selectedDayTrades.map((trade, i) => (
-                            <tr key={i} className="border-b border-border hover:bg-muted/50 transition-colors">
-                              <td className="py-3 px-4 text-sm text-muted-foreground">{trade.date}</td>
-                              <td className="py-3 px-4">
+                          {selectedDayTrades.map((trade) => (
+                            <tr key={trade.id} className="border-b border-border hover:bg-muted/50 transition-colors">
+                              <td className="py-3 px-3 text-sm text-muted-foreground">{trade.date}</td>
+                              <td className="py-3 px-3">
                                 <Badge variant="outline" className="text-xs">{trade.pair}</Badge>
                               </td>
-                              <td className="py-3 px-4">
+                              <td className="py-3 px-3">
                                 <div className="flex items-center gap-1.5">
                                   {trade.type === 'Long' ? (
                                     <TrendingUp className="h-3.5 w-3.5 text-success" />
@@ -265,24 +366,135 @@ export default function Journal() {
                                   <span className="text-sm text-foreground">{trade.type}</span>
                                 </div>
                               </td>
-                              <td className="py-3 px-4 text-sm text-foreground">{trade.entry}</td>
-                              <td className="py-3 px-4 text-sm text-foreground">{trade.exit}</td>
-                              <td className="py-3 px-4 text-sm text-foreground">{trade.lots}</td>
-                              <td className="py-3 px-4">
+                              <td className="py-3 px-3 text-sm text-foreground">{trade.entry}</td>
+                              <td className="py-3 px-3 text-sm text-foreground">{trade.exit}</td>
+                              <td className="py-3 px-3 text-sm text-foreground">{trade.lots}</td>
+                              <td className="py-3 px-3">
                                 <span className={`text-sm font-medium ${trade.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
                                   {trade.pnl >= 0 ? '+' : ''}£{trade.pnl}
                                 </span>
                               </td>
-                              <td className="py-3 px-4">
+                              <td className="py-3 px-3">
                                 <Badge variant="secondary" className="text-xs">{trade.status}</Badge>
+                              </td>
+                              <td className="py-3 px-3">
+                                {editingNoteId === trade.id ? (
+                                  <div className="flex gap-1">
+                                    <Input
+                                      value={noteValue}
+                                      onChange={(e) => setNoteValue(e.target.value)}
+                                      className="h-7 text-xs w-24"
+                                      placeholder="Add note..."
+                                      onKeyDown={(e) => e.key === 'Enter' && handleNoteSave(trade.id)}
+                                      autoFocus
+                                    />
+                                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => handleNoteSave(trade.id)}>
+                                      Save
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => handleNoteClick(trade.id, trade.notes || '')}
+                                    className="text-xs text-left hover:text-foreground transition-colors max-w-[120px] truncate"
+                                  >
+                                    {trade.notes || <span className="text-muted-foreground/60 italic">Add note…</span>}
+                                  </button>
+                                )}
+                              </td>
+                              <td className="py-3 px-3">
+                                <StarRating
+                                  rating={trade.rating || 0}
+                                  onRatingChange={(rating) => handleRatingChange(trade.id, rating)}
+                                />
                               </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     ) : (
-                      <p className="text-sm text-muted-foreground text-center py-8">No trades for this day</p>
+                      <div className="text-center py-8">
+                        <p className="text-sm text-muted-foreground mb-4">No trades for this day</p>
+                        <Button size="sm" onClick={() => setIsAddTradeOpen(true)}>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Trade
+                        </Button>
+                      </div>
                     )}
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              {/* Add Trade Dialog */}
+              <Dialog open={isAddTradeOpen} onOpenChange={setIsAddTradeOpen}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Add New Trade</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="pair">Pair</Label>
+                        <Input
+                          id="pair"
+                          placeholder="e.g. EURUSD"
+                          value={newTrade.pair}
+                          onChange={(e) => setNewTrade({ ...newTrade, pair: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="type">Type</Label>
+                        <Select
+                          value={newTrade.type}
+                          onValueChange={(value: 'Long' | 'Short') => setNewTrade({ ...newTrade, type: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Long">Long</SelectItem>
+                            <SelectItem value="Short">Short</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="entry">Entry</Label>
+                        <Input
+                          id="entry"
+                          type="number"
+                          step="0.0001"
+                          placeholder="1.0850"
+                          value={newTrade.entry}
+                          onChange={(e) => setNewTrade({ ...newTrade, entry: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="exit">Exit</Label>
+                        <Input
+                          id="exit"
+                          type="number"
+                          step="0.0001"
+                          placeholder="1.0900"
+                          value={newTrade.exit}
+                          onChange={(e) => setNewTrade({ ...newTrade, exit: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lots">Lots</Label>
+                        <Input
+                          id="lots"
+                          type="number"
+                          step="0.01"
+                          placeholder="1.0"
+                          value={newTrade.lots}
+                          onChange={(e) => setNewTrade({ ...newTrade, lots: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <Button className="w-full" onClick={handleAddTrade}>
+                      Add Trade
+                    </Button>
                   </div>
                 </DialogContent>
               </Dialog>
