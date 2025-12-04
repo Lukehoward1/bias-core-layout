@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardR
 import { createChart, IChartApi, ISeriesApi, CandlestickData, Time, CandlestickSeries, LineSeries, CrosshairMode } from 'lightweight-charts';
 import { OhlcDataPoint, formatPrice, formatTime } from '@/lib/mockOhlcData';
 import { ChartToolbar } from './ChartToolbar';
+import { ChartVerticalToolbar } from './ChartVerticalToolbar';
 
 interface CandlestickChartProps {
   data: OhlcDataPoint[];
@@ -23,6 +24,7 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
     const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
     const maSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
     const [crosshairEnabled, setCrosshairEnabled] = useState(true);
+    const [ohlcEnabled, setOhlcEnabled] = useState(false);
     const [tooltipData, setTooltipData] = useState<{
       visible: boolean;
       x: number;
@@ -245,15 +247,21 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
           pair={pair}
           timeframe={timeframe}
           onTimeframeChange={onTimeframeChange}
+          crosshairEnabled={crosshairEnabled}
+          onCrosshairToggle={handleCrosshairToggle}
+          ohlcEnabled={ohlcEnabled}
+          onOhlcToggle={setOhlcEnabled}
+        />
+
+        {/* Right-side Vertical Tools Panel */}
+        <ChartVerticalToolbar
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
           onReset={handleReset}
-          crosshairEnabled={crosshairEnabled}
-          onCrosshairToggle={handleCrosshairToggle}
         />
 
-        {/* Tooltip */}
-        {tooltipData && tooltipData.visible && (
+        {/* Tooltip - only shown when ohlcEnabled */}
+        {ohlcEnabled && tooltipData && tooltipData.visible && (
           <div
             className="absolute z-20 pointer-events-none bg-card/95 backdrop-blur-sm border border-border rounded-lg px-3 py-2 shadow-lg text-sm"
             style={{
@@ -278,7 +286,7 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
         )}
 
         {/* Chart Container */}
-        <div ref={chartContainerRef} className="w-full h-full pt-11" />
+        <div ref={chartContainerRef} className="w-full h-full pt-11 pr-12" />
 
         {/* Demo Data Label */}
         <div className="absolute bottom-3 left-3 z-10">
