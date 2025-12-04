@@ -5,7 +5,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Switch } from '@/components/ui/switch';
 import { 
   MousePointer2,
   TrendingUp,
@@ -21,7 +20,12 @@ import {
   ZoomOut,
   RotateCcw,
   Settings,
-  Check,
+  Crosshair,
+  Ruler,
+  Camera,
+  Brush,
+  ArrowDown,
+  ArrowUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -31,7 +35,7 @@ interface ChartVerticalToolbarProps {
   onReset: () => void;
 }
 
-type ToolId = 'cursor' | 'trendline' | 'horizontal' | 'ray' | 'rectangle' | 'ellipse' | 'arrow' | 'text' | 'price-label' | 'fib' | 'long' | 'short';
+type ToolId = 'cursor' | 'crosshair' | 'trendline' | 'horizontal' | 'horizontal-ray' | 'vertical' | 'ray' | 'rectangle' | 'ellipse' | 'arrow' | 'text' | 'price-label' | 'fib' | 'long' | 'short' | 'measure' | 'brush';
 
 interface Tool {
   id: ToolId;
@@ -43,10 +47,16 @@ const cursorTools: Tool[] = [
   { id: 'cursor', name: 'Select / Move', icon: <MousePointer2 className="h-4 w-4" /> },
 ];
 
+const crosshairTools: Tool[] = [
+  { id: 'crosshair', name: 'Crosshair', icon: <Crosshair className="h-4 w-4" /> },
+];
+
 const trendlineTools: Tool[] = [
   { id: 'trendline', name: 'Trend Line', icon: <TrendingUp className="h-4 w-4" /> },
   { id: 'horizontal', name: 'Horizontal Line', icon: <Minus className="h-4 w-4" /> },
-  { id: 'ray', name: 'Ray / Extended Line', icon: <ArrowRight className="h-4 w-4" /> },
+  { id: 'horizontal-ray', name: 'Horizontal Ray', icon: <ArrowRight className="h-4 w-4" /> },
+  { id: 'vertical', name: 'Vertical Line', icon: <ArrowDown className="h-4 w-4 rotate-0" /> },
+  { id: 'ray', name: 'Ray / Extended Line', icon: <ArrowUp className="h-4 w-4 rotate-45" /> },
 ];
 
 const shapeTools: Tool[] = [
@@ -64,15 +74,17 @@ const fibTools: Tool[] = [
   { id: 'fib', name: 'Fibonacci Retracement', icon: <BarChart3 className="h-4 w-4" /> },
 ];
 
+const measureTools: Tool[] = [
+  { id: 'measure', name: 'Measure Tool', icon: <Ruler className="h-4 w-4" /> },
+];
+
+const brushTools: Tool[] = [
+  { id: 'brush', name: 'Brush / Marker', icon: <Brush className="h-4 w-4" /> },
+];
+
 const positionTools: Tool[] = [
   { id: 'long', name: 'Long Position', icon: <span className="text-xs font-bold text-success">L</span> },
   { id: 'short', name: 'Short Position', icon: <span className="text-xs font-bold text-destructive">S</span> },
-];
-
-const indicators = [
-  { id: 'ma', name: 'Moving Average', description: 'Simple/Exponential MA overlay' },
-  { id: 'rsi', name: 'RSI', description: 'Relative Strength Index' },
-  { id: 'atr', name: 'ATR', description: 'Average True Range' },
 ];
 
 interface ToolGroupProps {
@@ -125,7 +137,7 @@ function ToolGroup({ tools, activeTool, onSelectTool, groupIcon }: ToolGroupProp
           <span className="absolute bottom-0.5 right-0.5 w-0 h-0 border-l-[4px] border-l-transparent border-b-[4px] border-b-muted-foreground/50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent side="left" align="start" className="w-48 p-1 bg-card border-border">
+      <PopoverContent side="left" align="start" className="w-52 p-1 bg-card border-border">
         {tools.map((tool) => (
           <button
             key={tool.id}
@@ -148,13 +160,6 @@ function ToolGroup({ tools, activeTool, onSelectTool, groupIcon }: ToolGroupProp
 
 export function ChartVerticalToolbar({ onZoomIn, onZoomOut, onReset }: ChartVerticalToolbarProps) {
   const [activeTool, setActiveTool] = useState<ToolId>('cursor');
-  const [activeIndicators, setActiveIndicators] = useState<string[]>([]);
-
-  const toggleIndicator = (id: string) => {
-    setActiveIndicators(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
-  };
 
   return (
     <div className="absolute right-14 top-14 bottom-8 z-10 flex flex-col items-center py-2 px-1 bg-background/80 backdrop-blur-sm border border-border/50 rounded-lg">
@@ -162,10 +167,19 @@ export function ChartVerticalToolbar({ onZoomIn, onZoomOut, onReset }: ChartVert
         {/* Cursor / Selection */}
         <ToolGroup tools={cursorTools} activeTool={activeTool} onSelectTool={setActiveTool} />
         
+        {/* Crosshair */}
+        <ToolGroup tools={crosshairTools} activeTool={activeTool} onSelectTool={setActiveTool} />
+        
         <div className="w-6 h-px bg-border/50 mx-auto my-1" />
         
         {/* Trendline tools */}
         <ToolGroup tools={trendlineTools} activeTool={activeTool} onSelectTool={setActiveTool} />
+        
+        {/* Fibonacci */}
+        <ToolGroup tools={fibTools} activeTool={activeTool} onSelectTool={setActiveTool} />
+        
+        {/* Brush / Marker */}
+        <ToolGroup tools={brushTools} activeTool={activeTool} onSelectTool={setActiveTool} />
         
         {/* Shapes */}
         <ToolGroup tools={shapeTools} activeTool={activeTool} onSelectTool={setActiveTool} />
@@ -175,8 +189,8 @@ export function ChartVerticalToolbar({ onZoomIn, onZoomOut, onReset }: ChartVert
         
         <div className="w-6 h-px bg-border/50 mx-auto my-1" />
         
-        {/* Fibonacci */}
-        <ToolGroup tools={fibTools} activeTool={activeTool} onSelectTool={setActiveTool} />
+        {/* Measure Tool */}
+        <ToolGroup tools={measureTools} activeTool={activeTool} onSelectTool={setActiveTool} />
         
         {/* Position tools */}
         <ToolGroup tools={positionTools} activeTool={activeTool} onSelectTool={setActiveTool} />
@@ -216,41 +230,22 @@ export function ChartVerticalToolbar({ onZoomIn, onZoomOut, onReset }: ChartVert
 
         <div className="w-6 h-px bg-border/50 mx-auto my-1" />
 
-        {/* Indicators */}
+        {/* Screenshot */}
         <Popover>
           <PopoverTrigger asChild>
             <Button
               variant="ghost"
               size="sm"
               className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
-              title="Indicators"
+              title="Screenshot"
             >
-              <TrendingUp className="h-4 w-4" />
+              <Camera className="h-4 w-4" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent side="left" align="end" className="w-72 bg-card border-border p-3">
-            <div className="text-sm font-medium text-foreground mb-3">Indicators</div>
-            <div className="space-y-3">
-              {indicators.map((indicator) => (
-                <div key={indicator.id} className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm text-foreground flex items-center gap-2">
-                      {indicator.name}
-                      {activeIndicators.includes(indicator.id) && (
-                        <Check className="h-3 w-3 text-success" />
-                      )}
-                    </div>
-                    <div className="text-xs text-muted-foreground">{indicator.description}</div>
-                  </div>
-                  <Switch
-                    checked={activeIndicators.includes(indicator.id)}
-                    onCheckedChange={() => toggleIndicator(indicator.id)}
-                  />
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border/50">
-              Indicator overlays are visual only in demo mode.
+          <PopoverContent side="left" align="end" className="w-56 bg-card border-border p-3">
+            <div className="text-sm font-medium text-foreground mb-2">Screenshot</div>
+            <p className="text-xs text-muted-foreground">
+              Chart screenshot export coming soon.
             </p>
           </PopoverContent>
         </Popover>

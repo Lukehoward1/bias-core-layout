@@ -11,6 +11,8 @@ import {
   Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { IndicatorSelector } from './chart/IndicatorSelector';
+import { ChartStyleSelector, ChartStyle } from './chart/ChartStyleSelector';
 
 interface ChartToolbarProps {
   pair: string;
@@ -20,6 +22,11 @@ interface ChartToolbarProps {
   onCrosshairToggle: (enabled: boolean) => void;
   ohlcEnabled: boolean;
   onOhlcToggle: (enabled: boolean) => void;
+  chartStyle: ChartStyle;
+  onChartStyleChange: (style: ChartStyle) => void;
+  activeIndicators: string[];
+  onToggleIndicator: (id: string) => void;
+  onRemoveIndicator: (id: string) => void;
 }
 
 const timeframes = [
@@ -62,45 +69,57 @@ export function ChartToolbar({
   onCrosshairToggle,
   ohlcEnabled,
   onOhlcToggle,
+  chartStyle,
+  onChartStyleChange,
+  activeIndicators,
+  onToggleIndicator,
+  onRemoveIndicator,
 }: ChartToolbarProps) {
   return (
     <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-3 py-2 bg-background/80 backdrop-blur-sm border-b border-border/50">
-      {/* Left: Timeframe buttons */}
-      <div className="flex items-center gap-1">
-        {timeframes.map((tf) => (
-          <Button
-            key={tf.value}
-            variant={timeframe === tf.value ? 'default' : 'ghost'}
-            size="sm"
-            className={cn(
-              "h-7 px-2.5 text-xs font-medium",
-              timeframe === tf.value 
-                ? 'bg-primary text-primary-foreground' 
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-            )}
-            onClick={() => onTimeframeChange(tf.value)}
-          >
-            {tf.label}
-          </Button>
-        ))}
-        
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-foreground">
-              <MoreHorizontal className="h-4 w-4" />
+      {/* Left: Timeframe buttons + Chart Style */}
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
+          {timeframes.map((tf) => (
+            <Button
+              key={tf.value}
+              variant={timeframe === tf.value ? 'default' : 'ghost'}
+              size="sm"
+              className={cn(
+                "h-7 px-2.5 text-xs font-medium",
+                timeframe === tf.value 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              )}
+              onClick={() => onTimeframeChange(tf.value)}
+            >
+              {tf.label}
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="bg-card border-border">
-            {moreTimeframes.map((tf) => (
-              <DropdownMenuItem 
-                key={tf.value}
-                className="text-muted-foreground cursor-not-allowed opacity-50"
-              >
-                {tf.label} <span className="ml-2 text-xs">(Coming Soon)</span>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+          ))}
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-foreground">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="bg-card border-border">
+              {moreTimeframes.map((tf) => (
+                <DropdownMenuItem 
+                  key={tf.value}
+                  className="text-muted-foreground cursor-not-allowed opacity-50"
+                >
+                  {tf.label} <span className="ml-2 text-xs">(Coming Soon)</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <div className="h-5 w-px bg-border/50" />
+
+        {/* Chart Style Selector */}
+        <ChartStyleSelector value={chartStyle} onChange={onChartStyleChange} />
       </div>
 
       {/* Center: Symbol + Timeframe label */}
@@ -115,7 +134,16 @@ export function ChartToolbar({
       </div>
 
       {/* Right: Icon controls */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
+        {/* Indicators Button */}
+        <IndicatorSelector
+          activeIndicators={activeIndicators}
+          onToggleIndicator={onToggleIndicator}
+          onRemoveIndicator={onRemoveIndicator}
+        />
+
+        <div className="h-5 w-px bg-border/50 mx-1" />
+
         {/* Crosshair toggle */}
         <Button
           variant={crosshairEnabled ? 'default' : 'ghost'}
@@ -143,7 +171,7 @@ export function ChartToolbar({
               : 'text-muted-foreground hover:text-foreground'
           )}
           onClick={() => onOhlcToggle(!ohlcEnabled)}
-          title="Toggle OHLC tooltip"
+          title="Show OHLC on Hover"
         >
           <Info className="h-3.5 w-3.5" />
           OHLC
