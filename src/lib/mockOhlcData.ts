@@ -44,6 +44,8 @@ export function generateMockOhlcData(
   
   // Volatility per timeframe (in price units)
   const volatilityMultipliers: Record<string, number> = {
+    m1: 0.0003,
+    m5: 0.0005,
     m15: 0.0008,
     h1: 0.0020,
     h4: 0.0040,
@@ -59,6 +61,8 @@ export function generateMockOhlcData(
   
   // Calculate time interval based on timeframe
   const intervalMs: Record<string, number> = {
+    m1: 60 * 1000,
+    m5: 5 * 60 * 1000,
     m15: 15 * 60 * 1000,
     h1: 60 * 60 * 1000,
     h4: 4 * 60 * 60 * 1000,
