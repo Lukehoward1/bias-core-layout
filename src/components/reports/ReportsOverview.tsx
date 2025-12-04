@@ -81,6 +81,15 @@ export function ReportsOverview({ trades, dateRangeLabel }: ReportsOverviewProps
       filename: `StreamBias-Overview-${new Date().toISOString().split('T')[0]}`,
       title: 'Overview Report',
       dateRange: dateRangeLabel,
+      userName: 'John Trader',
+      trades: {
+        totalPnl,
+        winRate,
+        avgRR,
+        tradeCount: trades.length,
+        bestDay,
+        worstDay,
+      },
     });
   };
 

@@ -27,11 +27,29 @@ interface ReportsRiskManagementProps {
 export function ReportsRiskManagement({ trades, dateRangeLabel }: ReportsRiskManagementProps) {
   const { exportToPdf } = usePdfExport();
 
+  // Calculate summary stats for PDF export
+  const summaryTotalPnl = trades.reduce((sum, t) => sum + t.pnl, 0);
+  const summaryWinningTrades = trades.filter(t => t.pnl > 0);
+  const summaryLosingTrades = trades.filter(t => t.pnl < 0);
+  const summaryWinRate = trades.length > 0 ? (summaryWinningTrades.length / trades.length) * 100 : 0;
+  const summaryAvgWin = summaryWinningTrades.length > 0 ? summaryWinningTrades.reduce((sum, t) => sum + t.pnl, 0) / summaryWinningTrades.length : 0;
+  const summaryAvgLoss = summaryLosingTrades.length > 0 ? Math.abs(summaryLosingTrades.reduce((sum, t) => sum + t.pnl, 0) / summaryLosingTrades.length) : 1;
+  const summaryAvgRR = summaryAvgLoss > 0 ? summaryAvgWin / summaryAvgLoss : 0;
+
   const handleExport = () => {
     exportToPdf('reports-risk', {
       filename: `StreamBias-RiskManagement-${new Date().toISOString().split('T')[0]}`,
       title: 'Risk Management Report',
       dateRange: dateRangeLabel,
+      userName: 'John Trader',
+      trades: {
+        totalPnl: summaryTotalPnl,
+        winRate: summaryWinRate,
+        avgRR: summaryAvgRR,
+        tradeCount: trades.length,
+        bestDay: null,
+        worstDay: null,
+      },
     });
   };
   // Calculate risk metrics (using lots as proxy for risk)
