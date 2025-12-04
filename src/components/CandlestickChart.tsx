@@ -4,6 +4,7 @@ import { OhlcDataPoint, formatPrice, formatTime } from '@/lib/mockOhlcData';
 import { ChartToolbar } from './ChartToolbar';
 import { ChartVerticalToolbar } from './ChartVerticalToolbar';
 import { ChartStyle } from './chart/ChartStyleSelector';
+import { SavedBacktest } from './chart/SavedBacktestsDropdown';
 import { Button } from '@/components/ui/button';
 import { Maximize2, Minimize2 } from 'lucide-react';
 
@@ -12,6 +13,10 @@ interface CandlestickChartProps {
   pair: string;
   timeframe: string;
   onTimeframeChange: (tf: string) => void;
+  savedBacktests?: SavedBacktest[];
+  onSaveBacktest?: () => void;
+  onLoadBacktest?: (id: string) => void;
+  onCompareBacktests?: (ids: string[]) => void;
 }
 
 export interface CandlestickChartRef {
@@ -50,7 +55,7 @@ function calculateHeikinAshi(data: OhlcDataPoint[]): OhlcDataPoint[] {
 }
 
 export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChartProps>(
-  ({ data, pair, timeframe, onTimeframeChange }, ref) => {
+  ({ data, pair, timeframe, onTimeframeChange, savedBacktests, onSaveBacktest, onLoadBacktest, onCompareBacktests }, ref) => {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartWrapperRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
@@ -165,8 +170,8 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
           fontFamily: 'Inter, system-ui, sans-serif',
         },
         grid: {
-          vertLines: { color: 'hsl(217, 19%, 18%)' },
-          horzLines: { color: 'hsl(217, 19%, 18%)' },
+          vertLines: { color: 'hsl(217, 19%, 16%)' },
+          horzLines: { color: 'hsl(217, 19%, 16%)' },
         },
         crosshair: {
           mode: CrosshairMode.Normal,
@@ -184,14 +189,14 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
           },
         },
         rightPriceScale: {
-          borderColor: 'hsl(217, 19%, 22%)',
+          borderColor: 'hsl(217, 19%, 20%)',
           scaleMargins: {
-            top: 0.1,
-            bottom: 0.1,
+            top: 0.08,
+            bottom: 0.08,
           },
         },
         timeScale: {
-          borderColor: 'hsl(217, 19%, 22%)',
+          borderColor: 'hsl(217, 19%, 20%)',
           timeVisible: true,
           secondsVisible: false,
         },
@@ -367,23 +372,23 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
       chartRef.current?.timeScale().fitContent();
     }, [data, chartStyle, activeIndicators, pair, timeframe]);
 
-    // Toolbar width constant for layout calculations
-    const TOOLBAR_WIDTH = 44; // px
-    const TOOLBAR_HEIGHT = 44; // px (top toolbar)
+    // Toolbar dimensions
+    const TOOLBAR_WIDTH = 40;
+    const TOOLBAR_HEIGHT = 44;
 
     return (
       <div 
         ref={chartWrapperRef}
-        className={`relative w-full h-full overflow-hidden ${
+        className={`relative w-full h-full ${
           isFullscreen 
-            ? 'fixed inset-0 z-[100] bg-[hsl(222,30%,8%)]' 
+            ? 'fixed inset-0 z-[100] bg-[hsl(222,30%,6%)]' 
             : ''
         }`}
       >
-        {/* Chart Toolbar - top bar (spans full width minus vertical toolbar) */}
+        {/* Chart Toolbar - top bar */}
         <div 
-          className="absolute top-0 left-0 z-30 h-11"
-          style={{ right: TOOLBAR_WIDTH }}
+          className="absolute top-0 left-0 z-30"
+          style={{ right: TOOLBAR_WIDTH, height: TOOLBAR_HEIGHT }}
         >
           <ChartToolbar
             pair={pair}
@@ -398,20 +403,27 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
             activeIndicators={activeIndicators}
             onToggleIndicator={handleToggleIndicator}
             onRemoveIndicator={handleRemoveIndicator}
+            savedBacktests={savedBacktests}
+            onSaveBacktest={onSaveBacktest}
+            onLoadBacktest={onLoadBacktest}
+            onCompareBacktests={onCompareBacktests}
           />
         </div>
 
-        {/* Right-side Vertical Tools Panel - flush to right edge, full height */}
+        {/* Right-side Vertical Tools Panel */}
         <div 
           className="absolute top-0 right-0 bottom-0 z-30"
           style={{ width: TOOLBAR_WIDTH }}
         >
-          {/* Fullscreen Toggle Button - at top of vertical toolbar */}
-          <div className="h-11 flex items-center justify-center border-b border-border/50 bg-background/90">
+          {/* Fullscreen Toggle Button */}
+          <div 
+            className="flex items-center justify-center border-b border-border/50 bg-background/95"
+            style={{ height: TOOLBAR_HEIGHT }}
+          >
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
               onClick={handleToggleFullscreen}
               title={isFullscreen ? 'Exit fullscreen (ESC)' : 'Enter fullscreen'}
             >
@@ -422,8 +434,11 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
               )}
             </Button>
           </div>
-          {/* Vertical tools below fullscreen button */}
-          <div className="absolute top-11 right-0 bottom-0 left-0">
+          {/* Vertical tools */}
+          <div 
+            className="absolute right-0 left-0"
+            style={{ top: TOOLBAR_HEIGHT, bottom: 0 }}
+          >
             <ChartVerticalToolbar
               onZoomIn={handleZoomIn}
               onZoomOut={handleZoomOut}
@@ -435,21 +450,21 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
         {/* Tooltip - only shown when ohlcEnabled */}
         {ohlcEnabled && tooltipData && tooltipData.visible && (
           <div
-            className="absolute z-50 pointer-events-none bg-card/95 backdrop-blur-sm border border-border rounded-lg px-3 py-2 shadow-lg text-sm"
+            className="absolute z-[60] pointer-events-none bg-card/95 backdrop-blur-sm border border-border rounded-lg px-3 py-2 shadow-lg text-sm"
             style={{
               left: Math.min(tooltipData.x + 12, (chartContainerRef.current?.clientWidth || 0) - 150),
-              top: Math.max(tooltipData.y - 80, 60),
+              top: Math.max(tooltipData.y - 80, TOOLBAR_HEIGHT + 10),
             }}
           >
             <div className="text-muted-foreground text-xs mb-1">{tooltipData.time}</div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
-              <span className="text-muted-foreground">Open:</span>
+              <span className="text-muted-foreground">O:</span>
               <span className="text-foreground font-medium">{tooltipData.open}</span>
-              <span className="text-muted-foreground">High:</span>
+              <span className="text-muted-foreground">H:</span>
               <span className="text-foreground font-medium">{tooltipData.high}</span>
-              <span className="text-muted-foreground">Low:</span>
+              <span className="text-muted-foreground">L:</span>
               <span className="text-foreground font-medium">{tooltipData.low}</span>
-              <span className="text-muted-foreground">Close:</span>
+              <span className="text-muted-foreground">C:</span>
               <span className={`font-medium ${tooltipData.isUp ? 'text-success' : 'text-destructive'}`}>
                 {tooltipData.close}
               </span>
@@ -457,25 +472,25 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
           </div>
         )}
 
-        {/* Chart Container - fills space between top toolbar and bottom, minus vertical toolbar */}
+        {/* Chart Container */}
         <div 
           ref={chartContainerRef} 
-          className="absolute left-0 bottom-0 bg-[hsl(222,30%,6%)] overflow-hidden"
+          className="absolute left-0 bottom-0 bg-[hsl(222,30%,5%)]"
           style={{ top: TOOLBAR_HEIGHT, right: TOOLBAR_WIDTH }}
         />
 
         {/* Demo Data Label */}
-        <div className="absolute bottom-3 left-3 z-20">
-          <span className="text-xs text-muted-foreground/60 bg-background/60 backdrop-blur-sm px-2 py-1 rounded">
+        <div className="absolute bottom-2 left-2 z-20">
+          <span className="text-[10px] text-muted-foreground/50 bg-background/50 backdrop-blur-sm px-1.5 py-0.5 rounded">
             Demo data – live data coming soon
           </span>
         </div>
 
         {/* Fullscreen exit hint */}
         {isFullscreen && (
-          <div className="absolute bottom-3 z-20" style={{ right: TOOLBAR_WIDTH + 12 }}>
-            <span className="text-xs text-muted-foreground/40 bg-background/40 backdrop-blur-sm px-2 py-1 rounded">
-              Press ESC to exit fullscreen
+          <div className="absolute bottom-2 z-20" style={{ right: TOOLBAR_WIDTH + 8 }}>
+            <span className="text-[10px] text-muted-foreground/40 bg-background/40 backdrop-blur-sm px-1.5 py-0.5 rounded">
+              Press ESC to exit
             </span>
           </div>
         )}

@@ -17,6 +17,7 @@ import { generateMockOhlcData } from "@/lib/mockOhlcData";
 import { SessionsPanel } from "@/components/strategy/SessionsPanel";
 import { useStrategySessions } from "@/hooks/use-strategy-sessions";
 import { NewStrategyModal } from "@/components/strategy/NewStrategyModal";
+import { SavedBacktest } from "@/components/chart/SavedBacktestsDropdown";
 import { toast } from "@/hooks/use-toast";
 
 interface CustomStrategy {
@@ -38,6 +39,7 @@ export default function StrategyTester() {
   const [hasRunBacktest, setHasRunBacktest] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [customStrategies, setCustomStrategies] = useState<CustomStrategy[]>([]);
+  const [savedBacktests, setSavedBacktests] = useState<SavedBacktest[]>([]);
 
   // Mock backtest results state
   const [backtestResults, setBacktestResults] = useState({
@@ -106,6 +108,61 @@ export default function StrategyTester() {
     });
   };
 
+  const handleSaveBacktest = () => {
+    if (!hasRunBacktest) {
+      toast({
+        title: "No Backtest Results",
+        description: "Run a backtest first before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newBacktest: SavedBacktest = {
+      id: `bt-${Date.now()}`,
+      strategyName: getStrategyName(selectedStrategy),
+      pair: selectedPair,
+      timeframe: selectedTimeframe,
+      savedAt: new Date(),
+      netProfit: backtestResults.netProfit,
+      winRate: backtestResults.winRate,
+      totalTrades: backtestResults.totalTrades,
+      profitFactor: backtestResults.profitFactor,
+      avgRR: Math.round((Math.random() * 2 + 1) * 100) / 100,
+      maxDrawdown: Math.round(Math.random() * 20 + 5),
+    };
+
+    setSavedBacktests(prev => [newBacktest, ...prev]);
+    toast({
+      title: "Backtest Saved",
+      description: `"${newBacktest.strategyName}" results have been saved.`,
+    });
+  };
+
+  const handleLoadBacktest = (id: string) => {
+    const backtest = savedBacktests.find(b => b.id === id);
+    if (backtest) {
+      setBacktestResults({
+        netProfit: backtest.netProfit,
+        totalTrades: backtest.totalTrades,
+        winRate: backtest.winRate,
+        profitFactor: backtest.profitFactor,
+      });
+      setHasRunBacktest(true);
+      toast({
+        title: "Backtest Loaded",
+        description: `Loaded "${backtest.strategyName}" results.`,
+      });
+    }
+  };
+
+  const handleCompareBacktests = (ids: string[]) => {
+    toast({
+      title: "Comparison Ready",
+      description: `Comparing ${ids.length} backtests.`,
+    });
+  };
+
   const handleCreateStrategy = (strategy: Omit<CustomStrategy, 'id'>) => {
     const newStrategy: CustomStrategy = {
       ...strategy,
@@ -133,14 +190,14 @@ export default function StrategyTester() {
     <div className="flex flex-col min-h-full bg-background">
       <AppHeader title="Strategy Tester" />
       
-      <div className="flex-1 p-4 md:p-6">
-        <div className="max-w-7xl mx-auto flex flex-col gap-4">
+      <div className="flex-1 p-3 md:p-4">
+        <div className="max-w-[1600px] mx-auto flex flex-col gap-3">
           {/* Top Control Bar */}
-          <Card>
-            <CardContent className="py-3">
-              <div className="flex flex-wrap items-center gap-3">
+          <Card className="border-border/50">
+            <CardContent className="py-2.5 px-3">
+              <div className="flex flex-wrap items-center gap-2">
                 <Select value={selectedPair} onValueChange={setSelectedPair}>
-                  <SelectTrigger className="w-[130px] h-9">
+                  <SelectTrigger className="w-[110px] h-8 text-xs">
                     <SelectValue placeholder="Pair" />
                   </SelectTrigger>
                   <SelectContent className="bg-card border-border">
@@ -152,7 +209,7 @@ export default function StrategyTester() {
                 </Select>
 
                 <Select value={selectedStrategy} onValueChange={setSelectedStrategy}>
-                  <SelectTrigger className="w-[180px] h-9">
+                  <SelectTrigger className="w-[160px] h-8 text-xs">
                     <SelectValue placeholder="Select Strategy" />
                   </SelectTrigger>
                   <SelectContent className="bg-card border-border">
@@ -170,18 +227,18 @@ export default function StrategyTester() {
                 <NewStrategyModal onCreateStrategy={handleCreateStrategy} />
 
                 <Button 
-                  className="ml-auto h-9" 
+                  className="ml-auto h-8 text-xs" 
                   onClick={handleRunBacktest}
                   disabled={isRunning}
                 >
                   {isRunning ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
                       Running...
                     </>
                   ) : (
                     <>
-                      <Play className="h-4 w-4 mr-2" />
+                      <Play className="h-3.5 w-3.5 mr-1.5" />
                       Run Backtest
                     </>
                   )}
@@ -190,38 +247,42 @@ export default function StrategyTester() {
             </CardContent>
           </Card>
 
-          {/* Main Chart Card - Dominant element with increased height */}
-          <Card className="flex-1">
+          {/* Main Chart Card */}
+          <Card className="flex-1 border-border/50 overflow-hidden">
             <CardContent className="p-0">
-              <div className="h-[calc(70vh-100px)] min-h-[500px] md:h-[calc(75vh-80px)]">
+              <div className="h-[calc(72vh-120px)] min-h-[450px] md:h-[calc(76vh-100px)]">
                 <CandlestickChart 
                   data={chartData} 
                   pair={selectedPair} 
                   timeframe={selectedTimeframe}
                   onTimeframeChange={setSelectedTimeframe}
+                  savedBacktests={savedBacktests}
+                  onSaveBacktest={handleSaveBacktest}
+                  onLoadBacktest={handleLoadBacktest}
+                  onCompareBacktests={handleCompareBacktests}
                 />
               </div>
             </CardContent>
           </Card>
 
-          {/* Strategy Results - Full width below chart */}
-          <Card>
-            <CardHeader className="py-3 px-4 md:px-6">
+          {/* Strategy Results */}
+          <Card className="border-border/50">
+            <CardHeader className="py-2.5 px-3 md:px-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <CardTitle className="text-base">Strategy Results</CardTitle>
-                <div className="flex items-center gap-3">
+                <CardTitle className="text-sm">Strategy Results</CardTitle>
+                <div className="flex items-center gap-2">
                   {hasRunBacktest && (
                     <>
-                      <Badge variant="secondary" className="text-xs">
+                      <Badge variant="secondary" className="text-xs h-5">
                         {getStrategyName(selectedStrategy)}
                       </Badge>
                       <Button 
                         size="sm" 
                         variant="outline"
-                        className="h-8"
+                        className="h-7 text-xs"
                         onClick={handleSaveSession}
                       >
-                        <Save className="h-4 w-4 mr-2" />
+                        <Save className="h-3 w-3 mr-1.5" />
                         Save Session
                       </Button>
                     </>
@@ -229,34 +290,34 @@ export default function StrategyTester() {
                   <Button 
                     size="sm" 
                     variant="outline"
-                    className="h-8"
+                    className="h-7 text-xs"
                     onClick={() => navigate('/journal')}
                   >
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    View Detailed Report
+                    <BarChart3 className="h-3 w-3 mr-1.5" />
+                    View Report
                   </Button>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="px-4 md:px-6 pb-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-3 bg-muted/30 rounded-lg">
-                  <div className="text-xs text-muted-foreground mb-1">Net Profit</div>
-                  <div className={`text-lg font-bold ${backtestResults.netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
+            <CardContent className="px-3 md:px-4 pb-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="text-center p-2.5 bg-muted/30 rounded-lg">
+                  <div className="text-[10px] text-muted-foreground mb-0.5">Net Profit</div>
+                  <div className={`text-base font-bold ${backtestResults.netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
                     {backtestResults.netProfit >= 0 ? '+' : ''}${backtestResults.netProfit.toLocaleString()}
                   </div>
                 </div>
-                <div className="text-center p-3 bg-muted/30 rounded-lg">
-                  <div className="text-xs text-muted-foreground mb-1">Total Trades</div>
-                  <div className="text-lg font-bold text-foreground">{backtestResults.totalTrades}</div>
+                <div className="text-center p-2.5 bg-muted/30 rounded-lg">
+                  <div className="text-[10px] text-muted-foreground mb-0.5">Total Trades</div>
+                  <div className="text-base font-bold text-foreground">{backtestResults.totalTrades}</div>
                 </div>
-                <div className="text-center p-3 bg-muted/30 rounded-lg">
-                  <div className="text-xs text-muted-foreground mb-1">Win Rate</div>
-                  <div className="text-lg font-bold text-foreground">{backtestResults.winRate}%</div>
+                <div className="text-center p-2.5 bg-muted/30 rounded-lg">
+                  <div className="text-[10px] text-muted-foreground mb-0.5">Win Rate</div>
+                  <div className="text-base font-bold text-foreground">{backtestResults.winRate}%</div>
                 </div>
-                <div className="text-center p-3 bg-muted/30 rounded-lg">
-                  <div className="text-xs text-muted-foreground mb-1">Profit Factor</div>
-                  <div className={`text-lg font-bold ${backtestResults.profitFactor >= 1 ? 'text-primary' : 'text-destructive'}`}>
+                <div className="text-center p-2.5 bg-muted/30 rounded-lg">
+                  <div className="text-[10px] text-muted-foreground mb-0.5">Profit Factor</div>
+                  <div className={`text-base font-bold ${backtestResults.profitFactor >= 1 ? 'text-primary' : 'text-destructive'}`}>
                     {backtestResults.profitFactor}
                   </div>
                 </div>

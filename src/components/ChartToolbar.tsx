@@ -8,11 +8,14 @@ import {
 import { 
   Crosshair, 
   MoreHorizontal,
-  Info
+  Info,
+  Palette
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IndicatorSelector } from './chart/IndicatorSelector';
 import { ChartStyleSelector, ChartStyle } from './chart/ChartStyleSelector';
+import { ReplayModePanel } from './chart/ReplayModePanel';
+import { SavedBacktestsDropdown, SavedBacktest } from './chart/SavedBacktestsDropdown';
 
 interface ChartToolbarProps {
   pair: string;
@@ -27,6 +30,10 @@ interface ChartToolbarProps {
   activeIndicators: string[];
   onToggleIndicator: (id: string) => void;
   onRemoveIndicator: (id: string) => void;
+  savedBacktests?: SavedBacktest[];
+  onSaveBacktest?: () => void;
+  onLoadBacktest?: (id: string) => void;
+  onCompareBacktests?: (ids: string[]) => void;
 }
 
 const timeframes = [
@@ -74,19 +81,23 @@ export function ChartToolbar({
   activeIndicators,
   onToggleIndicator,
   onRemoveIndicator,
+  savedBacktests = [],
+  onSaveBacktest,
+  onLoadBacktest,
+  onCompareBacktests,
 }: ChartToolbarProps) {
   return (
-    <div className="flex items-center justify-between px-3 py-2 h-11 bg-background/90 backdrop-blur-sm border-b border-border/50">
+    <div className="flex items-center justify-between px-3 py-2 h-11 bg-background/95 backdrop-blur-sm border-b border-border/50">
       {/* Left: Timeframe buttons + Chart Style */}
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           {timeframes.map((tf) => (
             <Button
               key={tf.value}
               variant={timeframe === tf.value ? 'default' : 'ghost'}
               size="sm"
               className={cn(
-                "h-7 px-2.5 text-xs font-medium",
+                "h-6 px-2 text-xs font-medium",
                 timeframe === tf.value 
                   ? 'bg-primary text-primary-foreground' 
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted'
@@ -99,8 +110,8 @@ export function ChartToolbar({
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-foreground">
-                <MoreHorizontal className="h-4 w-4" />
+              <Button variant="ghost" size="sm" className="h-6 px-1.5 text-muted-foreground hover:text-foreground">
+                <MoreHorizontal className="h-3.5 w-3.5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="bg-card border-border">
@@ -116,10 +127,22 @@ export function ChartToolbar({
           </DropdownMenu>
         </div>
 
-        <div className="h-5 w-px bg-border/50" />
+        <div className="h-4 w-px bg-border/50" />
 
         {/* Chart Style Selector */}
         <ChartStyleSelector value={chartStyle} onChange={onChartStyleChange} />
+
+        <div className="h-4 w-px bg-border/50" />
+
+        {/* Saved Backtests Dropdown */}
+        {onSaveBacktest && (
+          <SavedBacktestsDropdown
+            savedBacktests={savedBacktests}
+            onSave={onSaveBacktest}
+            onLoad={onLoadBacktest || (() => {})}
+            onCompare={onCompareBacktests || (() => {})}
+          />
+        )}
       </div>
 
       {/* Center: Symbol + Timeframe label */}
@@ -134,7 +157,12 @@ export function ChartToolbar({
       </div>
 
       {/* Right: Icon controls */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1">
+        {/* Replay Mode */}
+        <ReplayModePanel />
+
+        <div className="h-4 w-px bg-border/50 mx-1" />
+
         {/* Indicators Button */}
         <IndicatorSelector
           activeIndicators={activeIndicators}
@@ -142,14 +170,14 @@ export function ChartToolbar({
           onRemoveIndicator={onRemoveIndicator}
         />
 
-        <div className="h-5 w-px bg-border/50 mx-1" />
+        <div className="h-4 w-px bg-border/50 mx-1" />
 
         {/* Crosshair toggle */}
         <Button
           variant={crosshairEnabled ? 'default' : 'ghost'}
           size="sm"
           className={cn(
-            "h-7 w-7 p-0",
+            "h-6 w-6 p-0",
             crosshairEnabled 
               ? 'bg-primary/20 text-primary border border-primary/30' 
               : 'text-muted-foreground hover:text-foreground'
@@ -157,7 +185,7 @@ export function ChartToolbar({
           onClick={() => onCrosshairToggle(!crosshairEnabled)}
           title="Toggle crosshair"
         >
-          <Crosshair className="h-4 w-4" />
+          <Crosshair className="h-3.5 w-3.5" />
         </Button>
 
         {/* OHLC toggle */}
@@ -165,7 +193,7 @@ export function ChartToolbar({
           variant={ohlcEnabled ? 'default' : 'ghost'}
           size="sm"
           className={cn(
-            "h-7 px-2 text-xs font-medium gap-1",
+            "h-6 px-1.5 text-xs font-medium gap-1",
             ohlcEnabled 
               ? 'bg-primary/20 text-primary border border-primary/30' 
               : 'text-muted-foreground hover:text-foreground'
@@ -173,9 +201,28 @@ export function ChartToolbar({
           onClick={() => onOhlcToggle(!ohlcEnabled)}
           title="Show OHLC on Hover"
         >
-          <Info className="h-3.5 w-3.5" />
+          <Info className="h-3 w-3" />
           OHLC
         </Button>
+
+        {/* Theme placeholder */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+              title="Chart Theme"
+            >
+              <Palette className="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="bg-card border-border">
+            <DropdownMenuItem className="text-muted-foreground cursor-not-allowed opacity-50">
+              Custom Theme (Coming Soon)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
