@@ -13,10 +13,10 @@ const news = [
 ];
 
 const sessions = [
-  { name: 'Sydney', status: 'closed', time: 'Opens in 8:30:00' },
-  { name: 'Tokyo', status: 'open', time: 'Closes in 1:23:45' },
-  { name: 'London', status: 'closed', time: 'Opens in 2:15:30' },
-  { name: 'New York', status: 'closed', time: 'Opens in 5:45:12' },
+  { name: 'Sydney', status: 'closed', time: 'Opens in 8:30:00', accent: '#2EC4B6', region: 'Asia-Pacific Markets' },
+  { name: 'Tokyo', status: 'open', time: 'Closes in 1:23:45', accent: '#4361EE', region: 'JPY Markets' },
+  { name: 'London', status: 'closed', time: 'Opens in 2:15:30', accent: '#F4D35E', region: 'European Markets' },
+  { name: 'New York', status: 'closed', time: 'Opens in 5:45:12', accent: '#F77F00', region: 'US Markets' },
 ];
 
 const alerts = [
@@ -69,13 +69,18 @@ export default function Alerts() {
               <CardContent>
                 <div className="space-y-3">
                   {sessions.map((session) => (
-                    <div key={session.name} className="p-4 bg-muted/50 rounded-lg border border-border">
-                      <div className="flex items-center justify-between mb-2">
+                    <div key={session.name} className="relative p-4 bg-muted/50 rounded-lg border border-border overflow-hidden">
+                      <div 
+                        className="absolute left-0 top-0 bottom-0 w-[3px]" 
+                        style={{ backgroundColor: session.accent }}
+                      />
+                      <div className="flex items-center justify-between mb-1">
                         <h3 className="font-medium text-sm text-foreground">{session.name}</h3>
                         <Badge variant={session.status === 'open' ? 'default' : 'secondary'} className="text-xs">
                           {session.status}
                         </Badge>
                       </div>
+                      <p className="text-xs text-muted-foreground/70 mb-2">{session.region}</p>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Clock className="h-3.5 w-3.5" />
                         <span className="text-xs">{session.time}</span>
