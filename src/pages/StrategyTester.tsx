@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,9 +12,18 @@ import {
 } from "@/components/ui/select";
 import { Play, BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { CandlestickChart } from "@/components/CandlestickChart";
+import { generateMockOhlcData } from "@/lib/mockOhlcData";
 
 export default function StrategyTester() {
   const navigate = useNavigate();
+  const [selectedPair, setSelectedPair] = useState("eurusd");
+  const [selectedTimeframe, setSelectedTimeframe] = useState("h1");
+
+  // Generate mock data based on selected pair and timeframe
+  const chartData = useMemo(() => {
+    return generateMockOhlcData(selectedPair, selectedTimeframe, 150);
+  }, [selectedPair, selectedTimeframe]);
 
   return (
     <div className="flex flex-col min-h-full bg-background">
@@ -24,7 +34,7 @@ export default function StrategyTester() {
           <Card>
             <CardContent className="py-4">
               <div className="flex flex-wrap items-center gap-3">
-                <Select defaultValue="eurusd">
+                <Select value={selectedPair} onValueChange={setSelectedPair}>
                   <SelectTrigger className="w-[140px] h-9">
                     <SelectValue placeholder="Pair" />
                   </SelectTrigger>
@@ -36,7 +46,7 @@ export default function StrategyTester() {
                   </SelectContent>
                 </Select>
 
-                <Select defaultValue="h1">
+                <Select value={selectedTimeframe} onValueChange={setSelectedTimeframe}>
                   <SelectTrigger className="w-[140px] h-9">
                     <SelectValue placeholder="Timeframe" />
                   </SelectTrigger>
@@ -69,8 +79,12 @@ export default function StrategyTester() {
 
           <Card className="flex-1">
             <CardContent className="p-0">
-              <div className="h-[500px] bg-muted/30 flex items-center justify-center border-b border-border">
-                <p className="text-muted-foreground">TradingView-style chart placeholder</p>
+              <div className="h-[500px]">
+                <CandlestickChart 
+                  data={chartData} 
+                  pair={selectedPair} 
+                  timeframe={selectedTimeframe} 
+                />
               </div>
             </CardContent>
           </Card>
