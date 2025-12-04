@@ -2,6 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { TrendingUp, TrendingDown, Target, AlertCircle } from "lucide-react";
+import { PdfExportButton } from "./PdfExportButton";
+import { usePdfExport } from "@/hooks/use-pdf-export";
 
 interface Trade {
   id: string;
@@ -19,9 +21,19 @@ interface Trade {
 
 interface ReportsSessionsProps {
   trades: Trade[];
+  dateRangeLabel: string;
 }
 
-export function ReportsSessions({ trades }: ReportsSessionsProps) {
+export function ReportsSessions({ trades, dateRangeLabel }: ReportsSessionsProps) {
+  const { exportToPdf } = usePdfExport();
+
+  const handleExport = () => {
+    exportToPdf('reports-sessions', {
+      filename: `StreamBias-Sessions-${new Date().toISOString().split('T')[0]}`,
+      title: 'Sessions Report',
+      dateRange: dateRangeLabel,
+    });
+  };
   // Session performance data (placeholder - would need trade timestamps)
   const sessionData = [
     { 
@@ -63,7 +75,12 @@ export function ReportsSessions({ trades }: ReportsSessionsProps) {
   }));
 
   return (
-    <div className="space-y-6">
+    <div id="reports-sessions" className="space-y-6">
+      {/* Header with export */}
+      <div className="flex items-center justify-end" data-pdf-exclude>
+        <PdfExportButton onClick={handleExport} />
+      </div>
+
       {/* Session Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {sessionData.map((session) => (

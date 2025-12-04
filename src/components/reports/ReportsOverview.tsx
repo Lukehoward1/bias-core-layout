@@ -2,6 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, Calendar, Target, Zap } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { PdfExportButton } from "./PdfExportButton";
+import { usePdfExport } from "@/hooks/use-pdf-export";
 
 interface Trade {
   id: string;
@@ -19,9 +21,11 @@ interface Trade {
 
 interface ReportsOverviewProps {
   trades: Trade[];
+  dateRangeLabel: string;
 }
 
-export function ReportsOverview({ trades }: ReportsOverviewProps) {
+export function ReportsOverview({ trades, dateRangeLabel }: ReportsOverviewProps) {
+  const { exportToPdf } = usePdfExport();
   const totalPnl = trades.reduce((sum, t) => sum + t.pnl, 0);
   const winningTrades = trades.filter(t => t.pnl > 0);
   const losingTrades = trades.filter(t => t.pnl < 0);
@@ -72,13 +76,24 @@ export function ReportsOverview({ trades }: ReportsOverviewProps) {
     ? "High-confidence setups with 4+ star ratings" 
     : "Build more trade history to identify your edge";
 
+  const handleExportOverview = () => {
+    exportToPdf('reports-overview', {
+      filename: `StreamBias-Overview-${new Date().toISOString().split('T')[0]}`,
+      title: 'Overview Report',
+      dateRange: dateRangeLabel,
+    });
+  };
+
   return (
-    <div className="space-y-6">
+    <div id="reports-overview" className="space-y-6">
       {/* Key Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total P&L</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total P&L</CardTitle>
+              <PdfExportButton onClick={handleExportOverview} data-pdf-exclude />
+            </div>
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${totalPnl >= 0 ? 'text-success' : 'text-destructive'}`}>

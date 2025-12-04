@@ -10,7 +10,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Download, Search, TrendingUp, TrendingDown, Star } from "lucide-react";
+import { Download, Search, TrendingUp, TrendingDown, Star, FileText } from "lucide-react";
+import { PdfExportButton } from "./PdfExportButton";
+import { usePdfExport } from "@/hooks/use-pdf-export";
 
 interface Trade {
   id: string;
@@ -28,11 +30,21 @@ interface Trade {
 
 interface ReportsTradeLogProps {
   trades: Trade[];
+  dateRangeLabel: string;
 }
 
 type SortOption = 'date-desc' | 'date-asc' | 'pnl-desc' | 'pnl-asc' | 'rating-desc' | 'rating-asc';
 
-export function ReportsTradeLog({ trades }: ReportsTradeLogProps) {
+export function ReportsTradeLog({ trades, dateRangeLabel }: ReportsTradeLogProps) {
+  const { exportToPdf } = usePdfExport();
+
+  const handleExport = () => {
+    exportToPdf('reports-tradelog', {
+      filename: `StreamBias-TradeLog-${new Date().toISOString().split('T')[0]}`,
+      title: 'Trade Log Report',
+      dateRange: dateRangeLabel,
+    });
+  };
   const [searchQuery, setSearchQuery] = useState('');
   const [pairFilter, setPairFilter] = useState<string>('all');
   const [ratingFilter, setRatingFilter] = useState<string>('all');
@@ -125,16 +137,19 @@ export function ReportsTradeLog({ trades }: ReportsTradeLogProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div id="reports-tradelog" className="space-y-6">
       {/* Filters */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle>Filters & Search</CardTitle>
-            <Button variant="outline" size="sm" onClick={exportToCSV}>
-              <Download className="h-4 w-4 mr-2" />
-              Export CSV
-            </Button>
+            <div className="flex items-center gap-2" data-pdf-exclude>
+              <PdfExportButton onClick={handleExport} />
+              <Button variant="outline" size="sm" onClick={exportToCSV}>
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

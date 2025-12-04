@@ -2,6 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { Shield, AlertTriangle, TrendingDown, Target } from "lucide-react";
+import { PdfExportButton } from "./PdfExportButton";
+import { usePdfExport } from "@/hooks/use-pdf-export";
 
 interface Trade {
   id: string;
@@ -19,9 +21,19 @@ interface Trade {
 
 interface ReportsRiskManagementProps {
   trades: Trade[];
+  dateRangeLabel: string;
 }
 
-export function ReportsRiskManagement({ trades }: ReportsRiskManagementProps) {
+export function ReportsRiskManagement({ trades, dateRangeLabel }: ReportsRiskManagementProps) {
+  const { exportToPdf } = usePdfExport();
+
+  const handleExport = () => {
+    exportToPdf('reports-risk', {
+      filename: `StreamBias-RiskManagement-${new Date().toISOString().split('T')[0]}`,
+      title: 'Risk Management Report',
+      dateRange: dateRangeLabel,
+    });
+  };
   // Calculate risk metrics (using lots as proxy for risk)
   const risks = trades.map(t => t.lots * 100); // Convert to pseudo £ risk
   const avgRisk = risks.length > 0 ? risks.reduce((a, b) => a + b, 0) / risks.length : 0;
@@ -79,7 +91,12 @@ export function ReportsRiskManagement({ trades }: ReportsRiskManagementProps) {
   const riskOfRuin = ((1 - winRate) / winRate) * 100;
 
   return (
-    <div className="space-y-6">
+    <div id="reports-risk" className="space-y-6">
+      {/* Header with export */}
+      <div className="flex items-center justify-end" data-pdf-exclude>
+        <PdfExportButton onClick={handleExport} />
+      </div>
+
       {/* Key Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>

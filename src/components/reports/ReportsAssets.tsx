@@ -2,6 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { TrendingUp, TrendingDown, Star, Target } from "lucide-react";
+import { PdfExportButton } from "./PdfExportButton";
+import { usePdfExport } from "@/hooks/use-pdf-export";
 
 interface Trade {
   id: string;
@@ -19,9 +21,19 @@ interface Trade {
 
 interface ReportsAssetsProps {
   trades: Trade[];
+  dateRangeLabel: string;
 }
 
-export function ReportsAssets({ trades }: ReportsAssetsProps) {
+export function ReportsAssets({ trades, dateRangeLabel }: ReportsAssetsProps) {
+  const { exportToPdf } = usePdfExport();
+
+  const handleExport = () => {
+    exportToPdf('reports-assets', {
+      filename: `StreamBias-Assets-${new Date().toISOString().split('T')[0]}`,
+      title: 'Assets Report',
+      dateRange: dateRangeLabel,
+    });
+  };
   // Group trades by pair
   const pairStats = trades.reduce((acc, t) => {
     if (!acc[t.pair]) {
@@ -54,13 +66,16 @@ export function ReportsAssets({ trades }: ReportsAssetsProps) {
   }));
 
   return (
-    <div className="space-y-6">
+    <div id="reports-assets" className="space-y-6">
       {/* Top Insight Card */}
       <Card className="border-primary/30 bg-primary/5">
         <CardHeader className="pb-2">
-          <div className="flex items-center gap-2">
-            <Target className="h-5 w-5 text-primary" />
-            <CardTitle>Your Most Profitable Pair This Month</CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-primary" />
+              <CardTitle>Your Most Profitable Pair This Month</CardTitle>
+            </div>
+            <PdfExportButton onClick={handleExport} data-pdf-exclude />
           </div>
         </CardHeader>
         <CardContent>
