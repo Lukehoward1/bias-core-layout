@@ -10,20 +10,54 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Play, BarChart3 } from "lucide-react";
+import { Play, BarChart3, Save } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { CandlestickChart } from "@/components/CandlestickChart";
 import { generateMockOhlcData } from "@/lib/mockOhlcData";
+import { SessionsPanel } from "@/components/strategy/SessionsPanel";
+import { useStrategySessions } from "@/hooks/use-strategy-sessions";
+import { toast } from "@/hooks/use-toast";
 
 export default function StrategyTester() {
   const navigate = useNavigate();
   const [selectedPair, setSelectedPair] = useState("eurusd");
   const [selectedTimeframe, setSelectedTimeframe] = useState("h1");
+  const [selectedStrategy, setSelectedStrategy] = useState("ma-cross");
+  const [hasRunBacktest, setHasRunBacktest] = useState(false);
+
+  const {
+    sessions,
+    selectedSessionIds,
+    saveSession,
+    deleteSession,
+    renameSession,
+    updateSessionNotes,
+    toggleSessionSelection,
+    clearSelection,
+    getSelectedSessions,
+  } = useStrategySessions();
 
   // Generate mock data based on selected pair and timeframe
   const chartData = useMemo(() => {
     return generateMockOhlcData(selectedPair, selectedTimeframe, 200);
   }, [selectedPair, selectedTimeframe]);
+
+  const handleRunBacktest = () => {
+    setHasRunBacktest(true);
+    toast({
+      title: "Backtest Complete",
+      description: "Strategy results have been calculated.",
+    });
+  };
+
+  const handleSaveSession = () => {
+    const activeIndicators: string[] = ["SMA 20", "SMA 50"]; // Would come from chart state
+    const session = saveSession(selectedPair, selectedTimeframe, selectedStrategy, activeIndicators);
+    toast({
+      title: "Session Saved",
+      description: `"${session.name}" has been saved.`,
+    });
+  };
 
   return (
     <div className="flex flex-col min-h-full bg-background">
@@ -47,7 +81,7 @@ export default function StrategyTester() {
                   </SelectContent>
                 </Select>
 
-                <Select defaultValue="ma-cross">
+                <Select value={selectedStrategy} onValueChange={setSelectedStrategy}>
                   <SelectTrigger className="w-[160px] h-9">
                     <SelectValue placeholder="Strategy" />
                   </SelectTrigger>
@@ -58,7 +92,7 @@ export default function StrategyTester() {
                   </SelectContent>
                 </Select>
 
-                <Button className="ml-auto h-9">
+                <Button className="ml-auto h-9" onClick={handleRunBacktest}>
                   <Play className="h-4 w-4 mr-2" />
                   Run Backtest
                 </Button>
@@ -87,6 +121,17 @@ export default function StrategyTester() {
                 <CardTitle className="text-base">Strategy Results</CardTitle>
                 <div className="flex items-center gap-3">
                   <Badge variant="secondary" className="text-xs">Last run: 2 mins ago</Badge>
+                  {hasRunBacktest && (
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      className="h-8"
+                      onClick={handleSaveSession}
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Session
+                    </Button>
+                  )}
                   <Button 
                     size="sm" 
                     variant="outline"
@@ -122,6 +167,18 @@ export default function StrategyTester() {
           </Card>
         </div>
       </div>
+
+      {/* Sessions Panel */}
+      <SessionsPanel
+        sessions={sessions}
+        selectedSessionIds={selectedSessionIds}
+        onToggleSelection={toggleSessionSelection}
+        onClearSelection={clearSelection}
+        onDeleteSession={deleteSession}
+        onRenameSession={renameSession}
+        onUpdateNotes={updateSessionNotes}
+        getSelectedSessions={getSelectedSessions}
+      />
     </div>
   );
 }
