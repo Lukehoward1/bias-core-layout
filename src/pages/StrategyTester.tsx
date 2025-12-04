@@ -22,20 +22,21 @@ export default function StrategyTester() {
 
   // Generate mock data based on selected pair and timeframe
   const chartData = useMemo(() => {
-    return generateMockOhlcData(selectedPair, selectedTimeframe, 150);
+    return generateMockOhlcData(selectedPair, selectedTimeframe, 200);
   }, [selectedPair, selectedTimeframe]);
 
   return (
     <div className="flex flex-col min-h-full bg-background">
       <AppHeader title="Strategy Tester" />
       
-      <div className="flex-1 p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
+      <div className="flex-1 p-4 md:p-6">
+        <div className="max-w-7xl mx-auto flex flex-col gap-4">
+          {/* Top Control Bar */}
           <Card>
-            <CardContent className="py-4">
+            <CardContent className="py-3">
               <div className="flex flex-wrap items-center gap-3">
                 <Select value={selectedPair} onValueChange={setSelectedPair}>
-                  <SelectTrigger className="w-[140px] h-9">
+                  <SelectTrigger className="w-[130px] h-9">
                     <SelectValue placeholder="Pair" />
                   </SelectTrigger>
                   <SelectContent>
@@ -46,20 +47,8 @@ export default function StrategyTester() {
                   </SelectContent>
                 </Select>
 
-                <Select value={selectedTimeframe} onValueChange={setSelectedTimeframe}>
-                  <SelectTrigger className="w-[140px] h-9">
-                    <SelectValue placeholder="Timeframe" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="m15">15 Minutes</SelectItem>
-                    <SelectItem value="h1">1 Hour</SelectItem>
-                    <SelectItem value="h4">4 Hours</SelectItem>
-                    <SelectItem value="d1">Daily</SelectItem>
-                  </SelectContent>
-                </Select>
-
                 <Select defaultValue="ma-cross">
-                  <SelectTrigger className="w-[180px] h-9">
+                  <SelectTrigger className="w-[160px] h-9">
                     <SelectValue placeholder="Strategy" />
                   </SelectTrigger>
                   <SelectContent>
@@ -77,22 +66,25 @@ export default function StrategyTester() {
             </CardContent>
           </Card>
 
+          {/* Main Chart Card - Dominant element */}
           <Card className="flex-1">
             <CardContent className="p-0">
-              <div className="h-[500px]">
+              <div className="h-[calc(65vh-120px)] min-h-[400px] md:h-[calc(70vh-100px)]">
                 <CandlestickChart 
                   data={chartData} 
                   pair={selectedPair} 
-                  timeframe={selectedTimeframe} 
+                  timeframe={selectedTimeframe}
+                  onTimeframeChange={setSelectedTimeframe}
                 />
               </div>
             </CardContent>
           </Card>
 
+          {/* Strategy Results - Full width below chart */}
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Strategy Results</CardTitle>
+            <CardHeader className="py-3 px-4 md:px-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <CardTitle className="text-base">Strategy Results</CardTitle>
                 <div className="flex items-center gap-3">
                   <Badge variant="secondary" className="text-xs">Last run: 2 mins ago</Badge>
                   <Button 
@@ -107,23 +99,23 @@ export default function StrategyTester() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-                <div className="text-center">
-                  <div className="text-sm text-muted-foreground mb-1">Net Profit</div>
-                  <div className="text-xl font-bold text-success">+$12,450</div>
+            <CardContent className="px-4 md:px-6 pb-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-3 bg-muted/30 rounded-lg">
+                  <div className="text-xs text-muted-foreground mb-1">Net Profit</div>
+                  <div className="text-lg font-bold text-success">+$12,450</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-sm text-muted-foreground mb-1">Total Trades</div>
-                  <div className="text-xl font-bold text-foreground">184</div>
+                <div className="text-center p-3 bg-muted/30 rounded-lg">
+                  <div className="text-xs text-muted-foreground mb-1">Total Trades</div>
+                  <div className="text-lg font-bold text-foreground">184</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-sm text-muted-foreground mb-1">Percent Profitable</div>
-                  <div className="text-xl font-bold text-foreground">64.7%</div>
+                <div className="text-center p-3 bg-muted/30 rounded-lg">
+                  <div className="text-xs text-muted-foreground mb-1">Win Rate</div>
+                  <div className="text-lg font-bold text-foreground">64.7%</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-sm text-muted-foreground mb-1">Profit Factor</div>
-                  <div className="text-xl font-bold text-primary">1.85</div>
+                <div className="text-center p-3 bg-muted/30 rounded-lg">
+                  <div className="text-xs text-muted-foreground mb-1">Profit Factor</div>
+                  <div className="text-lg font-bold text-primary">1.85</div>
                 </div>
               </div>
             </CardContent>
