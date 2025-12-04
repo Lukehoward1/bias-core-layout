@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Star } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, addMonths, subMonths } from "date-fns";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { ReportsOverview } from "@/components/reports/ReportsOverview";
 import { ReportsPerformance } from "@/components/reports/ReportsPerformance";
 import { ReportsSessions } from "@/components/reports/ReportsSessions";
@@ -77,6 +78,90 @@ function StarRating({ rating, onRatingChange }: { rating: number; onRatingChange
         </button>
       ))}
     </div>
+  );
+}
+
+// Equity Curve Card Component
+function EquityCurveCard({ trades }: { trades: Trade[] }) {
+  const equityData = useMemo(() => {
+    const sortedTrades = [...trades].sort((a, b) => a.date.localeCompare(b.date));
+    let cumulative = 0;
+    let tradeCount = 0;
+    return sortedTrades.map(t => {
+      cumulative += t.pnl;
+      tradeCount += 1;
+      return { 
+        date: t.date, 
+        equity: cumulative,
+        tradeCount,
+        formattedDate: format(new Date(t.date), 'MMM d')
+      };
+    });
+  }, [trades]);
+
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+          <p className="text-xs text-muted-foreground mb-1">{data.formattedDate}</p>
+          <p className={`text-sm font-semibold ${data.equity >= 0 ? 'text-success' : 'text-destructive'}`}>
+            {data.equity >= 0 ? '+' : ''}£{data.equity.toLocaleString()}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">{data.tradeCount} trades total</p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle>Equity Curve</CardTitle>
+          <Badge variant="outline" className="text-xs">MT5 - Live</Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="h-56">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={equityData}>
+              <defs>
+                <linearGradient id="journalEquityGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <XAxis 
+                dataKey="formattedDate" 
+                tick={{ fontSize: 10 }} 
+                stroke="hsl(var(--muted-foreground))"
+                axisLine={{ stroke: 'hsl(var(--border))' }}
+                tickLine={{ stroke: 'hsl(var(--border))' }}
+              />
+              <YAxis 
+                tick={{ fontSize: 10 }} 
+                stroke="hsl(var(--muted-foreground))"
+                axisLine={{ stroke: 'hsl(var(--border))' }}
+                tickLine={{ stroke: 'hsl(var(--border))' }}
+                tickFormatter={(value) => `£${value}`}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Area 
+                type="monotone" 
+                dataKey="equity" 
+                stroke="hsl(var(--primary))" 
+                fill="url(#journalEquityGradient)"
+                strokeWidth={2}
+                dot={{ fill: 'hsl(var(--primary))', strokeWidth: 0, r: 0 }}
+                activeDot={{ fill: 'hsl(var(--primary))', strokeWidth: 2, stroke: 'hsl(var(--background))', r: 5 }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -220,19 +305,7 @@ export default function Journal() {
                 </Card>
               </div>
 
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Equity Curve</CardTitle>
-                    <Badge variant="outline" className="text-xs">MT5 - Live</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-56 bg-muted/30 rounded-lg flex items-center justify-center border border-border">
-                    <p className="text-sm text-muted-foreground">Chart placeholder - Equity curve visualization</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <EquityCurveCard trades={trades} />
 
               {/* Daily Performance Calendar */}
               <Card>
