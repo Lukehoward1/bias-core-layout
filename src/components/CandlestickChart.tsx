@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { createChart, IChartApi, ISeriesApi, CandlestickData, Time, CandlestickSeries, LineSeries, CrosshairMode } from 'lightweight-charts';
+import { createChart, IChartApi, ISeriesApi, CandlestickData, Time, CandlestickSeries, LineSeries, AreaSeries, BarSeries, CrosshairMode, LineData } from 'lightweight-charts';
 import { OhlcDataPoint, formatPrice, formatTime } from '@/lib/mockOhlcData';
 import { ChartToolbar } from './ChartToolbar';
 import { ChartVerticalToolbar } from './ChartVerticalToolbar';
+import { ChartStyle } from './chart/ChartStyleSelector';
 
 interface CandlestickChartProps {
   data: OhlcDataPoint[];
@@ -17,14 +18,46 @@ export interface CandlestickChartRef {
   resetView: () => void;
 }
 
+// Calculate Heikin Ashi candles
+function calculateHeikinAshi(data: OhlcDataPoint[]): OhlcDataPoint[] {
+  const result: OhlcDataPoint[] = [];
+  
+  for (let i = 0; i < data.length; i++) {
+    const current = data[i];
+    const prev = result[i - 1];
+    
+    const haClose = (current.open + current.high + current.low + current.close) / 4;
+    const haOpen = prev 
+      ? (prev.open + prev.close) / 2 
+      : (current.open + current.close) / 2;
+    const haHigh = Math.max(current.high, haOpen, haClose);
+    const haLow = Math.min(current.low, haOpen, haClose);
+    
+    result.push({
+      time: current.time,
+      timestamp: current.timestamp,
+      open: haOpen,
+      high: haHigh,
+      low: haLow,
+      close: haClose,
+    });
+  }
+  
+  return result;
+}
+
 export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChartProps>(
   ({ data, pair, timeframe, onTimeframeChange }, ref) => {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
-    const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+    const mainSeriesRef = useRef<ISeriesApi<'Candlestick'> | ISeriesApi<'Line'> | ISeriesApi<'Area'> | ISeriesApi<'Bar'> | null>(null);
     const maSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+    
     const [crosshairEnabled, setCrosshairEnabled] = useState(true);
     const [ohlcEnabled, setOhlcEnabled] = useState(false);
+    const [chartStyle, setChartStyle] = useState<ChartStyle>('candlestick');
+    const [activeIndicators, setActiveIndicators] = useState<string[]>([]);
+    
     const [tooltipData, setTooltipData] = useState<{
       visible: boolean;
       x: number;
@@ -36,6 +69,17 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
       close: string;
       isUp: boolean;
     } | null>(null);
+
+    // Toggle indicator
+    const handleToggleIndicator = useCallback((id: string) => {
+      setActiveIndicators(prev => 
+        prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+      );
+    }, []);
+
+    const handleRemoveIndicator = useCallback((id: string) => {
+      setActiveIndicators(prev => prev.filter(i => i !== id));
+    }, []);
 
     // Zoom controls
     const handleZoomIn = useCallback(() => {
@@ -142,26 +186,7 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
         },
       });
 
-      const candlestickSeries = chart.addSeries(CandlestickSeries, {
-        upColor: 'hsl(142, 71%, 45%)',
-        downColor: 'hsl(0, 84%, 60%)',
-        borderUpColor: 'hsl(142, 71%, 45%)',
-        borderDownColor: 'hsl(0, 84%, 60%)',
-        wickUpColor: 'hsl(142, 71%, 45%)',
-        wickDownColor: 'hsl(0, 84%, 60%)',
-      });
-
-      // Add MA line series (visual only)
-      const maSeries = chart.addSeries(LineSeries, {
-        color: 'hsl(200, 80%, 60%)',
-        lineWidth: 2,
-        priceLineVisible: false,
-        lastValueVisible: false,
-      });
-
       chartRef.current = chart;
-      seriesRef.current = candlestickSeries;
-      maSeriesRef.current = maSeries;
 
       // Handle resize
       const handleResize = () => {
@@ -176,69 +201,149 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
       window.addEventListener('resize', handleResize);
       handleResize();
 
-      // Crosshair move handler for tooltip
-      chart.subscribeCrosshairMove((param) => {
-        if (!param.point || !param.time || !param.seriesData.size) {
-          setTooltipData(null);
-          return;
-        }
-
-        const candleData = param.seriesData.get(candlestickSeries) as CandlestickData;
-        if (!candleData) {
-          setTooltipData(null);
-          return;
-        }
-
-        const isUp = candleData.close >= candleData.open;
-
-        setTooltipData({
-          visible: true,
-          x: param.point.x,
-          y: param.point.y,
-          time: formatTime(param.time as number, timeframe),
-          open: formatPrice(candleData.open, pair),
-          high: formatPrice(candleData.high, pair),
-          low: formatPrice(candleData.low, pair),
-          close: formatPrice(candleData.close, pair),
-          isUp,
-        });
-      });
-
       return () => {
         window.removeEventListener('resize', handleResize);
         chart.remove();
         chartRef.current = null;
-        seriesRef.current = null;
+        mainSeriesRef.current = null;
         maSeriesRef.current = null;
       };
     }, []);
 
-    // Update data when it changes
+    // Update series when chart style changes
     useEffect(() => {
-      if (!seriesRef.current || !maSeriesRef.current || !data.length) return;
+      if (!chartRef.current || !data.length) return;
 
-      const chartData: CandlestickData[] = data.map((d) => ({
-        time: d.timestamp as Time,
-        open: d.open,
-        high: d.high,
-        low: d.low,
-        close: d.close,
-      }));
+      // Remove existing series
+      if (mainSeriesRef.current) {
+        chartRef.current.removeSeries(mainSeriesRef.current);
+        mainSeriesRef.current = null;
+      }
+      if (maSeriesRef.current) {
+        chartRef.current.removeSeries(maSeriesRef.current);
+        maSeriesRef.current = null;
+      }
 
-      seriesRef.current.setData(chartData);
+      // Prepare data based on chart style
+      let processedData = data;
+      if (chartStyle === 'heikin-ashi') {
+        processedData = calculateHeikinAshi(data);
+      }
 
-      // Calculate simple MA (20-period)
-      const maPeriod = 20;
-      const maData = data.map((d, i) => {
-        if (i < maPeriod - 1) return null;
-        const slice = data.slice(i - maPeriod + 1, i + 1);
-        const avg = slice.reduce((sum, c) => sum + c.close, 0) / maPeriod;
-        return { time: d.timestamp as Time, value: avg };
-      }).filter(Boolean) as { time: Time; value: number }[];
+      // Create appropriate series based on chart style
+      if (chartStyle === 'line') {
+        const series = chartRef.current.addSeries(LineSeries, {
+          color: 'hsl(200, 80%, 60%)',
+          lineWidth: 2,
+          priceLineVisible: true,
+        });
+        const lineData: LineData[] = processedData.map((d) => ({
+          time: d.timestamp as Time,
+          value: d.close,
+        }));
+        series.setData(lineData);
+        mainSeriesRef.current = series;
+      } else if (chartStyle === 'area') {
+        const series = chartRef.current.addSeries(AreaSeries, {
+          topColor: 'hsl(200, 80%, 60%)',
+          bottomColor: 'hsla(200, 80%, 60%, 0.1)',
+          lineColor: 'hsl(200, 80%, 60%)',
+          lineWidth: 2,
+        });
+        const areaData: LineData[] = processedData.map((d) => ({
+          time: d.timestamp as Time,
+          value: d.close,
+        }));
+        series.setData(areaData);
+        mainSeriesRef.current = series;
+      } else if (chartStyle === 'bars') {
+        const series = chartRef.current.addSeries(BarSeries, {
+          upColor: 'hsl(142, 71%, 45%)',
+          downColor: 'hsl(0, 84%, 60%)',
+        });
+        const barData = processedData.map((d) => ({
+          time: d.timestamp as Time,
+          open: d.open,
+          high: d.high,
+          low: d.low,
+          close: d.close,
+        }));
+        series.setData(barData);
+        mainSeriesRef.current = series;
+      } else {
+        // Candlestick (default), heikin-ashi, or hollow candles
+        const isHollow = chartStyle === 'hollow';
+        const series = chartRef.current.addSeries(CandlestickSeries, {
+          upColor: isHollow ? 'transparent' : 'hsl(142, 71%, 45%)',
+          downColor: 'hsl(0, 84%, 60%)',
+          borderUpColor: 'hsl(142, 71%, 45%)',
+          borderDownColor: 'hsl(0, 84%, 60%)',
+          wickUpColor: 'hsl(142, 71%, 45%)',
+          wickDownColor: 'hsl(0, 84%, 60%)',
+        });
+        const candleData: CandlestickData[] = processedData.map((d) => ({
+          time: d.timestamp as Time,
+          open: d.open,
+          high: d.high,
+          low: d.low,
+          close: d.close,
+        }));
+        series.setData(candleData);
+        mainSeriesRef.current = series;
 
-      maSeriesRef.current.setData(maData);
+        // Subscribe to crosshair move for tooltip (only for candlestick types)
+        chartRef.current.subscribeCrosshairMove((param) => {
+          if (!param.point || !param.time || !param.seriesData.size) {
+            setTooltipData(null);
+            return;
+          }
+
+          const candleDataPoint = param.seriesData.get(series) as CandlestickData;
+          if (!candleDataPoint) {
+            setTooltipData(null);
+            return;
+          }
+
+          const isUp = candleDataPoint.close >= candleDataPoint.open;
+
+          setTooltipData({
+            visible: true,
+            x: param.point.x,
+            y: param.point.y,
+            time: formatTime(param.time as number, timeframe),
+            open: formatPrice(candleDataPoint.open, pair),
+            high: formatPrice(candleDataPoint.high, pair),
+            low: formatPrice(candleDataPoint.low, pair),
+            close: formatPrice(candleDataPoint.close, pair),
+            isUp,
+          });
+        });
+      }
+
+      // Add MA line if SMA or EMA is active
+      if (activeIndicators.some(id => ['sma', 'ema', 'ma'].includes(id))) {
+        const maSeries = chartRef.current.addSeries(LineSeries, {
+          color: 'hsl(200, 80%, 60%)',
+          lineWidth: 2,
+          priceLineVisible: false,
+          lastValueVisible: false,
+        });
+
+        // Calculate simple MA (20-period)
+        const maPeriod = 20;
+        const maData = data.map((d, i) => {
+          if (i < maPeriod - 1) return null;
+          const slice = data.slice(i - maPeriod + 1, i + 1);
+          const avg = slice.reduce((sum, c) => sum + c.close, 0) / maPeriod;
+          return { time: d.timestamp as Time, value: avg };
+        }).filter(Boolean) as { time: Time; value: number }[];
+
+        maSeries.setData(maData);
+        maSeriesRef.current = maSeries;
+      }
+
       chartRef.current?.timeScale().fitContent();
-    }, [data]);
+    }, [data, chartStyle, activeIndicators, pair, timeframe]);
 
     return (
       <div className="relative w-full h-full">
@@ -251,6 +356,11 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
           onCrosshairToggle={handleCrosshairToggle}
           ohlcEnabled={ohlcEnabled}
           onOhlcToggle={setOhlcEnabled}
+          chartStyle={chartStyle}
+          onChartStyleChange={setChartStyle}
+          activeIndicators={activeIndicators}
+          onToggleIndicator={handleToggleIndicator}
+          onRemoveIndicator={handleRemoveIndicator}
         />
 
         {/* Right-side Vertical Tools Panel */}
