@@ -4,6 +4,8 @@ import { OhlcDataPoint, formatPrice, formatTime } from '@/lib/mockOhlcData';
 import { ChartToolbar } from './ChartToolbar';
 import { ChartVerticalToolbar } from './ChartVerticalToolbar';
 import { ChartStyle } from './chart/ChartStyleSelector';
+import { Button } from '@/components/ui/button';
+import { Maximize2, Minimize2 } from 'lucide-react';
 
 interface CandlestickChartProps {
   data: OhlcDataPoint[];
@@ -16,6 +18,7 @@ export interface CandlestickChartRef {
   zoomIn: () => void;
   zoomOut: () => void;
   resetView: () => void;
+  toggleFullscreen: () => void;
 }
 
 // Calculate Heikin Ashi candles
@@ -49,6 +52,7 @@ function calculateHeikinAshi(data: OhlcDataPoint[]): OhlcDataPoint[] {
 export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChartProps>(
   ({ data, pair, timeframe, onTimeframeChange }, ref) => {
     const chartContainerRef = useRef<HTMLDivElement>(null);
+    const chartWrapperRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
     const mainSeriesRef = useRef<ISeriesApi<'Candlestick'> | ISeriesApi<'Line'> | ISeriesApi<'Area'> | ISeriesApi<'Bar'> | null>(null);
     const maSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
@@ -57,6 +61,7 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
     const [ohlcEnabled, setOhlcEnabled] = useState(false);
     const [chartStyle, setChartStyle] = useState<ChartStyle>('candlestick');
     const [activeIndicators, setActiveIndicators] = useState<string[]>([]);
+    const [isFullscreen, setIsFullscreen] = useState(false);
     
     const [tooltipData, setTooltipData] = useState<{
       visible: boolean;
@@ -113,11 +118,28 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
       chartRef.current.timeScale().fitContent();
     }, []);
 
+    // Fullscreen toggle
+    const handleToggleFullscreen = useCallback(() => {
+      setIsFullscreen(prev => !prev);
+    }, []);
+
+    // Handle ESC key to exit fullscreen
+    useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && isFullscreen) {
+          setIsFullscreen(false);
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isFullscreen]);
+
     // Expose methods via ref
     useImperativeHandle(ref, () => ({
       zoomIn: handleZoomIn,
       zoomOut: handleZoomOut,
       resetView: handleReset,
+      toggleFullscreen: handleToggleFullscreen,
     }));
 
     // Toggle crosshair mode
@@ -346,7 +368,14 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
     }, [data, chartStyle, activeIndicators, pair, timeframe]);
 
     return (
-      <div className="relative w-full h-full">
+      <div 
+        ref={chartWrapperRef}
+        className={`relative w-full h-full ${
+          isFullscreen 
+            ? 'fixed inset-0 z-50 bg-[hsl(222,30%,8%)]' 
+            : ''
+        }`}
+      >
         {/* Chart Toolbar */}
         <ChartToolbar
           pair={pair}
@@ -362,6 +391,21 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
           onToggleIndicator={handleToggleIndicator}
           onRemoveIndicator={handleRemoveIndicator}
         />
+
+        {/* Fullscreen Toggle Button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="absolute top-2 right-2 z-20 h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
+          onClick={handleToggleFullscreen}
+          title={isFullscreen ? 'Exit fullscreen (ESC)' : 'Enter fullscreen'}
+        >
+          {isFullscreen ? (
+            <Minimize2 className="h-4 w-4" />
+          ) : (
+            <Maximize2 className="h-4 w-4" />
+          )}
+        </Button>
 
         {/* Right-side Vertical Tools Panel */}
         <ChartVerticalToolbar
@@ -395,8 +439,11 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
           </div>
         )}
 
-        {/* Chart Container */}
-        <div ref={chartContainerRef} className="w-full h-full pt-11 pr-12" />
+        {/* Chart Container - slightly darker background */}
+        <div 
+          ref={chartContainerRef} 
+          className="w-full h-full pt-11 pr-12 bg-[hsl(222,30%,6%)]" 
+        />
 
         {/* Demo Data Label */}
         <div className="absolute bottom-3 left-3 z-10">
@@ -404,6 +451,15 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
             Demo data – live data coming soon
           </span>
         </div>
+
+        {/* Fullscreen exit hint */}
+        {isFullscreen && (
+          <div className="absolute bottom-3 right-3 z-10">
+            <span className="text-xs text-muted-foreground/40 bg-background/40 backdrop-blur-sm px-2 py-1 rounded">
+              Press ESC to exit fullscreen
+            </span>
+          </div>
+        )}
       </div>
     );
   }
