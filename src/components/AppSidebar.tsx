@@ -21,7 +21,6 @@ import {
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { useAppSidebar } from "@/hooks/use-app-sidebar";
 import { useTheme } from "@/hooks/use-theme";
 import sbLogo from "@/assets/sb-logo.svg";
@@ -102,17 +101,15 @@ export function AppSidebar() {
     >
       {/* TOP SECTION: Logo, Collapse Button, Main Nav */}
       <div className="flex-shrink-0">
-        {/* Logo */}
-        <div className={`${collapsed ? 'p-3' : 'px-4 py-5'} flex items-center justify-between`}>
-          <div className={`flex items-center ${collapsed ? 'justify-center h-10 w-10' : 'gap-3'}`}>
-            <img src={sbLogo} alt="StreamBias" className={`${collapsed ? 'h-8' : 'h-10'} w-auto flex-shrink-0`} />
+        {/* Logo - aligned with main header h-14 */}
+        <div className={`h-14 ${collapsed ? 'px-3' : 'px-4'} flex items-center justify-between border-b border-border`}>
+          <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
+            <img src={sbLogo} alt="StreamBias" className={`${collapsed ? 'h-7' : 'h-8'} w-auto flex-shrink-0`} />
             {!collapsed && (
               <span className="text-lg font-bold text-foreground">StreamBias</span>
             )}
           </div>
         </div>
-
-        <Separator className="bg-sidebar-border mx-3" />
 
         {/* Collapse Button */}
         <div className="px-3 py-3">
