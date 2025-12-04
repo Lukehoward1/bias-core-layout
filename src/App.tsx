@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/hooks/use-theme";
 import { AppLayout } from "@/layouts/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Markets from "./pages/Markets";
+import AssetDetail from "./pages/AssetDetail";
 import Calendar from "./pages/Calendar";
 import Alerts from "./pages/Alerts";
 import RiskTools from "./pages/RiskTools";
@@ -48,6 +49,8 @@ const App = () => (
               <Route path="/settings" element={<Settings />} />
               <Route path="/billing" element={<Billing />} />
             </Route>
+            {/* Full-screen Asset Detail (no sidebar) */}
+            <Route path="/asset/:symbol" element={<AssetDetail />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
