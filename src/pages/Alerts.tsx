@@ -13,6 +13,7 @@ const news = [
 ];
 
 const sessions = [
+  { name: 'Sydney', status: 'closed', time: 'Opens in 8:30:00' },
   { name: 'Tokyo', status: 'open', time: 'Closes in 1:23:45' },
   { name: 'London', status: 'closed', time: 'Opens in 2:15:30' },
   { name: 'New York', status: 'closed', time: 'Opens in 5:45:12' },
