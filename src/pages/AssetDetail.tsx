@@ -161,112 +161,115 @@ export default function AssetDetail() {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        {/* A) TOP HERO SECTION */}
+        {/* UNIFIED HERO CARD */}
         <Card className="overflow-hidden">
           <CardContent className="p-8">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-              <div className="flex items-center gap-6">
+            <div className="grid lg:grid-cols-2 gap-8">
+              {/* LEFT SIDE (50%) */}
+              <div className="flex flex-col">
+                {/* Asset Name */}
+                <div className="flex items-center gap-3 mb-3">
+                  <h1 className="text-4xl font-bold text-foreground">{asset.name}</h1>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleWatchlist}
+                    className="h-10 w-10"
+                  >
+                    <Star className={`h-6 w-6 ${isWatchlisted ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
+                  </Button>
+                </div>
+
+                {/* Price + Change */}
+                <div className="flex items-baseline gap-3 mb-6">
+                  <span className="text-3xl font-semibold text-foreground">{asset.price}</span>
+                  <span className={`text-lg font-medium ${asset.change.startsWith('+') ? 'text-success' : 'text-destructive'}`}>
+                    {asset.change}
+                  </span>
+                </div>
+
+                {/* Quick Insights */}
                 <div>
-                  <div className="flex items-center gap-4 mb-2">
-                    <h1 className="text-4xl font-bold text-foreground">{asset.name}</h1>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={toggleWatchlist}
-                      className="h-10 w-10"
-                    >
-                      <Star className={`h-6 w-6 ${isWatchlisted ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
-                    </Button>
+                  <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Quick Insights</h3>
+                  <div className="space-y-2">
+                    {insights.map((insight, index) => {
+                      const colors = ['bg-primary', 'bg-success', 'bg-warning', 'bg-destructive'];
+                      return (
+                        <div key={index} className="flex items-start gap-2">
+                          <div className={`h-1.5 w-1.5 rounded-full ${colors[index % colors.length]} mt-1.5 flex-shrink-0`} />
+                          <p className="text-sm text-muted-foreground">{insight}</p>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="flex items-center gap-4">
-                    <span className="text-3xl font-semibold text-foreground">{asset.price}</span>
-                    <span className={`text-lg font-medium ${asset.change.startsWith('+') ? 'text-success' : 'text-destructive'}`}>
-                      {asset.change}
+                </div>
+              </div>
+
+              {/* RIGHT SIDE (50%) */}
+              <div className="flex flex-col">
+                {/* Stats Row - 4 boxes */}
+                <div className="grid grid-cols-4 gap-3 mb-6">
+                  <div className="p-3 bg-muted/30 rounded-lg text-center">
+                    <span className="text-xs text-muted-foreground block mb-1">Volume</span>
+                    <span className="text-sm font-semibold text-foreground">{asset.volume}</span>
+                  </div>
+                  <div className="p-3 bg-muted/30 rounded-lg text-center">
+                    <span className="text-xs text-muted-foreground block mb-1">Spread</span>
+                    <span className="text-sm font-semibold text-foreground">{asset.spread}</span>
+                  </div>
+                  <div className="p-3 bg-muted/30 rounded-lg text-center">
+                    <span className="text-xs text-muted-foreground block mb-1">Confidence</span>
+                    <span className="text-sm font-semibold text-foreground">{asset.confidence}%</span>
+                  </div>
+                  <div className="p-3 bg-muted/30 rounded-lg text-center">
+                    <span className="text-xs text-muted-foreground block mb-1">Sentiment</span>
+                    <span className={`text-sm font-semibold ${asset.sentiment > 0 ? 'text-success' : asset.sentiment < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                      {asset.sentiment > 0 ? '+' : ''}{asset.sentiment}
                     </span>
                   </div>
                 </div>
-              </div>
 
-              {/* Bias Gauge */}
-              <div className="flex flex-col items-center gap-3 p-6 bg-muted/30 rounded-xl min-w-[200px]">
-                <span className="text-sm text-muted-foreground uppercase tracking-wide">Current Bias</span>
-                <div className="relative w-32 h-16">
-                  <svg viewBox="0 0 100 50" className="w-full h-full">
-                    <path
-                      d="M 10 45 A 40 40 0 0 1 90 45"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="6"
-                      className="text-muted"
-                    />
-                    <path
-                      d="M 10 45 A 40 40 0 0 1 90 45"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="6"
-                      strokeDasharray={`${(asset.confidence / 100) * 126} 126`}
-                      className={getBiasColor(asset.bias)}
-                    />
-                    {/* Needle */}
-                    <line
-                      x1="50"
-                      y1="45"
-                      x2={50 + 30 * Math.cos((Math.PI * (180 - asset.confidence * 1.8)) / 180)}
-                      y2={45 - 30 * Math.sin((Math.PI * (180 - asset.confidence * 1.8)) / 180)}
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className="text-foreground"
-                    />
-                    <circle cx="50" cy="45" r="4" fill="currentColor" className="text-foreground" />
-                  </svg>
-                </div>
-                <div className={`flex items-center gap-2 ${getBiasColor(asset.bias)}`}>
-                  {getBiasIcon(asset.bias)}
-                  <span className="text-xl font-bold">{asset.bias}</span>
-                </div>
-              </div>
-
-              {/* Stats */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-muted/30 rounded-lg text-center">
-                  <span className="text-xs text-muted-foreground block mb-1">Volume</span>
-                  <span className="text-lg font-semibold text-foreground">{asset.volume}</span>
-                </div>
-                <div className="p-4 bg-muted/30 rounded-lg text-center">
-                  <span className="text-xs text-muted-foreground block mb-1">Spread</span>
-                  <span className="text-lg font-semibold text-foreground">{asset.spread}</span>
-                </div>
-                <div className="p-4 bg-muted/30 rounded-lg text-center">
-                  <span className="text-xs text-muted-foreground block mb-1">Confidence</span>
-                  <span className="text-lg font-semibold text-foreground">{asset.confidence}%</span>
-                </div>
-                <div className="p-4 bg-muted/30 rounded-lg text-center">
-                  <span className="text-xs text-muted-foreground block mb-1">Sentiment</span>
-                  <span className={`text-lg font-semibold ${asset.sentiment > 0 ? 'text-success' : asset.sentiment < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                    {asset.sentiment > 0 ? '+' : ''}{asset.sentiment}
-                  </span>
+                {/* Large Bias Gauge */}
+                <div className="flex-1 flex flex-col items-center justify-center p-6 bg-muted/20 rounded-xl">
+                  <span className="text-sm text-muted-foreground uppercase tracking-wide mb-4">Current Bias</span>
+                  <div className="relative w-48 h-24">
+                    <svg viewBox="0 0 100 50" className="w-full h-full">
+                      {/* Background arc */}
+                      <path
+                        d="M 10 45 A 40 40 0 0 1 90 45"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="8"
+                        className="text-muted"
+                      />
+                      {/* Filled arc */}
+                      <path
+                        d="M 10 45 A 40 40 0 0 1 90 45"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="8"
+                        strokeDasharray={`${(asset.confidence / 100) * 126} 126`}
+                        className={getBiasColor(asset.bias)}
+                      />
+                      {/* Needle */}
+                      <line
+                        x1="50"
+                        y1="45"
+                        x2={50 + 35 * Math.cos((Math.PI * (180 - asset.confidence * 1.8)) / 180)}
+                        y2={45 - 35 * Math.sin((Math.PI * (180 - asset.confidence * 1.8)) / 180)}
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        className="text-foreground"
+                      />
+                      <circle cx="50" cy="45" r="5" fill="currentColor" className="text-foreground" />
+                    </svg>
+                  </div>
+                  <div className={`flex items-center gap-2 mt-4 ${getBiasColor(asset.bias)}`}>
+                    {getBiasIcon(asset.bias)}
+                    <span className="text-2xl font-bold">{asset.bias}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* B) QUICK INSIGHTS */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-primary" />
-              Quick Insights
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4">
-              {insights.map((insight, index) => (
-                <div key={index} className="flex items-start gap-3 p-4 bg-muted/20 rounded-lg">
-                  <div className="h-2 w-2 rounded-full bg-primary mt-2 flex-shrink-0" />
-                  <p className="text-lg text-foreground">{insight}</p>
-                </div>
-              ))}
             </div>
           </CardContent>
         </Card>
