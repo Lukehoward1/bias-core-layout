@@ -38,11 +38,29 @@ type SortOption = 'date-desc' | 'date-asc' | 'pnl-desc' | 'pnl-asc' | 'rating-de
 export function ReportsTradeLog({ trades, dateRangeLabel }: ReportsTradeLogProps) {
   const { exportToPdf } = usePdfExport();
 
+  // Calculate summary stats
+  const totalPnl = trades.reduce((sum, t) => sum + t.pnl, 0);
+  const winningTrades = trades.filter(t => t.pnl > 0);
+  const losingTrades = trades.filter(t => t.pnl < 0);
+  const winRate = trades.length > 0 ? (winningTrades.length / trades.length) * 100 : 0;
+  const avgWin = winningTrades.length > 0 ? winningTrades.reduce((sum, t) => sum + t.pnl, 0) / winningTrades.length : 0;
+  const avgLoss = losingTrades.length > 0 ? Math.abs(losingTrades.reduce((sum, t) => sum + t.pnl, 0) / losingTrades.length) : 1;
+  const avgRR = avgLoss > 0 ? avgWin / avgLoss : 0;
+
   const handleExport = () => {
     exportToPdf('reports-tradelog', {
       filename: `StreamBias-TradeLog-${new Date().toISOString().split('T')[0]}`,
       title: 'Trade Log Report',
       dateRange: dateRangeLabel,
+      userName: 'John Trader',
+      trades: {
+        totalPnl,
+        winRate,
+        avgRR,
+        tradeCount: trades.length,
+        bestDay: null,
+        worstDay: null,
+      },
     });
   };
   const [searchQuery, setSearchQuery] = useState('');

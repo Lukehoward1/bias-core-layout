@@ -29,11 +29,29 @@ const NEGATIVE_KEYWORDS = ['fear', 'fomo', 'hesitation', 'revenge', 'late entry'
 export function ReportsPsychology({ trades, dateRangeLabel }: ReportsPsychologyProps) {
   const { exportToPdf } = usePdfExport();
 
+  // Calculate summary stats
+  const totalPnl = trades.reduce((sum, t) => sum + t.pnl, 0);
+  const winningTrades = trades.filter(t => t.pnl > 0);
+  const losingTrades = trades.filter(t => t.pnl < 0);
+  const winRate = trades.length > 0 ? (winningTrades.length / trades.length) * 100 : 0;
+  const avgWin = winningTrades.length > 0 ? winningTrades.reduce((sum, t) => sum + t.pnl, 0) / winningTrades.length : 0;
+  const avgLoss = losingTrades.length > 0 ? Math.abs(losingTrades.reduce((sum, t) => sum + t.pnl, 0) / losingTrades.length) : 1;
+  const avgRR = avgLoss > 0 ? avgWin / avgLoss : 0;
+
   const handleExport = () => {
     exportToPdf('reports-psychology', {
       filename: `StreamBias-Psychology-${new Date().toISOString().split('T')[0]}`,
       title: 'Psychology Report',
       dateRange: dateRangeLabel,
+      userName: 'John Trader',
+      trades: {
+        totalPnl,
+        winRate,
+        avgRR,
+        tradeCount: trades.length,
+        bestDay: null,
+        worstDay: null,
+      },
     });
   };
   // Sentiment analysis
