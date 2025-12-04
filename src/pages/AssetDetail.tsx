@@ -230,9 +230,9 @@ export default function AssetDetail() {
                 </div>
 
                 {/* Large Bias Gauge */}
-                <div className="flex-1 flex flex-col items-center justify-center p-6 bg-muted/20 rounded-xl">
-                  <span className="text-sm text-muted-foreground uppercase tracking-wide mb-4">Current Bias</span>
-                  <div className="relative w-48 h-24">
+                <div className="flex-1 flex flex-col items-center justify-center pt-2">
+                  <span className="text-sm text-muted-foreground uppercase tracking-wide mb-6">Current Bias</span>
+                  <div className="relative w-72 h-36">
                     <svg viewBox="0 0 100 50" className="w-full h-full">
                       {/* Background arc */}
                       <path
@@ -264,9 +264,9 @@ export default function AssetDetail() {
                       <circle cx="50" cy="45" r="5" fill="currentColor" className="text-foreground" />
                     </svg>
                   </div>
-                  <div className={`flex items-center gap-2 mt-4 ${getBiasColor(asset.bias)}`}>
+                  <div className={`flex items-center gap-2 mt-6 ${getBiasColor(asset.bias)}`}>
                     {getBiasIcon(asset.bias)}
-                    <span className="text-2xl font-bold">{asset.bias}</span>
+                    <span className="text-3xl font-bold">{asset.bias}</span>
                   </div>
                 </div>
               </div>
