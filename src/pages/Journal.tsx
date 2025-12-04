@@ -22,6 +22,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Star } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, addMonths, subMonths } from "date-fns";
+import { ReportsOverview } from "@/components/reports/ReportsOverview";
+import { ReportsPerformance } from "@/components/reports/ReportsPerformance";
+import { ReportsSessions } from "@/components/reports/ReportsSessions";
+import { ReportsAssets } from "@/components/reports/ReportsAssets";
+import { ReportsSetupQuality } from "@/components/reports/ReportsSetupQuality";
+import { ReportsPsychology } from "@/components/reports/ReportsPsychology";
+import { ReportsRiskManagement } from "@/components/reports/ReportsRiskManagement";
+import { ReportsTradeLog } from "@/components/reports/ReportsTradeLog";
 
 interface Trade {
   id: string;
@@ -501,94 +509,43 @@ export default function Journal() {
             </TabsContent>
 
             <TabsContent value="reports" className="space-y-6 mt-5">
-              <div className="flex flex-wrap items-center gap-3">
-                <Select defaultValue="performance">
-                  <SelectTrigger className="w-[180px] h-9">
-                    <SelectValue placeholder="Report type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="performance">Performance Overview</SelectItem>
-                    <SelectItem value="by-pair">By Pair</SelectItem>
-                    <SelectItem value="by-session">By Session</SelectItem>
-                    <SelectItem value="by-day">By Day of Week</SelectItem>
-                    <SelectItem value="strategy">Strategy Comparison</SelectItem>
-                  </SelectContent>
-                </Select>
+              <Tabs defaultValue="overview" className="w-full">
+                <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 h-auto gap-1 p-1">
+                  <TabsTrigger value="overview" className="text-xs px-2 py-1.5">Overview</TabsTrigger>
+                  <TabsTrigger value="performance" className="text-xs px-2 py-1.5">Performance</TabsTrigger>
+                  <TabsTrigger value="sessions" className="text-xs px-2 py-1.5">Sessions</TabsTrigger>
+                  <TabsTrigger value="assets" className="text-xs px-2 py-1.5">Assets</TabsTrigger>
+                  <TabsTrigger value="setup" className="text-xs px-2 py-1.5">Setup Quality</TabsTrigger>
+                  <TabsTrigger value="psychology" className="text-xs px-2 py-1.5">Psychology</TabsTrigger>
+                  <TabsTrigger value="risk" className="text-xs px-2 py-1.5">Risk Mgmt</TabsTrigger>
+                  <TabsTrigger value="tradelog" className="text-xs px-2 py-1.5">Trade Log</TabsTrigger>
+                </TabsList>
 
-                <Select defaultValue="live">
-                  <SelectTrigger className="w-[160px] h-9">
-                    <SelectValue placeholder="Data source" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="live">Live Account</SelectItem>
-                    <SelectItem value="backtests">Backtests</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-foreground">68%</div>
-                    <p className="text-xs text-success mt-1">+3% from last period</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Average R</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-foreground">2.1</div>
-                    <p className="text-xs text-success mt-1">+0.2 from last period</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Max Drawdown</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-destructive">-8.5%</div>
-                    <p className="text-xs text-muted-foreground mt-1">Within acceptable limits</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Best Pair</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-foreground">EURUSD</div>
-                    <p className="text-xs text-success mt-1">+$12,450</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Equity Curve</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-56 bg-muted/30 rounded-lg flex items-center justify-center border border-border">
-                    <p className="text-sm text-muted-foreground">Equity curve visualization (Performance Overview)</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Performance by Pair</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-56 bg-muted/30 rounded-lg flex items-center justify-center border border-border">
-                    <p className="text-sm text-muted-foreground">Bar chart showing P&L by trading pair</p>
-                  </div>
-                </CardContent>
-              </Card>
+                <TabsContent value="overview" className="mt-5">
+                  <ReportsOverview trades={trades} />
+                </TabsContent>
+                <TabsContent value="performance" className="mt-5">
+                  <ReportsPerformance trades={trades} />
+                </TabsContent>
+                <TabsContent value="sessions" className="mt-5">
+                  <ReportsSessions trades={trades} />
+                </TabsContent>
+                <TabsContent value="assets" className="mt-5">
+                  <ReportsAssets trades={trades} />
+                </TabsContent>
+                <TabsContent value="setup" className="mt-5">
+                  <ReportsSetupQuality trades={trades} />
+                </TabsContent>
+                <TabsContent value="psychology" className="mt-5">
+                  <ReportsPsychology trades={trades} />
+                </TabsContent>
+                <TabsContent value="risk" className="mt-5">
+                  <ReportsRiskManagement trades={trades} />
+                </TabsContent>
+                <TabsContent value="tradelog" className="mt-5">
+                  <ReportsTradeLog trades={trades} />
+                </TabsContent>
+              </Tabs>
             </TabsContent>
           </Tabs>
         </div>

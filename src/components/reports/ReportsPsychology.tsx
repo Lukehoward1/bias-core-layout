@@ -1,0 +1,271 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Brain, AlertTriangle, ThumbsUp, Target, TrendingUp, Heart } from "lucide-react";
+
+interface Trade {
+  id: string;
+  date: string;
+  pair: string;
+  type: 'Long' | 'Short';
+  entry: number;
+  exit: number;
+  lots: number;
+  pnl: number;
+  status: string;
+  notes?: string;
+  rating?: number;
+}
+
+interface ReportsPsychologyProps {
+  trades: Trade[];
+}
+
+const POSITIVE_KEYWORDS = ['patient', 'perfect', 'confident', 'disciplined', 'calm', 'good setup', 'followed plan', 'great'];
+const NEGATIVE_KEYWORDS = ['fear', 'fomo', 'hesitation', 'revenge', 'late entry', 'early exit', 'overtrading', 'impatient', 'greedy', 'emotional'];
+
+export function ReportsPsychology({ trades }: ReportsPsychologyProps) {
+  // Sentiment analysis
+  const tradesWithNotes = trades.filter(t => t.notes && t.notes.trim().length > 0);
+  
+  const positiveNotes = tradesWithNotes.filter(t => 
+    POSITIVE_KEYWORDS.some(kw => t.notes?.toLowerCase().includes(kw))
+  );
+  const negativeNotes = tradesWithNotes.filter(t => 
+    NEGATIVE_KEYWORDS.some(kw => t.notes?.toLowerCase().includes(kw))
+  );
+
+  // Word frequency
+  const wordFrequency = trades.reduce((acc, t) => {
+    if (!t.notes) return acc;
+    const words = t.notes.toLowerCase().split(/\s+/);
+    words.forEach(word => {
+      if (word.length > 3) {
+        acc[word] = (acc[word] || 0) + 1;
+      }
+    });
+    return acc;
+  }, {} as Record<string, number>);
+
+  const topWords = Object.entries(wordFrequency)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15)
+    .map(([word, count]) => ({ word, count }));
+
+  // Emotional trigger analysis
+  const triggerAnalysis = NEGATIVE_KEYWORDS.map(trigger => {
+    const triggerTrades = trades.filter(t => t.notes?.toLowerCase().includes(trigger));
+    const totalPnl = triggerTrades.reduce((sum, t) => sum + t.pnl, 0);
+    const avgPnl = triggerTrades.length > 0 ? totalPnl / triggerTrades.length : 0;
+    return { trigger, count: triggerTrades.length, avgPnl, totalPnl };
+  }).filter(t => t.count > 0).sort((a, b) => a.avgPnl - b.avgPnl);
+
+  // Top mistakes
+  const topMistakes = triggerAnalysis.slice(0, 3);
+
+  // Most confident trades (high rating + positive notes)
+  const confidentTrades = trades
+    .filter(t => t.rating && t.rating >= 4 && t.pnl > 0)
+    .sort((a, b) => b.pnl - a.pnl)
+    .slice(0, 3);
+
+  // Improvement focus
+  const getImprovementFocus = () => {
+    if (topMistakes.length > 0) {
+      const worst = topMistakes[0];
+      return `Focus on eliminating "${worst.trigger}" - it has cost you £${Math.abs(worst.totalPnl).toLocaleString()} across ${worst.count} trades.`;
+    }
+    if (tradesWithNotes.length < trades.length * 0.3) {
+      return "Start adding notes to more trades to identify psychological patterns.";
+    }
+    return "Keep maintaining trading discipline and documenting your thoughts.";
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Sentiment Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <Brain className="h-4 w-4 text-primary" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Trades with Notes</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">{tradesWithNotes.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {Math.round((tradesWithNotes.length / trades.length) * 100)}% of all trades
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-success/30 bg-success/5">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <ThumbsUp className="h-4 w-4 text-success" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Positive Notes</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-success">{positiveNotes.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Trades with confident/disciplined mentions
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Negative Notes</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-destructive">{negativeNotes.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Trades with fear/FOMO/emotional mentions
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Word Cloud (simplified as tags) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Common Terms in Notes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {topWords.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {topWords.map((w) => (
+                <Badge 
+                  key={w.word} 
+                  variant="secondary"
+                  className="text-sm px-3 py-1"
+                  style={{ fontSize: `${Math.min(16, 10 + w.count * 2)}px` }}
+                >
+                  {w.word} ({w.count})
+                </Badge>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Add notes to your trades to build a word frequency analysis.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Emotional Triggers Heatmap */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            <CardTitle>Emotional Triggers vs Outcomes</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {triggerAnalysis.length > 0 ? (
+            <div className="space-y-3">
+              {triggerAnalysis.map((t) => (
+                <div 
+                  key={t.trigger}
+                  className={`p-3 rounded-lg border flex items-center justify-between ${
+                    t.avgPnl < 0 ? 'bg-destructive/5 border-destructive/30' : 'bg-success/5 border-success/30'
+                  }`}
+                >
+                  <div>
+                    <p className="text-sm font-medium capitalize">{t.trigger}</p>
+                    <p className="text-xs text-muted-foreground">{t.count} occurrences</p>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-sm font-bold ${t.avgPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                      {t.avgPnl >= 0 ? '+' : ''}£{Math.round(t.avgPnl)}/trade
+                    </p>
+                    <p className={`text-xs ${t.totalPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                      Total: {t.totalPnl >= 0 ? '+' : ''}£{t.totalPnl.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Add emotional notes to trades (fear, FOMO, hesitation, etc.) to analyze triggers.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Top Emotional Mistakes */}
+      {topMistakes.length > 0 && (
+        <Card className="border-destructive/30">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              <CardTitle>Top Emotional Mistakes</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {topMistakes.map((m, idx) => (
+                <div key={m.trigger} className="flex items-center gap-3">
+                  <span className="text-lg font-bold text-muted-foreground">#{idx + 1}</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium capitalize">{m.trigger}</p>
+                    <p className="text-xs text-destructive">
+                      Cost: £{Math.abs(m.totalPnl).toLocaleString()} ({m.count} trades)
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Most Confident Trades */}
+      <Card className="border-success/30 bg-success/5">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Heart className="h-5 w-5 text-success" />
+            <CardTitle>Most Confident Winning Trades</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {confidentTrades.length > 0 ? (
+            <div className="space-y-3">
+              {confidentTrades.map((t) => (
+                <div key={t.id} className="flex items-center justify-between p-2 rounded-lg bg-background/50">
+                  <div>
+                    <Badge variant="outline">{t.pair}</Badge>
+                    <span className="text-xs text-muted-foreground ml-2">{t.date}</span>
+                  </div>
+                  <span className="text-sm font-bold text-success">+£{t.pnl.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Rate your best trades 4-5 stars to track confident winners.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Improvement Focus */}
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Target className="h-5 w-5 text-primary" />
+            <CardTitle>Your Improvement Focus This Month</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-foreground">{getImprovementFocus()}</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
