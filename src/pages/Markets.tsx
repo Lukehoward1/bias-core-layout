@@ -131,7 +131,7 @@ export default function Markets() {
           </div>
 
           {/* Watchlist Overview Bar */}
-          {selectedType === 'Watchlist' && watchlistedPairs.length > 0 && (
+          {(selectedType === 'Watchlist' || selectedType === 'All') && watchlistedPairs.length > 0 && (
             <Card className="bg-muted/30">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
