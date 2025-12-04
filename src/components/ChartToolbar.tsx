@@ -76,7 +76,7 @@ export function ChartToolbar({
   onRemoveIndicator,
 }: ChartToolbarProps) {
   return (
-    <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-3 py-2 bg-background/80 backdrop-blur-sm border-b border-border/50">
+    <div className="flex items-center justify-between px-3 py-2 h-11 bg-background/90 backdrop-blur-sm border-b border-border/50">
       {/* Left: Timeframe buttons + Chart Style */}
       <div className="flex items-center gap-2">
         <div className="flex items-center gap-1">

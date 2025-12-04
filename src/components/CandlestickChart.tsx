@@ -367,60 +367,78 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
       chartRef.current?.timeScale().fitContent();
     }, [data, chartStyle, activeIndicators, pair, timeframe]);
 
+    // Toolbar width constant for layout calculations
+    const TOOLBAR_WIDTH = 44; // px
+    const TOOLBAR_HEIGHT = 44; // px (top toolbar)
+
     return (
       <div 
         ref={chartWrapperRef}
-        className={`relative w-full h-full ${
+        className={`relative w-full h-full overflow-hidden ${
           isFullscreen 
-            ? 'fixed inset-0 z-50 bg-[hsl(222,30%,8%)]' 
+            ? 'fixed inset-0 z-[100] bg-[hsl(222,30%,8%)]' 
             : ''
         }`}
       >
-        {/* Chart Toolbar */}
-        <ChartToolbar
-          pair={pair}
-          timeframe={timeframe}
-          onTimeframeChange={onTimeframeChange}
-          crosshairEnabled={crosshairEnabled}
-          onCrosshairToggle={handleCrosshairToggle}
-          ohlcEnabled={ohlcEnabled}
-          onOhlcToggle={setOhlcEnabled}
-          chartStyle={chartStyle}
-          onChartStyleChange={setChartStyle}
-          activeIndicators={activeIndicators}
-          onToggleIndicator={handleToggleIndicator}
-          onRemoveIndicator={handleRemoveIndicator}
-        />
-
-        {/* Fullscreen Toggle Button */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="absolute top-2 right-2 z-20 h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
-          onClick={handleToggleFullscreen}
-          title={isFullscreen ? 'Exit fullscreen (ESC)' : 'Enter fullscreen'}
+        {/* Chart Toolbar - top bar (spans full width minus vertical toolbar) */}
+        <div 
+          className="absolute top-0 left-0 z-30 h-11"
+          style={{ right: TOOLBAR_WIDTH }}
         >
-          {isFullscreen ? (
-            <Minimize2 className="h-4 w-4" />
-          ) : (
-            <Maximize2 className="h-4 w-4" />
-          )}
-        </Button>
+          <ChartToolbar
+            pair={pair}
+            timeframe={timeframe}
+            onTimeframeChange={onTimeframeChange}
+            crosshairEnabled={crosshairEnabled}
+            onCrosshairToggle={handleCrosshairToggle}
+            ohlcEnabled={ohlcEnabled}
+            onOhlcToggle={setOhlcEnabled}
+            chartStyle={chartStyle}
+            onChartStyleChange={setChartStyle}
+            activeIndicators={activeIndicators}
+            onToggleIndicator={handleToggleIndicator}
+            onRemoveIndicator={handleRemoveIndicator}
+          />
+        </div>
 
-        {/* Right-side Vertical Tools Panel */}
-        <ChartVerticalToolbar
-          onZoomIn={handleZoomIn}
-          onZoomOut={handleZoomOut}
-          onReset={handleReset}
-        />
+        {/* Right-side Vertical Tools Panel - flush to right edge, full height */}
+        <div 
+          className="absolute top-0 right-0 bottom-0 z-30"
+          style={{ width: TOOLBAR_WIDTH }}
+        >
+          {/* Fullscreen Toggle Button - at top of vertical toolbar */}
+          <div className="h-11 flex items-center justify-center border-b border-border/50 bg-background/90">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
+              onClick={handleToggleFullscreen}
+              title={isFullscreen ? 'Exit fullscreen (ESC)' : 'Enter fullscreen'}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="h-4 w-4" />
+              ) : (
+                <Maximize2 className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+          {/* Vertical tools below fullscreen button */}
+          <div className="absolute top-11 right-0 bottom-0 left-0">
+            <ChartVerticalToolbar
+              onZoomIn={handleZoomIn}
+              onZoomOut={handleZoomOut}
+              onReset={handleReset}
+            />
+          </div>
+        </div>
 
         {/* Tooltip - only shown when ohlcEnabled */}
         {ohlcEnabled && tooltipData && tooltipData.visible && (
           <div
-            className="absolute z-20 pointer-events-none bg-card/95 backdrop-blur-sm border border-border rounded-lg px-3 py-2 shadow-lg text-sm"
+            className="absolute z-50 pointer-events-none bg-card/95 backdrop-blur-sm border border-border rounded-lg px-3 py-2 shadow-lg text-sm"
             style={{
               left: Math.min(tooltipData.x + 12, (chartContainerRef.current?.clientWidth || 0) - 150),
-              top: Math.max(tooltipData.y - 80, 50),
+              top: Math.max(tooltipData.y - 80, 60),
             }}
           >
             <div className="text-muted-foreground text-xs mb-1">{tooltipData.time}</div>
@@ -439,14 +457,15 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
           </div>
         )}
 
-        {/* Chart Container - slightly darker background */}
+        {/* Chart Container - fills space between top toolbar and bottom, minus vertical toolbar */}
         <div 
           ref={chartContainerRef} 
-          className="w-full h-full pt-11 pr-12 bg-[hsl(222,30%,6%)]" 
+          className="absolute left-0 bottom-0 bg-[hsl(222,30%,6%)] overflow-hidden"
+          style={{ top: TOOLBAR_HEIGHT, right: TOOLBAR_WIDTH }}
         />
 
         {/* Demo Data Label */}
-        <div className="absolute bottom-3 left-3 z-10">
+        <div className="absolute bottom-3 left-3 z-20">
           <span className="text-xs text-muted-foreground/60 bg-background/60 backdrop-blur-sm px-2 py-1 rounded">
             Demo data – live data coming soon
           </span>
@@ -454,7 +473,7 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
 
         {/* Fullscreen exit hint */}
         {isFullscreen && (
-          <div className="absolute bottom-3 right-3 z-10">
+          <div className="absolute bottom-3 z-20" style={{ right: TOOLBAR_WIDTH + 12 }}>
             <span className="text-xs text-muted-foreground/40 bg-background/40 backdrop-blur-sm px-2 py-1 rounded">
               Press ESC to exit fullscreen
             </span>
