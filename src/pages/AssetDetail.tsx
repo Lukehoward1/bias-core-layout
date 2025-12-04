@@ -60,6 +60,38 @@ const quickInsights: Record<string, string[]> = {
   ],
 };
 
+// Asset-specific news events for today
+const assetNewsEvents: Record<string, { event: string; time: string; impact: 'High' | 'Medium' | 'Low' }[]> = {
+  'EURUSD': [
+    { event: 'CPI (USD)', time: '13:30 GMT', impact: 'High' },
+    { event: 'Core CPI (USD)', time: '15:00 GMT', impact: 'High' },
+  ],
+  'GBPUSD': [
+    { event: 'Retail Sales (GBP)', time: '14:00 GMT', impact: 'Medium' },
+    { event: 'CPI (USD)', time: '13:30 GMT', impact: 'High' },
+  ],
+  'USDJPY': [],
+  'XAUUSD': [
+    { event: 'CPI (USD)', time: '13:30 GMT', impact: 'High' },
+    { event: 'Gold Futures Report', time: '15:30 GMT', impact: 'Medium' },
+  ],
+  'BTCUSD': [
+    { event: 'BTC ETF Decision', time: '12:00 GMT', impact: 'High' },
+  ],
+  'AUDUSD': [],
+  'USDCAD': [
+    { event: 'CAD Inflation', time: '16:00 GMT', impact: 'High' },
+    { event: 'CPI (USD)', time: '13:30 GMT', impact: 'High' },
+  ],
+  'SPX500': [
+    { event: 'US Market Open', time: '14:30 GMT', impact: 'Low' },
+    { event: 'CPI (USD)', time: '13:30 GMT', impact: 'High' },
+  ],
+  'ETHUSD': [
+    { event: 'ETH Network Update', time: '18:00 GMT', impact: 'Medium' },
+  ],
+};
+
 const keyLevels = [
   { type: 'Daily Support', price: '2018.5', notes: 'Retest zone' },
   { type: 'Daily Resistance', price: '2035.0', notes: 'Liquidity overhead' },
@@ -202,6 +234,38 @@ export default function AssetDetail() {
                       );
                     })}
                   </div>
+
+                  {/* News Impact Section */}
+                  {symbol && assetNewsEvents[symbol] && assetNewsEvents[symbol].length > 0 && (
+                    <div className="mt-5">
+                      <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">News Impact</h3>
+                      <div className="space-y-2">
+                        {assetNewsEvents[symbol].map((newsItem, index) => {
+                          const impactColors = {
+                            High: 'bg-destructive text-destructive-foreground',
+                            Medium: 'bg-warning text-warning-foreground',
+                            Low: 'bg-success text-success-foreground'
+                          };
+                          return (
+                            <button
+                              key={index}
+                              onClick={() => navigate('/alerts')}
+                              className="w-full flex items-center gap-2 text-left hover:bg-muted/30 rounded-md px-2 py-1.5 transition-colors group"
+                            >
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${impactColors[newsItem.impact]}`}>
+                                {newsItem.impact}
+                              </span>
+                              <span className="text-sm text-foreground group-hover:text-primary transition-colors">
+                                {newsItem.event}
+                              </span>
+                              <span className="text-sm text-muted-foreground">—</span>
+                              <span className="text-sm text-muted-foreground">{newsItem.time}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
