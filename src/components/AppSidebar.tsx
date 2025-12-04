@@ -97,7 +97,7 @@ export function AppSidebar() {
         ${collapsed ? 'w-16' : 'w-60'} 
         bg-sidebar
         flex flex-col h-screen transition-all duration-300
-        fixed left-0 top-0 z-40 overflow-y-auto
+        fixed left-0 top-0 z-40 overflow-y-auto overflow-x-hidden
       `}
     >
       {/* TOP SECTION: Logo, Collapse Button, Main Nav */}
