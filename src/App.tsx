@@ -13,6 +13,9 @@ import Alerts from "./pages/Alerts";
 import RiskTools from "./pages/RiskTools";
 import Journal from "./pages/Journal";
 import StrategyTester from "./pages/StrategyTester";
+import ManualBacktesting from "./pages/ManualBacktesting";
+import AutomatedStrategyLab from "./pages/AutomatedStrategyLab";
+import FundingChallengeSim from "./pages/FundingChallengeSim";
 import Community from "./pages/Community";
 import Education from "./pages/Education";
 import Webinars from "./pages/Webinars";
@@ -41,6 +44,9 @@ const App = () => (
               <Route path="/risk-tools" element={<RiskTools />} />
               <Route path="/journal" element={<Journal />} />
               <Route path="/strategy-tester" element={<StrategyTester />} />
+              <Route path="/strategy/manual" element={<ManualBacktesting />} />
+              <Route path="/strategy/auto" element={<AutomatedStrategyLab />} />
+              <Route path="/strategy/funding" element={<FundingChallengeSim />} />
               <Route path="/community" element={<Community />} />
               <Route path="/education" element={<Education />} />
               <Route path="/webinars" element={<Webinars />} />
