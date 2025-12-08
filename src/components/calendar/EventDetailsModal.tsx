@@ -1,9 +1,6 @@
-import { useState } from "react";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,10 +10,12 @@ import {
   Info, 
   Clock, 
   Star, 
-  Bell, 
-  ArrowLeft,
+  Bell,
   Calendar,
-  BarChart3
+  BarChart3,
+  TrendingDown,
+  ArrowUpRight,
+  ArrowDownRight
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,7 +37,6 @@ interface EventDetailsModalProps {
 
 // Mock historical data generator based on event
 const getHistoricalData = (eventName: string) => {
-  // Generate mock data that varies slightly per event
   const baseValues = [185, 225, 165, 253, 281, 209, 187, 227, 336, 150, 199];
   const seed = eventName.length;
   return [
@@ -57,22 +55,55 @@ const getHistoricalData = (eventName: string) => {
   ];
 };
 
-// Market interpretation text based on event type
-const getMarketInterpretation = (eventName: string, isReleased: boolean) => {
-  const interpretations: Record<string, string> = {
-    "Non-Farm Payrolls": "Non-Farm Payrolls (NFP) measures the change in the number of employed people in the US, excluding farm workers. A higher than expected reading is typically bullish for USD, while a lower reading is bearish. This is one of the most market-moving economic indicators.",
-    "Unemployment Rate": "The Unemployment Rate measures the percentage of the total workforce that is unemployed and actively seeking employment. Lower unemployment is generally positive for the currency as it indicates economic strength.",
-    "German Factory Orders": "German Factory Orders measures the change in the total value of new purchase orders placed with manufacturers. Strong orders indicate robust economic activity and are generally positive for EUR.",
-    "ECB Interest Rate Decision": "The European Central Bank's interest rate decision directly impacts EUR valuation. Higher rates attract foreign investment, strengthening the currency, while lower rates tend to weaken it.",
-    "Employment Change": "Employment Change measures the change in the number of employed people. Strong employment growth is bullish for CAD as it indicates economic expansion and potential inflationary pressure.",
-    "BOE Interest Rate Decision": "The Bank of England's interest rate decision is crucial for GBP. Rate hikes typically strengthen the pound, while cuts or dovish guidance tend to weaken it.",
+// Market interpretation with bullish/bearish focus
+const getMarketInterpretation = (eventName: string, currency: string, isReleased: boolean) => {
+  const interpretations: Record<string, { text: string; bias: 'bullish' | 'bearish' | 'neutral'; pairs: string[] }> = {
+    "Non-Farm Payrolls": {
+      text: "Higher-than-expected NFP is typically bullish for USD, signaling strong job creation and economic momentum. Lower-than-expected readings are bearish for USD as they may prompt the Fed to consider rate cuts.",
+      bias: 'bullish',
+      pairs: ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF']
+    },
+    "Unemployment Rate": {
+      text: "Lower-than-expected unemployment is usually bullish for USD, especially against EUR, GBP and JPY, as it signals stronger labour market conditions. Higher-than-expected unemployment is typically bearish for USD as it suggests economic weakness and may increase the chances of policy easing.",
+      bias: 'bullish',
+      pairs: ['EURUSD', 'GBPUSD', 'USDJPY']
+    },
+    "German Factory Orders": {
+      text: "Higher-than-expected factory orders are bullish for EUR, indicating robust manufacturing demand. Lower readings are bearish for EUR as they suggest weakening industrial activity in the eurozone's largest economy.",
+      bias: 'neutral',
+      pairs: ['EURUSD', 'EURGBP', 'EURJPY']
+    },
+    "ECB Interest Rate Decision": {
+      text: "Rate hikes or hawkish guidance are bullish for EUR as higher rates attract foreign capital. Rate cuts or dovish signals are bearish for EUR. Markets often price in expectations, so surprises move price most.",
+      bias: 'neutral',
+      pairs: ['EURUSD', 'EURGBP', 'EURJPY', 'EURCHF']
+    },
+    "Employment Change": {
+      text: "Stronger-than-expected job growth is bullish for CAD as it signals economic strength and supports BoC tightening. Weaker readings are bearish for CAD and may weigh on rate expectations.",
+      bias: 'bullish',
+      pairs: ['USDCAD', 'CADJPY', 'EURCAD']
+    },
+    "BOE Interest Rate Decision": {
+      text: "Rate hikes or hawkish tone are bullish for GBP, attracting yield-seeking flows. Rate cuts or dovish forward guidance are bearish for GBP. Watch for voting split and MPC commentary.",
+      bias: 'neutral',
+      pairs: ['GBPUSD', 'EURGBP', 'GBPJPY']
+    },
   };
+
+  const defaultInterpretation = {
+    text: `Better-than-forecast data is typically bullish for ${currency}, while weaker-than-expected readings tend to be bearish. The magnitude of the surprise often determines the strength of the market reaction.`,
+    bias: 'neutral' as const,
+    pairs: [`${currency}USD`, `EUR${currency}`]
+  };
+
+  const interpretation = interpretations[eventName] || defaultInterpretation;
   
-  if (!isReleased) {
-    return (interpretations[eventName] || "This economic indicator provides insight into the health of the economy. Market participants will closely watch the release for deviations from expectations.") + "\n\n⏳ Awaiting data release...";
-  }
+  const awaitingText = "\n\nWe are awaiting the new release – price may be volatile around the announcement.";
   
-  return interpretations[eventName] || "This economic indicator provides insight into the health of the economy. The released data will be analyzed for its implications on monetary policy and market sentiment.";
+  return {
+    ...interpretation,
+    text: interpretation.text + (isReleased ? "" : awaitingText)
+  };
 };
 
 // Event narrative based on release status
@@ -96,7 +127,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
   const isReleased = event.actual !== "—";
   const historicalData = getHistoricalData(event.event);
   const maxValue = Math.max(...historicalData.map(d => d.actual || d.forecast || 0));
-  const interpretation = getMarketInterpretation(event.event, isReleased);
+  const interpretation = getMarketInterpretation(event.event, event.currency, isReleased);
   const narrative = getEventNarrative(event);
 
   const getImpactColor = (impact: string) => {
@@ -119,114 +150,197 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-card border-border">
-        {/* Header */}
-        <DialogHeader className="space-y-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs font-semibold">
-                  {event.currency}
-                </Badge>
-                <Badge variant={getImpactColor(event.impact)} className="text-xs">
-                  {event.impact.toUpperCase()} IMPACT
-                </Badge>
-              </div>
-              <DialogTitle className="text-xl font-semibold text-foreground">
+      <DialogContent className="max-w-5xl w-[95vw] max-h-[90vh] overflow-y-auto bg-card border-border p-0">
+        {/* Header Row */}
+        <div className="sticky top-0 z-10 bg-card border-b border-border px-6 py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3 flex-wrap">
+              <Badge variant="outline" className="text-sm font-bold px-3 py-1">
+                {event.currency}
+              </Badge>
+              <Badge variant={getImpactColor(event.impact)} className="text-xs">
+                {event.impact.toUpperCase()} IMPACT
+              </Badge>
+              <h2 className="text-xl font-semibold text-foreground">
                 {event.event}
-              </DialogTitle>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              </h2>
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                 <Clock className="h-3.5 w-3.5" />
                 <span>Today at {event.time} GMT</span>
               </div>
             </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2 shrink-0">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-1.5"
+                onClick={handleAddToWatchlist}
+              >
+                <Star className="h-3.5 w-3.5" />
+                Add to Watchlist
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-1.5"
+                onClick={handleSetAlert}
+              >
+                <Bell className="h-3.5 w-3.5" />
+                Set Release Alert
+              </Button>
+            </div>
           </div>
+        </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="gap-1.5"
-              onClick={handleAddToWatchlist}
-            >
-              <Star className="h-3.5 w-3.5" />
-              Add to Watchlist
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="gap-1.5"
-              onClick={handleSetAlert}
-            >
-              <Bell className="h-3.5 w-3.5" />
-              Set Release Alert
-            </Button>
-          </div>
-        </DialogHeader>
-
-        <div className="space-y-5 mt-2">
-          {/* Market Interpretation */}
-          <Card className="bg-muted/30 border-border/50">
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2 mb-3">
-                <BarChart3 className="h-4 w-4 text-primary" />
-                <h3 className="text-sm font-medium text-foreground">Market Interpretation</h3>
-              </div>
-              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
-                {interpretation}
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Current Event Figures */}
-          <Card className="bg-muted/30 border-border/50">
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Calendar className="h-4 w-4 text-primary" />
-                <h3 className="text-sm font-medium text-foreground">Current Release Figures</h3>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-background/50 rounded-lg p-3 text-center">
-                  <div className="text-xs text-muted-foreground mb-1">Previous</div>
-                  <div className="text-lg font-semibold text-foreground">{event.previous}</div>
+        <div className="p-6 space-y-6">
+          {/* Two Column Layout: Market Interpretation + Current Figures */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Market Interpretation - Left Column */}
+            <Card className="bg-muted/30 border-border/50">
+              <CardContent className="pt-5 pb-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <BarChart3 className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-semibold text-foreground">Market Interpretation</h3>
                 </div>
-                <div className="bg-background/50 rounded-lg p-3 text-center">
-                  <div className="text-xs text-muted-foreground mb-1">Forecast</div>
-                  <div className="text-lg font-semibold text-foreground">{event.forecast}</div>
+                
+                {/* Bias Indicator */}
+                <div className="flex items-center gap-2 mb-4 p-3 rounded-lg bg-background/50">
+                  {interpretation.bias === 'bullish' && (
+                    <>
+                      <div className="h-8 w-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                        <ArrowUpRight className="h-4 w-4 text-emerald-500" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Typical Bias</div>
+                        <div className="text-sm font-medium text-emerald-500">Bullish for {event.currency}</div>
+                      </div>
+                    </>
+                  )}
+                  {interpretation.bias === 'bearish' && (
+                    <>
+                      <div className="h-8 w-8 rounded-full bg-red-500/20 flex items-center justify-center">
+                        <ArrowDownRight className="h-4 w-4 text-red-500" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Typical Bias</div>
+                        <div className="text-sm font-medium text-red-500">Bearish for {event.currency}</div>
+                      </div>
+                    </>
+                  )}
+                  {interpretation.bias === 'neutral' && (
+                    <>
+                      <div className="h-8 w-8 rounded-full bg-amber-500/20 flex items-center justify-center">
+                        <TrendingUp className="h-4 w-4 text-amber-500" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Typical Bias</div>
+                        <div className="text-sm font-medium text-amber-500">Data-Dependent</div>
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div className="bg-background/50 rounded-lg p-3 text-center">
-                  <div className="text-xs text-muted-foreground mb-1">Actual</div>
-                  <div className={`text-lg font-semibold ${isReleased ? 'text-primary' : 'text-muted-foreground'}`}>
-                    {event.actual}
+
+                <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line mb-4">
+                  {interpretation.text}
+                </p>
+
+                {/* Relevant Pairs */}
+                <div className="pt-3 border-t border-border/50">
+                  <div className="text-xs text-muted-foreground mb-2">Most impacted pairs:</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {interpretation.pairs.map((pair) => (
+                      <Badge key={pair} variant="secondary" className="text-xs font-mono">
+                        {pair}
+                      </Badge>
+                    ))}
                   </div>
                 </div>
-                <div className="bg-background/50 rounded-lg p-3 text-center">
-                  <div className="text-xs text-muted-foreground mb-1">Deviation</div>
-                  <div className="text-lg font-semibold text-muted-foreground">
-                    {isReleased ? "—" : "Pending"}
+              </CardContent>
+            </Card>
+
+            {/* Current Release Figures - Right Column */}
+            <Card className="bg-muted/30 border-border/50">
+              <CardContent className="pt-5 pb-5 h-full flex flex-col">
+                <div className="flex items-center gap-2 mb-4">
+                  <Calendar className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-semibold text-foreground">Current Release Figures</h3>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3 flex-1">
+                  <div className="bg-background/50 rounded-lg p-4 flex flex-col justify-center">
+                    <div className="text-xs text-muted-foreground mb-1">Previous</div>
+                    <div className="text-2xl font-bold text-foreground">{event.previous}</div>
+                  </div>
+                  <div className="bg-background/50 rounded-lg p-4 flex flex-col justify-center">
+                    <div className="text-xs text-muted-foreground mb-1">Forecast</div>
+                    <div className="text-2xl font-bold text-foreground">{event.forecast}</div>
+                  </div>
+                  <div className="bg-background/50 rounded-lg p-4 flex flex-col justify-center">
+                    <div className="text-xs text-muted-foreground mb-1">Actual</div>
+                    <div className={`text-2xl font-bold ${isReleased ? 'text-primary' : 'text-muted-foreground'}`}>
+                      {event.actual}
+                    </div>
+                  </div>
+                  <div className="bg-background/50 rounded-lg p-4 flex flex-col justify-center">
+                    <div className="text-xs text-muted-foreground mb-1">Deviation</div>
+                    <div className="text-2xl font-bold text-muted-foreground">
+                      {isReleased ? "—" : "Pending"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Release Commentary */}
+                <div className="mt-4 pt-4 border-t border-border/50">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground">Release Commentary</span>
+                  </div>
+                  {narrative ? (
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {narrative}
+                    </p>
+                  ) : (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Clock className="h-3.5 w-3.5" />
+                      <span>Awaiting release. Commentary will appear once data is published.</span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Historical Trend Chart - Full Width */}
+          <Card className="bg-muted/30 border-border/50">
+            <CardContent className="pt-5 pb-5">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-semibold text-foreground">Historical Trend (demo)</h3>
+                </div>
+                {/* Legend inline on desktop */}
+                <div className="hidden sm:flex items-center gap-4">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-sm bg-primary" />
+                    <span className="text-xs text-muted-foreground">Actual</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-sm border-2 border-dashed border-primary/60 bg-primary/10" />
+                    <span className="text-xs text-muted-foreground">Forecast</span>
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Historical Trend Chart */}
-          <Card className="bg-muted/30 border-border/50">
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2 mb-1">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                <h3 className="text-sm font-medium text-foreground">Historical Trend (demo)</h3>
-              </div>
-              <p className="text-xs text-muted-foreground mb-4">
+              <p className="text-xs text-muted-foreground mb-5">
                 Annual performance trend based on previous releases (demo)
               </p>
               
               {/* Chart Container - Scrollable on mobile */}
               <div className="overflow-x-auto -mx-4 px-4">
-                <div className="min-w-[500px]">
+                <div className="min-w-[600px]">
                   {/* Grid background */}
-                  <div className="relative h-40 border-l border-b border-border/50">
+                  <div className="relative h-44 border-l border-b border-border/50">
                     {/* Horizontal grid lines */}
                     {[0, 25, 50, 75, 100].map((percent) => (
                       <div
@@ -243,7 +357,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                     ))}
                     
                     {/* Bars container */}
-                    <div className="absolute inset-0 flex items-end justify-between gap-1 px-1 pb-0">
+                    <div className="absolute inset-0 flex items-end justify-between gap-2 px-2 pb-0">
                       {historicalData.map((item, index) => {
                         const value = item.actual || item.forecast || 0;
                         const heightPercent = (value / maxValue) * 100;
@@ -252,7 +366,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                         return (
                           <div key={index} className="flex-1 flex flex-col items-center">
                             <div
-                              className={`w-full max-w-[28px] rounded-t transition-all duration-300 ${
+                              className={`w-full max-w-[36px] rounded-t transition-all duration-300 ${
                                 isForecast
                                   ? "border-2 border-dashed border-primary/60 bg-primary/10"
                                   : "bg-primary hover:bg-primary/80"
@@ -267,10 +381,10 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                   </div>
                   
                   {/* X-axis labels */}
-                  <div className="flex justify-between gap-1 px-1 mt-1.5">
+                  <div className="flex justify-between gap-2 px-2 mt-2">
                     {historicalData.map((item, index) => (
                       <div key={index} className="flex-1 text-center">
-                        <span className={`text-[8px] ${item.actual === null ? "text-primary font-medium" : "text-muted-foreground"}`}>
+                        <span className={`text-[9px] ${item.actual === null ? "text-primary font-medium" : "text-muted-foreground"}`}>
                           {item.period}
                         </span>
                       </div>
@@ -279,8 +393,8 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                 </div>
               </div>
               
-              {/* Legend */}
-              <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/50">
+              {/* Legend - Mobile only */}
+              <div className="flex sm:hidden items-center gap-4 mt-4 pt-3 border-t border-border/50">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-sm bg-primary" />
                   <span className="text-[10px] text-muted-foreground">Actual</span>
@@ -292,48 +406,26 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
               </div>
               
               {/* Interpretation bullets */}
-              <div className="mt-3 pt-3 border-t border-border/50">
+              <div className="mt-4 pt-4 border-t border-border/50">
                 <div className="flex items-center gap-1 mb-2">
                   <Info className="h-3 w-3 text-muted-foreground" />
                   <span className="text-[10px] font-medium text-muted-foreground">How to interpret</span>
                 </div>
-                <ul className="space-y-1">
-                  <li className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
                     <span className="w-1 h-1 rounded-full bg-primary mt-1 shrink-0" />
                     <span>Rising trend indicates strengthening labour or economic performance</span>
-                  </li>
-                  <li className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
+                  </div>
+                  <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
                     <span className="w-1 h-1 rounded-full bg-primary mt-1 shrink-0" />
                     <span>Large deviations between releases may indicate market uncertainty</span>
-                  </li>
-                  <li className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
+                  </div>
+                  <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
                     <span className="w-1 h-1 rounded-full bg-primary mt-1 shrink-0" />
                     <span>Traders often compare last 6–12 months for seasonal bias</span>
-                  </li>
-                </ul>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Event Narrative */}
-          <Card className="bg-muted/30 border-border/50">
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Info className="h-4 w-4 text-primary" />
-                <h3 className="text-sm font-medium text-foreground">Release Commentary</h3>
-              </div>
-              {narrative ? (
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {narrative}
-                </p>
-              ) : (
-                <div className="bg-background/50 rounded-lg p-4 text-center">
-                  <Clock className="h-5 w-5 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">
-                    Awaiting release. Commentary will appear once data is published.
-                  </p>
+                  </div>
                 </div>
-              )}
+              </div>
             </CardContent>
           </Card>
         </div>
