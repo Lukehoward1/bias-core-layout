@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,8 +32,29 @@ const events = [
 type CalendarEvent = typeof events[0];
 
 export default function Calendar() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Auto-open event modal if navigated with event parameter
+  useEffect(() => {
+    const eventParam = searchParams.get('event');
+    if (eventParam) {
+      // Find matching event by name (case-insensitive partial match)
+      const matchingEvent = events.find(e => 
+        e.event.toLowerCase().includes(eventParam.toLowerCase()) ||
+        eventParam.toLowerCase().includes(e.event.toLowerCase())
+      );
+      
+      if (matchingEvent) {
+        setSelectedEvent(matchingEvent);
+        setIsModalOpen(true);
+      }
+      
+      // Clear the search param after processing
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const getImpactColor = (impact: string) => {
     if (impact === 'high') return 'destructive';
