@@ -111,3 +111,15 @@ Spacing System:
     @apply bg-background text-foreground;
   }
 }
+
+/* Utility class for hiding scrollbars in modals while maintaining scroll functionality */
+@layer utilities {
+  .scrollbar-hidden {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+  }
+  
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+}

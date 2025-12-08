@@ -150,7 +150,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-5xl w-[95vw] max-h-[90vh] overflow-y-auto bg-card border-border p-0">
+      <DialogContent className="max-w-5xl w-[95vw] max-h-[90vh] overflow-y-auto scrollbar-hidden bg-card border-border p-0">
         {/* Header Row */}
         <div className="sticky top-0 z-10 bg-card border-b border-border px-6 py-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
