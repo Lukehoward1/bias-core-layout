@@ -6,6 +6,11 @@ import { ArticleCard } from "@/components/education/ArticleCard";
 import { TipCard } from "@/components/education/TipCard";
 import { ResourceCard } from "@/components/education/ResourceCard";
 import { EducationContentModal } from "@/components/education/EducationContentModal";
+import { CourseDetailModal } from "@/components/education/CourseDetailModal";
+import { CertificateModal } from "@/components/education/CertificateModal";
+import { useEducationProgress } from "@/hooks/use-education-progress";
+import { generateCertificatePdf } from "@/lib/generateCertificatePdf";
+import { toast } from "@/hooks/use-toast";
 
 type TabType = 'articles' | 'tips' | 'resources';
 
@@ -27,6 +32,13 @@ interface Tip {
   level: 'Beginner' | 'Intermediate' | 'Advanced';
 }
 
+interface Lesson {
+  id: string;
+  title: string;
+  duration: string;
+  type: 'video' | 'text' | 'quiz';
+}
+
 interface Resource {
   id: string;
   title: string;
@@ -35,7 +47,7 @@ interface Resource {
   duration: string;
   level: 'Beginner' | 'Intermediate' | 'Advanced';
   type: 'video' | 'pdf' | 'course' | 'lesson';
-  progress: number;
+  lessons: Lesson[];
 }
 
 // Mock data
@@ -103,27 +115,121 @@ const tips: Tip[] = [
 ];
 
 const resources: Resource[] = [
-  { id: '1', title: 'Complete Price Action Masterclass', description: 'A comprehensive 4-hour video course covering all aspects of price action trading from basics to advanced concepts.', content: 'This masterclass covers everything you need to know about price action trading...', duration: '4 hours', level: 'Beginner', type: 'course', progress: 45 },
-  { id: '2', title: 'Risk Management Calculator Guide', description: 'Downloadable PDF with position sizing formulas, risk of ruin tables, and practical worksheets.', content: 'Complete guide to calculating position sizes and managing risk...', duration: '30 min read', level: 'Beginner', type: 'pdf', progress: 100 },
-  { id: '3', title: 'Order Flow Fundamentals', description: 'Understanding how institutional orders affect price movement and how to trade alongside smart money.', content: 'Order flow analysis reveals the true supply and demand...', duration: '2 hours', level: 'Advanced', type: 'video', progress: 0 },
-  { id: '4', title: 'Session Trading Blueprint', description: 'Learn to trade the London and New York sessions with specific strategies for each time zone.', content: 'Each trading session has unique characteristics...', duration: '1.5 hours', level: 'Intermediate', type: 'lesson', progress: 75 },
-  { id: '5', title: 'Trading Psychology Workbook', description: 'Interactive PDF with exercises for developing mental discipline and emotional control.', content: 'Psychology is 80% of trading success...', duration: '45 min read', level: 'Intermediate', type: 'pdf', progress: 20 },
-  { id: '6', title: 'Advanced Chart Pattern Recognition', description: 'Deep dive into complex chart patterns including harmonics, Elliott Wave, and Wyckoff method.', content: 'Advanced patterns offer high-probability setups...', duration: '3 hours', level: 'Advanced', type: 'course', progress: 0 }
+  { 
+    id: '1', 
+    title: 'Complete Price Action Masterclass', 
+    description: 'A comprehensive 4-hour video course covering all aspects of price action trading from basics to advanced concepts.', 
+    content: 'This masterclass covers everything you need to know about price action trading...', 
+    duration: '4 hours', 
+    level: 'Beginner', 
+    type: 'course',
+    lessons: [
+      { id: '1-1', title: 'Introduction to Price Action', duration: '15 min', type: 'video' },
+      { id: '1-2', title: 'Understanding Candlestick Patterns', duration: '25 min', type: 'video' },
+      { id: '1-3', title: 'Support and Resistance Basics', duration: '30 min', type: 'video' },
+      { id: '1-4', title: 'Trend Identification', duration: '20 min', type: 'video' },
+      { id: '1-5', title: 'Entry and Exit Strategies', duration: '35 min', type: 'video' },
+      { id: '1-6', title: 'Practice Quiz', duration: '15 min', type: 'quiz' }
+    ]
+  },
+  { 
+    id: '2', 
+    title: 'Risk Management Calculator Guide', 
+    description: 'Downloadable PDF with position sizing formulas, risk of ruin tables, and practical worksheets.', 
+    content: 'Complete guide to calculating position sizes and managing risk...', 
+    duration: '30 min read', 
+    level: 'Beginner', 
+    type: 'pdf',
+    lessons: [
+      { id: '2-1', title: 'Understanding Risk Per Trade', duration: '10 min', type: 'text' },
+      { id: '2-2', title: 'Position Sizing Formulas', duration: '10 min', type: 'text' },
+      { id: '2-3', title: 'Practical Worksheets', duration: '10 min', type: 'text' }
+    ]
+  },
+  { 
+    id: '3', 
+    title: 'Order Flow Fundamentals', 
+    description: 'Understanding how institutional orders affect price movement and how to trade alongside smart money.', 
+    content: 'Order flow analysis reveals the true supply and demand...', 
+    duration: '2 hours', 
+    level: 'Advanced', 
+    type: 'video',
+    lessons: [
+      { id: '3-1', title: 'What is Order Flow?', duration: '15 min', type: 'video' },
+      { id: '3-2', title: 'Identifying Liquidity Pools', duration: '25 min', type: 'video' },
+      { id: '3-3', title: 'Order Blocks Explained', duration: '30 min', type: 'video' },
+      { id: '3-4', title: 'Fair Value Gaps', duration: '25 min', type: 'video' },
+      { id: '3-5', title: 'Putting It All Together', duration: '25 min', type: 'video' }
+    ]
+  },
+  { 
+    id: '4', 
+    title: 'Session Trading Blueprint', 
+    description: 'Learn to trade the London and New York sessions with specific strategies for each time zone.', 
+    content: 'Each trading session has unique characteristics...', 
+    duration: '1.5 hours', 
+    level: 'Intermediate', 
+    type: 'lesson',
+    lessons: [
+      { id: '4-1', title: 'Understanding Market Sessions', duration: '20 min', type: 'video' },
+      { id: '4-2', title: 'London Session Strategy', duration: '25 min', type: 'video' },
+      { id: '4-3', title: 'New York Session Strategy', duration: '25 min', type: 'video' },
+      { id: '4-4', title: 'Session Quiz', duration: '10 min', type: 'quiz' }
+    ]
+  },
+  { 
+    id: '5', 
+    title: 'Trading Psychology Workbook', 
+    description: 'Interactive PDF with exercises for developing mental discipline and emotional control.', 
+    content: 'Psychology is 80% of trading success...', 
+    duration: '45 min read', 
+    level: 'Intermediate', 
+    type: 'pdf',
+    lessons: [
+      { id: '5-1', title: 'Self-Assessment Exercise', duration: '15 min', type: 'text' },
+      { id: '5-2', title: 'Emotional Triggers Worksheet', duration: '15 min', type: 'text' },
+      { id: '5-3', title: 'Building Your Trading Plan', duration: '15 min', type: 'text' }
+    ]
+  },
+  { 
+    id: '6', 
+    title: 'Advanced Chart Pattern Recognition', 
+    description: 'Deep dive into complex chart patterns including harmonics, Elliott Wave, and Wyckoff method.', 
+    content: 'Advanced patterns offer high-probability setups...', 
+    duration: '3 hours', 
+    level: 'Advanced', 
+    type: 'course',
+    lessons: [
+      { id: '6-1', title: 'Harmonic Patterns Introduction', duration: '30 min', type: 'video' },
+      { id: '6-2', title: 'ABCD and Gartley Patterns', duration: '35 min', type: 'video' },
+      { id: '6-3', title: 'Elliott Wave Basics', duration: '40 min', type: 'video' },
+      { id: '6-4', title: 'Wyckoff Method Overview', duration: '45 min', type: 'video' },
+      { id: '6-5', title: 'Pattern Recognition Quiz', duration: '20 min', type: 'quiz' }
+    ]
+  }
 ];
 
 export default function Education() {
   const [activeTab, setActiveTab] = useState<TabType>('articles');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedContent, setSelectedContent] = useState<{
-    title: string;
-    type: 'article' | 'tip' | 'resource';
-    level?: 'Beginner' | 'Intermediate' | 'Advanced';
-    readTime?: string;
-    duration?: string;
-    tags?: string[];
-    content: string;
-  } | null>(null);
+  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
+  const [selectedTip, setSelectedTip] = useState<Tip | null>(null);
+  const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
+  const [showCertificateModal, setShowCertificateModal] = useState(false);
+  const [certificateCourse, setCertificateCourse] = useState<Resource | null>(null);
   const [bookmarkedResources, setBookmarkedResources] = useState<string[]>([]);
+
+  const { 
+    progress, 
+    toggleLessonComplete, 
+    getCourseProgress, 
+    getProgressPercentage,
+    requestCertificate,
+    issueCertificate
+  } = useEducationProgress();
+
+  // Mock student name - in production this would come from auth
+  const studentName = "John Doe";
 
   const tabs: { id: TabType; label: string }[] = [
     { id: 'articles', label: 'Articles & Guides' },
@@ -161,40 +267,66 @@ export default function Education() {
   }, [searchQuery]);
 
   const handleArticleClick = (article: Article) => {
-    setSelectedContent({
-      title: article.title,
-      type: 'article',
-      level: article.level,
-      readTime: article.readTime,
-      tags: article.tags,
-      content: article.content
-    });
+    setSelectedArticle(article);
   };
 
   const handleTipClick = (tip: Tip) => {
-    setSelectedContent({
-      title: tip.title,
-      type: 'tip',
-      level: tip.level,
-      tags: [tip.category],
-      content: tip.content
-    });
+    setSelectedTip(tip);
   };
 
   const handleResourceClick = (resource: Resource) => {
-    setSelectedContent({
-      title: resource.title,
-      type: 'resource',
-      level: resource.level,
-      duration: resource.duration,
-      content: resource.content
-    });
+    setSelectedResource(resource);
+  };
+
+  const handleViewCertificate = (resource: Resource) => {
+    setCertificateCourse(resource);
+    setShowCertificateModal(true);
+    setSelectedResource(null);
+  };
+
+  const handleRequestCertificate = () => {
+    if (certificateCourse) {
+      requestCertificate(certificateCourse.id);
+      toast({
+        title: "Certificate Requested",
+        description: "Your certificate request has been submitted successfully."
+      });
+    }
+  };
+
+  const handleGeneratePdf = async () => {
+    if (certificateCourse) {
+      const courseProgress = getCourseProgress(certificateCourse.id);
+      try {
+        await generateCertificatePdf({
+          studentName,
+          courseName: certificateCourse.title,
+          completedAt: courseProgress?.completedAt || new Date().toISOString()
+        });
+        // Mark as issued after generating
+        issueCertificate(certificateCourse.id);
+        toast({
+          title: "Certificate Downloaded",
+          description: "Your certificate PDF has been generated and downloaded."
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to generate certificate. Please try again.",
+          variant: "destructive"
+        });
+      }
+    }
   };
 
   const toggleBookmark = (id: string) => {
     setBookmarkedResources(prev => 
       prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]
     );
+  };
+
+  const getResourceProgress = (resource: Resource) => {
+    return getProgressPercentage(resource.id, resource.lessons.length);
   };
 
   return (
@@ -276,20 +408,24 @@ export default function Education() {
 
           {activeTab === 'resources' && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredResources.map((resource) => (
-                <ResourceCard
-                  key={resource.id}
-                  title={resource.title}
-                  description={resource.description}
-                  duration={resource.duration}
-                  level={resource.level}
-                  type={resource.type}
-                  progress={resource.progress}
-                  isBookmarked={bookmarkedResources.includes(resource.id)}
-                  onClick={() => handleResourceClick(resource)}
-                  onBookmark={() => toggleBookmark(resource.id)}
-                />
-              ))}
+              {filteredResources.map((resource) => {
+                const courseProgress = getCourseProgress(resource.id);
+                return (
+                  <ResourceCard
+                    key={resource.id}
+                    title={resource.title}
+                    description={resource.description}
+                    duration={resource.duration}
+                    level={resource.level}
+                    type={resource.type}
+                    progress={getResourceProgress(resource)}
+                    isCompleted={courseProgress?.isCompleted || false}
+                    isBookmarked={bookmarkedResources.includes(resource.id)}
+                    onClick={() => handleResourceClick(resource)}
+                    onBookmark={() => toggleBookmark(resource.id)}
+                  />
+                );
+              })}
               {filteredResources.length === 0 && (
                 <div className="col-span-full text-center py-12 text-muted-foreground">
                   No resources found matching "{searchQuery}"
@@ -300,12 +436,63 @@ export default function Education() {
         </div>
       </div>
 
-      {/* Content Modal */}
+      {/* Article Modal */}
       <EducationContentModal
-        isOpen={!!selectedContent}
-        onClose={() => setSelectedContent(null)}
-        content={selectedContent}
+        isOpen={!!selectedArticle}
+        onClose={() => setSelectedArticle(null)}
+        content={selectedArticle ? {
+          title: selectedArticle.title,
+          type: 'article',
+          level: selectedArticle.level,
+          readTime: selectedArticle.readTime,
+          tags: selectedArticle.tags,
+          content: selectedArticle.content
+        } : null}
       />
+
+      {/* Tip Modal */}
+      <EducationContentModal
+        isOpen={!!selectedTip}
+        onClose={() => setSelectedTip(null)}
+        content={selectedTip ? {
+          title: selectedTip.title,
+          type: 'tip',
+          level: selectedTip.level,
+          tags: [selectedTip.category],
+          content: selectedTip.content
+        } : null}
+      />
+
+      {/* Course Detail Modal */}
+      {selectedResource && (
+        <CourseDetailModal
+          isOpen={!!selectedResource}
+          onClose={() => setSelectedResource(null)}
+          course={selectedResource}
+          completedLessons={getCourseProgress(selectedResource.id)?.completedLessons || []}
+          isCompleted={getCourseProgress(selectedResource.id)?.isCompleted || false}
+          onToggleLesson={(lessonId) => toggleLessonComplete(selectedResource.id, lessonId, selectedResource.lessons.length)}
+          onViewCertificate={() => handleViewCertificate(selectedResource)}
+        />
+      )}
+
+      {/* Certificate Modal */}
+      {certificateCourse && (
+        <CertificateModal
+          isOpen={showCertificateModal}
+          onClose={() => {
+            setShowCertificateModal(false);
+            setCertificateCourse(null);
+          }}
+          courseName={certificateCourse.title}
+          studentName={studentName}
+          completedAt={getCourseProgress(certificateCourse.id)?.completedAt || new Date().toISOString()}
+          certificateRequested={getCourseProgress(certificateCourse.id)?.certificateRequested || false}
+          certificateIssued={getCourseProgress(certificateCourse.id)?.certificateIssued || false}
+          onRequestCertificate={handleRequestCertificate}
+          onGeneratePdf={handleGeneratePdf}
+        />
+      )}
     </div>
   );
 }
