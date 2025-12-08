@@ -116,7 +116,7 @@ export function SessionsPanel({
                 <SheetTitle className="text-base">Session Overview</SheetTitle>
               </div>
             </SheetHeader>
-            <ScrollArea className="flex-1 p-4">
+            <ScrollArea className="flex-1 p-4" hideScrollbar>
               <div className="space-y-4">
                 {/* Session Name */}
                 <div>
@@ -250,7 +250,7 @@ export function SessionsPanel({
                 )}
               </div>
             </SheetHeader>
-            <ScrollArea className="flex-1">
+            <ScrollArea className="flex-1" hideScrollbar>
               {sessions.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground">
                   <Layers className="h-12 w-12 mx-auto mb-3 opacity-50" />

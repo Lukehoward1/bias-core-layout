@@ -496,7 +496,7 @@ export default function Journal() {
 
               {/* Day Detail Dialog */}
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden flex flex-col">
+                <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto scrollbar-hidden flex flex-col">
                   <DialogHeader>
                     <div className="flex items-center justify-between pr-8">
                       <DialogTitle>
