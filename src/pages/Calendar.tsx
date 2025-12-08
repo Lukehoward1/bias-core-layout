@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Filter } from "lucide-react";
+import { HistoricalTrendChart } from "@/components/calendar/HistoricalTrendChart";
 
 const keyEvents = [
   { time: '08:30', currency: 'USD', event: 'Non-Farm Payrolls', impact: 'high' },
@@ -152,6 +153,9 @@ export default function Calendar() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Historical Trend Chart */}
+          <HistoricalTrendChart />
         </div>
       </div>
     </div>
