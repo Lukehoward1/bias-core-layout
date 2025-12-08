@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -14,13 +14,14 @@ import {
   Clock,
   BookOpen,
   Award,
-  Play,
   FileText,
   Video,
   GraduationCap,
   Bookmark,
-  CheckCircle,
   Layers,
+  Lightbulb,
+  ArrowLeft,
+  ChevronRight,
 } from "lucide-react";
 
 // Types
@@ -207,30 +208,28 @@ const demoCertificates: Certificate[] = [
   { id: 'c3', courseName: 'Algorithmic Trading Basics', completedDate: 'Oct 22, 2024' },
 ];
 
-// Demo progress stats
-const coursesInProgress = courses.filter(c => c.progress === 'in-progress').length;
-const coursesCompleted = courses.filter(c => c.progress === 'completed').length;
-const totalCourses = courses.length;
-const overallProgress = Math.round((coursesCompleted / totalCourses) * 100);
+type ViewMode = 'landing' | 'courses' | 'articles' | 'tips';
 
 export default function Education() {
+  const [viewMode, setViewMode] = useState<ViewMode>('landing');
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [certificateCourse, setCertificateCourse] = useState<Course | null>(null);
-  const [activeFilters, setActiveFilters] = useState<{ levels: string[]; topics: string[] }>({
-    levels: [],
-    topics: []
-  });
+  const [resourceTab, setResourceTab] = useState<'articles' | 'tips'>('articles');
 
   const { 
-    progress, 
-    toggleLessonComplete, 
     getCourseProgress, 
     requestCertificate,
     issueCertificate
   } = useEducationProgress();
 
   const studentName = "John Doe";
+
+  // Progress stats for courses view
+  const coursesInProgress = courses.filter(c => c.progress === 'in-progress').length;
+  const coursesCompleted = courses.filter(c => c.progress === 'completed').length;
+  const totalCourses = courses.length;
+  const overallProgress = Math.round((coursesCompleted / totalCourses) * 100);
 
   const getLevelColor = (level: string) => {
     switch (level) {
@@ -304,404 +303,380 @@ export default function Education() {
     }
   };
 
-  const toggleFilter = (type: 'levels' | 'topics', value: string) => {
-    setActiveFilters(prev => ({
-      ...prev,
-      [type]: prev[type].includes(value)
-        ? prev[type].filter(v => v !== value)
-        : [...prev[type], value]
-    }));
-  };
-
-  // Get completed lessons for current course from progress hook
   const getCompletedLessonsForCourse = (courseId: string) => {
     const courseProgress = getCourseProgress(courseId);
     return courseProgress?.completedLessons || [];
   };
 
-  return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <AppHeader title="Education" />
-      
-      <div className="flex-1 overflow-y-auto p-6">
-        {/* Page Header */}
-        <div className="flex items-start justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Education</h1>
-            <p className="text-muted-foreground mt-1">
-              Curated training for serious traders – strategies, risk, and psychology.
+  // Landing Page View
+  if (viewMode === 'landing') {
+    return (
+      <div className="flex-1 flex flex-col min-h-0">
+        <AppHeader title="Education" />
+        
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Page Header - Centered */}
+          <div className="text-center max-w-2xl mx-auto mb-16 pt-8">
+            <h1 className="text-3xl font-bold text-foreground mb-3">Education</h1>
+            <p className="text-muted-foreground text-lg">
+              Optional learning resources to support strategy, psychology & performance.
             </p>
           </div>
-          
-          {/* Learning Snapshot Pill */}
-          <div className="flex items-center gap-4 px-4 py-3 bg-card border border-border rounded-xl">
-            <div className="text-center">
-              <div className="text-lg font-bold text-foreground">{coursesInProgress}</div>
-              <div className="text-xs text-muted-foreground">In Progress</div>
-            </div>
-            <div className="w-px h-8 bg-border" />
-            <div className="text-center">
-              <div className="text-lg font-bold text-success">{coursesCompleted}</div>
-              <div className="text-xs text-muted-foreground">Completed</div>
-            </div>
-            <div className="w-px h-8 bg-border" />
-            <div className="relative w-12 h-12">
-              <svg className="w-12 h-12 -rotate-90">
-                <circle
-                  cx="24"
-                  cy="24"
-                  r="20"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  className="text-muted/30"
-                />
-                <circle
-                  cx="24"
-                  cy="24"
-                  r="20"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  strokeDasharray={`${overallProgress * 1.256} 125.6`}
-                  className="text-primary"
-                />
-              </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-foreground">
-                {overallProgress}%
-              </span>
-            </div>
-          </div>
-        </div>
 
-        {/* Main 2-Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
-          {/* Left Column - Main Content */}
-          <div className="space-y-6">
-            {/* Structured Courses Section */}
-            <section>
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                  <GraduationCap className="h-5 w-5 text-primary" />
-                  Structured Courses
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Deep-dive programs with progress tracking & certificates.
+          {/* Category Cards Grid */}
+          <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Structured Courses */}
+            <Card 
+              className="bg-card border-border hover:border-primary/50 transition-all duration-200 cursor-pointer group"
+              onClick={() => setViewMode('courses')}
+            >
+              <CardContent className="p-8 flex flex-col items-center text-center">
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
+                  <GraduationCap className="h-8 w-8 text-primary" />
+                </div>
+                <h2 className="text-xl font-semibold text-foreground mb-2">Structured Courses</h2>
+                <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+                  Full learning programs with tracked progress and certificates.
                 </p>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {courses.map((course) => (
-                  <Card 
-                    key={course.id} 
-                    className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group"
-                    onClick={() => handleCourseClick(course)}
-                  >
-                    <CardContent className="p-5">
-                      {/* Title & Description */}
-                      <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors mb-1">
-                        {course.title}
-                      </h3>
-                      <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                        {course.description}
-                      </p>
-                      
-                      {/* Badges Row */}
-                      <div className="flex flex-wrap items-center gap-1.5 mb-3">
-                        <Badge variant="outline" className={`text-[10px] ${getLevelColor(course.level)}`}>
-                          {course.level}
-                        </Badge>
-                        <Badge variant="secondary" className="text-[10px] gap-1">
-                          {getFormatIcon(course.format)}
-                          {course.format}
-                        </Badge>
-                      </div>
-                      
-                      {/* Meta Row */}
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {course.duration}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <BookOpen className="h-3 w-3" />
-                          {course.lessonsCount} lessons
-                        </span>
-                        {course.hasCertificate && (
-                          <span className="flex items-center gap-1 text-primary">
-                            <Award className="h-3 w-3" />
-                            Certificate
-                          </span>
-                        )}
-                      </div>
-                      
-                      {/* Progress */}
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className={`font-medium ${
-                            course.progress === 'completed' ? 'text-success' :
-                            course.progress === 'in-progress' ? 'text-warning' :
-                            'text-muted-foreground'
-                          }`}>
-                            {getProgressText(course.progress)}
-                          </span>
-                          <span className="text-muted-foreground">{course.progressPercent}%</span>
-                        </div>
-                        <Progress value={course.progressPercent} className="h-1.5" />
-                      </div>
-                      
-                      {/* CTA Button */}
-                      <Button 
-                        className="w-full" 
-                        size="sm"
-                        variant={course.progress === 'completed' ? 'outline' : 'default'}
-                      >
-                        {course.progress === 'completed' ? (
-                          <>
-                            <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
-                            View Course
-                          </>
-                        ) : course.progress === 'in-progress' ? (
-                          <>
-                            <Play className="h-3.5 w-3.5 mr-1.5" />
-                            Continue
-                          </>
-                        ) : (
-                          <>
-                            <Play className="h-3.5 w-3.5 mr-1.5" />
-                            Start Course
-                          </>
-                        )}
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </section>
-
-            {/* Quick Resources Section */}
-            <section>
-              <Card className="bg-card border-border">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <BookOpen className="h-4 w-4 text-primary" />
-                    Quick Resources
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Tabs defaultValue="articles" className="w-full">
-                    <TabsList className="mb-4 bg-muted/50">
-                      <TabsTrigger value="articles">Articles & Guides</TabsTrigger>
-                      <TabsTrigger value="tips">Trading Tips</TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="articles" className="space-y-2 mt-0">
-                      {articles.map((article) => (
-                        <div
-                          key={article.id}
-                          className="flex items-start justify-between gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer group"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">
-                              {article.title}
-                            </h4>
-                            <p className="text-xs text-muted-foreground mt-0.5">{article.description}</p>
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-xs text-muted-foreground">{article.readTime}</span>
-                              {article.tags.map(tag => (
-                                <Badge key={tag} variant="secondary" className="text-[10px]">{tag}</Badge>
-                              ))}
-                            </div>
-                          </div>
-                          <Button variant="ghost" size="icon" className="flex-shrink-0 h-8 w-8 text-muted-foreground hover:text-primary">
-                            <Bookmark className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </TabsContent>
-                    
-                    <TabsContent value="tips" className="space-y-2 mt-0">
-                      {tips.map((tip) => (
-                        <div
-                          key={tip.id}
-                          className="flex items-start justify-between gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer group"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">
-                              {tip.title}
-                            </h4>
-                            <p className="text-xs text-muted-foreground mt-0.5">{tip.description}</p>
-                            <div className="flex items-center gap-2 mt-2">
-                              <span className="text-xs text-muted-foreground">{tip.readTime}</span>
-                              {tip.tags.map(tag => (
-                                <Badge key={tag} variant="secondary" className="text-[10px]">{tag}</Badge>
-                              ))}
-                            </div>
-                          </div>
-                          <Button variant="ghost" size="icon" className="flex-shrink-0 h-8 w-8 text-muted-foreground hover:text-primary">
-                            <Bookmark className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </TabsContent>
-                  </Tabs>
-                </CardContent>
-              </Card>
-            </section>
-          </div>
-
-          {/* Right Column - Sidebar */}
-          <div className="space-y-4">
-            {/* Learning Path Card */}
-            <Card className="bg-card border-border">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-muted-foreground font-medium">Learning Path</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-xs text-muted-foreground">Next up for you:</p>
-                
-                {/* Recommended Course */}
-                <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-lg bg-primary/20 text-primary">
-                      <GraduationCap className="h-4 w-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm text-foreground">Trading Psychology Essentials</h4>
-                      <p className="text-xs text-muted-foreground mt-0.5">2h 50m • 5 lessons</p>
-                    </div>
-                  </div>
-                  <Button size="sm" className="w-full mt-3">
-                    <Play className="h-3 w-3 mr-1" />
-                    Start
-                  </Button>
-                </div>
-                
-                {/* Recommended Resource */}
-                <div className="p-3 rounded-lg bg-muted/30 border border-border">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-lg bg-muted text-muted-foreground">
-                      <FileText className="h-4 w-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm text-foreground">Order Flow Basics</h4>
-                      <p className="text-xs text-muted-foreground mt-0.5">10 min read</p>
-                    </div>
-                  </div>
-                  <Button size="sm" variant="outline" className="w-full mt-3">
-                    Open
-                  </Button>
-                </div>
+                <Button className="w-full group-hover:bg-primary/90">
+                  Browse Courses
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
               </CardContent>
             </Card>
 
-            {/* Filters Card */}
-            <Card className="bg-card border-border">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-muted-foreground font-medium">Filters</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Level Filters */}
-                <div>
-                  <p className="text-xs text-muted-foreground mb-2">Level</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {['Beginner', 'Intermediate', 'Advanced'].map((level) => (
-                      <Badge
-                        key={level}
-                        variant={activeFilters.levels.includes(level) ? 'default' : 'secondary'}
-                        className="cursor-pointer text-xs"
-                        onClick={() => toggleFilter('levels', level)}
-                      >
-                        {level}
-                      </Badge>
-                    ))}
-                  </div>
+            {/* Articles & Guides */}
+            <Card 
+              className="bg-card border-border hover:border-primary/50 transition-all duration-200 cursor-pointer group"
+              onClick={() => setViewMode('articles')}
+            >
+              <CardContent className="p-8 flex flex-col items-center text-center">
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
+                  <FileText className="h-8 w-8 text-primary" />
                 </div>
-                
-                {/* Topic Filters */}
-                <div>
-                  <p className="text-xs text-muted-foreground mb-2">Topics</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {['Strategy', 'Risk', 'Psychology', 'Platform'].map((topic) => (
-                      <Badge
-                        key={topic}
-                        variant={activeFilters.topics.includes(topic) ? 'default' : 'secondary'}
-                        className="cursor-pointer text-xs"
-                        onClick={() => toggleFilter('topics', topic)}
-                      >
-                        {topic}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
+                <h2 className="text-xl font-semibold text-foreground mb-2">Articles & Guides</h2>
+                <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+                  Short-form breakdowns of market concepts, psychology and platform usage.
+                </p>
+                <Button className="w-full group-hover:bg-primary/90">
+                  Browse Articles
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
               </CardContent>
             </Card>
 
-            {/* Certificates Card */}
-            <Card className="bg-card border-border">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-muted-foreground font-medium flex items-center gap-2">
-                  <Award className="h-4 w-4 text-primary" />
-                  Certificates
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {demoCertificates.map((cert) => (
-                  <div key={cert.id} className="flex items-center justify-between gap-2 p-3 rounded-lg bg-muted/30">
-                    <div className="min-w-0 flex-1">
-                      <h4 className="text-sm font-medium text-foreground truncate">{cert.courseName}</h4>
-                      <p className="text-xs text-muted-foreground">{cert.completedDate}</p>
-                    </div>
-                    <Button variant="ghost" size="sm" className="flex-shrink-0 text-xs">
-                      <FileText className="h-3 w-3 mr-1" />
-                      PDF
-                    </Button>
-                  </div>
-                ))}
+            {/* Trading Tips */}
+            <Card 
+              className="bg-card border-border hover:border-primary/50 transition-all duration-200 cursor-pointer group"
+              onClick={() => setViewMode('tips')}
+            >
+              <CardContent className="p-8 flex flex-col items-center text-center">
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
+                  <Lightbulb className="h-8 w-8 text-primary" />
+                </div>
+                <h2 className="text-xl font-semibold text-foreground mb-2">Trading Tips</h2>
+                <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+                  Execution and improvement techniques for serious traders.
+                </p>
+                <Button className="w-full group-hover:bg-primary/90">
+                  Browse Tips
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
               </CardContent>
             </Card>
           </div>
         </div>
       </div>
+    );
+  }
 
-      {/* Course Detail Modal */}
-      {selectedCourse && (
+  // Courses View
+  if (viewMode === 'courses') {
+    return (
+      <div className="flex-1 flex flex-col min-h-0">
+        <AppHeader title="Education" />
+        
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Back Button & Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setViewMode('landing')}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">Structured Courses</h1>
+                <p className="text-sm text-muted-foreground">
+                  Deep-dive programs with progress tracking & certificates.
+                </p>
+              </div>
+            </div>
+            
+            {/* Learning Snapshot - Subtle */}
+            <div className="flex items-center gap-3 px-3 py-2 bg-card/50 border border-border/50 rounded-lg text-sm">
+              <span className="text-muted-foreground">{coursesInProgress} in progress</span>
+              <span className="text-muted-foreground">·</span>
+              <span className="text-success">{coursesCompleted} completed</span>
+              <span className="text-muted-foreground">·</span>
+              <span className="text-primary">{overallProgress}%</span>
+            </div>
+          </div>
+
+          {/* Courses Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {courses.map((course) => (
+              <Card 
+                key={course.id} 
+                className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group"
+                onClick={() => handleCourseClick(course)}
+              >
+                <CardContent className="p-5">
+                  <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors mb-1">
+                    {course.title}
+                  </h3>
+                  <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                    {course.description}
+                  </p>
+                  
+                  <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                    <Badge variant="outline" className={`text-[10px] ${getLevelColor(course.level)}`}>
+                      {course.level}
+                    </Badge>
+                    <Badge variant="secondary" className="text-[10px] gap-1">
+                      {getFormatIcon(course.format)}
+                      {course.format}
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {course.duration}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <BookOpen className="h-3 w-3" />
+                      {course.lessonsCount} lessons
+                    </span>
+                    {course.hasCertificate && (
+                      <span className="flex items-center gap-1 text-primary">
+                        <Award className="h-3 w-3" />
+                        Certificate
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className={`font-medium ${
+                        course.progress === 'completed' ? 'text-success' :
+                        course.progress === 'in-progress' ? 'text-warning' :
+                        'text-muted-foreground'
+                      }`}>
+                        {getProgressText(course.progress)}
+                      </span>
+                      <span className="text-muted-foreground">{course.progressPercent}%</span>
+                    </div>
+                    <Progress value={course.progressPercent} className="h-1.5" />
+                  </div>
+                  
+                  <Button 
+                    size="sm" 
+                    className="w-full"
+                    variant={course.progress === 'completed' ? 'secondary' : 'default'}
+                  >
+                    {course.progress === 'completed' ? 'Review Course' :
+                     course.progress === 'in-progress' ? 'Continue' : 'Start Course'}
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Certificates Section - Subtle at bottom */}
+          {demoCertificates.length > 0 && (
+            <div className="mt-8 pt-6 border-t border-border/50">
+              <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                <Award className="h-4 w-4" />
+                Your Certificates
+              </h3>
+              <div className="flex flex-wrap gap-3">
+                {demoCertificates.map((cert) => (
+                  <div 
+                    key={cert.id}
+                    className="flex items-center gap-3 px-3 py-2 bg-card/50 border border-border/50 rounded-lg"
+                  >
+                    <Award className="h-4 w-4 text-primary" />
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{cert.courseName}</p>
+                      <p className="text-xs text-muted-foreground">{cert.completedDate}</p>
+                    </div>
+                    <Button variant="ghost" size="sm" className="text-xs h-7">
+                      Download
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Course Detail Modal */}
         <CourseDetailModal
           isOpen={!!selectedCourse}
           onClose={() => setSelectedCourse(null)}
-          course={{
-            id: selectedCourse.id,
-            title: selectedCourse.title,
-            description: selectedCourse.description,
-            duration: selectedCourse.duration,
-            level: selectedCourse.level,
-            type: 'course',
-            lessons: selectedCourse.lessons
-          }}
-          completedLessons={getCompletedLessonsForCourse(selectedCourse.id)}
-          isCompleted={selectedCourse.progress === 'completed'}
-          onToggleLesson={(lessonId) => toggleLessonComplete(selectedCourse.id, lessonId, selectedCourse.lessons.length)}
+          course={selectedCourse ? {
+            ...selectedCourse,
+            type: 'course' as const
+          } : { id: '', title: '', description: '', duration: '', level: 'Beginner' as const, type: 'course' as const, lessons: [] }}
+          completedLessons={selectedCourse ? getCompletedLessonsForCourse(selectedCourse.id) : []}
+          isCompleted={selectedCourse?.progress === 'completed'}
+          onToggleLesson={() => {}}
           onViewCertificate={handleViewCertificate}
         />
-      )}
 
-      {/* Certificate Modal */}
-      {certificateCourse && (
+        {/* Certificate Modal */}
         <CertificateModal
-          isOpen={showCertificateModal}
+          isOpen={showCertificateModal && !!certificateCourse}
           onClose={() => {
             setShowCertificateModal(false);
             setCertificateCourse(null);
           }}
-          courseName={certificateCourse.title}
+          courseName={certificateCourse?.title || ''}
           studentName={studentName}
-          completedAt={getCourseProgress(certificateCourse.id)?.completedAt || new Date().toISOString()}
-          certificateRequested={getCourseProgress(certificateCourse.id)?.certificateRequested || false}
-          certificateIssued={getCourseProgress(certificateCourse.id)?.certificateIssued || false}
+          completedAt={certificateCourse ? (getCourseProgress(certificateCourse.id)?.completedAt || new Date().toISOString()) : new Date().toISOString()}
+          certificateRequested={certificateCourse ? (getCourseProgress(certificateCourse.id)?.certificateRequested || false) : false}
+          certificateIssued={certificateCourse ? (getCourseProgress(certificateCourse.id)?.certificateIssued || false) : false}
           onRequestCertificate={handleRequestCertificate}
           onGeneratePdf={handleGeneratePdf}
         />
-      )}
-    </div>
-  );
+      </div>
+    );
+  }
+
+  // Articles View
+  if (viewMode === 'articles') {
+    return (
+      <div className="flex-1 flex flex-col min-h-0">
+        <AppHeader title="Education" />
+        
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Back Button & Header */}
+          <div className="flex items-center gap-4 mb-6">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setViewMode('landing')}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Articles & Guides</h1>
+              <p className="text-sm text-muted-foreground">
+                Short-form breakdowns of market concepts, psychology and platform usage.
+              </p>
+            </div>
+          </div>
+
+          {/* Articles List */}
+          <div className="max-w-3xl space-y-3">
+            {articles.map((article) => (
+              <Card 
+                key={article.id}
+                className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer"
+              >
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex-1">
+                    <h3 className="font-medium text-foreground mb-1">{article.title}</h3>
+                    <p className="text-sm text-muted-foreground mb-2">{article.description}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {article.readTime} read
+                      </span>
+                      {article.tags.map((tag) => (
+                        <Badge key={tag} variant="secondary" className="text-[10px]">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="icon" className="text-muted-foreground">
+                    <Bookmark className="h-4 w-4" />
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Tips View
+  if (viewMode === 'tips') {
+    return (
+      <div className="flex-1 flex flex-col min-h-0">
+        <AppHeader title="Education" />
+        
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Back Button & Header */}
+          <div className="flex items-center gap-4 mb-6">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setViewMode('landing')}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Trading Tips</h1>
+              <p className="text-sm text-muted-foreground">
+                Execution and improvement techniques for serious traders.
+              </p>
+            </div>
+          </div>
+
+          {/* Tips Grid */}
+          <div className="max-w-3xl grid grid-cols-1 md:grid-cols-2 gap-4">
+            {tips.map((tip) => (
+              <Card 
+                key={tip.id}
+                className="bg-card border-border hover:border-primary/50 transition-colors"
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Lightbulb className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-foreground mb-1">{tip.title}</h3>
+                      <p className="text-sm text-muted-foreground">{tip.description}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        {tip.tags.map((tag) => (
+                          <Badge key={tag} variant="secondary" className="text-[10px]">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }
