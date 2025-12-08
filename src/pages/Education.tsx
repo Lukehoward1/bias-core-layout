@@ -1,37 +1,29 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
-import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
-import { ArticleCard } from "@/components/education/ArticleCard";
-import { TipCard } from "@/components/education/TipCard";
-import { ResourceCard } from "@/components/education/ResourceCard";
-import { EducationContentModal } from "@/components/education/EducationContentModal";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CourseDetailModal } from "@/components/education/CourseDetailModal";
 import { CertificateModal } from "@/components/education/CertificateModal";
 import { useEducationProgress } from "@/hooks/use-education-progress";
 import { generateCertificatePdf } from "@/lib/generateCertificatePdf";
 import { toast } from "@/hooks/use-toast";
+import {
+  Clock,
+  BookOpen,
+  Award,
+  Play,
+  FileText,
+  Video,
+  GraduationCap,
+  Bookmark,
+  CheckCircle,
+  Layers,
+} from "lucide-react";
 
-type TabType = 'articles' | 'tips' | 'resources';
-
-interface Article {
-  id: string;
-  title: string;
-  preview: string;
-  content: string;
-  readTime: string;
-  level: 'Beginner' | 'Intermediate' | 'Advanced';
-  tags: string[];
-}
-
-interface Tip {
-  id: string;
-  title: string;
-  content: string;
-  category: string;
-  level: 'Beginner' | 'Intermediate' | 'Advanced';
-}
-
+// Types
 interface Lesson {
   id: string;
   title: string;
@@ -39,249 +31,243 @@ interface Lesson {
   type: 'video' | 'text' | 'quiz';
 }
 
-interface Resource {
+interface Course {
   id: string;
   title: string;
   description: string;
-  content: string;
   duration: string;
+  lessonsCount: number;
   level: 'Beginner' | 'Intermediate' | 'Advanced';
-  type: 'video' | 'pdf' | 'course' | 'lesson';
+  format: 'Video' | 'Text' | 'Mixed';
+  hasCertificate: boolean;
+  progress: 'not-started' | 'in-progress' | 'completed';
+  progressPercent: number;
   lessons: Lesson[];
 }
 
-// Mock data
-const articles: Article[] = [
+interface QuickResource {
+  id: string;
+  title: string;
+  description: string;
+  readTime: string;
+  tags: string[];
+}
+
+interface Certificate {
+  id: string;
+  courseName: string;
+  completedDate: string;
+}
+
+// Demo data
+const courses: Course[] = [
   {
     id: '1',
-    title: 'Understanding Market Structure: The Foundation of Technical Analysis',
-    preview: 'Learn how to identify key market structures including higher highs, lower lows, and trend changes that form the basis of all technical trading strategies.',
-    content: `Market structure is the backbone of technical analysis. Understanding how price moves in waves and creates patterns is essential for any trader.\n\nKey Concepts:\n\n1. Higher Highs and Higher Lows (Uptrend)\nIn an uptrend, price consistently makes higher highs and higher lows. This pattern indicates buying pressure is dominant.\n\n2. Lower Highs and Lower Lows (Downtrend)\nDowntrends are characterized by consecutive lower highs and lower lows, showing sellers are in control.\n\n3. Break of Structure (BOS)\nA break of structure occurs when price breaks a significant swing point, potentially signaling a trend change.\n\n4. Change of Character (CHoCH)\nThis is the first sign of a potential reversal, where price fails to continue the current structure.\n\nPractical Application:\n- Wait for clear structure before entering trades\n- Use structure breaks to identify potential reversal zones\n- Combine with volume analysis for confirmation\n- Always respect the higher timeframe structure`,
-    readTime: '8 min read',
+    title: 'Foundations of Forex',
+    description: 'Master the fundamentals of currency trading from scratch.',
+    duration: '4h 20m',
+    lessonsCount: 8,
     level: 'Beginner',
-    tags: ['Technical Analysis', 'Market Structure', 'Trends']
+    format: 'Video',
+    hasCertificate: true,
+    progress: 'in-progress',
+    progressPercent: 45,
+    lessons: [
+      { id: '1-1', title: 'What is Forex?', duration: '12 min', type: 'video' },
+      { id: '1-2', title: 'Currency Pairs Explained', duration: '18 min', type: 'video' },
+      { id: '1-3', title: 'Reading Forex Quotes', duration: '15 min', type: 'video' },
+      { id: '1-4', title: 'Market Sessions', duration: '20 min', type: 'video' },
+      { id: '1-5', title: 'Pips and Lots', duration: '22 min', type: 'video' },
+      { id: '1-6', title: 'Your First Trade', duration: '25 min', type: 'video' },
+      { id: '1-7', title: 'Practice Exercises', duration: '30 min', type: 'text' },
+      { id: '1-8', title: 'Module Quiz', duration: '15 min', type: 'quiz' },
+    ]
   },
   {
     id: '2',
-    title: 'Risk Management: Position Sizing for Consistent Growth',
-    preview: 'Discover the mathematical approach to position sizing that protects your capital while maximizing growth potential.',
-    content: `Proper position sizing is what separates professional traders from amateurs. It's not about how much you can make, but how much you can lose.\n\nThe 1% Rule:\nNever risk more than 1-2% of your account on any single trade. This ensures you can survive losing streaks and remain in the game.\n\nCalculating Position Size:\nPosition Size = (Account Risk) / (Stop Loss in Points × Point Value)\n\nExample:\n- Account: $10,000\n- Risk: 1% = $100\n- Stop Loss: 50 pips\n- Pip Value: $10/pip (1 standard lot)\n- Position Size: $100 / (50 × $10) = 0.2 lots\n\nRisk of Ruin:\nWith 1% risk per trade, you would need 100 consecutive losses to blow your account. This is statistically almost impossible with any edge-based strategy.\n\nKey Takeaways:\n- Size positions based on stop loss, not potential profit\n- Keep risk consistent regardless of conviction\n- Scale up only when account grows, not when you "feel confident"`,
-    readTime: '6 min read',
-    level: 'Beginner',
-    tags: ['Risk Management', 'Position Sizing', 'Capital Protection']
+    title: 'Risk Management Mastery',
+    description: 'Protect your capital with professional risk frameworks.',
+    duration: '3h 45m',
+    lessonsCount: 6,
+    level: 'Intermediate',
+    format: 'Mixed',
+    hasCertificate: true,
+    progress: 'in-progress',
+    progressPercent: 20,
+    lessons: [
+      { id: '2-1', title: 'Why Risk Management Matters', duration: '15 min', type: 'video' },
+      { id: '2-2', title: 'Position Sizing Formulas', duration: '25 min', type: 'video' },
+      { id: '2-3', title: 'The 1% Rule', duration: '20 min', type: 'video' },
+      { id: '2-4', title: 'Stop Loss Strategies', duration: '30 min', type: 'video' },
+      { id: '2-5', title: 'Risk Calculator Worksheet', duration: '20 min', type: 'text' },
+      { id: '2-6', title: 'Final Assessment', duration: '15 min', type: 'quiz' },
+    ]
   },
   {
     id: '3',
-    title: 'Order Flow Analysis: Reading the Institutional Footprint',
-    preview: 'Advanced techniques for understanding how institutional traders move markets and how to position alongside them.',
-    content: `Order flow analysis reveals the true supply and demand behind price movements. Unlike traditional indicators that lag, order flow shows real-time market participation.\n\nKey Order Flow Concepts:\n\n1. Liquidity Pools\nAreas where stop losses cluster create liquidity pools. Institutions need this liquidity to fill large orders.\n\n2. Order Blocks\nThese are areas where institutional orders were executed, often becoming future support/resistance.\n\n3. Fair Value Gaps\nRapid price movements that leave gaps in the order book. Price often returns to fill these inefficiencies.\n\n4. Absorption\nWhen aggressive buying/selling is absorbed by passive orders, indicating potential reversals.\n\nPractical Application:\n- Identify where retail stops are likely placed\n- Wait for liquidity sweeps before entering\n- Use order blocks as entry zones\n- Trade fair value gaps for mean reversion\n\nRemember: Institutions need retail traders on the wrong side to fill their positions.`,
-    readTime: '12 min read',
-    level: 'Advanced',
-    tags: ['Order Flow', 'Institutional Trading', 'Liquidity']
+    title: 'Trading Psychology Essentials',
+    description: 'Build the mental edge that separates pros from amateurs.',
+    duration: '2h 50m',
+    lessonsCount: 5,
+    level: 'Beginner',
+    format: 'Video',
+    hasCertificate: true,
+    progress: 'not-started',
+    progressPercent: 0,
+    lessons: [
+      { id: '3-1', title: "The Trader's Mindset", duration: '20 min', type: 'video' },
+      { id: '3-2', title: 'Emotional Triggers', duration: '25 min', type: 'video' },
+      { id: '3-3', title: 'Handling Losses', duration: '30 min', type: 'video' },
+      { id: '3-4', title: 'Building Discipline', duration: '25 min', type: 'video' },
+      { id: '3-5', title: 'Psychology Journal', duration: '20 min', type: 'text' },
+    ]
   },
   {
     id: '4',
-    title: 'Session Trading: Maximizing the London-New York Overlap',
-    preview: 'How to capitalize on the most volatile and liquid trading hours of the day for optimal trade execution.',
-    content: `The London-New York overlap (8:00 AM - 12:00 PM EST) is the most active trading period, offering the best opportunities for directional trades.\n\nWhy This Session Matters:\n- Highest volume and liquidity\n- Major economic releases\n- Clear directional moves\n- Tightest spreads\n\nSession Strategy:\n1. Prepare before London open (3:00 AM EST)\n2. Note overnight high/low levels\n3. Wait for initial volatility to settle\n4. Look for breakout trades during overlap\n5. Close positions before NY close\n\nKey Times (EST):\n- 3:00 AM: London Open\n- 8:00 AM: New York Open\n- 8:30 AM: Major US data releases\n- 12:00 PM: London Close\n- 4:00 PM: New York Close\n\nBest Pairs:\nEURUSD, GBPUSD, and USDJPY typically offer the cleanest moves during the overlap.`,
-    readTime: '5 min read',
-    level: 'Intermediate',
-    tags: ['Session Trading', 'London', 'New York', 'Volatility']
+    title: 'Advanced Price Action',
+    description: 'Read charts like a professional with advanced PA techniques.',
+    duration: '5h 15m',
+    lessonsCount: 10,
+    level: 'Advanced',
+    format: 'Video',
+    hasCertificate: true,
+    progress: 'completed',
+    progressPercent: 100,
+    lessons: [
+      { id: '4-1', title: 'Market Structure Deep Dive', duration: '30 min', type: 'video' },
+      { id: '4-2', title: 'Order Blocks', duration: '35 min', type: 'video' },
+      { id: '4-3', title: 'Fair Value Gaps', duration: '30 min', type: 'video' },
+      { id: '4-4', title: 'Liquidity Concepts', duration: '40 min', type: 'video' },
+      { id: '4-5', title: 'Break of Structure', duration: '25 min', type: 'video' },
+      { id: '4-6', title: 'Change of Character', duration: '25 min', type: 'video' },
+      { id: '4-7', title: 'Entry Models', duration: '35 min', type: 'video' },
+      { id: '4-8', title: 'Case Studies', duration: '40 min', type: 'video' },
+      { id: '4-9', title: 'Practice Charts', duration: '30 min', type: 'text' },
+      { id: '4-10', title: 'Certification Exam', duration: '20 min', type: 'quiz' },
+    ]
   },
   {
     id: '5',
-    title: 'The Psychology of Drawdowns: Mental Frameworks for Recovery',
-    preview: 'Develop the psychological resilience needed to navigate losing streaks without abandoning your strategy.',
-    content: `Every trader faces drawdowns. How you handle them determines your long-term success.\n\nUnderstanding Drawdowns:\nA drawdown is the peak-to-trough decline in your account. Even profitable strategies can have 20-30% drawdowns.\n\nMental Framework:\n\n1. Expected vs. Unexpected Drawdowns\n- If your strategy has a historical max drawdown of 25%, experiencing 15% is normal\n- Panic only when drawdowns exceed historical norms significantly\n\n2. The Recovery Mindset\n- A 20% loss requires 25% gain to recover\n- A 50% loss requires 100% gain to recover\n- This is why small, consistent losses are manageable\n\n3. Process Over Outcome\n- Focus on executing your system correctly\n- Review trades for execution errors, not just results\n- Accept that individual trade outcomes are random\n\nRecovery Protocol:\n- Reduce position size during drawdowns (not increase)\n- Take a 24-48 hour break after large losses\n- Review your edge with historical data\n- Re-enter slowly with half positions\n- Never revenge trade`,
-    readTime: '10 min read',
+    title: 'Session Trading Strategies',
+    description: 'Optimize your trading around London and New York sessions.',
+    duration: '2h 30m',
+    lessonsCount: 4,
     level: 'Intermediate',
-    tags: ['Psychology', 'Drawdowns', 'Mental Resilience']
-  }
+    format: 'Mixed',
+    hasCertificate: true,
+    progress: 'completed',
+    progressPercent: 100,
+    lessons: [
+      { id: '5-1', title: 'Understanding Sessions', duration: '25 min', type: 'video' },
+      { id: '5-2', title: 'London Kill Zone', duration: '35 min', type: 'video' },
+      { id: '5-3', title: 'NY Session Plays', duration: '35 min', type: 'video' },
+      { id: '5-4', title: 'Session Quiz', duration: '15 min', type: 'quiz' },
+    ]
+  },
+  {
+    id: '6',
+    title: 'Algorithmic Trading Basics',
+    description: 'Introduction to building automated trading systems.',
+    duration: '4h 00m',
+    lessonsCount: 7,
+    level: 'Advanced',
+    format: 'Text',
+    hasCertificate: true,
+    progress: 'completed',
+    progressPercent: 100,
+    lessons: [
+      { id: '6-1', title: 'What is Algo Trading?', duration: '20 min', type: 'text' },
+      { id: '6-2', title: 'Strategy Logic', duration: '30 min', type: 'text' },
+      { id: '6-3', title: 'Backtesting Fundamentals', duration: '40 min', type: 'video' },
+      { id: '6-4', title: 'Avoiding Overfitting', duration: '30 min', type: 'text' },
+      { id: '6-5', title: 'Paper Trading', duration: '25 min', type: 'video' },
+      { id: '6-6', title: 'Going Live', duration: '30 min', type: 'text' },
+      { id: '6-7', title: 'Final Test', duration: '15 min', type: 'quiz' },
+    ]
+  },
 ];
 
-const tips: Tip[] = [
-  { id: '1', title: 'Always set your stop loss before entering a trade', content: 'Define your risk before thinking about profit. Place stops at logical levels where your trade idea is invalidated.', category: 'Risk Management', level: 'Beginner' },
-  { id: '2', title: 'Use the 1% rule religiously', content: 'Never risk more than 1% of your account on a single trade. This keeps you in the game through inevitable losing streaks.', category: 'Risk Management', level: 'Beginner' },
-  { id: '3', title: 'Mark the previous day high and low', content: 'These levels act as magnets for price and often provide excellent entry and exit points.', category: 'Charting', level: 'Beginner' },
-  { id: '4', title: 'Wait for candle close before entering', content: 'A wick can become a body. Always wait for the candle to close before confirming your setup.', category: 'Execution', level: 'Beginner' },
-  { id: '5', title: 'Trade the first hour with caution', content: 'The first hour of any session is often choppy. Let the market show its hand before committing.', category: 'Execution', level: 'Intermediate' },
-  { id: '6', title: 'Keep a trading journal', content: 'Record every trade with screenshots and notes. Review weekly to identify patterns in your behavior.', category: 'Psychology', level: 'Beginner' },
-  { id: '7', title: 'Avoid trading around major news', content: 'Unless you trade news specifically, close positions 15 minutes before high-impact releases.', category: 'Risk Management', level: 'Intermediate' },
-  { id: '8', title: 'Higher timeframe bias, lower timeframe entry', content: 'Use H4/Daily for direction, H1/M15 for entries. This alignment improves win rate significantly.', category: 'Charting', level: 'Intermediate' },
-  { id: '9', title: 'Scale out, not in', content: 'Take partial profits at logical levels. Never add to losing positions hoping they will recover.', category: 'Risk Management', level: 'Advanced' },
-  { id: '10', title: 'Your edge exists over 100+ trades', content: 'Individual trades are coin flips. Your strategy\'s edge only manifests over a large sample size.', category: 'Psychology', level: 'Intermediate' },
-  { id: '11', title: 'Avoid revenge trading at all costs', content: 'After a loss, take a break. Emotional trading compounds losses and destroys accounts.', category: 'Psychology', level: 'Beginner' },
-  { id: '12', title: 'Trade less, not more', content: 'Quality over quantity. The best traders take 2-3 setups per week, not 20 per day.', category: 'Execution', level: 'Advanced' }
+const articles: QuickResource[] = [
+  { id: 'a1', title: 'Understanding Market Structure', description: 'The foundation of all technical analysis.', readTime: '6 min', tags: ['Technical', 'Beginner'] },
+  { id: 'a2', title: 'The Psychology of Drawdowns', description: 'How to navigate losing streaks.', readTime: '8 min', tags: ['Psychology'] },
+  { id: 'a3', title: 'Session Trading 101', description: 'Maximize the London-NY overlap.', readTime: '5 min', tags: ['Strategy'] },
+  { id: 'a4', title: 'Order Flow Basics', description: 'Reading institutional footprints.', readTime: '10 min', tags: ['Advanced'] },
 ];
 
-const resources: Resource[] = [
-  { 
-    id: '1', 
-    title: 'Complete Price Action Masterclass', 
-    description: 'A comprehensive 4-hour video course covering all aspects of price action trading from basics to advanced concepts.', 
-    content: 'This masterclass covers everything you need to know about price action trading...', 
-    duration: '4 hours', 
-    level: 'Beginner', 
-    type: 'course',
-    lessons: [
-      { id: '1-1', title: 'Introduction to Price Action', duration: '15 min', type: 'video' },
-      { id: '1-2', title: 'Understanding Candlestick Patterns', duration: '25 min', type: 'video' },
-      { id: '1-3', title: 'Support and Resistance Basics', duration: '30 min', type: 'video' },
-      { id: '1-4', title: 'Trend Identification', duration: '20 min', type: 'video' },
-      { id: '1-5', title: 'Entry and Exit Strategies', duration: '35 min', type: 'video' },
-      { id: '1-6', title: 'Practice Quiz', duration: '15 min', type: 'quiz' }
-    ]
-  },
-  { 
-    id: '2', 
-    title: 'Risk Management Calculator Guide', 
-    description: 'Downloadable PDF with position sizing formulas, risk of ruin tables, and practical worksheets.', 
-    content: 'Complete guide to calculating position sizes and managing risk...', 
-    duration: '30 min read', 
-    level: 'Beginner', 
-    type: 'pdf',
-    lessons: [
-      { id: '2-1', title: 'Understanding Risk Per Trade', duration: '10 min', type: 'text' },
-      { id: '2-2', title: 'Position Sizing Formulas', duration: '10 min', type: 'text' },
-      { id: '2-3', title: 'Practical Worksheets', duration: '10 min', type: 'text' }
-    ]
-  },
-  { 
-    id: '3', 
-    title: 'Order Flow Fundamentals', 
-    description: 'Understanding how institutional orders affect price movement and how to trade alongside smart money.', 
-    content: 'Order flow analysis reveals the true supply and demand...', 
-    duration: '2 hours', 
-    level: 'Advanced', 
-    type: 'video',
-    lessons: [
-      { id: '3-1', title: 'What is Order Flow?', duration: '15 min', type: 'video' },
-      { id: '3-2', title: 'Identifying Liquidity Pools', duration: '25 min', type: 'video' },
-      { id: '3-3', title: 'Order Blocks Explained', duration: '30 min', type: 'video' },
-      { id: '3-4', title: 'Fair Value Gaps', duration: '25 min', type: 'video' },
-      { id: '3-5', title: 'Putting It All Together', duration: '25 min', type: 'video' }
-    ]
-  },
-  { 
-    id: '4', 
-    title: 'Session Trading Blueprint', 
-    description: 'Learn to trade the London and New York sessions with specific strategies for each time zone.', 
-    content: 'Each trading session has unique characteristics...', 
-    duration: '1.5 hours', 
-    level: 'Intermediate', 
-    type: 'lesson',
-    lessons: [
-      { id: '4-1', title: 'Understanding Market Sessions', duration: '20 min', type: 'video' },
-      { id: '4-2', title: 'London Session Strategy', duration: '25 min', type: 'video' },
-      { id: '4-3', title: 'New York Session Strategy', duration: '25 min', type: 'video' },
-      { id: '4-4', title: 'Session Quiz', duration: '10 min', type: 'quiz' }
-    ]
-  },
-  { 
-    id: '5', 
-    title: 'Trading Psychology Workbook', 
-    description: 'Interactive PDF with exercises for developing mental discipline and emotional control.', 
-    content: 'Psychology is 80% of trading success...', 
-    duration: '45 min read', 
-    level: 'Intermediate', 
-    type: 'pdf',
-    lessons: [
-      { id: '5-1', title: 'Self-Assessment Exercise', duration: '15 min', type: 'text' },
-      { id: '5-2', title: 'Emotional Triggers Worksheet', duration: '15 min', type: 'text' },
-      { id: '5-3', title: 'Building Your Trading Plan', duration: '15 min', type: 'text' }
-    ]
-  },
-  { 
-    id: '6', 
-    title: 'Advanced Chart Pattern Recognition', 
-    description: 'Deep dive into complex chart patterns including harmonics, Elliott Wave, and Wyckoff method.', 
-    content: 'Advanced patterns offer high-probability setups...', 
-    duration: '3 hours', 
-    level: 'Advanced', 
-    type: 'course',
-    lessons: [
-      { id: '6-1', title: 'Harmonic Patterns Introduction', duration: '30 min', type: 'video' },
-      { id: '6-2', title: 'ABCD and Gartley Patterns', duration: '35 min', type: 'video' },
-      { id: '6-3', title: 'Elliott Wave Basics', duration: '40 min', type: 'video' },
-      { id: '6-4', title: 'Wyckoff Method Overview', duration: '45 min', type: 'video' },
-      { id: '6-5', title: 'Pattern Recognition Quiz', duration: '20 min', type: 'quiz' }
-    ]
-  }
+const tips: QuickResource[] = [
+  { id: 't1', title: 'Always set your stop loss first', description: 'Define risk before profit.', readTime: '1 min', tags: ['Risk'] },
+  { id: 't2', title: 'Wait for candle close', description: 'A wick can become a body.', readTime: '1 min', tags: ['Execution'] },
+  { id: 't3', title: 'Trade the overlap', description: 'Best liquidity 8-12 EST.', readTime: '1 min', tags: ['Sessions'] },
+  { id: 't4', title: 'Journal every trade', description: 'Review to improve.', readTime: '1 min', tags: ['Psychology'] },
 ];
+
+const demoCertificates: Certificate[] = [
+  { id: 'c1', courseName: 'Advanced Price Action', completedDate: 'Nov 28, 2024' },
+  { id: 'c2', courseName: 'Session Trading Strategies', completedDate: 'Nov 15, 2024' },
+  { id: 'c3', courseName: 'Algorithmic Trading Basics', completedDate: 'Oct 22, 2024' },
+];
+
+// Demo progress stats
+const coursesInProgress = courses.filter(c => c.progress === 'in-progress').length;
+const coursesCompleted = courses.filter(c => c.progress === 'completed').length;
+const totalCourses = courses.length;
+const overallProgress = Math.round((coursesCompleted / totalCourses) * 100);
 
 export default function Education() {
-  const [activeTab, setActiveTab] = useState<TabType>('articles');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
-  const [selectedTip, setSelectedTip] = useState<Tip | null>(null);
-  const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
-  const [certificateCourse, setCertificateCourse] = useState<Resource | null>(null);
-  const [bookmarkedResources, setBookmarkedResources] = useState<string[]>([]);
+  const [certificateCourse, setCertificateCourse] = useState<Course | null>(null);
+  const [activeFilters, setActiveFilters] = useState<{ levels: string[]; topics: string[] }>({
+    levels: [],
+    topics: []
+  });
 
   const { 
     progress, 
     toggleLessonComplete, 
     getCourseProgress, 
-    getProgressPercentage,
     requestCertificate,
     issueCertificate
   } = useEducationProgress();
 
-  // Mock student name - in production this would come from auth
   const studentName = "John Doe";
 
-  const tabs: { id: TabType; label: string }[] = [
-    { id: 'articles', label: 'Articles & Guides' },
-    { id: 'tips', label: 'Tips' },
-    { id: 'resources', label: 'Educational Resources' }
-  ];
-
-  const filteredArticles = useMemo(() => {
-    if (!searchQuery) return articles;
-    const query = searchQuery.toLowerCase();
-    return articles.filter(a => 
-      a.title.toLowerCase().includes(query) || 
-      a.preview.toLowerCase().includes(query) ||
-      a.tags.some(t => t.toLowerCase().includes(query))
-    );
-  }, [searchQuery]);
-
-  const filteredTips = useMemo(() => {
-    if (!searchQuery) return tips;
-    const query = searchQuery.toLowerCase();
-    return tips.filter(t => 
-      t.title.toLowerCase().includes(query) || 
-      t.content.toLowerCase().includes(query) ||
-      t.category.toLowerCase().includes(query)
-    );
-  }, [searchQuery]);
-
-  const filteredResources = useMemo(() => {
-    if (!searchQuery) return resources;
-    const query = searchQuery.toLowerCase();
-    return resources.filter(r => 
-      r.title.toLowerCase().includes(query) || 
-      r.description.toLowerCase().includes(query)
-    );
-  }, [searchQuery]);
-
-  const handleArticleClick = (article: Article) => {
-    setSelectedArticle(article);
+  const getLevelColor = (level: string) => {
+    switch (level) {
+      case 'Beginner': return 'bg-success/20 text-success border-success/30';
+      case 'Intermediate': return 'bg-warning/20 text-warning border-warning/30';
+      case 'Advanced': return 'bg-destructive/20 text-destructive border-destructive/30';
+      default: return 'bg-muted text-muted-foreground';
+    }
   };
 
-  const handleTipClick = (tip: Tip) => {
-    setSelectedTip(tip);
+  const getFormatIcon = (format: string) => {
+    switch (format) {
+      case 'Video': return <Video className="h-3 w-3" />;
+      case 'Text': return <FileText className="h-3 w-3" />;
+      case 'Mixed': return <Layers className="h-3 w-3" />;
+      default: return <BookOpen className="h-3 w-3" />;
+    }
   };
 
-  const handleResourceClick = (resource: Resource) => {
-    setSelectedResource(resource);
+  const getProgressText = (progress: string) => {
+    switch (progress) {
+      case 'completed': return 'Completed';
+      case 'in-progress': return 'In Progress';
+      default: return 'Not Started';
+    }
   };
 
-  const handleViewCertificate = (resource: Resource) => {
-    setCertificateCourse(resource);
-    setShowCertificateModal(true);
-    setSelectedResource(null);
+  const handleCourseClick = (course: Course) => {
+    setSelectedCourse(course);
+  };
+
+  const handleViewCertificate = () => {
+    if (selectedCourse) {
+      setCertificateCourse(selectedCourse);
+      setShowCertificateModal(true);
+      setSelectedCourse(null);
+    }
   };
 
   const handleRequestCertificate = () => {
@@ -289,7 +275,7 @@ export default function Education() {
       requestCertificate(certificateCourse.id);
       toast({
         title: "Certificate Requested",
-        description: "Your certificate request has been submitted successfully."
+        description: "Your certificate request has been submitted."
       });
     }
   };
@@ -303,176 +289,399 @@ export default function Education() {
           courseName: certificateCourse.title,
           completedAt: courseProgress?.completedAt || new Date().toISOString()
         });
-        // Mark as issued after generating
         issueCertificate(certificateCourse.id);
         toast({
           title: "Certificate Downloaded",
-          description: "Your certificate PDF has been generated and downloaded."
+          description: "Your certificate PDF has been generated."
         });
-      } catch (error) {
+      } catch {
         toast({
           title: "Error",
-          description: "Failed to generate certificate. Please try again.",
+          description: "Failed to generate certificate.",
           variant: "destructive"
         });
       }
     }
   };
 
-  const toggleBookmark = (id: string) => {
-    setBookmarkedResources(prev => 
-      prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]
-    );
+  const toggleFilter = (type: 'levels' | 'topics', value: string) => {
+    setActiveFilters(prev => ({
+      ...prev,
+      [type]: prev[type].includes(value)
+        ? prev[type].filter(v => v !== value)
+        : [...prev[type], value]
+    }));
   };
 
-  const getResourceProgress = (resource: Resource) => {
-    return getProgressPercentage(resource.id, resource.lessons.length);
+  // Get completed lessons for current course from progress hook
+  const getCompletedLessonsForCourse = (courseId: string) => {
+    const courseProgress = getCourseProgress(courseId);
+    return courseProgress?.completedLessons || [];
   };
 
   return (
-    <div className="flex flex-col min-h-full bg-background">
+    <div className="flex-1 flex flex-col min-h-0">
       <AppHeader title="Education" />
       
-      <div className="flex-1 p-6 overflow-y-auto scrollbar-hidden">
-        <div className="max-w-7xl mx-auto space-y-6">
-          {/* Search Bar */}
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search articles, tips, resources..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-card border-border"
-            />
+      <div className="flex-1 overflow-y-auto p-6">
+        {/* Page Header */}
+        <div className="flex items-start justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Education</h1>
+            <p className="text-muted-foreground mt-1">
+              Curated training for serious traders – strategies, risk, and psychology.
+            </p>
+          </div>
+          
+          {/* Learning Snapshot Pill */}
+          <div className="flex items-center gap-4 px-4 py-3 bg-card border border-border rounded-xl">
+            <div className="text-center">
+              <div className="text-lg font-bold text-foreground">{coursesInProgress}</div>
+              <div className="text-xs text-muted-foreground">In Progress</div>
+            </div>
+            <div className="w-px h-8 bg-border" />
+            <div className="text-center">
+              <div className="text-lg font-bold text-success">{coursesCompleted}</div>
+              <div className="text-xs text-muted-foreground">Completed</div>
+            </div>
+            <div className="w-px h-8 bg-border" />
+            <div className="relative w-12 h-12">
+              <svg className="w-12 h-12 -rotate-90">
+                <circle
+                  cx="24"
+                  cy="24"
+                  r="20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                  className="text-muted/30"
+                />
+                <circle
+                  cx="24"
+                  cy="24"
+                  r="20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                  strokeDasharray={`${overallProgress * 1.256} 125.6`}
+                  className="text-primary"
+                />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-foreground">
+                {overallProgress}%
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Main 2-Column Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
+          {/* Left Column - Main Content */}
+          <div className="space-y-6">
+            {/* Structured Courses Section */}
+            <section>
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <GraduationCap className="h-5 w-5 text-primary" />
+                  Structured Courses
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Deep-dive programs with progress tracking & certificates.
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {courses.map((course) => (
+                  <Card 
+                    key={course.id} 
+                    className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group"
+                    onClick={() => handleCourseClick(course)}
+                  >
+                    <CardContent className="p-5">
+                      {/* Title & Description */}
+                      <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors mb-1">
+                        {course.title}
+                      </h3>
+                      <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                        {course.description}
+                      </p>
+                      
+                      {/* Badges Row */}
+                      <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                        <Badge variant="outline" className={`text-[10px] ${getLevelColor(course.level)}`}>
+                          {course.level}
+                        </Badge>
+                        <Badge variant="secondary" className="text-[10px] gap-1">
+                          {getFormatIcon(course.format)}
+                          {course.format}
+                        </Badge>
+                      </div>
+                      
+                      {/* Meta Row */}
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {course.duration}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <BookOpen className="h-3 w-3" />
+                          {course.lessonsCount} lessons
+                        </span>
+                        {course.hasCertificate && (
+                          <span className="flex items-center gap-1 text-primary">
+                            <Award className="h-3 w-3" />
+                            Certificate
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Progress */}
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className={`font-medium ${
+                            course.progress === 'completed' ? 'text-success' :
+                            course.progress === 'in-progress' ? 'text-warning' :
+                            'text-muted-foreground'
+                          }`}>
+                            {getProgressText(course.progress)}
+                          </span>
+                          <span className="text-muted-foreground">{course.progressPercent}%</span>
+                        </div>
+                        <Progress value={course.progressPercent} className="h-1.5" />
+                      </div>
+                      
+                      {/* CTA Button */}
+                      <Button 
+                        className="w-full" 
+                        size="sm"
+                        variant={course.progress === 'completed' ? 'outline' : 'default'}
+                      >
+                        {course.progress === 'completed' ? (
+                          <>
+                            <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
+                            View Course
+                          </>
+                        ) : course.progress === 'in-progress' ? (
+                          <>
+                            <Play className="h-3.5 w-3.5 mr-1.5" />
+                            Continue
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-3.5 w-3.5 mr-1.5" />
+                            Start Course
+                          </>
+                        )}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </section>
+
+            {/* Quick Resources Section */}
+            <section>
+              <Card className="bg-card border-border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <BookOpen className="h-4 w-4 text-primary" />
+                    Quick Resources
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Tabs defaultValue="articles" className="w-full">
+                    <TabsList className="mb-4 bg-muted/50">
+                      <TabsTrigger value="articles">Articles & Guides</TabsTrigger>
+                      <TabsTrigger value="tips">Trading Tips</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="articles" className="space-y-2 mt-0">
+                      {articles.map((article) => (
+                        <div
+                          key={article.id}
+                          className="flex items-start justify-between gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer group"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">
+                              {article.title}
+                            </h4>
+                            <p className="text-xs text-muted-foreground mt-0.5">{article.description}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="text-xs text-muted-foreground">{article.readTime}</span>
+                              {article.tags.map(tag => (
+                                <Badge key={tag} variant="secondary" className="text-[10px]">{tag}</Badge>
+                              ))}
+                            </div>
+                          </div>
+                          <Button variant="ghost" size="icon" className="flex-shrink-0 h-8 w-8 text-muted-foreground hover:text-primary">
+                            <Bookmark className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </TabsContent>
+                    
+                    <TabsContent value="tips" className="space-y-2 mt-0">
+                      {tips.map((tip) => (
+                        <div
+                          key={tip.id}
+                          className="flex items-start justify-between gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer group"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">
+                              {tip.title}
+                            </h4>
+                            <p className="text-xs text-muted-foreground mt-0.5">{tip.description}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="text-xs text-muted-foreground">{tip.readTime}</span>
+                              {tip.tags.map(tag => (
+                                <Badge key={tag} variant="secondary" className="text-[10px]">{tag}</Badge>
+                              ))}
+                            </div>
+                          </div>
+                          <Button variant="ghost" size="icon" className="flex-shrink-0 h-8 w-8 text-muted-foreground hover:text-primary">
+                            <Bookmark className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
+            </section>
           </div>
 
-          {/* Tab Bar */}
-          <div className="flex items-center gap-2 p-1 bg-muted/50 rounded-lg w-fit">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                  activeTab === tab.id
-                    ? 'bg-card text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+          {/* Right Column - Sidebar */}
+          <div className="space-y-4">
+            {/* Learning Path Card */}
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground font-medium">Learning Path</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-xs text-muted-foreground">Next up for you:</p>
+                
+                {/* Recommended Course */}
+                <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-primary/20 text-primary">
+                      <GraduationCap className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-sm text-foreground">Trading Psychology Essentials</h4>
+                      <p className="text-xs text-muted-foreground mt-0.5">2h 50m • 5 lessons</p>
+                    </div>
+                  </div>
+                  <Button size="sm" className="w-full mt-3">
+                    <Play className="h-3 w-3 mr-1" />
+                    Start
+                  </Button>
+                </div>
+                
+                {/* Recommended Resource */}
+                <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-muted text-muted-foreground">
+                      <FileText className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-sm text-foreground">Order Flow Basics</h4>
+                      <p className="text-xs text-muted-foreground mt-0.5">10 min read</p>
+                    </div>
+                  </div>
+                  <Button size="sm" variant="outline" className="w-full mt-3">
+                    Open
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Filters Card */}
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground font-medium">Filters</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Level Filters */}
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Level</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['Beginner', 'Intermediate', 'Advanced'].map((level) => (
+                      <Badge
+                        key={level}
+                        variant={activeFilters.levels.includes(level) ? 'default' : 'secondary'}
+                        className="cursor-pointer text-xs"
+                        onClick={() => toggleFilter('levels', level)}
+                      >
+                        {level}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Topic Filters */}
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Topics</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['Strategy', 'Risk', 'Psychology', 'Platform'].map((topic) => (
+                      <Badge
+                        key={topic}
+                        variant={activeFilters.topics.includes(topic) ? 'default' : 'secondary'}
+                        className="cursor-pointer text-xs"
+                        onClick={() => toggleFilter('topics', topic)}
+                      >
+                        {topic}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Certificates Card */}
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground font-medium flex items-center gap-2">
+                  <Award className="h-4 w-4 text-primary" />
+                  Certificates
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {demoCertificates.map((cert) => (
+                  <div key={cert.id} className="flex items-center justify-between gap-2 p-3 rounded-lg bg-muted/30">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-sm font-medium text-foreground truncate">{cert.courseName}</h4>
+                      <p className="text-xs text-muted-foreground">{cert.completedDate}</p>
+                    </div>
+                    <Button variant="ghost" size="sm" className="flex-shrink-0 text-xs">
+                      <FileText className="h-3 w-3 mr-1" />
+                      PDF
+                    </Button>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
           </div>
-
-          {/* Content Area */}
-          {activeTab === 'articles' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredArticles.map((article) => (
-                <ArticleCard
-                  key={article.id}
-                  title={article.title}
-                  preview={article.preview}
-                  readTime={article.readTime}
-                  level={article.level}
-                  tags={article.tags}
-                  onClick={() => handleArticleClick(article)}
-                />
-              ))}
-              {filteredArticles.length === 0 && (
-                <div className="col-span-full text-center py-12 text-muted-foreground">
-                  No articles found matching "{searchQuery}"
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'tips' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {filteredTips.map((tip) => (
-                <TipCard
-                  key={tip.id}
-                  title={tip.title}
-                  content={tip.content}
-                  category={tip.category}
-                  level={tip.level}
-                  onClick={() => handleTipClick(tip)}
-                />
-              ))}
-              {filteredTips.length === 0 && (
-                <div className="col-span-full text-center py-12 text-muted-foreground">
-                  No tips found matching "{searchQuery}"
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'resources' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredResources.map((resource) => {
-                const courseProgress = getCourseProgress(resource.id);
-                return (
-                  <ResourceCard
-                    key={resource.id}
-                    title={resource.title}
-                    description={resource.description}
-                    duration={resource.duration}
-                    level={resource.level}
-                    type={resource.type}
-                    progress={getResourceProgress(resource)}
-                    isCompleted={courseProgress?.isCompleted || false}
-                    isBookmarked={bookmarkedResources.includes(resource.id)}
-                    onClick={() => handleResourceClick(resource)}
-                    onBookmark={() => toggleBookmark(resource.id)}
-                  />
-                );
-              })}
-              {filteredResources.length === 0 && (
-                <div className="col-span-full text-center py-12 text-muted-foreground">
-                  No resources found matching "{searchQuery}"
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Article Modal */}
-      <EducationContentModal
-        isOpen={!!selectedArticle}
-        onClose={() => setSelectedArticle(null)}
-        content={selectedArticle ? {
-          title: selectedArticle.title,
-          type: 'article',
-          level: selectedArticle.level,
-          readTime: selectedArticle.readTime,
-          tags: selectedArticle.tags,
-          content: selectedArticle.content
-        } : null}
-      />
-
-      {/* Tip Modal */}
-      <EducationContentModal
-        isOpen={!!selectedTip}
-        onClose={() => setSelectedTip(null)}
-        content={selectedTip ? {
-          title: selectedTip.title,
-          type: 'tip',
-          level: selectedTip.level,
-          tags: [selectedTip.category],
-          content: selectedTip.content
-        } : null}
-      />
-
       {/* Course Detail Modal */}
-      {selectedResource && (
+      {selectedCourse && (
         <CourseDetailModal
-          isOpen={!!selectedResource}
-          onClose={() => setSelectedResource(null)}
-          course={selectedResource}
-          completedLessons={getCourseProgress(selectedResource.id)?.completedLessons || []}
-          isCompleted={getCourseProgress(selectedResource.id)?.isCompleted || false}
-          onToggleLesson={(lessonId) => toggleLessonComplete(selectedResource.id, lessonId, selectedResource.lessons.length)}
-          onViewCertificate={() => handleViewCertificate(selectedResource)}
+          isOpen={!!selectedCourse}
+          onClose={() => setSelectedCourse(null)}
+          course={{
+            id: selectedCourse.id,
+            title: selectedCourse.title,
+            description: selectedCourse.description,
+            duration: selectedCourse.duration,
+            level: selectedCourse.level,
+            type: 'course',
+            lessons: selectedCourse.lessons
+          }}
+          completedLessons={getCompletedLessonsForCourse(selectedCourse.id)}
+          isCompleted={selectedCourse.progress === 'completed'}
+          onToggleLesson={(lessonId) => toggleLessonComplete(selectedCourse.id, lessonId, selectedCourse.lessons.length)}
+          onViewCertificate={handleViewCertificate}
         />
       )}
 
