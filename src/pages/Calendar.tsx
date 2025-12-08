@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Filter } from "lucide-react";
-import { HistoricalTrendChart } from "@/components/calendar/HistoricalTrendChart";
+import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 
 const keyEvents = [
   { time: '08:30', currency: 'USD', event: 'Non-Farm Payrolls', impact: 'high' },
@@ -27,11 +28,36 @@ const events = [
   { time: '14:00', currency: 'GBP', event: 'BOE Interest Rate Decision', previous: '5.25%', forecast: '5.25%', actual: '—', impact: 'high' },
 ];
 
+type CalendarEvent = typeof events[0];
+
 export default function Calendar() {
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   const getImpactColor = (impact: string) => {
     if (impact === 'high') return 'destructive';
     if (impact === 'medium') return 'default';
     return 'secondary';
+  };
+
+  const handleEventClick = (event: CalendarEvent) => {
+    setSelectedEvent(event);
+    setIsModalOpen(true);
+  };
+
+  const handleKeyEventClick = (keyEvent: typeof keyEvents[0]) => {
+    // Find the matching full event data
+    const fullEvent = events.find(e => e.event === keyEvent.event && e.currency === keyEvent.currency);
+    if (fullEvent) {
+      setSelectedEvent(fullEvent);
+      setIsModalOpen(true);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    // Keep selectedEvent for a moment to prevent flash during close animation
+    setTimeout(() => setSelectedEvent(null), 200);
   };
 
   return (
@@ -96,7 +122,11 @@ export default function Calendar() {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 {keyEvents.map((event, i) => (
-                  <div key={i} className="p-4 bg-muted/50 rounded-lg border border-border">
+                  <div 
+                    key={i} 
+                    className="p-4 bg-muted/50 rounded-lg border border-border cursor-pointer hover:bg-muted/70 hover:border-primary/30 transition-all"
+                    onClick={() => handleKeyEventClick(event)}
+                  >
                     <div className="flex items-center justify-between mb-2">
                       <Badge variant={getImpactColor(event.impact)} className="text-xs">
                         {event.impact.toUpperCase()}
@@ -132,7 +162,11 @@ export default function Calendar() {
                   </thead>
                   <tbody>
                     {events.map((event, i) => (
-                      <tr key={i} className="border-b border-border hover:bg-muted/50 transition-colors">
+                      <tr 
+                        key={i} 
+                        className="border-b border-border hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => handleEventClick(event)}
+                      >
                         <td className="py-3 px-5 text-sm text-foreground">{event.time}</td>
                         <td className="py-3 px-4">
                           <Badge variant="outline" className="text-xs">{event.currency}</Badge>
@@ -153,11 +187,15 @@ export default function Calendar() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Historical Trend Chart */}
-          <HistoricalTrendChart />
         </div>
       </div>
+
+      {/* Event Details Modal */}
+      <EventDetailsModal 
+        event={selectedEvent} 
+        isOpen={isModalOpen} 
+        onClose={handleCloseModal} 
+      />
     </div>
   );
 }
