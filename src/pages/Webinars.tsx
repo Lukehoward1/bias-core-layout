@@ -122,36 +122,39 @@ const asiaWebinars: Webinar[] = [
 
 type ViewMode = 'landing' | 'london' | 'newyork' | 'asia';
 
-// Session icons as React components
+// Unified teal accent color for all icons
+const ICON_COLOR = "#2EC4B6";
+
+// Session icons as React components - all using unified teal accent
 const LondonIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="5" y="8" width="4" height="12" rx="1" fill="#F4D35E" fillOpacity="0.9"/>
-    <line x1="7" y1="4" x2="7" y2="8" stroke="#F4D35E" strokeWidth="1.5" strokeLinecap="round"/>
-    <line x1="7" y1="20" x2="7" y2="24" stroke="#F4D35E" strokeWidth="1.5" strokeLinecap="round"/>
-    <rect x="12" y="10" width="4" height="8" rx="1" stroke="#F4D35E" strokeWidth="1.5"/>
-    <line x1="14" y1="6" x2="14" y2="10" stroke="#F4D35E" strokeWidth="1.5" strokeLinecap="round"/>
-    <line x1="14" y1="18" x2="14" y2="22" stroke="#F4D35E" strokeWidth="1.5" strokeLinecap="round"/>
-    <rect x="19" y="6" width="4" height="14" rx="1" fill="#F4D35E" fillOpacity="0.9"/>
-    <line x1="21" y1="3" x2="21" y2="6" stroke="#F4D35E" strokeWidth="1.5" strokeLinecap="round"/>
-    <line x1="21" y1="20" x2="21" y2="25" stroke="#F4D35E" strokeWidth="1.5" strokeLinecap="round"/>
+  <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="5" y="8" width="4" height="12" rx="1" fill={ICON_COLOR} fillOpacity="0.9"/>
+    <line x1="7" y1="4" x2="7" y2="8" stroke={ICON_COLOR} strokeWidth="1.5" strokeLinecap="round"/>
+    <line x1="7" y1="20" x2="7" y2="24" stroke={ICON_COLOR} strokeWidth="1.5" strokeLinecap="round"/>
+    <rect x="12" y="10" width="4" height="8" rx="1" stroke={ICON_COLOR} strokeWidth="1.5"/>
+    <line x1="14" y1="6" x2="14" y2="10" stroke={ICON_COLOR} strokeWidth="1.5" strokeLinecap="round"/>
+    <line x1="14" y1="18" x2="14" y2="22" stroke={ICON_COLOR} strokeWidth="1.5" strokeLinecap="round"/>
+    <rect x="19" y="6" width="4" height="14" rx="1" fill={ICON_COLOR} fillOpacity="0.9"/>
+    <line x1="21" y1="3" x2="21" y2="6" stroke={ICON_COLOR} strokeWidth="1.5" strokeLinecap="round"/>
+    <line x1="21" y1="20" x2="21" y2="25" stroke={ICON_COLOR} strokeWidth="1.5" strokeLinecap="round"/>
   </svg>
 );
 
 const NewYorkIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M4 20L10 14L14 17L24 7" stroke="#F77F00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M18 7H24V13" stroke="#F77F00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    <line x1="4" y1="24" x2="24" y2="24" stroke="#F77F00" strokeWidth="1.5" strokeLinecap="round" strokeOpacity="0.5"/>
+  <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 20L10 14L14 17L24 7" stroke={ICON_COLOR} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M18 7H24V13" stroke={ICON_COLOR} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <line x1="4" y1="24" x2="24" y2="24" stroke={ICON_COLOR} strokeWidth="1.5" strokeLinecap="round" strokeOpacity="0.5"/>
   </svg>
 );
 
 const AsiaIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <line x1="4" y1="10" x2="24" y2="10" stroke="#2EC4B6" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2 2"/>
-    <line x1="4" y1="18" x2="24" y2="18" stroke="#2EC4B6" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2 2"/>
-    <path d="M6 14H10L12 12L14 16L16 13L18 15L20 14H22" stroke="#2EC4B6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    <rect x="3" y="9" width="2" height="10" rx="1" fill="#2EC4B6" fillOpacity="0.3"/>
-    <rect x="23" y="9" width="2" height="10" rx="1" fill="#2EC4B6" fillOpacity="0.3"/>
+  <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <line x1="4" y1="10" x2="24" y2="10" stroke={ICON_COLOR} strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2 2"/>
+    <line x1="4" y1="18" x2="24" y2="18" stroke={ICON_COLOR} strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2 2"/>
+    <path d="M6 14H10L12 12L14 16L16 13L18 15L20 14H22" stroke={ICON_COLOR} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <rect x="3" y="9" width="2" height="10" rx="1" fill={ICON_COLOR} fillOpacity="0.3"/>
+    <rect x="23" y="9" width="2" height="10" rx="1" fill={ICON_COLOR} fillOpacity="0.3"/>
   </svg>
 );
 
@@ -160,21 +163,18 @@ const sessionConfig = {
     title: 'London Session',
     subtitle: 'Live analysis and execution during London market hours.',
     Icon: LondonIcon,
-    color: 'bg-[#F4D35E]/10 text-[#F4D35E]',
     webinars: londonWebinars
   },
   newyork: {
     title: 'New York Session',
     subtitle: 'Live futures and forex sessions during NY open.',
     Icon: NewYorkIcon,
-    color: 'bg-[#F77F00]/10 text-[#F77F00]',
     webinars: nyWebinars
   },
   asia: {
     title: 'Asia Session',
     subtitle: 'Strategy discussion and trading during Asian liquidity.',
     Icon: AsiaIcon,
-    color: 'bg-[#2EC4B6]/10 text-[#2EC4B6]',
     webinars: asiaWebinars
   }
 };
@@ -224,24 +224,13 @@ export default function Webinars() {
           <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* London Session */}
             <Card 
-              className="bg-card border-border hover:border-[#F4D35E]/50 transition-all duration-200 cursor-pointer group animate-fade-in"
+              className="bg-card border-border hover:border-primary/50 transition-all duration-300 cursor-pointer group animate-fade-in"
               style={{ animationDelay: '0.1s' }}
               onClick={() => setViewMode('london')}
             >
               <CardContent className="p-8 flex flex-col items-center text-center">
-                <div className="w-16 h-16 rounded-2xl bg-[#F4D35E]/10 flex items-center justify-center mb-6 group-hover:bg-[#F4D35E]/20 transition-colors">
-                  {/* Candlestick cluster icon */}
-                  <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect x="5" y="8" width="4" height="12" rx="1" fill="#F4D35E" fillOpacity="0.9"/>
-                    <line x1="7" y1="4" x2="7" y2="8" stroke="#F4D35E" strokeWidth="1.5" strokeLinecap="round"/>
-                    <line x1="7" y1="20" x2="7" y2="24" stroke="#F4D35E" strokeWidth="1.5" strokeLinecap="round"/>
-                    <rect x="12" y="10" width="4" height="8" rx="1" stroke="#F4D35E" strokeWidth="1.5"/>
-                    <line x1="14" y1="6" x2="14" y2="10" stroke="#F4D35E" strokeWidth="1.5" strokeLinecap="round"/>
-                    <line x1="14" y1="18" x2="14" y2="22" stroke="#F4D35E" strokeWidth="1.5" strokeLinecap="round"/>
-                    <rect x="19" y="6" width="4" height="14" rx="1" fill="#F4D35E" fillOpacity="0.9"/>
-                    <line x1="21" y1="3" x2="21" y2="6" stroke="#F4D35E" strokeWidth="1.5" strokeLinecap="round"/>
-                    <line x1="21" y1="20" x2="21" y2="25" stroke="#F4D35E" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 group-hover:scale-105 group-hover:shadow-[0_0_20px_rgba(46,196,182,0.15)] transition-all duration-300">
+                  <LondonIcon />
                 </div>
                 <h2 className="text-xl font-semibold text-foreground mb-2">London Session</h2>
                 <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
@@ -256,18 +245,13 @@ export default function Webinars() {
 
             {/* New York Session */}
             <Card 
-              className="bg-card border-border hover:border-[#F77F00]/50 transition-all duration-200 cursor-pointer group animate-fade-in"
+              className="bg-card border-border hover:border-primary/50 transition-all duration-300 cursor-pointer group animate-fade-in"
               style={{ animationDelay: '0.2s' }}
               onClick={() => setViewMode('newyork')}
             >
               <CardContent className="p-8 flex flex-col items-center text-center">
-                <div className="w-16 h-16 rounded-2xl bg-[#F77F00]/10 flex items-center justify-center mb-6 group-hover:bg-[#F77F00]/20 transition-colors">
-                  {/* Upward trend arrow with line graph */}
-                  <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M4 20L10 14L14 17L24 7" stroke="#F77F00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M18 7H24V13" stroke="#F77F00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <line x1="4" y1="24" x2="24" y2="24" stroke="#F77F00" strokeWidth="1.5" strokeLinecap="round" strokeOpacity="0.5"/>
-                  </svg>
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 group-hover:scale-105 group-hover:shadow-[0_0_20px_rgba(46,196,182,0.15)] transition-all duration-300">
+                  <NewYorkIcon />
                 </div>
                 <h2 className="text-xl font-semibold text-foreground mb-2">New York Session</h2>
                 <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
@@ -282,20 +266,13 @@ export default function Webinars() {
 
             {/* Asia Session */}
             <Card 
-              className="bg-card border-border hover:border-[#2EC4B6]/50 transition-all duration-200 cursor-pointer group animate-fade-in"
+              className="bg-card border-border hover:border-primary/50 transition-all duration-300 cursor-pointer group animate-fade-in"
               style={{ animationDelay: '0.3s' }}
               onClick={() => setViewMode('asia')}
             >
               <CardContent className="p-8 flex flex-col items-center text-center">
-                <div className="w-16 h-16 rounded-2xl bg-[#2EC4B6]/10 flex items-center justify-center mb-6 group-hover:bg-[#2EC4B6]/20 transition-colors">
-                  {/* Horizontal price range / consolidation icon */}
-                  <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <line x1="4" y1="10" x2="24" y2="10" stroke="#2EC4B6" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2 2"/>
-                    <line x1="4" y1="18" x2="24" y2="18" stroke="#2EC4B6" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2 2"/>
-                    <path d="M6 14H10L12 12L14 16L16 13L18 15L20 14H22" stroke="#2EC4B6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <rect x="3" y="9" width="2" height="10" rx="1" fill="#2EC4B6" fillOpacity="0.3"/>
-                    <rect x="23" y="9" width="2" height="10" rx="1" fill="#2EC4B6" fillOpacity="0.3"/>
-                  </svg>
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 group-hover:scale-105 group-hover:shadow-[0_0_20px_rgba(46,196,182,0.15)] transition-all duration-300">
+                  <AsiaIcon />
                 </div>
                 <h2 className="text-xl font-semibold text-foreground mb-2">Asia Session</h2>
                 <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
