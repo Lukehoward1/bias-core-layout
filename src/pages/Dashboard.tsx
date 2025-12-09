@@ -93,16 +93,26 @@ export default function Dashboard() {
                 <CardTitle>Session Timers</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {[
-                    { name: 'London', time: '2:15:30', status: 'closed' },
-                    { name: 'New York', time: '5:45:12', status: 'closed' },
-                    { name: 'Tokyo', time: 'Open', status: 'active' },
+                    { name: 'Sydney', time: 'Opens in 8:30:00', status: 'closed', accent: '#2EC4B6', region: 'Asia-Pacific' },
+                    { name: 'Tokyo', time: 'Closes in 1:23:45', status: 'active', accent: '#4361EE', region: 'JPY Markets' },
+                    { name: 'London', time: 'Opens in 2:15:30', status: 'closed', accent: '#F4D35E', region: 'European' },
+                    { name: 'New York', time: 'Opens in 5:45:12', status: 'closed', accent: '#F77F00', region: 'US Markets' },
                   ].map((session) => (
-                    <div key={session.name} className="flex items-center justify-between">
-                      <div className="font-medium text-foreground">{session.name}</div>
-                      <div className={`text-sm ${session.status === 'active' ? 'text-success' : 'text-muted-foreground'}`}>
-                        {session.time}
+                    <div key={session.name} className="relative p-3 bg-muted/50 rounded-lg border border-border overflow-hidden">
+                      <div 
+                        className="absolute left-0 top-0 bottom-0 w-[3px]" 
+                        style={{ backgroundColor: session.accent }}
+                      />
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium text-foreground text-sm">{session.name}</div>
+                          <div className="text-xs text-muted-foreground">{session.region}</div>
+                        </div>
+                        <div className={`text-xs ${session.status === 'active' ? 'text-success font-medium' : 'text-muted-foreground'}`}>
+                          {session.time}
+                        </div>
                       </div>
                     </div>
                   ))}

@@ -319,22 +319,22 @@ export default function Education() {
           <div className="text-center max-w-2xl mx-auto mb-16 pt-8">
             <h1 className="text-3xl font-bold text-foreground mb-3">Education</h1>
             <p className="text-muted-foreground text-lg">
-              Optional learning resources to support strategy, psychology & performance.
+              Curated training for serious traders – strategies, risk, and psychology.
             </p>
           </div>
 
           {/* Category Cards Grid */}
           <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Structured Courses */}
+            {/* Courses */}
             <Card 
               className="bg-card border-border hover:border-primary/50 transition-all duration-200 cursor-pointer group"
               onClick={() => setViewMode('courses')}
             >
               <CardContent className="p-8 flex flex-col items-center text-center">
-                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 group-hover:scale-105 transition-all">
                   <GraduationCap className="h-8 w-8 text-primary" />
                 </div>
-                <h2 className="text-xl font-semibold text-foreground mb-2">Structured Courses</h2>
+                <h2 className="text-xl font-semibold text-foreground mb-2">Courses</h2>
                 <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
                   Full learning programs with tracked progress and certificates.
                 </p>
@@ -351,12 +351,12 @@ export default function Education() {
               onClick={() => setViewMode('articles')}
             >
               <CardContent className="p-8 flex flex-col items-center text-center">
-                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 group-hover:scale-105 transition-all">
                   <FileText className="h-8 w-8 text-primary" />
                 </div>
                 <h2 className="text-xl font-semibold text-foreground mb-2">Articles & Guides</h2>
                 <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-                  Short-form breakdowns of market concepts, psychology and platform usage.
+                  Short-form breakdowns of market concepts, psychology and strategies.
                 </p>
                 <Button className="w-full group-hover:bg-primary/90">
                   Browse Articles
@@ -371,12 +371,12 @@ export default function Education() {
               onClick={() => setViewMode('tips')}
             >
               <CardContent className="p-8 flex flex-col items-center text-center">
-                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 group-hover:scale-105 transition-all">
                   <Lightbulb className="h-8 w-8 text-primary" />
                 </div>
                 <h2 className="text-xl font-semibold text-foreground mb-2">Trading Tips</h2>
                 <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-                  Execution and improvement techniques for serious traders.
+                  Quick execution and improvement techniques for serious traders.
                 </p>
                 <Button className="w-full group-hover:bg-primary/90">
                   Browse Tips
