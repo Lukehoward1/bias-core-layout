@@ -41,8 +41,11 @@ const learningItems = [
   { title: "Webinars", url: "/webinars", icon: Video },
 ];
 
+const brokerageItems = [
+  { title: "Brokerage", url: "/brokerage", icon: Link2 },
+];
+
 const accountItems = [
-  { title: "Broker Connections", url: "/broker-connections", icon: Link2 },
   { title: "Settings", url: "/settings", icon: Settings },
   { title: "Subscriptions", url: "/billing", icon: CreditCard },
 ];
@@ -129,10 +132,13 @@ export function AppSidebar() {
         </nav>
       </div>
 
-      {/* MIDDLE SECTION: Learning (centered vertically) */}
-      <div className="flex-1 flex items-center">
+      {/* MIDDLE SECTION: Learning + Brokerage */}
+      <div className="flex-1 flex flex-col justify-center gap-6">
         <nav className="px-3 w-full">
           <NavSection title="LEARNING" items={learningItems} />
+        </nav>
+        <nav className="px-3 w-full">
+          <NavSection title="BROKERAGE" items={brokerageItems} />
         </nav>
       </div>
 

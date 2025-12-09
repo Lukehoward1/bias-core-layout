@@ -20,7 +20,7 @@ import Community from "./pages/Community";
 import Education from "./pages/Education";
 import Webinars from "./pages/Webinars";
 
-import BrokerConnections from "./pages/BrokerConnections";
+import Brokerage from "./pages/Brokerage";
 import Settings from "./pages/Settings";
 import Billing from "./pages/Billing";
 import Pricing from "./pages/Pricing";
@@ -51,7 +51,7 @@ const App = () => (
               <Route path="/education" element={<Education />} />
               <Route path="/webinars" element={<Webinars />} />
               
-              <Route path="/broker-connections" element={<BrokerConnections />} />
+              <Route path="/brokerage" element={<Brokerage />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/billing" element={<Billing />} />
             </Route>
