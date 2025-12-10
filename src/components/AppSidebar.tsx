@@ -16,13 +16,15 @@ import {
   Sun,
   ChevronLeft,
   ChevronRight,
-  Zap
+  Zap,
+  X
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAppSidebar } from "@/hooks/use-app-sidebar";
 import { useTheme } from "@/hooks/use-theme";
+import { useIsMobile } from "@/hooks/use-mobile";
 import sbLogo from "@/assets/sb-logo.svg";
 
 const mainItems = [
@@ -51,10 +53,17 @@ const accountItems = [
 ];
 
 export function AppSidebar() {
-  const { collapsed, toggleCollapsed } = useAppSidebar();
+  const { collapsed, toggleCollapsed, mobileOpen, setMobileOpen } = useAppSidebar();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const currentPath = location.pathname;
+  const isMobile = useIsMobile();
+
+  const handleNavClick = () => {
+    if (isMobile) {
+      setMobileOpen(false);
+    }
+  };
 
   const NavSection = ({ title, items }: { title: string; items: typeof mainItems }) => (
     <div className="space-y-1">
@@ -65,16 +74,18 @@ export function AppSidebar() {
       )}
       <div className="space-y-0.5">
         {items.map((item) => {
-          const isActive = currentPath === item.url;
+          const isActive = currentPath === item.url || 
+            (item.url !== '/' && currentPath.startsWith(item.url));
           const Icon = item.icon;
           
           return (
             <NavLink
               key={item.url}
               to={item.url}
+              onClick={handleNavClick}
               className={`
                 flex items-center px-3 py-2.5 rounded-lg transition-all relative
-                ${collapsed ? 'justify-center mx-1' : 'justify-start'}
+                ${collapsed && !isMobile ? 'justify-center mx-1' : 'justify-start'}
                 ${isActive 
                   ? 'bg-sidebar-accent text-sidebar-primary' 
                   : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
@@ -84,8 +95,8 @@ export function AppSidebar() {
               {isActive && !collapsed && (
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full" />
               )}
-              <Icon className={`${collapsed ? '' : 'mr-3'} h-[18px] w-[18px] flex-shrink-0`} />
-              {!collapsed && <span className="text-sm font-medium">{item.title}</span>}
+              <Icon className={`${collapsed && !isMobile ? '' : 'mr-3'} h-[18px] w-[18px] flex-shrink-0`} />
+              {(!collapsed || isMobile) && <span className="text-sm font-medium">{item.title}</span>}
             </NavLink>
           );
         })}
@@ -93,38 +104,43 @@ export function AppSidebar() {
     </div>
   );
 
-  return (
-    <aside 
-      className={`
-        ${collapsed ? 'w-16' : 'w-60'} 
-        bg-sidebar
-        flex flex-col h-screen transition-all duration-300
-        fixed left-0 top-0 z-40 overflow-y-auto overflow-x-hidden
-      `}
-    >
-      {/* TOP SECTION: Logo, Collapse Button, Main Nav */}
+  const sidebarContent = (
+    <>
+      {/* TOP SECTION: Logo, Collapse Button */}
       <div className="flex-shrink-0">
         {/* Logo - aligned with main header h-14 */}
-        <div className={`h-14 ${collapsed ? 'px-3' : 'px-4'} flex items-center justify-between border-b border-border`}>
-          <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
-            <img src={sbLogo} alt="StreamBias" className={`${collapsed ? 'h-7' : 'h-8'} w-auto flex-shrink-0`} />
-            {!collapsed && (
+        <div className={`h-14 ${collapsed && !isMobile ? 'px-3' : 'px-4'} flex items-center justify-between border-b border-border`}>
+          <div className={`flex items-center ${collapsed && !isMobile ? 'justify-center' : 'gap-3'}`}>
+            <img src={sbLogo} alt="StreamBias" className={`${collapsed && !isMobile ? 'h-7' : 'h-8'} w-auto flex-shrink-0`} />
+            {(!collapsed || isMobile) && (
               <span className="text-lg font-bold text-foreground">StreamBias</span>
             )}
           </div>
+          {isMobile && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMobileOpen(false)}
+              className="h-8 w-8"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
         </div>
 
-        {/* Collapse Button */}
-        <div className="px-3 py-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleCollapsed}
-            className={`w-full justify-center hover:bg-sidebar-accent h-9 ${collapsed ? 'px-0' : ''}`}
-          >
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          </Button>
-        </div>
+        {/* Collapse Button - Desktop only */}
+        {!isMobile && (
+          <div className="px-3 py-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleCollapsed}
+              className={`w-full justify-center hover:bg-sidebar-accent h-9 ${collapsed ? 'px-0' : ''}`}
+            >
+              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            </Button>
+          </div>
+        )}
 
         {/* Main Navigation */}
         <nav className="px-3 pt-1 pb-4">
@@ -132,8 +148,8 @@ export function AppSidebar() {
         </nav>
       </div>
 
-      {/* MIDDLE SECTION: Learning + Brokerage */}
-      <div className="flex-1 flex flex-col justify-center gap-6">
+      {/* MIDDLE SECTION: Learning + Brokerage - flex-1 to take available space */}
+      <div className="flex-1 flex flex-col justify-center gap-6 min-h-0">
         <nav className="px-3 w-full">
           <NavSection title="LEARNING" items={learningItems} />
         </nav>
@@ -142,8 +158,8 @@ export function AppSidebar() {
         </nav>
       </div>
 
-      {/* BOTTOM SECTION: Account + Theme/Upgrade */}
-      <div className="flex-shrink-0">
+      {/* BOTTOM SECTION: Account + Theme/Upgrade - pinned to bottom */}
+      <div className="flex-shrink-0 mt-auto">
         <nav className="px-3 py-4">
           <NavSection title="ACCOUNT" items={accountItems} />
         </nav>
@@ -154,13 +170,13 @@ export function AppSidebar() {
             variant="ghost"
             size="sm"
             onClick={toggleTheme}
-            className={`w-full h-9 ${collapsed ? 'justify-center px-0' : 'justify-start px-3'} hover:bg-sidebar-accent`}
+            className={`w-full h-9 ${collapsed && !isMobile ? 'justify-center px-0' : 'justify-start px-3'} hover:bg-sidebar-accent`}
           >
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            {!collapsed && <span className="ml-3 text-sm">Theme</span>}
+            {(!collapsed || isMobile) && <span className="ml-3 text-sm">Theme</span>}
           </Button>
           
-          {!collapsed && (
+          {(!collapsed || isMobile) && (
             <Button
               size="sm"
               className="w-full h-9 bg-gradient-to-r from-primary to-accent hover:opacity-90"
@@ -171,6 +187,49 @@ export function AppSidebar() {
           )}
         </div>
       </div>
+    </>
+  );
+
+  // Mobile: Overlay drawer
+  if (isMobile) {
+    return (
+      <>
+        {/* Overlay backdrop */}
+        {mobileOpen && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-40"
+            onClick={() => setMobileOpen(false)}
+          />
+        )}
+        
+        {/* Slide-out drawer */}
+        <aside 
+          className={`
+            fixed left-0 top-0 z-50 h-full w-72
+            bg-sidebar flex flex-col
+            transform transition-transform duration-300 ease-in-out
+            ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
+            overflow-y-auto
+          `}
+        >
+          {sidebarContent}
+        </aside>
+      </>
+    );
+  }
+
+  // Desktop: Fixed sidebar (no scroll)
+  return (
+    <aside 
+      className={`
+        ${collapsed ? 'w-16' : 'w-60'} 
+        bg-sidebar
+        flex flex-col h-screen
+        fixed left-0 top-0 z-40
+        transition-all duration-300
+      `}
+    >
+      {sidebarContent}
     </aside>
   );
 }
