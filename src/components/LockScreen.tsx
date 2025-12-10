@@ -18,7 +18,7 @@ const redNews = [
   { id: 'rate-gbp-1', time: '14:00', currency: 'GBP', event: 'Interest Rate Decision', impact: 'High' as const },
 ];
 
-// Mock session data
+// Mock session data - includes Sydney
 const currentSession = {
   name: 'London',
   status: 'live' as const,
@@ -64,11 +64,9 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
         const parsed = JSON.parse(stored);
         setFavoritePairs(parsed);
       } catch {
-        // Fall back to default
         setFavoritePairs(['XAUUSD', 'EURUSD']);
       }
     } else {
-      // Default to first 2 pairs if no favorites set
       const watchlist = localStorage.getItem('watchlist');
       if (watchlist) {
         try {
@@ -100,39 +98,33 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     });
   };
 
-  // Navigate to calendar with specific event
   const handleNewsClick = (e: React.MouseEvent, eventId: string, eventName: string) => {
     e.stopPropagation();
     navigate(`/calendar?event=${encodeURIComponent(eventName)}`);
   };
 
-  // Navigate to calendar page
   const handleViewAllNews = (e: React.MouseEvent) => {
     e.stopPropagation();
     navigate('/calendar');
   };
 
-  // Navigate to asset detail
   const handleBiasClick = (e: React.MouseEvent, symbol: string) => {
     e.stopPropagation();
     navigate(`/asset/${symbol}?from=Dashboard`);
   };
 
-  // Handle background click to unlock
   const handleBackgroundClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       onUnlock();
     }
   };
 
-  // Open manage modal
   const handleOpenManageModal = (e: React.MouseEvent) => {
     e.stopPropagation();
     setTempSelection([...favoritePairs]);
     setIsManageModalOpen(true);
   };
 
-  // Toggle pair selection in modal
   const handleTogglePair = (symbol: string) => {
     if (tempSelection.includes(symbol)) {
       setTempSelection(tempSelection.filter(s => s !== symbol));
@@ -141,14 +133,12 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     }
   };
 
-  // Save favorites
   const handleSaveFavorites = () => {
     setFavoritePairs(tempSelection);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(tempSelection));
     setIsManageModalOpen(false);
   };
 
-  // Get bias data for displayed pairs
   const displayedPairs = favoritePairs
     .map(symbol => allPairsWithBias.find(p => p.symbol === symbol))
     .filter(Boolean) as typeof allPairsWithBias;
@@ -156,89 +146,89 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   return (
     <>
       <div 
-        className="fixed inset-0 z-50 bg-gradient-to-br from-gray-900 via-gray-950 to-black flex items-center justify-center"
+        className="fixed inset-0 z-50 bg-background dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-950 dark:to-black flex items-center justify-center"
         onClick={handleBackgroundClick}
       >
         <div className="text-center space-y-6 px-6 max-w-2xl w-full" onClick={handleBackgroundClick}>
           {/* Time */}
           <div className="cursor-pointer" onClick={onUnlock}>
-            <div className="text-8xl font-light text-white tracking-tight mb-2">
+            <div className="text-7xl sm:text-8xl font-light text-foreground tracking-tight mb-2">
               {formatTime(currentTime)}
             </div>
-            <div className="text-lg text-gray-400">
+            <div className="text-base sm:text-lg text-muted-foreground">
               {formatDate(currentTime)}
             </div>
           </div>
 
           {/* Session Info - Informational only, not clickable */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-muted/50 dark:bg-white/5 border border-border dark:border-white/10">
             <div className={`w-2 h-2 rounded-full ${currentSession.status === 'live' ? 'bg-success animate-pulse' : 'bg-warning'}`} />
-            <span className="text-sm text-gray-300">
+            <span className="text-sm text-foreground dark:text-gray-300">
               {currentSession.name} Session {currentSession.status === 'live' ? 'Live' : `in ${currentSession.nextSessionIn}`}
             </span>
-            <Clock className="h-3 w-3 text-gray-500" />
+            <Clock className="h-3 w-3 text-muted-foreground dark:text-gray-500" />
           </div>
 
           {/* Dashboard Focus Pairs */}
           <div className="space-y-2">
             <button
               onClick={handleOpenManageModal}
-              className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-400 transition-colors"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               <Pencil className="h-3 w-3" />
               <span>Edit pairs</span>
             </button>
-            <div className="flex justify-center gap-3 flex-wrap">
+            <div className="flex justify-center gap-2 sm:gap-3 flex-wrap">
               {displayedPairs.map((market) => (
                 <button
                   key={market.symbol}
                   onClick={(e) => handleBiasClick(e, market.symbol)}
-                  className="group flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 hover:border-primary/30 transition-all duration-200"
+                  className="group flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg bg-muted/50 dark:bg-white/5 border border-border dark:border-white/10 hover:bg-muted dark:hover:bg-white/10 hover:border-primary/30 transition-all duration-200"
                 >
-                  <span className="text-sm font-medium text-white">{market.symbol}</span>
+                  <span className="text-xs sm:text-sm font-medium text-foreground">{market.symbol}</span>
                   <div className={`flex items-center gap-1 ${market.bias === 'Bullish' ? 'text-success' : 'text-destructive'}`}>
                     {market.bias === 'Bullish' ? (
-                      <TrendingUp className="h-3.5 w-3.5" />
+                      <TrendingUp className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                     ) : (
-                      <TrendingDown className="h-3.5 w-3.5" />
+                      <TrendingDown className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                     )}
-                    <span className="text-xs">{market.bias}</span>
+                    <span className="text-[10px] sm:text-xs">{market.bias}</span>
                   </div>
-                  <ChevronRight className="h-3 w-3 text-gray-500 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+                  <ChevronRight className="h-3 w-3 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
                 </button>
               ))}
             </div>
           </div>
 
           {/* Today's Red News */}
-          <div className="space-y-3 mt-8">
+          <div className="space-y-3 mt-6 sm:mt-8">
             <button 
               onClick={handleViewAllNews}
               className="group flex items-center justify-center gap-2 mx-auto hover:opacity-80 transition-opacity"
             >
-              <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider group-hover:text-gray-300 transition-colors">
+              <h3 className="text-xs sm:text-sm font-medium text-muted-foreground uppercase tracking-wider group-hover:text-foreground transition-colors">
                 Today's Red News
               </h3>
-              <ExternalLink className="h-3 w-3 text-gray-500 group-hover:text-primary transition-colors" />
+              <ExternalLink className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
             </button>
             <div className="space-y-2">
               {redNews.map((item) => (
                 <button
                   key={item.id}
                   onClick={(e) => handleNewsClick(e, item.id, item.event)}
-                  className="w-full bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/10 hover:bg-white/10 hover:border-red-500/30 transition-all duration-200 group"
+                  className="w-full bg-muted/50 dark:bg-white/5 backdrop-blur-sm rounded-lg p-3 sm:p-4 border border-border dark:border-white/10 hover:bg-muted dark:hover:bg-white/10 hover:border-destructive/30 transition-all duration-200 group"
                 >
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-sm font-medium text-gray-400 min-w-[60px] group-hover:text-gray-300 transition-colors">
+                  <div className="flex items-center justify-between gap-2 sm:gap-4">
+                    <span className="text-xs sm:text-sm font-medium text-muted-foreground min-w-[45px] sm:min-w-[60px] group-hover:text-foreground transition-colors">
                       {item.time}
                     </span>
-                    <Badge variant="outline" className="border-red-500/30 text-red-400 text-xs group-hover:bg-red-500/10 transition-colors">
+                    <Badge variant="outline" className="border-destructive/30 text-destructive text-[10px] sm:text-xs group-hover:bg-destructive/10 transition-colors">
                       {item.currency}
                     </Badge>
-                    <span className="text-sm text-white flex-1 text-left group-hover:text-primary transition-colors">
+                    <span className="text-xs sm:text-sm text-foreground flex-1 text-left group-hover:text-primary transition-colors truncate">
                       {item.event}
                     </span>
-                    <ChevronRight className="h-4 w-4 text-gray-600 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+                    <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all flex-shrink-0" />
                   </div>
                 </button>
               ))}
@@ -248,7 +238,7 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
           {/* Unlock prompt */}
           <button 
             onClick={onUnlock}
-            className="mt-10 text-sm text-gray-500 hover:text-gray-400 animate-pulse transition-colors"
+            className="mt-8 sm:mt-10 text-xs sm:text-sm text-muted-foreground hover:text-foreground animate-pulse transition-colors"
           >
             Tap anywhere to unlock your dashboard
           </button>

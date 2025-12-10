@@ -4,7 +4,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CourseDetailModal } from "@/components/education/CourseDetailModal";
 import { CertificateModal } from "@/components/education/CertificateModal";
 import { useEducationProgress } from "@/hooks/use-education-progress";
@@ -22,6 +21,7 @@ import {
   Lightbulb,
   ArrowLeft,
   ChevronRight,
+  Check,
 } from "lucide-react";
 
 // Types
@@ -215,7 +215,6 @@ export default function Education() {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [certificateCourse, setCertificateCourse] = useState<Course | null>(null);
-  const [resourceTab, setResourceTab] = useState<'articles' | 'tips'>('articles');
 
   const { 
     getCourseProgress, 
@@ -224,12 +223,6 @@ export default function Education() {
   } = useEducationProgress();
 
   const studentName = "John Doe";
-
-  // Progress stats for courses view
-  const coursesInProgress = courses.filter(c => c.progress === 'in-progress').length;
-  const coursesCompleted = courses.filter(c => c.progress === 'completed').length;
-  const totalCourses = courses.length;
-  const overallProgress = Math.round((coursesCompleted / totalCourses) * 100);
 
   const getLevelColor = (level: string) => {
     switch (level) {
@@ -246,14 +239,6 @@ export default function Education() {
       case 'Text': return <FileText className="h-3 w-3" />;
       case 'Mixed': return <Layers className="h-3 w-3" />;
       default: return <BookOpen className="h-3 w-3" />;
-    }
-  };
-
-  const getProgressText = (progress: string) => {
-    switch (progress) {
-      case 'completed': return 'Completed';
-      case 'in-progress': return 'In Progress';
-      default: return 'Not Started';
     }
   };
 
@@ -314,31 +299,31 @@ export default function Education() {
       <div className="flex-1 flex flex-col min-h-0">
         <AppHeader title="Education" />
         
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {/* Page Header - Centered */}
-          <div className="text-center max-w-2xl mx-auto mb-16 pt-8">
-            <h1 className="text-3xl font-bold text-foreground mb-3">Education</h1>
-            <p className="text-muted-foreground text-lg">
+          <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-16 pt-4 sm:pt-8">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">Education</h1>
+            <p className="text-muted-foreground text-base sm:text-lg">
               Curated training for serious traders – strategies, risk, and psychology.
             </p>
           </div>
 
           {/* Category Cards Grid */}
-          <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
             {/* Courses */}
             <Card 
               className="bg-card border-border hover:border-primary/50 transition-all duration-200 cursor-pointer group"
               onClick={() => setViewMode('courses')}
             >
-              <CardContent className="p-8 flex flex-col items-center text-center">
-                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 group-hover:scale-105 transition-all">
-                  <GraduationCap className="h-8 w-8 text-primary" />
+              <CardContent className="p-6 sm:p-8 flex flex-col items-center text-center">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 sm:mb-6 group-hover:bg-primary/20 group-hover:scale-105 transition-all">
+                  <GraduationCap className="h-7 w-7 sm:h-8 sm:w-8 text-primary" />
                 </div>
-                <h2 className="text-xl font-semibold text-foreground mb-2">Courses</h2>
-                <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+                <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-2">Courses</h2>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-6 leading-relaxed">
                   Full learning programs with tracked progress and certificates.
                 </p>
-                <Button className="w-full group-hover:bg-primary/90">
+                <Button className="w-full group-hover:bg-primary/90 text-sm">
                   Browse Courses
                   <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
@@ -350,15 +335,15 @@ export default function Education() {
               className="bg-card border-border hover:border-primary/50 transition-all duration-200 cursor-pointer group"
               onClick={() => setViewMode('articles')}
             >
-              <CardContent className="p-8 flex flex-col items-center text-center">
-                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 group-hover:scale-105 transition-all">
-                  <FileText className="h-8 w-8 text-primary" />
+              <CardContent className="p-6 sm:p-8 flex flex-col items-center text-center">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 sm:mb-6 group-hover:bg-primary/20 group-hover:scale-105 transition-all">
+                  <FileText className="h-7 w-7 sm:h-8 sm:w-8 text-primary" />
                 </div>
-                <h2 className="text-xl font-semibold text-foreground mb-2">Articles & Guides</h2>
-                <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+                <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-2">Articles & Guides</h2>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-6 leading-relaxed">
                   Short-form breakdowns of market concepts, psychology and strategies.
                 </p>
-                <Button className="w-full group-hover:bg-primary/90">
+                <Button className="w-full group-hover:bg-primary/90 text-sm">
                   Browse Articles
                   <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
@@ -370,15 +355,15 @@ export default function Education() {
               className="bg-card border-border hover:border-primary/50 transition-all duration-200 cursor-pointer group"
               onClick={() => setViewMode('tips')}
             >
-              <CardContent className="p-8 flex flex-col items-center text-center">
-                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 group-hover:scale-105 transition-all">
-                  <Lightbulb className="h-8 w-8 text-primary" />
+              <CardContent className="p-6 sm:p-8 flex flex-col items-center text-center">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 sm:mb-6 group-hover:bg-primary/20 group-hover:scale-105 transition-all">
+                  <Lightbulb className="h-7 w-7 sm:h-8 sm:w-8 text-primary" />
                 </div>
-                <h2 className="text-xl font-semibold text-foreground mb-2">Trading Tips</h2>
-                <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+                <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-2">Trading Tips</h2>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-6 leading-relaxed">
                   Quick execution and improvement techniques for serious traders.
                 </p>
-                <Button className="w-full group-hover:bg-primary/90">
+                <Button className="w-full group-hover:bg-primary/90 text-sm">
                   Browse Tips
                   <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
@@ -390,15 +375,15 @@ export default function Education() {
     );
   }
 
-  // Courses View
+  // Courses View - Updated with compact cards and subtle progress
   if (viewMode === 'courses') {
     return (
       <div className="flex-1 flex flex-col min-h-0">
         <AppHeader title="Education" />
         
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {/* Back Button & Header */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div className="flex items-center gap-4">
               <Button 
                 variant="ghost" 
@@ -410,24 +395,15 @@ export default function Education() {
                 Back
               </Button>
               <div>
-                <h1 className="text-2xl font-bold text-foreground">Structured Courses</h1>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="text-xl sm:text-2xl font-bold text-foreground">Structured Courses</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   Deep-dive programs with progress tracking & certificates.
                 </p>
               </div>
             </div>
-            
-            {/* Learning Snapshot - Subtle */}
-            <div className="flex items-center gap-3 px-3 py-2 bg-card/50 border border-border/50 rounded-lg text-sm">
-              <span className="text-muted-foreground">{coursesInProgress} in progress</span>
-              <span className="text-muted-foreground">·</span>
-              <span className="text-success">{coursesCompleted} completed</span>
-              <span className="text-muted-foreground">·</span>
-              <span className="text-primary">{overallProgress}%</span>
-            </div>
           </div>
 
-          {/* Courses Grid */}
+          {/* Courses Grid - Compact cards matching other sections */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {courses.map((course) => (
               <Card 
@@ -435,14 +411,16 @@ export default function Education() {
                 className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group"
                 onClick={() => handleCourseClick(course)}
               >
-                <CardContent className="p-5">
-                  <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors mb-1">
+                <CardContent className="p-4 sm:p-5">
+                  {/* Title & Description */}
+                  <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors mb-1 text-sm sm:text-base">
                     {course.title}
                   </h3>
-                  <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                  <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1 mb-3">
                     {course.description}
                   </p>
                   
+                  {/* Meta badges */}
                   <div className="flex flex-wrap items-center gap-1.5 mb-3">
                     <Badge variant="outline" className={`text-[10px] ${getLevelColor(course.level)}`}>
                       {course.level}
@@ -453,7 +431,8 @@ export default function Education() {
                     </Badge>
                   </div>
                   
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
+                  {/* Meta info row */}
+                  <div className="flex items-center gap-3 text-[10px] sm:text-xs text-muted-foreground mb-3">
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
                       {course.duration}
@@ -465,33 +444,30 @@ export default function Education() {
                     {course.hasCertificate && (
                       <span className="flex items-center gap-1 text-primary">
                         <Award className="h-3 w-3" />
-                        Certificate
+                        Cert
                       </span>
                     )}
                   </div>
                   
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className={`font-medium ${
+                  {/* Subtle progress strip at bottom */}
+                  <div className="pt-3 border-t border-border/50">
+                    <div className="flex items-center justify-between text-[10px] sm:text-xs mb-1.5">
+                      <span className={`flex items-center gap-1 ${
                         course.progress === 'completed' ? 'text-success' :
-                        course.progress === 'in-progress' ? 'text-warning' :
+                        course.progress === 'in-progress' ? 'text-muted-foreground' :
                         'text-muted-foreground'
                       }`}>
-                        {getProgressText(course.progress)}
+                        {course.progress === 'completed' && <Check className="h-3 w-3" />}
+                        {course.progress === 'completed' ? 'Completed' :
+                         course.progress === 'in-progress' ? `In progress – ${course.progressPercent}%` :
+                         'Not started'}
                       </span>
-                      <span className="text-muted-foreground">{course.progressPercent}%</span>
                     </div>
-                    <Progress value={course.progressPercent} className="h-1.5" />
+                    <Progress 
+                      value={course.progressPercent} 
+                      className="h-1"
+                    />
                   </div>
-                  
-                  <Button 
-                    size="sm" 
-                    className="w-full"
-                    variant={course.progress === 'completed' ? 'secondary' : 'default'}
-                  >
-                    {course.progress === 'completed' ? 'Review Course' :
-                     course.progress === 'in-progress' ? 'Continue' : 'Start Course'}
-                  </Button>
                 </CardContent>
               </Card>
             ))}
@@ -512,8 +488,8 @@ export default function Education() {
                   >
                     <Award className="h-4 w-4 text-primary" />
                     <div>
-                      <p className="text-sm font-medium text-foreground">{cert.courseName}</p>
-                      <p className="text-xs text-muted-foreground">{cert.completedDate}</p>
+                      <p className="text-xs sm:text-sm font-medium text-foreground">{cert.courseName}</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground">{cert.completedDate}</p>
                     </div>
                     <Button variant="ghost" size="sm" className="text-xs h-7">
                       Download
@@ -564,7 +540,7 @@ export default function Education() {
       <div className="flex-1 flex flex-col min-h-0">
         <AppHeader title="Education" />
         
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {/* Back Button & Header */}
           <div className="flex items-center gap-4 mb-6">
             <Button 
@@ -577,8 +553,8 @@ export default function Education() {
               Back
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Articles & Guides</h1>
-              <p className="text-sm text-muted-foreground">
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">Articles & Guides</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 Short-form breakdowns of market concepts, psychology and platform usage.
               </p>
             </div>
@@ -593,10 +569,10 @@ export default function Education() {
               >
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex-1">
-                    <h3 className="font-medium text-foreground mb-1">{article.title}</h3>
-                    <p className="text-sm text-muted-foreground mb-2">{article.description}</p>
+                    <h3 className="font-medium text-foreground mb-1 text-sm sm:text-base">{article.title}</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-2">{article.description}</p>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <span className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         {article.readTime} read
                       </span>
@@ -625,7 +601,7 @@ export default function Education() {
       <div className="flex-1 flex flex-col min-h-0">
         <AppHeader title="Education" />
         
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {/* Back Button & Header */}
           <div className="flex items-center gap-4 mb-6">
             <Button 
@@ -638,8 +614,8 @@ export default function Education() {
               Back
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Trading Tips</h1>
-              <p className="text-sm text-muted-foreground">
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">Trading Tips</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 Execution and improvement techniques for serious traders.
               </p>
             </div>
@@ -658,8 +634,8 @@ export default function Education() {
                       <Lightbulb className="h-4 w-4 text-primary" />
                     </div>
                     <div>
-                      <h3 className="font-medium text-foreground mb-1">{tip.title}</h3>
-                      <p className="text-sm text-muted-foreground">{tip.description}</p>
+                      <h3 className="font-medium text-foreground mb-1 text-sm">{tip.title}</h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground">{tip.description}</p>
                       <div className="flex items-center gap-2 mt-2">
                         {tip.tags.map((tag) => (
                           <Badge key={tag} variant="secondary" className="text-[10px]">
