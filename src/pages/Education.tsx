@@ -403,71 +403,84 @@ export default function Education() {
             </div>
           </div>
 
-          {/* Courses Grid - Compact cards matching other sections */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {/* Courses List - Single column matching Articles & Guides style */}
+          <div className="max-w-3xl space-y-3">
             {courses.map((course) => (
               <Card 
                 key={course.id} 
                 className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group"
                 onClick={() => handleCourseClick(course)}
               >
-                <CardContent className="p-4 sm:p-5">
-                  {/* Title & Description */}
-                  <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors mb-1 text-sm sm:text-base">
-                    {course.title}
-                  </h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground line-clamp-1 mb-3">
-                    {course.description}
-                  </p>
-                  
-                  {/* Meta badges */}
-                  <div className="flex flex-wrap items-center gap-1.5 mb-3">
-                    <Badge variant="outline" className={`text-[10px] ${getLevelColor(course.level)}`}>
-                      {course.level}
-                    </Badge>
-                    <Badge variant="secondary" className="text-[10px] gap-1">
-                      {getFormatIcon(course.format)}
-                      {course.format}
-                    </Badge>
-                  </div>
-                  
-                  {/* Meta info row */}
-                  <div className="flex items-center gap-3 text-[10px] sm:text-xs text-muted-foreground mb-3">
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {course.duration}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <BookOpen className="h-3 w-3" />
-                      {course.lessonsCount} lessons
-                    </span>
-                    {course.hasCertificate && (
-                      <span className="flex items-center gap-1 text-primary">
-                        <Award className="h-3 w-3" />
-                        Cert
-                      </span>
-                    )}
-                  </div>
-                  
-                  {/* Subtle progress strip at bottom */}
-                  <div className="pt-3 border-t border-border/50">
-                    <div className="flex items-center justify-between text-[10px] sm:text-xs mb-1.5">
-                      <span className={`flex items-center gap-1 ${
-                        course.progress === 'completed' ? 'text-success' :
-                        course.progress === 'in-progress' ? 'text-muted-foreground' :
-                        'text-muted-foreground'
-                      }`}>
-                        {course.progress === 'completed' && <Check className="h-3 w-3" />}
-                        {course.progress === 'completed' ? 'Completed' :
-                         course.progress === 'in-progress' ? `In progress – ${course.progressPercent}%` :
-                         'Not started'}
-                      </span>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      {/* Title */}
+                      <h3 className="font-medium text-foreground group-hover:text-primary transition-colors mb-1 text-sm sm:text-base">
+                        {course.title}
+                      </h3>
+                      {/* Subtitle */}
+                      <p className="text-xs sm:text-sm text-muted-foreground mb-3">
+                        {course.description}
+                      </p>
+                      
+                      {/* Pill row: Level, Format, Duration, Lessons, Certificate */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Badge variant="outline" className={`text-[10px] ${getLevelColor(course.level)}`}>
+                          {course.level}
+                        </Badge>
+                        <Badge variant="secondary" className="text-[10px] gap-1">
+                          {getFormatIcon(course.format)}
+                          {course.format}
+                        </Badge>
+                        <Badge variant="secondary" className="text-[10px] gap-1">
+                          <Clock className="h-3 w-3" />
+                          {course.duration}
+                        </Badge>
+                        <Badge variant="secondary" className="text-[10px] gap-1">
+                          <BookOpen className="h-3 w-3" />
+                          {course.lessonsCount} lessons
+                        </Badge>
+                        {course.hasCertificate && (
+                          <Badge variant="secondary" className="text-[10px] gap-1 text-primary border-primary/30">
+                            <Award className="h-3 w-3" />
+                            Certificate
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                    <Progress 
-                      value={course.progressPercent} 
-                      className="h-1"
-                    />
+                    
+                    {/* Action Button */}
+                    <Button 
+                      size="sm" 
+                      className="flex-shrink-0 text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCourseClick(course);
+                      }}
+                    >
+                      {course.progressPercent === 0 ? 'Start course' :
+                       course.progressPercent === 100 ? 'Review course' :
+                       'Continue'}
+                    </Button>
                   </div>
+                  
+                  {/* Thin bottom progress bar - only show if progress > 0 */}
+                  {course.progressPercent > 0 && (
+                    <div className="mt-3 pt-3 border-t border-border/50">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className={`text-[10px] sm:text-xs flex items-center gap-1 ${
+                          course.progressPercent === 100 ? 'text-success' : 'text-muted-foreground'
+                        }`}>
+                          {course.progressPercent === 100 && <Check className="h-3 w-3" />}
+                          {course.progressPercent === 100 ? '✓ Completed' : `In progress – ${course.progressPercent}%`}
+                        </span>
+                      </div>
+                      <Progress 
+                        value={course.progressPercent} 
+                        className="h-1"
+                      />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
