@@ -375,7 +375,7 @@ export default function Education() {
     );
   }
 
-  // Courses View - Updated with compact cards and subtle progress
+  // Courses View - 2-column grid matching Articles & Guides style
   if (viewMode === 'courses') {
     return (
       <div className="flex-1 flex flex-col min-h-0">
@@ -403,56 +403,57 @@ export default function Education() {
             </div>
           </div>
 
-          {/* Courses List - Single column matching Articles & Guides style */}
-          <div className="max-w-3xl space-y-3">
+          {/* Courses Grid - 2 columns on desktop, 1 on mobile */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {courses.map((course) => (
               <Card 
                 key={course.id} 
-                className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group"
+                className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group flex flex-col"
                 onClick={() => handleCourseClick(course)}
               >
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      {/* Title */}
-                      <h3 className="font-medium text-foreground group-hover:text-primary transition-colors mb-1 text-sm sm:text-base">
-                        {course.title}
-                      </h3>
-                      {/* Subtitle */}
-                      <p className="text-xs sm:text-sm text-muted-foreground mb-3">
-                        {course.description}
-                      </p>
-                      
-                      {/* Pill row: Level, Format, Duration, Lessons, Certificate */}
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <Badge variant="outline" className={`text-[10px] ${getLevelColor(course.level)}`}>
-                          {course.level}
-                        </Badge>
-                        <Badge variant="secondary" className="text-[10px] gap-1">
-                          {getFormatIcon(course.format)}
-                          {course.format}
-                        </Badge>
-                        <Badge variant="secondary" className="text-[10px] gap-1">
-                          <Clock className="h-3 w-3" />
-                          {course.duration}
-                        </Badge>
-                        <Badge variant="secondary" className="text-[10px] gap-1">
-                          <BookOpen className="h-3 w-3" />
-                          {course.lessonsCount} lessons
-                        </Badge>
-                        {course.hasCertificate && (
-                          <Badge variant="secondary" className="text-[10px] gap-1 text-primary border-primary/30">
-                            <Award className="h-3 w-3" />
-                            Certificate
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Action Button */}
+                <CardContent className="p-4 flex flex-col flex-1">
+                  {/* Title */}
+                  <h3 className="font-medium text-foreground group-hover:text-primary transition-colors mb-1 text-sm sm:text-base">
+                    {course.title}
+                  </h3>
+                  {/* Subtitle */}
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-3 line-clamp-2">
+                    {course.description}
+                  </p>
+                  
+                  {/* Pill row: Level, Format, Duration, Lessons, Certificate */}
+                  <div className="flex flex-wrap items-center gap-1.5 mb-4">
+                    <Badge variant="outline" className={`text-[10px] ${getLevelColor(course.level)}`}>
+                      {course.level}
+                    </Badge>
+                    <Badge variant="secondary" className="text-[10px] gap-1">
+                      {getFormatIcon(course.format)}
+                      {course.format}
+                    </Badge>
+                    <Badge variant="secondary" className="text-[10px] gap-1">
+                      <Clock className="h-3 w-3" />
+                      {course.duration}
+                    </Badge>
+                    <Badge variant="secondary" className="text-[10px] gap-1">
+                      <BookOpen className="h-3 w-3" />
+                      {course.lessonsCount} lessons
+                    </Badge>
+                    {course.hasCertificate && (
+                      <Badge variant="secondary" className="text-[10px] gap-1 text-primary border-primary/30">
+                        <Award className="h-3 w-3" />
+                        Certificate
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Spacer to push button and progress to bottom */}
+                  <div className="flex-1" />
+
+                  {/* Action Button - Right aligned */}
+                  <div className="flex justify-end mb-3">
                     <Button 
                       size="sm" 
-                      className="flex-shrink-0 text-xs"
+                      className="text-xs"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleCourseClick(course);
@@ -464,23 +465,29 @@ export default function Education() {
                     </Button>
                   </div>
                   
-                  {/* Thin bottom progress bar - only show if progress > 0 */}
-                  {course.progressPercent > 0 && (
-                    <div className="mt-3 pt-3 border-t border-border/50">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <span className={`text-[10px] sm:text-xs flex items-center gap-1 ${
-                          course.progressPercent === 100 ? 'text-success' : 'text-muted-foreground'
-                        }`}>
-                          {course.progressPercent === 100 && <Check className="h-3 w-3" />}
-                          {course.progressPercent === 100 ? '✓ Completed' : `In progress – ${course.progressPercent}%`}
-                        </span>
-                      </div>
-                      <Progress 
-                        value={course.progressPercent} 
-                        className="h-1"
-                      />
-                    </div>
-                  )}
+                  {/* Progress area at bottom */}
+                  <div className="border-t border-border/50 pt-3">
+                    {course.progressPercent === 0 ? (
+                      <span className="text-[10px] sm:text-xs text-muted-foreground">
+                        Not started
+                      </span>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className={`text-[10px] sm:text-xs flex items-center gap-1 ${
+                            course.progressPercent === 100 ? 'text-success' : 'text-muted-foreground'
+                          }`}>
+                            {course.progressPercent === 100 && <Check className="h-3 w-3" />}
+                            {course.progressPercent === 100 ? 'Completed' : `In progress – ${course.progressPercent}%`}
+                          </span>
+                        </div>
+                        <Progress 
+                          value={course.progressPercent} 
+                          className="h-1"
+                        />
+                      </>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -547,7 +554,7 @@ export default function Education() {
     );
   }
 
-  // Articles View
+  // Articles View - 2-column grid matching Courses style
   if (viewMode === 'articles') {
     return (
       <div className="flex-1 flex flex-col min-h-0">
@@ -573,32 +580,43 @@ export default function Education() {
             </div>
           </div>
 
-          {/* Articles List */}
-          <div className="max-w-3xl space-y-3">
+          {/* Articles Grid - 2 columns on desktop, 1 on mobile */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {articles.map((article) => (
               <Card 
                 key={article.id}
-                className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer"
+                className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group flex flex-col"
               >
-                <CardContent className="p-4 flex items-center justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-medium text-foreground mb-1 text-sm sm:text-base">{article.title}</h3>
-                    <p className="text-xs sm:text-sm text-muted-foreground mb-2">{article.description}</p>
+                <CardContent className="p-4 flex flex-col flex-1">
+                  {/* Title */}
+                  <h3 className="font-medium text-foreground group-hover:text-primary transition-colors mb-1 text-sm sm:text-base">
+                    {article.title}
+                  </h3>
+                  {/* Subtitle */}
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-3 line-clamp-2">
+                    {article.description}
+                  </p>
+                  
+                  {/* Spacer */}
+                  <div className="flex-1" />
+
+                  {/* Meta row with bookmark */}
+                  <div className="flex items-center justify-between pt-3 border-t border-border/50">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1">
+                      <Badge variant="secondary" className="text-[10px] gap-1">
                         <Clock className="h-3 w-3" />
                         {article.readTime} read
-                      </span>
+                      </Badge>
                       {article.tags.map((tag) => (
                         <Badge key={tag} variant="secondary" className="text-[10px]">
                           {tag}
                         </Badge>
                       ))}
                     </div>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary">
+                      <Bookmark className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button variant="ghost" size="icon" className="text-muted-foreground">
-                    <Bookmark className="h-4 w-4" />
-                  </Button>
                 </CardContent>
               </Card>
             ))}
@@ -608,7 +626,7 @@ export default function Education() {
     );
   }
 
-  // Tips View
+  // Tips View - 2-column grid matching Courses & Articles style
   if (viewMode === 'tips') {
     return (
       <div className="flex-1 flex flex-col min-h-0">
@@ -634,29 +652,33 @@ export default function Education() {
             </div>
           </div>
 
-          {/* Tips Grid */}
-          <div className="max-w-3xl grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Tips Grid - 2 columns on desktop, 1 on mobile */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {tips.map((tip) => (
               <Card 
                 key={tip.id}
-                className="bg-card border-border hover:border-primary/50 transition-colors"
+                className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group flex flex-col"
               >
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Lightbulb className="h-4 w-4 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-foreground mb-1 text-sm">{tip.title}</h3>
-                      <p className="text-xs sm:text-sm text-muted-foreground">{tip.description}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        {tip.tags.map((tag) => (
-                          <Badge key={tag} variant="secondary" className="text-[10px]">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
+                <CardContent className="p-4 flex flex-col flex-1">
+                  {/* Title */}
+                  <h3 className="font-medium text-foreground group-hover:text-primary transition-colors mb-1 text-sm sm:text-base">
+                    {tip.title}
+                  </h3>
+                  {/* Subtitle */}
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-3 line-clamp-2">
+                    {tip.description}
+                  </p>
+                  
+                  {/* Spacer */}
+                  <div className="flex-1" />
+
+                  {/* Meta row */}
+                  <div className="flex items-center gap-2 pt-3 border-t border-border/50">
+                    {tip.tags.map((tag) => (
+                      <Badge key={tag} variant="secondary" className="text-[10px]">
+                        {tag}
+                      </Badge>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
