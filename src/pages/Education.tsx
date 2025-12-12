@@ -422,7 +422,7 @@ export default function Education() {
                   </p>
                   
                   {/* Pill row: Level, Format, Duration, Lessons, Certificate */}
-                  <div className="flex flex-wrap items-center gap-1.5 mb-4">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <Badge variant="outline" className={`text-[10px] ${getLevelColor(course.level)}`}>
                       {course.level}
                     </Badge>
@@ -446,48 +446,36 @@ export default function Education() {
                     )}
                   </div>
 
-                  {/* Spacer to push button and progress to bottom */}
+                  {/* Spacer */}
                   <div className="flex-1" />
 
-                  {/* Action Button - Right aligned */}
-                  <div className="flex justify-end mb-3">
-                    <Button 
-                      size="sm" 
-                      className="text-xs"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCourseClick(course);
-                      }}
-                    >
-                      {course.progressPercent === 0 ? 'Start course' :
-                       course.progressPercent === 100 ? 'Review course' :
-                       'Continue'}
-                    </Button>
-                  </div>
-                  
-                  {/* Progress area at bottom */}
-                  <div className="border-t border-border/50 pt-3">
-                    {course.progressPercent === 0 ? (
-                      <span className="text-[10px] sm:text-xs text-muted-foreground">
-                        Not started
-                      </span>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <span className={`text-[10px] sm:text-xs flex items-center gap-1 ${
-                            course.progressPercent === 100 ? 'text-success' : 'text-muted-foreground'
-                          }`}>
-                            {course.progressPercent === 100 && <Check className="h-3 w-3" />}
-                            {course.progressPercent === 100 ? 'Completed' : `In progress – ${course.progressPercent}%`}
-                          </span>
-                        </div>
+                  {/* Progress area - only shown if course has been started */}
+                  {course.progressPercent > 0 && (
+                    <div className="flex items-center justify-between pt-3 mt-3 border-t border-border/50">
+                      <div className="flex items-center gap-2 flex-1 mr-3">
+                        <span className={`text-[10px] sm:text-xs flex items-center gap-1 ${
+                          course.progressPercent === 100 ? 'text-success' : 'text-muted-foreground'
+                        }`}>
+                          {course.progressPercent === 100 && <Check className="h-3 w-3" />}
+                          {course.progressPercent === 100 ? 'Completed' : `In progress – ${course.progressPercent}%`}
+                        </span>
                         <Progress 
                           value={course.progressPercent} 
-                          className="h-1"
+                          className="h-1 flex-1 max-w-24"
                         />
-                      </>
-                    )}
-                  </div>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        className="text-xs h-7"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCourseClick(course);
+                        }}
+                      >
+                        {course.progressPercent === 100 ? 'Review' : 'Continue'}
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
