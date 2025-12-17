@@ -66,9 +66,9 @@ export function AppSidebar() {
   };
 
   const NavSection = ({ title, items }: { title: string; items: typeof mainItems }) => (
-    <div className="space-y-1">
+    <div>
       {!collapsed && (
-        <div className="px-3 pb-2">
+        <div className="px-3 mb-2">
           <h2 className="text-[11px] font-semibold text-muted-foreground tracking-wider uppercase">{title}</h2>
         </div>
       )}
@@ -84,7 +84,7 @@ export function AppSidebar() {
               to={item.url}
               onClick={handleNavClick}
               className={`
-                flex items-center px-3 py-2.5 rounded-lg transition-all relative
+                flex items-center px-3 py-2 rounded-lg transition-all relative
                 ${collapsed && !isMobile ? 'justify-center mx-1' : 'justify-start'}
                 ${isActive 
                   ? 'bg-sidebar-accent text-sidebar-primary' 
@@ -93,7 +93,7 @@ export function AppSidebar() {
               `}
             >
               {isActive && !collapsed && (
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full" />
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary rounded-r-full" />
               )}
               <Icon className={`${collapsed && !isMobile ? '' : 'mr-3'} h-[18px] w-[18px] flex-shrink-0`} />
               {(!collapsed || isMobile) && <span className="text-sm font-medium">{item.title}</span>}
@@ -106,9 +106,8 @@ export function AppSidebar() {
 
   const sidebarContent = (
     <>
-      {/* TOP SECTION: Logo, Collapse Button */}
+      {/* TOP: Logo */}
       <div className="flex-shrink-0">
-        {/* Logo - aligned with main header h-14 */}
         <div className={`h-14 ${collapsed && !isMobile ? 'px-3' : 'px-4'} flex items-center justify-between border-b border-border`}>
           <div className={`flex items-center ${collapsed && !isMobile ? 'justify-center' : 'gap-3'}`}>
             <img src={sbLogo} alt="StreamBias" className={`${collapsed && !isMobile ? 'h-7' : 'h-8'} w-auto flex-shrink-0`} />
@@ -130,62 +129,48 @@ export function AppSidebar() {
 
         {/* Collapse Button - Desktop only */}
         {!isMobile && (
-          <div className="px-3 py-3">
+          <div className="px-3 py-2">
             <Button
               variant="ghost"
               size="sm"
               onClick={toggleCollapsed}
-              className={`w-full justify-center hover:bg-sidebar-accent h-9 ${collapsed ? 'px-0' : ''}`}
+              className={`w-full justify-center hover:bg-sidebar-accent h-8 ${collapsed ? 'px-0' : ''}`}
             >
               {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
             </Button>
           </div>
         )}
-
-        {/* Main Navigation */}
-        <nav className="px-3 pt-1 pb-4">
-          <NavSection title="MAIN" items={mainItems} />
-        </nav>
       </div>
 
-      {/* MIDDLE SECTION: Learning + Brokerage - flex-1 to take available space */}
-      <div className="flex-1 flex flex-col justify-center gap-6 min-h-0">
-        <nav className="px-3 w-full">
-          <NavSection title="LEARNING" items={learningItems} />
-        </nav>
-        <nav className="px-3 w-full">
-          <NavSection title="BROKERAGE" items={brokerageItems} />
-        </nav>
+      {/* MIDDLE: Navigation - takes remaining space */}
+      <div className="flex-1 flex flex-col overflow-y-auto px-3 py-2 space-y-5">
+        <NavSection title="MAIN" items={mainItems} />
+        <NavSection title="LEARNING" items={learningItems} />
+        <NavSection title="BROKERAGE" items={brokerageItems} />
+        <NavSection title="ACCOUNT" items={accountItems} />
       </div>
 
-      {/* BOTTOM SECTION: Account + Theme/Upgrade - pinned to bottom */}
-      <div className="flex-shrink-0 mt-auto">
-        <nav className="px-3 py-4">
-          <NavSection title="ACCOUNT" items={accountItems} />
-        </nav>
-
-        {/* Footer */}
-        <div className="px-3 py-4 border-t border-sidebar-border space-y-2">
+      {/* BOTTOM: Theme + Upgrade - pinned */}
+      <div className="flex-shrink-0 px-3 py-3 border-t border-sidebar-border space-y-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggleTheme}
+          className={`w-full h-8 ${collapsed && !isMobile ? 'justify-center px-0' : 'justify-start px-3'} hover:bg-sidebar-accent`}
+        >
+          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          {(!collapsed || isMobile) && <span className="ml-3 text-sm">Theme</span>}
+        </Button>
+        
+        {(!collapsed || isMobile) && (
           <Button
-            variant="ghost"
             size="sm"
-            onClick={toggleTheme}
-            className={`w-full h-9 ${collapsed && !isMobile ? 'justify-center px-0' : 'justify-start px-3'} hover:bg-sidebar-accent`}
+            className="w-full h-8 bg-gradient-to-r from-primary to-accent hover:opacity-90"
           >
-            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            {(!collapsed || isMobile) && <span className="ml-3 text-sm">Theme</span>}
+            <Zap className="h-4 w-4 mr-2" />
+            Upgrade
           </Button>
-          
-          {(!collapsed || isMobile) && (
-            <Button
-              size="sm"
-              className="w-full h-9 bg-gradient-to-r from-primary to-accent hover:opacity-90"
-            >
-              <Zap className="h-4 w-4 mr-2" />
-              Upgrade
-            </Button>
-          )}
-        </div>
+        )}
       </div>
     </>
   );
@@ -205,11 +190,10 @@ export function AppSidebar() {
         {/* Slide-out drawer */}
         <aside 
           className={`
-            fixed left-0 top-0 z-50 h-full w-72
+            fixed left-0 top-0 z-50 h-screen w-72
             bg-sidebar flex flex-col
             transform transition-transform duration-300 ease-in-out
             ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
-            overflow-y-auto
           `}
         >
           {sidebarContent}
