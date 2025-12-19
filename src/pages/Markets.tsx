@@ -1,7 +1,9 @@
+import { useState, useMemo } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -9,9 +11,10 @@ import {
   Calendar, 
   Star,
   ChevronRight,
-  Activity
+  Activity,
+  Search
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 type MarketType = 'Watchlist' | 'All' | 'FX' | 'Crypto' | 'Indices' | 'Commodities' | 'ETFs' | 'Futures';
@@ -49,6 +52,7 @@ export default function Markets() {
   
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const [selectedType, setSelectedType] = useState<MarketType>('All');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const saved = localStorage.getItem('watchlist');
@@ -74,11 +78,25 @@ export default function Markets() {
     localStorage.setItem('watchlist', JSON.stringify(updated));
   };
 
-  const filteredPairs = selectedType === 'Watchlist'
-    ? pairs.filter(pair => watchlist.includes(pair.name))
-    : selectedType === 'All' 
-      ? pairs 
-      : pairs.filter(pair => pair.type === selectedType);
+  // Filter by type and search query
+  const filteredPairs = useMemo(() => {
+    let filtered = selectedType === 'Watchlist'
+      ? pairs.filter(pair => watchlist.includes(pair.name))
+      : selectedType === 'All' 
+        ? pairs 
+        : pairs.filter(pair => pair.type === selectedType);
+    
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(pair => 
+        pair.name.toLowerCase().includes(query) ||
+        pair.type.toLowerCase().includes(query) ||
+        pair.bias.toLowerCase().includes(query)
+      );
+    }
+    
+    return filtered;
+  }, [selectedType, watchlist, searchQuery]);
 
   const watchlistedPairs = pairs.filter(pair => watchlist.includes(pair.name));
 
@@ -105,7 +123,16 @@ export default function Markets() {
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <p className="text-sm text-muted-foreground">Real-time market bias and sentiment analysis</p>
+            {/* Search Bar - Replaces the real-time text */}
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search markets..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9 bg-muted/50"
+              />
+            </div>
             <Badge variant="outline" className="text-xs">Updated 2 mins ago</Badge>
           </div>
 
@@ -188,8 +215,21 @@ export default function Markets() {
             </Card>
           )}
 
+          {/* No Search Results */}
+          {searchQuery && filteredPairs.length === 0 && (
+            <Card className="bg-muted/30">
+              <CardContent className="py-12 text-center">
+                <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-foreground mb-2">No results found</h3>
+                <p className="text-sm text-muted-foreground">
+                  No markets match "{searchQuery}"
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Asset Cards Grid */}
-          {(selectedType !== 'Watchlist' || watchlistedPairs.length > 0) && (
+          {(selectedType !== 'Watchlist' || watchlistedPairs.length > 0) && filteredPairs.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
               {filteredPairs.map((pair) => (
                 <Card 
