@@ -2,7 +2,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, MessageCircle, Eye, TrendingUp } from "lucide-react";
+import { Heart, MessageCircle, Eye, TrendingUp, BarChart3, LineChart, PieChart } from "lucide-react";
 
 const ideas = [
   { title: 'EURUSD Long Setup - Bullish Reversal', author: 'TradePro', tags: ['EURUSD', 'Long'], likes: 124, comments: 18, views: 2340 },
@@ -11,6 +11,14 @@ const ideas = [
   { title: 'USD Strength into NFP', author: 'NewsTrader', tags: ['USD', 'News'], likes: 156, comments: 24, views: 3120 },
   { title: 'JPY Pairs Setup for Monday', author: 'AsiaSession', tags: ['USDJPY', 'Long'], likes: 72, comments: 9, views: 1450 },
   { title: 'Multi-Timeframe EURUSD Analysis', author: 'ChartWizard', tags: ['EURUSD', 'Analysis'], likes: 143, comments: 21, views: 2890 },
+];
+
+// Abstract placeholder icons for chart visuals
+const placeholderIcons = [
+  <BarChart3 className="h-12 w-12 text-primary/30" />,
+  <LineChart className="h-12 w-12 text-primary/30" />,
+  <TrendingUp className="h-12 w-12 text-primary/30" />,
+  <PieChart className="h-12 w-12 text-primary/30" />,
 ];
 
 export default function Community() {
@@ -26,8 +34,28 @@ export default function Community() {
                 {ideas.map((idea, i) => (
                   <Card key={i} className="hover:shadow-lg transition-all cursor-pointer group">
                     <CardHeader className="pb-3">
-                      <div className="h-28 bg-muted/50 rounded-lg mb-3 flex items-center justify-center border border-border group-hover:border-primary/50 transition-colors">
-                        <TrendingUp className="h-10 w-10 text-muted-foreground" />
+                      {/* Placeholder Image - Abstract Chart Visual */}
+                      <div className="h-28 bg-gradient-to-br from-muted/80 to-muted/30 rounded-lg mb-3 flex items-center justify-center border border-border group-hover:border-primary/50 transition-colors relative overflow-hidden">
+                        {/* Abstract background pattern */}
+                        <div className="absolute inset-0 opacity-20">
+                          <svg className="w-full h-full" viewBox="0 0 100 60" preserveAspectRatio="none">
+                            <path 
+                              d={`M0,${30 + Math.sin(i) * 10} Q25,${20 + Math.cos(i) * 15} 50,${35 + Math.sin(i * 2) * 8} T100,${28 + Math.cos(i) * 12}`}
+                              fill="none" 
+                              stroke="currentColor" 
+                              strokeWidth="0.5"
+                              className="text-primary"
+                            />
+                            <path 
+                              d={`M0,${40 + Math.cos(i) * 8} Q30,${25 + Math.sin(i) * 10} 60,${45 + Math.cos(i * 2) * 5} T100,${35 + Math.sin(i) * 10}`}
+                              fill="none" 
+                              stroke="currentColor" 
+                              strokeWidth="0.3"
+                              className="text-muted-foreground"
+                            />
+                          </svg>
+                        </div>
+                        {placeholderIcons[i % placeholderIcons.length]}
                       </div>
                       <CardTitle className="text-sm line-clamp-2">{idea.title}</CardTitle>
                     </CardHeader>
