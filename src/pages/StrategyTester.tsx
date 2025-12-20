@@ -55,7 +55,7 @@ export default function StrategyTester() {
         </div>
 
         {/* Mode Category Cards Grid */}
-        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Manual Backtesting */}
           <Card 
             className="bg-card border-border hover:border-primary/50 transition-all duration-300 cursor-pointer group animate-fade-in"
