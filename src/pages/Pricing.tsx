@@ -75,7 +75,7 @@ const Pricing = () => {
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
       <section className="relative px-6 py-20 md:py-28">
-        <div className="mx-auto max-w-4xl text-center">
+        <div className="mx-auto max-w-7xl text-center">
           <h1 className="text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
             Choose Your Plan
           </h1>
@@ -99,7 +99,7 @@ const Pricing = () => {
 
       {/* Launch Offer Banner */}
       <section className="px-6">
-        <div className="mx-auto max-w-4xl">
+        <div className="mx-auto max-w-7xl">
           <div className="rounded-xl border border-primary/30 bg-primary/10 px-6 py-4 text-center">
             <p className="flex items-center justify-center gap-2 text-sm font-medium text-foreground md:text-base">
               <Flame className="h-5 w-5 text-orange-500" />
@@ -208,7 +208,7 @@ const Pricing = () => {
 
       {/* Footer CTA */}
       <section className="px-6 py-16 md:py-20">
-        <div className="mx-auto max-w-2xl text-center">
+        <div className="mx-auto max-w-7xl text-center">
           <h2 className="text-3xl font-bold text-foreground">
             Secure early access
           </h2>
