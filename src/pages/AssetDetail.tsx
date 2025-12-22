@@ -14,51 +14,7 @@ import {
   Target,
   Zap
 } from "lucide-react";
-import { useState, useEffect } from "react";
-
-const assetsData: Record<string, {
-  name: string;
-  type: string;
-  bias: string;
-  confidence: number;
-  sentiment: number;
-  change: string;
-  price: string;
-  spread: string;
-  volume: string;
-  news: string;
-}> = {
-  'EURUSD': { name: 'EURUSD', type: 'FX', bias: 'Bullish', confidence: 85, sentiment: 72, change: '+0.45%', price: '1.08450', spread: '0.8', volume: '1.2M', news: 'Today 13:30 – USD CPI (High Impact)' },
-  'GBPUSD': { name: 'GBPUSD', type: 'FX', bias: 'Bullish', confidence: 78, sentiment: 68, change: '+0.32%', price: '1.26520', spread: '1.2', volume: '980K', news: 'Today 14:00 – GBP Retail Sales' },
-  'USDJPY': { name: 'USDJPY', type: 'FX', bias: 'Bearish', confidence: 82, sentiment: -65, change: '-0.28%', price: '148.250', spread: '0.9', volume: '1.5M', news: 'Tomorrow 08:00 – JPY GDP' },
-  'XAUUSD': { name: 'XAUUSD', type: 'Commodities', bias: 'Bullish', confidence: 91, sentiment: 88, change: '+1.24%', price: '2025.50', spread: '2.5', volume: '850K', news: 'Today 15:30 – Gold Futures Report' },
-  'BTCUSD': { name: 'BTCUSD', type: 'Crypto', bias: 'Bullish', confidence: 76, sentiment: 65, change: '+2.15%', price: '37245.00', spread: '15.0', volume: '2.3M', news: 'Today 12:00 – BTC ETF Decision' },
-  'AUDUSD': { name: 'AUDUSD', type: 'FX', bias: 'Neutral', confidence: 45, sentiment: 12, change: '+0.05%', price: '0.65420', spread: '1.0', volume: '620K', news: 'Tomorrow 10:30 – AUD Employment' },
-  'USDCAD': { name: 'USDCAD', type: 'FX', bias: 'Bearish', confidence: 73, sentiment: -58, change: '-0.18%', price: '1.35820', spread: '1.1', volume: '740K', news: 'Today 16:00 – CAD Inflation' },
-  'SPX500': { name: 'SPX500', type: 'Indices', bias: 'Bullish', confidence: 80, sentiment: 70, change: '+0.85%', price: '4587.20', spread: '0.5', volume: '3.1M', news: 'Today 11:00 – US Market Open' },
-  'ETHUSD': { name: 'ETHUSD', type: 'Crypto', bias: 'Neutral', confidence: 55, sentiment: 15, change: '+0.45%', price: '2045.30', spread: '8.0', volume: '1.8M', news: 'Today 18:00 – ETH Network Update' },
-};
-
-const quickInsights: Record<string, string[]> = {
-  'XAUUSD': [
-    'Bias: Bullish → approaching resistance at 2035',
-    'Level: Price near D1 support 2018–2022',
-    'Trend: H4 structure remains bullish',
-    'Volatility: High-impact USD news in 2 hours'
-  ],
-  'EURUSD': [
-    'Bias: Bullish → testing 1.0850 resistance',
-    'Level: Price above D1 support 1.0820',
-    'Trend: H4 bullish momentum increasing',
-    'Volatility: CPI data expected today'
-  ],
-  'BTCUSD': [
-    'Bias: Bullish → ETF decision pending',
-    'Level: Price consolidating near 37,000',
-    'Trend: Weekly structure bullish',
-    'Volatility: High due to regulatory news'
-  ],
-};
+import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
 
 // Asset-specific news events for today
 const assetNewsEvents: Record<string, { event: string; time: string; impact: 'High' | 'Medium' | 'Low' }[]> = {
@@ -92,6 +48,28 @@ const assetNewsEvents: Record<string, { event: string; time: string; impact: 'Hi
   ],
 };
 
+// Quick insights per asset
+const quickInsights: Record<string, string[]> = {
+  'XAUUSD': [
+    'Bias: Bullish → approaching resistance at 2035',
+    'Level: Price near D1 support 2018–2022',
+    'Trend: H4 structure remains bullish',
+    'Volatility: High-impact USD news in 2 hours'
+  ],
+  'EURUSD': [
+    'Bias: Bullish → testing 1.0850 resistance',
+    'Level: Price above D1 support 1.0820',
+    'Trend: H4 bullish momentum increasing',
+    'Volatility: CPI data expected today'
+  ],
+  'BTCUSD': [
+    'Bias: Bullish → ETF decision pending',
+    'Level: Price consolidating near 37,000',
+    'Trend: Weekly structure bullish',
+    'Volatility: High due to regulatory news'
+  ],
+};
+
 const keyLevels = [
   { type: 'Daily Support', price: '2018.5', notes: 'Retest zone' },
   { type: 'Daily Resistance', price: '2035.0', notes: 'Liquidity overhead' },
@@ -115,30 +93,21 @@ export default function AssetDetail() {
   const { symbol } = useParams<{ symbol: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [isWatchlisted, setIsWatchlisted] = useState(false);
+  
+  // Use shared data sources
+  const { getAssetBySymbol } = useAssets();
+  const { isInWatchlist, toggleWatchlist } = useWatchlist();
 
   const returnFilter = searchParams.get('from') || 'All';
 
-  const asset = symbol ? assetsData[symbol] : null;
+  // Get asset from shared data source
+  const asset = symbol ? getAssetBySymbol(symbol) : undefined;
+  const isWatchlisted = symbol ? isInWatchlist(symbol) : false;
 
-  useEffect(() => {
+  const handleToggleWatchlist = () => {
     if (symbol) {
-      const watchlist = JSON.parse(localStorage.getItem('watchlist') || '[]');
-      setIsWatchlisted(watchlist.includes(symbol));
+      toggleWatchlist(symbol);
     }
-  }, [symbol]);
-
-  const toggleWatchlist = () => {
-    if (!symbol) return;
-    const watchlist = JSON.parse(localStorage.getItem('watchlist') || '[]');
-    if (isWatchlisted) {
-      const updated = watchlist.filter((s: string) => s !== symbol);
-      localStorage.setItem('watchlist', JSON.stringify(updated));
-    } else {
-      watchlist.push(symbol);
-      localStorage.setItem('watchlist', JSON.stringify(watchlist));
-    }
-    setIsWatchlisted(!isWatchlisted);
   };
 
   const handleBack = () => {
@@ -169,7 +138,7 @@ export default function AssetDetail() {
   };
 
   const insights = quickInsights[symbol || ''] || [
-    `Bias: ${asset.bias} → monitoring key levels`,
+    `Bias: ${asset.biasDirection} → monitoring key levels`,
     'Level: Price near significant support/resistance',
     'Trend: Structure developing on H4',
     'Volatility: Watch for upcoming news events'
@@ -201,22 +170,22 @@ export default function AssetDetail() {
               <div className="flex flex-col">
                 {/* Asset Name */}
                 <div className="flex items-center gap-3 mb-3">
-                  <h1 className="text-4xl font-bold text-foreground">{asset.name}</h1>
+                  <h1 className="text-4xl font-bold text-foreground">{asset.symbol}</h1>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={toggleWatchlist}
+                    onClick={handleToggleWatchlist}
                     className="h-10 w-10"
                   >
                     <Star className={`h-6 w-6 ${isWatchlisted ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
                   </Button>
                 </div>
 
-                {/* Price + Change */}
+                {/* Price + Change - Using shared data */}
                 <div className="flex items-baseline gap-3 mb-6">
-                  <span className="text-3xl font-semibold text-foreground">{asset.price}</span>
-                  <span className={`text-lg font-medium ${asset.change.startsWith('+') ? 'text-success' : 'text-destructive'}`}>
-                    {asset.change}
+                  <span className="text-3xl font-semibold text-foreground">{asset.latestPrice}</span>
+                  <span className={`text-lg font-medium ${asset.priceChange.startsWith('+') ? 'text-success' : 'text-destructive'}`}>
+                    {asset.priceChange}
                   </span>
                 </div>
 
@@ -271,7 +240,7 @@ export default function AssetDetail() {
 
               {/* RIGHT SIDE (50%) */}
               <div className="flex flex-col">
-                {/* Stats Row - 4 boxes */}
+                {/* Stats Row - 4 boxes - Using shared data */}
                 <div className="grid grid-cols-4 gap-3 mb-6">
                   <div className="p-3 bg-muted/30 rounded-lg text-center">
                     <span className="text-xs text-muted-foreground block mb-1">Volume</span>
@@ -283,7 +252,7 @@ export default function AssetDetail() {
                   </div>
                   <div className="p-3 bg-muted/30 rounded-lg text-center">
                     <span className="text-xs text-muted-foreground block mb-1">Confidence</span>
-                    <span className="text-sm font-semibold text-foreground">{asset.confidence}%</span>
+                    <span className="text-sm font-semibold text-foreground">{asset.biasConfidence}%</span>
                   </div>
                   <div className="p-3 bg-muted/30 rounded-lg text-center">
                     <span className="text-xs text-muted-foreground block mb-1">Sentiment</span>
@@ -293,7 +262,7 @@ export default function AssetDetail() {
                   </div>
                 </div>
 
-                {/* Large Bias Gauge */}
+                {/* Large Bias Gauge - Using shared data */}
                 <div className="flex-1 flex flex-col items-center justify-center pt-2">
                   <span className="text-sm text-muted-foreground uppercase tracking-wide mb-6">Current Bias</span>
                   <div className="relative w-72 h-36">
@@ -312,15 +281,15 @@ export default function AssetDetail() {
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="8"
-                        strokeDasharray={`${(asset.confidence / 100) * 126} 126`}
-                        className={getBiasColor(asset.bias)}
+                        strokeDasharray={`${(asset.biasConfidence / 100) * 126} 126`}
+                        className={getBiasColor(asset.biasDirection)}
                       />
                       {/* Needle */}
                       <line
                         x1="50"
                         y1="45"
-                        x2={50 + 35 * Math.cos((Math.PI * (180 - asset.confidence * 1.8)) / 180)}
-                        y2={45 - 35 * Math.sin((Math.PI * (180 - asset.confidence * 1.8)) / 180)}
+                        x2={50 + 35 * Math.cos((Math.PI * (180 - asset.biasConfidence * 1.8)) / 180)}
+                        y2={45 - 35 * Math.sin((Math.PI * (180 - asset.biasConfidence * 1.8)) / 180)}
                         stroke="currentColor"
                         strokeWidth="2.5"
                         className="text-foreground"
@@ -328,9 +297,9 @@ export default function AssetDetail() {
                       <circle cx="50" cy="45" r="5" fill="currentColor" className="text-foreground" />
                     </svg>
                   </div>
-                  <div className={`flex items-center gap-2 mt-6 ${getBiasColor(asset.bias)}`}>
-                    {getBiasIcon(asset.bias)}
-                    <span className="text-3xl font-bold">{asset.bias}</span>
+                  <div className={`flex items-center gap-2 mt-6 ${getBiasColor(asset.biasDirection)}`}>
+                    {getBiasIcon(asset.biasDirection)}
+                    <span className="text-3xl font-bold">{asset.biasDirection}</span>
                   </div>
                 </div>
               </div>
@@ -349,8 +318,8 @@ export default function AssetDetail() {
           <CardContent>
             <div className="prose prose-sm dark:prose-invert max-w-none">
               <p className="text-muted-foreground leading-relaxed">
-                <strong className="text-foreground">{asset.name}</strong> is currently showing a <strong className={getBiasColor(asset.bias)}>{asset.bias.toLowerCase()}</strong> bias 
-                with {asset.confidence}% confidence based on our multi-timeframe analysis. On the weekly timeframe, 
+                <strong className="text-foreground">{asset.symbol}</strong> is currently showing a <strong className={getBiasColor(asset.biasDirection)}>{asset.biasDirection.toLowerCase()}</strong> bias 
+                with {asset.biasConfidence}% confidence based on our multi-timeframe analysis. On the weekly timeframe, 
                 price remains above the key support zone, indicating underlying strength. The daily chart shows 
                 consolidation near recent highs with potential for continuation.
               </p>
@@ -377,109 +346,86 @@ export default function AssetDetail() {
           </CardContent>
         </Card>
 
-        <div className="grid lg:grid-cols-2 gap-6">
-          {/* D) KEY LEVELS */}
+        {/* Grid for Key Levels, Session Insights, Upcoming News */}
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Key Levels */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-primary" />
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Target className="h-4 w-4 text-primary" />
                 Key Levels
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-3 px-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Level Type</th>
-                      <th className="text-left py-3 px-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Price</th>
-                      <th className="text-left py-3 px-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {keyLevels.map((level, index) => (
-                      <tr key={index} className="border-b border-border/50 last:border-0">
-                        <td className="py-3 px-2 text-sm font-medium text-foreground">{level.type}</td>
-                        <td className="py-3 px-2 text-sm text-foreground font-mono">{level.price}</td>
-                        <td className="py-3 px-2 text-sm text-muted-foreground">{level.notes}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="space-y-3">
+                {keyLevels.map((level, index) => (
+                  <div key={index} className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
+                    <div>
+                      <span className="text-sm font-medium text-foreground">{level.type}</span>
+                      <p className="text-xs text-muted-foreground">{level.notes}</p>
+                    </div>
+                    <span className="text-sm font-semibold text-foreground">{level.price}</span>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
 
-          {/* F) SESSION PERFORMANCE INSIGHTS */}
+          {/* Session Insights */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-primary" />
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Clock className="h-4 w-4 text-primary" />
                 Session Insights
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {sessionInsights.map((session, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 bg-muted/20 rounded-lg">
-                    <div>
-                      <span className="font-medium text-foreground">{session.session}</span>
-                      <p className="text-sm text-muted-foreground mt-1">{session.description}</p>
+                  <div key={index} className="p-2 bg-muted/30 rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-foreground">{session.session}</span>
+                      <Badge variant={session.volatility === 'High' ? 'destructive' : session.volatility === 'Medium' ? 'default' : 'secondary'} className="text-[10px]">
+                        {session.volatility}
+                      </Badge>
                     </div>
-                    <Badge variant={
-                      session.volatility === 'High' ? 'destructive' : 
-                      session.volatility === 'Medium' ? 'default' : 'secondary'
-                    }>
-                      {session.volatility}
-                    </Badge>
+                    <p className="text-xs text-muted-foreground">{session.description}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Upcoming News */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Zap className="h-4 w-4 text-primary" />
+                Upcoming News
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {upcomingNews.map((news, index) => (
+                  <div key={index} className="p-2 bg-muted/30 rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-muted-foreground">{news.time}</span>
+                      <Badge variant={news.impact === 'High' ? 'destructive' : 'default'} className="text-[10px]">
+                        {news.impact}
+                      </Badge>
+                    </div>
+                    <p className="text-sm font-medium text-foreground mb-1">{news.event}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>F: {news.forecast}</span>
+                      <span>P: {news.previous}</span>
+                      <span>A: {news.actual}</span>
+                    </div>
                   </div>
                 ))}
               </div>
             </CardContent>
           </Card>
         </div>
-
-        {/* E) RELEVANT NEWS */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-primary" />
-              Upcoming High-Impact News
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-3 px-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Time</th>
-                    <th className="text-left py-3 px-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Event</th>
-                    <th className="text-left py-3 px-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Impact</th>
-                    <th className="text-left py-3 px-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Forecast</th>
-                    <th className="text-left py-3 px-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Previous</th>
-                    <th className="text-left py-3 px-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Actual</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {upcomingNews.map((news, index) => (
-                    <tr key={index} className="border-b border-border/50 last:border-0">
-                      <td className="py-3 px-2 text-sm font-medium text-foreground">{news.time}</td>
-                      <td className="py-3 px-2 text-sm text-foreground">{news.event}</td>
-                      <td className="py-3 px-2">
-                        <Badge variant={news.impact === 'High' ? 'destructive' : 'secondary'} className="text-xs">
-                          {news.impact}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-2 text-sm text-muted-foreground font-mono">{news.forecast}</td>
-                      <td className="py-3 px-2 text-sm text-muted-foreground font-mono">{news.previous}</td>
-                      <td className="py-3 px-2 text-sm text-muted-foreground font-mono">{news.actual}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
