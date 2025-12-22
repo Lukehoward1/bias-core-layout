@@ -1,8 +1,11 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { LockScreen } from "@/components/LockScreen";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, Clock, Calendar as CalendarIcon, Activity, ChevronDown } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Clock, Calendar as CalendarIcon, Activity, ChevronDown, ChevronRight } from "lucide-react";
+import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
+import { defaultDashboardAssets } from "@/data/assets";
 
 interface SessionData {
   name: string;
@@ -33,29 +36,34 @@ function SessionTimerDropdown({
 }) {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current && 
-        !dropdownRef.current.contains(e.target as Node) &&
-        anchorRef.current &&
-        !anchorRef.current.contains(e.target as Node)
-      ) {
-        onClose();
-      }
-    };
+  const handleClickOutside = (event: MouseEvent) => {
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target as Node) &&
+      anchorRef.current &&
+      !anchorRef.current.contains(event.target as Node)
+    ) {
+      onClose();
+    }
+  };
 
+  // Attach/detach event listener based on dropdown visibility
+  useState(() => {
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+    } else {
+      document.removeEventListener('mousedown', handleClickOutside);
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, [isOpen, onClose, anchorRef]);
 
   if (!isOpen) return null;
 
   const activeSession = sessions.find(s => s.status === 'active');
   const upcomingSessions = sessions.filter(s => s.status !== 'active').sort((a, b) => {
-    // Simple sort by time string for demo
     return a.time.localeCompare(b.time);
   });
 
@@ -105,6 +113,32 @@ export default function Dashboard() {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [showSessionDropdown, setShowSessionDropdown] = useState(false);
   const sessionCardRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  
+  // Use shared data sources
+  const { watchlistAssets } = useWatchlist();
+  const { getAssetBySymbol } = useAssets();
+
+  // Get bias snapshot assets: use watchlist if available, otherwise defaults
+  const biasSnapshotAssets = watchlistAssets.length > 0 
+    ? watchlistAssets.slice(0, 5)
+    : defaultDashboardAssets.map(symbol => getAssetBySymbol(symbol)).filter((asset): asset is NonNullable<typeof asset> => asset !== undefined);
+
+  const getBiasIcon = (bias: string) => {
+    if (bias === 'Bullish') return <TrendingUp className="h-4 w-4" />;
+    if (bias === 'Bearish') return <TrendingDown className="h-4 w-4" />;
+    return <Minus className="h-4 w-4" />;
+  };
+
+  const getBiasColor = (bias: string) => {
+    if (bias === 'Bullish') return 'text-success';
+    if (bias === 'Bearish') return 'text-destructive';
+    return 'text-muted-foreground';
+  };
+
+  const handleAssetClick = (symbol: string) => {
+    navigate(`/asset/${symbol}?from=Dashboard`);
+  };
 
   if (!isUnlocked) {
     return <LockScreen onUnlock={() => setIsUnlocked(true)} />;
@@ -183,19 +217,30 @@ export default function Dashboard() {
 
           {/* Main Content */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Today's Bias Snapshot - Using shared data */}
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle>Today's Bias Snapshot</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {['EURUSD', 'GBPUSD', 'USDJPY'].map((pair) => (
-                    <div key={pair} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  {biasSnapshotAssets.map((asset) => asset && (
+                    <div 
+                      key={asset.symbol} 
+                      onClick={() => handleAssetClick(asset.symbol)}
+                      className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors group"
+                    >
                       <div className="flex items-center gap-3">
-                        <div className="font-semibold text-foreground">{pair}</div>
-                        <div className="text-sm text-success font-medium">Bullish</div>
+                        <div className="font-semibold text-foreground">{asset.symbol}</div>
+                        <div className={`flex items-center gap-1 text-sm font-medium ${getBiasColor(asset.biasDirection)}`}>
+                          {getBiasIcon(asset.biasDirection)}
+                          {asset.biasDirection}
+                        </div>
                       </div>
-                      <div className="text-sm text-muted-foreground">78% confidence</div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-sm text-muted-foreground">{asset.biasConfidence}% confidence</div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                      </div>
                     </div>
                   ))}
                 </div>

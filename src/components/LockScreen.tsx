@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-import { TrendingUp, TrendingDown, Clock, ChevronRight, ExternalLink, Pencil, X, Check } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Clock, ChevronRight, ExternalLink, Pencil, X, Check } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { useAssets } from "@/hooks/use-watchlist";
+import { type Asset } from "@/data/assets";
 
 // Trading sessions data
 const tradingSessions = [
@@ -47,6 +49,7 @@ function formatTimeUntil(hours: number, minutes: number) {
   if (hours === 0) return `${minutes}m`;
   return `${hours}h ${minutes}m`;
 }
+
 // Mock news data with identifiers for navigation
 const redNews = [
   { id: 'nfp-1', time: '08:30', currency: 'USD', event: 'Non-Farm Payrolls', impact: 'High' as const },
@@ -54,25 +57,13 @@ const redNews = [
   { id: 'rate-gbp-1', time: '14:00', currency: 'GBP', event: 'Interest Rate Decision', impact: 'High' as const },
 ];
 
-// Mock session data - includes Sydney
+// Mock session data
 const currentSession = {
   name: 'London',
   status: 'live' as const,
   nextSession: 'New York',
   nextSessionIn: '2h 15m'
 };
-
-// All available pairs with bias data
-const allPairsWithBias = [
-  { symbol: 'XAUUSD', bias: 'Bullish', confidence: 85 },
-  { symbol: 'EURUSD', bias: 'Bullish', confidence: 72 },
-  { symbol: 'GBPUSD', bias: 'Bearish', confidence: 68 },
-  { symbol: 'USDJPY', bias: 'Bullish', confidence: 75 },
-  { symbol: 'AUDUSD', bias: 'Bearish', confidence: 62 },
-  { symbol: 'USDCAD', bias: 'Bullish', confidence: 58 },
-  { symbol: 'NZDUSD', bias: 'Bearish', confidence: 55 },
-  { symbol: 'BTCUSD', bias: 'Bullish', confidence: 80 },
-];
 
 const STORAGE_KEY = 'streambias-dashboard-favorites';
 const MAX_FAVORITES = 5;
@@ -86,6 +77,9 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   const sessionIconRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  
+  // Use shared assets data
+  const { assets, getAssetBySymbol } = useAssets();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -197,9 +191,22 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     setIsManageModalOpen(false);
   };
 
-  const displayedPairs = favoritePairs
-    .map(symbol => allPairsWithBias.find(p => p.symbol === symbol))
-    .filter(Boolean) as typeof allPairsWithBias;
+  // Get displayed pairs from shared assets data
+  const displayedPairs: Asset[] = favoritePairs
+    .map(symbol => getAssetBySymbol(symbol))
+    .filter((asset): asset is Asset => asset !== undefined);
+
+  const getBiasIcon = (bias: string) => {
+    if (bias === 'Bullish') return <TrendingUp className="h-3 w-3 sm:h-3.5 sm:w-3.5" />;
+    if (bias === 'Bearish') return <TrendingDown className="h-3 w-3 sm:h-3.5 sm:w-3.5" />;
+    return <Minus className="h-3 w-3 sm:h-3.5 sm:w-3.5" />;
+  };
+
+  const getBiasColor = (bias: string) => {
+    if (bias === 'Bullish') return 'text-success';
+    if (bias === 'Bearish') return 'text-destructive';
+    return 'text-muted-foreground';
+  };
 
   return (
     <>
@@ -285,7 +292,7 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
             )}
           </div>
 
-          {/* Dashboard Focus Pairs */}
+          {/* Dashboard Focus Pairs - Using shared data */}
           <div className="space-y-2">
             <button
               onClick={handleOpenManageModal}
@@ -295,20 +302,16 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
               <span>Edit pairs</span>
             </button>
             <div className="flex justify-center gap-2 sm:gap-3 flex-wrap">
-              {displayedPairs.map((market) => (
+              {displayedPairs.map((asset) => (
                 <button
-                  key={market.symbol}
-                  onClick={(e) => handleBiasClick(e, market.symbol)}
+                  key={asset.symbol}
+                  onClick={(e) => handleBiasClick(e, asset.symbol)}
                   className="group flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg bg-muted/50 dark:bg-white/5 border border-border dark:border-white/10 hover:bg-muted dark:hover:bg-white/10 hover:border-primary/30 transition-all duration-200"
                 >
-                  <span className="text-xs sm:text-sm font-medium text-foreground">{market.symbol}</span>
-                  <div className={`flex items-center gap-1 ${market.bias === 'Bullish' ? 'text-success' : 'text-destructive'}`}>
-                    {market.bias === 'Bullish' ? (
-                      <TrendingUp className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                    ) : (
-                      <TrendingDown className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                    )}
-                    <span className="text-[10px] sm:text-xs">{market.bias}</span>
+                  <span className="text-xs sm:text-sm font-medium text-foreground">{asset.symbol}</span>
+                  <div className={`flex items-center gap-1 ${getBiasColor(asset.biasDirection)}`}>
+                    {getBiasIcon(asset.biasDirection)}
+                    <span className="text-[10px] sm:text-xs">{asset.biasDirection}</span>
                   </div>
                   <ChevronRight className="h-3 w-3 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
                 </button>
@@ -361,7 +364,7 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
         </div>
       </div>
 
-      {/* Manage Dashboard Focus Pairs Modal */}
+      {/* Manage Dashboard Focus Pairs Modal - Using shared assets data */}
       <Dialog open={isManageModalOpen} onOpenChange={setIsManageModalOpen}>
         <DialogContent className="sm:max-w-md bg-card border-border" onClick={(e) => e.stopPropagation()}>
           <DialogHeader>
@@ -379,13 +382,13 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
             )}
 
             <div className="space-y-2 max-h-64 overflow-y-auto">
-              {allPairsWithBias.map((pair) => {
-                const isSelected = tempSelection.includes(pair.symbol);
+              {assets.map((asset) => {
+                const isSelected = tempSelection.includes(asset.symbol);
                 const isDisabled = !isSelected && tempSelection.length >= MAX_FAVORITES;
                 
                 return (
                   <div
-                    key={pair.symbol}
+                    key={asset.symbol}
                     className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
                       isSelected 
                         ? 'bg-primary/10 border-primary/30' 
@@ -398,17 +401,19 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
                       <Checkbox
                         checked={isSelected}
                         disabled={isDisabled}
-                        onCheckedChange={() => handleTogglePair(pair.symbol)}
+                        onCheckedChange={() => handleTogglePair(asset.symbol)}
                       />
-                      <span className="font-medium text-foreground">{pair.symbol}</span>
+                      <span className="font-medium text-foreground">{asset.symbol}</span>
                     </div>
-                    <div className={`flex items-center gap-1 text-xs ${pair.bias === 'Bullish' ? 'text-success' : 'text-destructive'}`}>
-                      {pair.bias === 'Bullish' ? (
+                    <div className={`flex items-center gap-1 text-xs ${getBiasColor(asset.biasDirection)}`}>
+                      {asset.biasDirection === 'Bullish' ? (
                         <TrendingUp className="h-3 w-3" />
-                      ) : (
+                      ) : asset.biasDirection === 'Bearish' ? (
                         <TrendingDown className="h-3 w-3" />
+                      ) : (
+                        <Minus className="h-3 w-3" />
                       )}
-                      <span>{pair.bias}</span>
+                      <span>{asset.biasDirection}</span>
                     </div>
                   </div>
                 );
