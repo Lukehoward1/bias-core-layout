@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { TrendingUp, TrendingDown, Clock, ChevronRight, ExternalLink, Pencil, X, Check } from "lucide-react";
@@ -11,6 +11,42 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 
+// Trading sessions data
+const tradingSessions = [
+  { name: 'Sydney', openHour: 22, closeHour: 7, accent: '#2EC4B6' },
+  { name: 'Asia', openHour: 0, closeHour: 9, accent: '#4361EE' },
+  { name: 'London', openHour: 8, closeHour: 17, accent: '#F4D35E' },
+  { name: 'New York', openHour: 13, closeHour: 22, accent: '#F77F00' },
+];
+
+function getSessionStatus(session: typeof tradingSessions[0], currentHour: number) {
+  const { openHour, closeHour } = session;
+  
+  // Handle sessions that cross midnight
+  if (openHour > closeHour) {
+    if (currentHour >= openHour || currentHour < closeHour) {
+      return { isLive: true, timeUntilOpen: 0 };
+    }
+  } else {
+    if (currentHour >= openHour && currentHour < closeHour) {
+      return { isLive: true, timeUntilOpen: 0 };
+    }
+  }
+  
+  // Calculate time until open
+  let hoursUntil = openHour - currentHour;
+  if (hoursUntil <= 0) hoursUntil += 24;
+  
+  const hours = Math.floor(hoursUntil);
+  const minutes = Math.floor((hoursUntil % 1) * 60);
+  
+  return { isLive: false, hours, minutes };
+}
+
+function formatTimeUntil(hours: number, minutes: number) {
+  if (hours === 0) return `${minutes}m`;
+  return `${hours}h ${minutes}m`;
+}
 // Mock news data with identifiers for navigation
 const redNews = [
   { id: 'nfp-1', time: '08:30', currency: 'USD', event: 'Non-Farm Payrolls', impact: 'High' as const },
@@ -46,6 +82,9 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   const [favoritePairs, setFavoritePairs] = useState<string[]>([]);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [tempSelection, setTempSelection] = useState<string[]>([]);
+  const [showSessionDropdown, setShowSessionDropdown] = useState(false);
+  const sessionIconRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -55,6 +94,25 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
 
     return () => clearInterval(timer);
   }, []);
+
+  // Handle click outside for session dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        dropdownRef.current && 
+        !dropdownRef.current.contains(e.target as Node) &&
+        sessionIconRef.current &&
+        !sessionIconRef.current.contains(e.target as Node)
+      ) {
+        setShowSessionDropdown(false);
+      }
+    };
+
+    if (showSessionDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showSessionDropdown]);
 
   // Load favorite pairs from localStorage
   useEffect(() => {
@@ -160,13 +218,71 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
             </div>
           </div>
 
-          {/* Session Info - Informational only, not clickable */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-muted/50 dark:bg-white/5 border border-border dark:border-white/10">
-            <div className={`w-2 h-2 rounded-full ${currentSession.status === 'live' ? 'bg-success animate-pulse' : 'bg-warning'}`} />
-            <span className="text-sm text-foreground dark:text-gray-300">
-              {currentSession.name} Session {currentSession.status === 'live' ? 'Live' : `in ${currentSession.nextSessionIn}`}
-            </span>
-            <Clock className="h-3 w-3 text-muted-foreground dark:text-gray-500" />
+          {/* Session Info with Interactive Timer Dropdown */}
+          <div className="relative inline-block">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-muted/50 dark:bg-white/5 border border-border dark:border-white/10">
+              {(() => {
+                const currentHour = currentTime.getHours();
+                const liveSession = tradingSessions.find(s => getSessionStatus(s, currentHour).isLive);
+                return (
+                  <>
+                    <div className={`w-2 h-2 rounded-full ${liveSession ? 'bg-success animate-pulse' : 'bg-warning'}`} />
+                    <span className="text-sm text-foreground dark:text-gray-300">
+                      {liveSession ? `${liveSession.name} Session Live` : 'Market Closed'}
+                    </span>
+                  </>
+                );
+              })()}
+              <button
+                ref={sessionIconRef}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowSessionDropdown(!showSessionDropdown);
+                }}
+                onMouseEnter={() => setShowSessionDropdown(true)}
+                className="p-1 -m-1 rounded-full hover:bg-muted dark:hover:bg-white/10 transition-colors cursor-pointer"
+                aria-label="View session times"
+              >
+                <Clock className="h-3.5 w-3.5 text-muted-foreground dark:text-gray-400 hover:text-foreground transition-colors" />
+              </button>
+            </div>
+
+            {/* Session Timer Dropdown */}
+            {showSessionDropdown && (
+              <div 
+                ref={dropdownRef}
+                onMouseLeave={() => setShowSessionDropdown(false)}
+                className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-56 bg-popover border border-border rounded-lg shadow-lg z-[60]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-3 space-y-2">
+                  {tradingSessions.map(session => {
+                    const status = getSessionStatus(session, currentTime.getHours());
+                    return (
+                      <div 
+                        key={session.name}
+                        className={`flex items-center justify-between p-2 rounded-md transition-colors ${
+                          status.isLive ? 'bg-success/10 border border-success/20' : 'hover:bg-muted/50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className={`w-2 h-2 rounded-full ${status.isLive ? 'animate-pulse' : ''}`}
+                            style={{ backgroundColor: session.accent }}
+                          />
+                          <span className={`text-sm ${status.isLive ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
+                            {session.name}
+                          </span>
+                        </div>
+                        <span className={`text-xs ${status.isLive ? 'text-success font-medium' : 'text-muted-foreground'}`}>
+                          {status.isLive ? 'Live' : `opens in ${formatTimeUntil(status.hours!, status.minutes!)}`}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Dashboard Focus Pairs */}
