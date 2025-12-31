@@ -22,7 +22,7 @@ const news = [
 
 const sessions = [
   { name: 'Sydney', status: 'closed', time: 'Opens in 8:30:00', accent: '#2EC4B6', region: 'Asia-Pacific Markets' },
-  { name: 'Tokyo', status: 'open', time: 'Closes in 1:23:45', accent: '#4361EE', region: 'JPY Markets' },
+  { name: 'Asia', status: 'open', time: 'Closes in 1:23:45', accent: '#4361EE', region: 'Asia-Pacific Markets' },
   { name: 'London', status: 'closed', time: 'Opens in 2:15:30', accent: '#F4D35E', region: 'European Markets' },
   { name: 'New York', status: 'closed', time: 'Opens in 5:45:12', accent: '#F77F00', region: 'US Markets' },
 ];
