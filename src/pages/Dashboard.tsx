@@ -17,7 +17,7 @@ interface SessionData {
 
 const sessionsData: SessionData[] = [
   { name: 'Sydney', time: 'Opens in 8:30:00', status: 'closed', accent: '#2EC4B6', region: 'Asia-Pacific' },
-  { name: 'Tokyo', time: 'Closes in 1:23:45', status: 'active', accent: '#4361EE', region: 'JPY Markets' },
+  { name: 'Asia', time: 'Closes in 1:23:45', status: 'active', accent: '#4361EE', region: 'Asia-Pacific Markets' },
   { name: 'London', time: 'Opens in 2:15:30', status: 'closed', accent: '#F4D35E', region: 'European' },
   { name: 'New York', time: 'Opens in 5:45:12', status: 'closed', accent: '#F77F00', region: 'US Markets' },
 ];
