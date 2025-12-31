@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { LockScreen } from "@/components/LockScreen";
@@ -48,7 +48,7 @@ function SessionTimerDropdown({
   };
 
   // Attach/detach event listener based on dropdown visibility
-  useState(() => {
+  useEffect(() => {
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     } else {

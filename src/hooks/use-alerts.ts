@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import type { AlertItem } from "@/components/alerts/AlertToast";
 import type { AlertPreferences } from "@/components/alerts/AlertPreferencesPanel";
+import { useWatchlist } from "@/hooks/use-watchlist";
 
 const defaultPreferences: AlertPreferences = {
   sessionReminders: true,
@@ -25,11 +26,43 @@ const defaultPreferences: AlertPreferences = {
 };
 
 export function useAlerts() {
+  const { watchlist, watchlistCurrencies } = useWatchlist();
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [preferences, setPreferences] = useState<AlertPreferences>(() => {
     const saved = localStorage.getItem('alertPreferences');
     return saved ? JSON.parse(saved) : defaultPreferences;
   });
+
+  // Combine watchlist-derived currencies with manually selected currencies
+  const relevantCurrencies = useMemo(() => {
+    const combined = new Set([
+      ...watchlistCurrencies,
+      ...preferences.relevantCurrencies
+    ]);
+    return Array.from(combined);
+  }, [watchlistCurrencies, preferences.relevantCurrencies]);
+
+  // Check if an alert is relevant based on watchlist and preferences
+  const isAlertRelevant = useCallback((alert: Omit<AlertItem, 'id' | 'timestamp' | 'read'>) => {
+    // Event-specific alerts always notify
+    if (alert.type === 'news' && preferences.eventSpecificNews.length > 0) {
+      return true;
+    }
+    
+    // Bias alerts are watchlist-only
+    if (alert.type === 'bias') {
+      return alert.relatedAsset ? watchlist.includes(alert.relatedAsset) : false;
+    }
+    
+    // For other alerts, check currency relevance
+    if (alert.relatedAsset) {
+      // Check if the asset's currencies match any relevant currencies
+      const assetCurrencies = alert.relatedAsset.match(/[A-Z]{3}/g) || [];
+      return assetCurrencies.some(curr => relevantCurrencies.includes(curr));
+    }
+    
+    return true; // Non-asset-specific alerts are always relevant
+  }, [watchlist, relevantCurrencies, preferences.eventSpecificNews]);
 
   // Check if currently in quiet hours
   const isQuietHours = useCallback(() => {
@@ -76,6 +109,11 @@ export function useAlerts() {
   }, [preferences]);
 
   const addAlert = useCallback((alert: Omit<AlertItem, 'id' | 'timestamp' | 'read'>) => {
+    // Check relevance before adding (except for manual timers which always add)
+    if (alert.type !== 'timer' && !isAlertRelevant(alert)) {
+      return null;
+    }
+    
     const newAlert: AlertItem = {
       ...alert,
       id: Math.random().toString(36).substr(2, 9),
@@ -84,7 +122,7 @@ export function useAlerts() {
     };
     setAlerts(prev => [newAlert, ...prev].slice(0, 100)); // Keep max 100 alerts
     return newAlert;
-  }, []);
+  }, [isAlertRelevant]);
 
   const markRead = useCallback((id: string) => {
     setAlerts(prev => prev.map(a => 
@@ -116,12 +154,16 @@ export function useAlerts() {
     alerts,
     preferences,
     isQuietHours: isQuietHours(),
+    watchlist,
+    watchlistCurrencies,
+    relevantCurrencies,
     addAlert,
     markRead,
     markAllRead,
     dismissAlert,
     deleteAlert,
     clearAllAlerts,
-    updatePreferences
+    updatePreferences,
+    isAlertRelevant
   };
 }
