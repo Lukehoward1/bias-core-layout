@@ -33,6 +33,7 @@ import { ReportsRiskManagement } from "@/components/reports/ReportsRiskManagemen
 import { ReportsTradeLog } from "@/components/reports/ReportsTradeLog";
 import { ReportDateRangeFilter, DateRange } from "@/components/reports/ReportDateRangeFilter";
 import { usePdfExport } from "@/hooks/use-pdf-export";
+import { useUserPlan } from "@/hooks/use-user-plan";
 
 interface Trade {
   id: string;
@@ -176,6 +177,7 @@ export default function Journal() {
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [noteValue, setNoteValue] = useState('');
   const { exportAllReports } = usePdfExport();
+  const { hasReportsAccess, hasExportAccess } = useUserPlan();
 
   // Date range filter for Reports
   const [dateRange, setDateRange] = useState<DateRange>({
@@ -356,50 +358,14 @@ export default function Journal() {
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           <Tabs defaultValue="journal" className="w-full">
-            <TabsList className="grid w-full max-w-xs grid-cols-2">
+            <TabsList className={`grid w-full max-w-xs ${hasReportsAccess ? 'grid-cols-2' : 'grid-cols-1'}`}>
               <TabsTrigger value="journal" className="text-sm">Journal</TabsTrigger>
-              <TabsTrigger value="reports" className="text-sm">Reports</TabsTrigger>
+              {hasReportsAccess && (
+                <TabsTrigger value="reports" className="text-sm">Reports</TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="journal" className="space-y-6 mt-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Trades</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-foreground">127</div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-foreground">68%</div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Total P&L</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-success">+$24,680</div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">Avg R:R</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-foreground">2.1</div>
-                  </CardContent>
-                </Card>
-              </div>
-
               <EquityCurveCard trades={trades} />
 
               {/* Daily Performance Calendar */}
@@ -676,66 +642,70 @@ export default function Journal() {
               </Dialog>
             </TabsContent>
 
-            <TabsContent value="reports" className="space-y-6 mt-5">
-              <Tabs defaultValue="overview" className="w-full">
-                {/* Header with tabs and date range filter */}
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
-                  <TabsList className="grid w-full lg:w-auto grid-cols-4 lg:grid-cols-8 h-auto gap-1 p-1">
-                    <TabsTrigger value="overview" className="text-xs px-2 py-1.5">Overview</TabsTrigger>
-                    <TabsTrigger value="performance" className="text-xs px-2 py-1.5">Performance</TabsTrigger>
-                    <TabsTrigger value="sessions" className="text-xs px-2 py-1.5">Sessions</TabsTrigger>
-                    <TabsTrigger value="assets" className="text-xs px-2 py-1.5">Assets</TabsTrigger>
-                    <TabsTrigger value="setup" className="text-xs px-2 py-1.5">Setup Quality</TabsTrigger>
-                    <TabsTrigger value="psychology" className="text-xs px-2 py-1.5">Psychology</TabsTrigger>
-                    <TabsTrigger value="risk" className="text-xs px-2 py-1.5">Risk Mgmt</TabsTrigger>
-                    <TabsTrigger value="tradelog" className="text-xs px-2 py-1.5">Trade Log</TabsTrigger>
-                  </TabsList>
-                  
-                  <div className="flex items-center gap-3">
-                    <ReportDateRangeFilter 
-                      dateRange={dateRange}
-                      onDateRangeChange={setDateRange}
-                      firstTradeDate={firstTradeDate}
-                      lastTradeDate={lastTradeDate}
-                    />
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="h-8 gap-1.5 text-xs"
-                      onClick={handleExportAllReports}
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      Export All
-                    </Button>
+            {hasReportsAccess && (
+              <TabsContent value="reports" className="space-y-6 mt-5">
+                <Tabs defaultValue="overview" className="w-full">
+                  {/* Header with tabs and date range filter */}
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
+                    <TabsList className="grid w-full lg:w-auto grid-cols-4 lg:grid-cols-8 h-auto gap-1 p-1">
+                      <TabsTrigger value="overview" className="text-xs px-2 py-1.5">Overview</TabsTrigger>
+                      <TabsTrigger value="performance" className="text-xs px-2 py-1.5">Performance</TabsTrigger>
+                      <TabsTrigger value="sessions" className="text-xs px-2 py-1.5">Sessions</TabsTrigger>
+                      <TabsTrigger value="assets" className="text-xs px-2 py-1.5">Assets</TabsTrigger>
+                      <TabsTrigger value="setup" className="text-xs px-2 py-1.5">Setup Quality</TabsTrigger>
+                      <TabsTrigger value="psychology" className="text-xs px-2 py-1.5">Psychology</TabsTrigger>
+                      <TabsTrigger value="risk" className="text-xs px-2 py-1.5">Risk Mgmt</TabsTrigger>
+                      <TabsTrigger value="tradelog" className="text-xs px-2 py-1.5">Trade Log</TabsTrigger>
+                    </TabsList>
+                    
+                    <div className="flex items-center gap-3">
+                      <ReportDateRangeFilter 
+                        dateRange={dateRange}
+                        onDateRangeChange={setDateRange}
+                        firstTradeDate={firstTradeDate}
+                        lastTradeDate={lastTradeDate}
+                      />
+                      {hasExportAccess && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-8 gap-1.5 text-xs"
+                          onClick={handleExportAllReports}
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          Export All
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                <TabsContent value="overview" className="mt-5">
-                  <ReportsOverview trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
-                </TabsContent>
-                <TabsContent value="performance" className="mt-5">
-                  <ReportsPerformance trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
-                </TabsContent>
-                <TabsContent value="sessions" className="mt-5">
-                  <ReportsSessions trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
-                </TabsContent>
-                <TabsContent value="assets" className="mt-5">
-                  <ReportsAssets trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
-                </TabsContent>
-                <TabsContent value="setup" className="mt-5">
-                  <ReportsSetupQuality trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
-                </TabsContent>
-                <TabsContent value="psychology" className="mt-5">
-                  <ReportsPsychology trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
-                </TabsContent>
-                <TabsContent value="risk" className="mt-5">
-                  <ReportsRiskManagement trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
-                </TabsContent>
-                <TabsContent value="tradelog" className="mt-5">
-                  <ReportsTradeLog trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
-                </TabsContent>
-              </Tabs>
-            </TabsContent>
+                  <TabsContent value="overview" className="mt-5">
+                    <ReportsOverview trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
+                  </TabsContent>
+                  <TabsContent value="performance" className="mt-5">
+                    <ReportsPerformance trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
+                  </TabsContent>
+                  <TabsContent value="sessions" className="mt-5">
+                    <ReportsSessions trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
+                  </TabsContent>
+                  <TabsContent value="assets" className="mt-5">
+                    <ReportsAssets trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
+                  </TabsContent>
+                  <TabsContent value="setup" className="mt-5">
+                    <ReportsSetupQuality trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
+                  </TabsContent>
+                  <TabsContent value="psychology" className="mt-5">
+                    <ReportsPsychology trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
+                  </TabsContent>
+                  <TabsContent value="risk" className="mt-5">
+                    <ReportsRiskManagement trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
+                  </TabsContent>
+                  <TabsContent value="tradelog" className="mt-5">
+                    <ReportsTradeLog trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
+                  </TabsContent>
+                </Tabs>
+              </TabsContent>
+            )}
           </Tabs>
         </div>
       </div>
