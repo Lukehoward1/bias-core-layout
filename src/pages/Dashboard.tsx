@@ -3,9 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { LockScreen } from "@/components/LockScreen";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, Minus, Clock, Calendar as CalendarIcon, Activity, ChevronDown, ChevronRight } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Clock, Calendar as CalendarIcon, Activity, ChevronDown, ChevronRight, AlertTriangle, BookOpen, Shield } from "lucide-react";
 import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
 import { defaultDashboardAssets } from "@/data/assets";
+import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
+import { DashboardEditToolbar } from "@/components/dashboard/DashboardEditToolbar";
+import { DraggableDashboardCard } from "@/components/dashboard/DraggableDashboardCard";
+import { AddCardsModal } from "@/components/dashboard/AddCardsModal";
 
 interface SessionData {
   name: string;
@@ -47,7 +51,6 @@ function SessionTimerDropdown({
     }
   };
 
-  // Attach/detach event listener based on dropdown visibility
   useEffect(() => {
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
@@ -112,9 +115,25 @@ function SessionTimerDropdown({
 export default function Dashboard() {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [showSessionDropdown, setShowSessionDropdown] = useState(false);
+  const [showAddCardsModal, setShowAddCardsModal] = useState(false);
+  const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
+  const [dragOverCardId, setDragOverCardId] = useState<string | null>(null);
   const sessionCardRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   
+  // Dashboard layout customization
+  const {
+    isEditMode,
+    toggleEditMode,
+    addCard,
+    removeCard,
+    moveCard,
+    resetToDefault,
+    isCardVisible,
+    getVisibleCardsInOrder,
+    getAvailableToAdd,
+  } = useDashboardLayout();
+
   // Use shared data sources
   const { watchlistAssets } = useWatchlist();
   const { getAssetBySymbol } = useAssets();
@@ -137,25 +156,64 @@ export default function Dashboard() {
   };
 
   const handleAssetClick = (symbol: string) => {
+    if (isEditMode) return; // Prevent navigation in edit mode
     navigate(`/asset/${symbol}?from=Dashboard`);
+  };
+
+  const handleDragStart = (cardId: string) => {
+    setDraggingCardId(cardId);
+  };
+
+  const handleDragOver = (cardId: string) => {
+    if (draggingCardId && cardId !== draggingCardId) {
+      setDragOverCardId(cardId);
+    }
+  };
+
+  const handleDragEnd = () => {
+    if (draggingCardId && dragOverCardId) {
+      moveCard(draggingCardId, dragOverCardId);
+    }
+    setDraggingCardId(null);
+    setDragOverCardId(null);
   };
 
   if (!isUnlocked) {
     return <LockScreen onUnlock={() => setIsUnlocked(true)} />;
   }
 
-  return (
-    <div className="flex flex-col min-h-full bg-background">
-      <AppHeader title="Dashboard" />
-      
-      <div className="flex-1 p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          {/* Welcome Header */}
-          <h1 className="text-3xl font-bold text-foreground">Welcome, Trader</h1>
-          
-          {/* Key Metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            <Card>
+  // Get visible cards in user-defined order
+  const visibleCardIds = getVisibleCardsInOrder();
+
+  // Define all card render functions
+  const renderCard = (cardId: string) => {
+    const cardContent = getCardContent(cardId);
+    if (!cardContent) return null;
+
+    return (
+      <DraggableDashboardCard
+        key={cardId}
+        cardId={cardId}
+        isEditMode={isEditMode}
+        onRemove={removeCard}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        isDragging={draggingCardId === cardId}
+        isDragOver={dragOverCardId === cardId}
+        className={cardContent.className}
+      >
+        {cardContent.element}
+      </DraggableDashboardCard>
+    );
+  };
+
+  const getCardContent = (cardId: string): { element: React.ReactNode; className?: string } | null => {
+    switch (cardId) {
+      case 'todays-bias':
+        return {
+          element: (
+            <Card className="h-full">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Today's Bias</CardTitle>
                 <TrendingUp className="h-4 w-4 text-success" />
@@ -165,8 +223,13 @@ export default function Dashboard() {
                 <p className="text-xs text-muted-foreground mt-1">85% confidence</p>
               </CardContent>
             </Card>
+          ),
+        };
 
-            <Card>
+      case 'active-trades':
+        return {
+          element: (
+            <Card className="h-full">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Active Trades</CardTitle>
                 <Activity className="h-4 w-4 text-primary" />
@@ -176,12 +239,16 @@ export default function Dashboard() {
                 <p className="text-xs text-success mt-1">+$2,450 unrealized</p>
               </CardContent>
             </Card>
+          ),
+        };
 
-            {/* Next Session Card with Dropdown */}
-            <div className="relative" ref={sessionCardRef}>
+      case 'next-session':
+        return {
+          element: (
+            <div className="relative h-full" ref={sessionCardRef}>
               <Card 
-                className="cursor-pointer hover:bg-muted/30 transition-colors"
-                onClick={() => setShowSessionDropdown(!showSessionDropdown)}
+                className="cursor-pointer hover:bg-muted/30 transition-colors h-full"
+                onClick={() => !isEditMode && setShowSessionDropdown(!showSessionDropdown)}
               >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">Next Session</CardTitle>
@@ -196,14 +263,19 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
               <SessionTimerDropdown
-                isOpen={showSessionDropdown}
+                isOpen={showSessionDropdown && !isEditMode}
                 onClose={() => setShowSessionDropdown(false)}
                 sessions={sessionsData}
                 anchorRef={sessionCardRef}
               />
             </div>
+          ),
+        };
 
-            <Card>
+      case 'high-impact-events':
+        return {
+          element: (
+            <Card className="h-full">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">High Impact Events</CardTitle>
                 <CalendarIcon className="h-4 w-4 text-destructive" />
@@ -213,12 +285,14 @@ export default function Dashboard() {
                 <p className="text-xs text-muted-foreground mt-1">Today</p>
               </CardContent>
             </Card>
-          </div>
+          ),
+        };
 
-          {/* Main Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            {/* Today's Bias Snapshot - Using shared data */}
-            <Card className="lg:col-span-2">
+      case 'bias-snapshot':
+        return {
+          className: 'lg:col-span-2',
+          element: (
+            <Card className="h-full">
               <CardHeader>
                 <CardTitle>Today's Bias Snapshot</CardTitle>
               </CardHeader>
@@ -246,8 +320,13 @@ export default function Dashboard() {
                 </div>
               </CardContent>
             </Card>
+          ),
+        };
 
-            <Card>
+      case 'session-timers':
+        return {
+          element: (
+            <Card className="h-full">
               <CardHeader>
                 <CardTitle>Session Timers</CardTitle>
               </CardHeader>
@@ -273,10 +352,13 @@ export default function Dashboard() {
                 </div>
               </CardContent>
             </Card>
-          </div>
+          ),
+        };
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <Card>
+      case 'upcoming-events':
+        return {
+          element: (
+            <Card className="h-full">
               <CardHeader>
                 <CardTitle>Upcoming Events</CardTitle>
               </CardHeader>
@@ -300,8 +382,13 @@ export default function Dashboard() {
                 </div>
               </CardContent>
             </Card>
+          ),
+        };
 
-            <Card>
+      case 'performance-overview':
+        return {
+          element: (
+            <Card className="h-full">
               <CardHeader>
                 <CardTitle>Performance Overview</CardTitle>
               </CardHeader>
@@ -326,9 +413,176 @@ export default function Dashboard() {
                 </div>
               </CardContent>
             </Card>
+          ),
+        };
+
+      case 'journal-summary':
+        return {
+          element: (
+            <Card className="h-full">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle>Journal Summary</CardTitle>
+                <BookOpen className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Entries This Week</span>
+                    <span className="font-medium text-foreground">12</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Avg. Mood</span>
+                    <span className="font-medium text-success">Positive</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Last Entry</span>
+                    <span className="font-medium text-foreground">2h ago</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ),
+        };
+
+      case 'risk-snapshot':
+        return {
+          element: (
+            <Card className="h-full">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle>Risk Snapshot</CardTitle>
+                <Shield className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Daily Drawdown</span>
+                    <span className="font-medium text-foreground">1.2%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Max Position</span>
+                    <span className="font-medium text-foreground">2.5%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Risk Status</span>
+                    <span className="font-medium text-success">Healthy</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ),
+        };
+
+      case 'calendar-events':
+        return {
+          element: (
+            <Card className="h-full">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle>Week Ahead</CardTitle>
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 p-2 bg-muted/50 rounded-lg">
+                    <div className="text-xs font-medium text-muted-foreground min-w-[40px]">Mon</div>
+                    <div className="text-sm text-foreground">FOMC Minutes</div>
+                    <AlertTriangle className="h-3.5 w-3.5 text-destructive ml-auto shrink-0" />
+                  </div>
+                  <div className="flex items-start gap-3 p-2 bg-muted/50 rounded-lg">
+                    <div className="text-xs font-medium text-muted-foreground min-w-[40px]">Wed</div>
+                    <div className="text-sm text-foreground">CPI Data</div>
+                    <AlertTriangle className="h-3.5 w-3.5 text-destructive ml-auto shrink-0" />
+                  </div>
+                  <div className="flex items-start gap-3 p-2 bg-muted/50 rounded-lg">
+                    <div className="text-xs font-medium text-muted-foreground min-w-[40px]">Fri</div>
+                    <div className="text-sm text-foreground">NFP Release</div>
+                    <AlertTriangle className="h-3.5 w-3.5 text-destructive ml-auto shrink-0" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ),
+        };
+
+      default:
+        return null;
+    }
+  };
+
+  // Group cards by their display category for layout
+  const metricsCards = ['todays-bias', 'active-trades', 'next-session', 'high-impact-events'];
+  const analysisCards = ['bias-snapshot', 'session-timers'];
+  const overviewCards = ['upcoming-events', 'performance-overview', 'journal-summary', 'risk-snapshot', 'calendar-events'];
+
+  const visibleMetrics = visibleCardIds.filter(id => metricsCards.includes(id));
+  const visibleAnalysis = visibleCardIds.filter(id => analysisCards.includes(id));
+  const visibleOverview = visibleCardIds.filter(id => overviewCards.includes(id));
+
+  return (
+    <div className="flex flex-col min-h-full bg-background">
+      <AppHeader 
+        title="Dashboard" 
+        rightContent={
+          <DashboardEditToolbar
+            isEditMode={isEditMode}
+            onToggleEdit={toggleEditMode}
+            onReset={resetToDefault}
+            onOpenAddCards={() => setShowAddCardsModal(true)}
+          />
+        }
+      />
+      
+      <div className="flex-1 p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Welcome Header */}
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold text-foreground">Welcome, Trader</h1>
+            {isEditMode && (
+              <p className="text-sm text-muted-foreground">
+                Drag cards to reorder • Click × to remove
+              </p>
+            )}
           </div>
+          
+          {/* Key Metrics Row */}
+          {visibleMetrics.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              {visibleMetrics.map(cardId => renderCard(cardId))}
+            </div>
+          )}
+
+          {/* Analysis Section */}
+          {visibleAnalysis.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              {visibleAnalysis.map(cardId => renderCard(cardId))}
+            </div>
+          )}
+
+          {/* Overview Section */}
+          {visibleOverview.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {visibleOverview.map(cardId => renderCard(cardId))}
+            </div>
+          )}
+
+          {/* Empty state when no cards */}
+          {visibleCardIds.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <p className="text-muted-foreground mb-4">No cards on your Dashboard.</p>
+              <p className="text-sm text-muted-foreground">
+                Click "Edit Dashboard" and then "Add Cards" to customize.
+              </p>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Add Cards Modal */}
+      <AddCardsModal
+        open={showAddCardsModal}
+        onOpenChange={setShowAddCardsModal}
+        availableCards={getAvailableToAdd()}
+        onAddCard={addCard}
+      />
     </div>
   );
 }

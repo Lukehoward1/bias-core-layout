@@ -13,9 +13,10 @@ import { ChevronDown, User, LogOut, Sparkles } from "lucide-react";
 
 interface AppHeaderProps {
   title: string;
+  rightContent?: React.ReactNode;
 }
 
-export function AppHeader({ title }: AppHeaderProps) {
+export function AppHeader({ title, rightContent }: AppHeaderProps) {
   return (
     <header className="h-14 border-b border-border bg-card flex items-center justify-between px-6 gap-6 shrink-0 sticky top-0 z-30">
       <h1 className="text-xl font-semibold text-foreground shrink-0">{title}</h1>
@@ -32,6 +33,7 @@ export function AppHeader({ title }: AppHeaderProps) {
       </div>
       
       <div className="flex items-center gap-4 shrink-0">
+        {rightContent}
         <Badge variant="secondary" className="text-xs font-medium h-6 px-2.5">
           Pro
         </Badge>
