@@ -519,28 +519,26 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col min-h-full bg-background">
-      <AppHeader 
-        title="Dashboard" 
-        rightContent={
-          <DashboardEditToolbar
-            isEditMode={isEditMode}
-            onToggleEdit={toggleEditMode}
-            onReset={resetToDefault}
-            onOpenAddCards={() => setShowAddCardsModal(true)}
-          />
-        }
-      />
+      <AppHeader title="Dashboard" />
       
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto space-y-6">
-          {/* Welcome Header */}
+          {/* Welcome Header with Edit Controls */}
           <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold text-foreground">Welcome, Trader</h1>
-            {isEditMode && (
-              <p className="text-sm text-muted-foreground">
-                Drag cards to reorder • Click × to remove
-              </p>
-            )}
+            <div className="flex items-center gap-4">
+              <h1 className="text-3xl font-bold text-foreground">Welcome, Trader</h1>
+              {isEditMode && (
+                <p className="text-sm text-muted-foreground">
+                  Drag cards to reorder • Click × to remove
+                </p>
+              )}
+            </div>
+            <DashboardEditToolbar
+              isEditMode={isEditMode}
+              onToggleEdit={toggleEditMode}
+              onReset={resetToDefault}
+              onOpenAddCards={() => setShowAddCardsModal(true)}
+            />
           </div>
           
           {/* Key Metrics Row */}
