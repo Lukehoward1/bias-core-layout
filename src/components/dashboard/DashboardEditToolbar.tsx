@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Move, RotateCcw, Check, Plus } from 'lucide-react';
+import { Settings2, RotateCcw, Check, Plus } from 'lucide-react';
 
 interface DashboardEditToolbarProps {
   isEditMode: boolean;
@@ -39,7 +39,7 @@ export function DashboardEditToolbar({
         </>
       )}
       <Button
-        variant={isEditMode ? "default" : "ghost"}
+        variant={isEditMode ? "default" : "outline"}
         size="sm"
         onClick={onToggleEdit}
         className="gap-1.5"
@@ -51,8 +51,8 @@ export function DashboardEditToolbar({
           </>
         ) : (
           <>
-            <Move className="h-4 w-4" />
-            Move Cards
+            <Settings2 className="h-4 w-4" />
+            Edit Dashboard
           </>
         )}
       </Button>

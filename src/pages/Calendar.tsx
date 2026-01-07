@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/select";
 import { Filter } from "lucide-react";
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
-import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 
 const keyEvents = [
   { time: '08:30', currency: 'USD', event: 'Non-Farm Payrolls', impact: 'high' },
@@ -140,14 +139,7 @@ export default function Calendar() {
           {/* Key Events */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Key Events Today</CardTitle>
-                <AddToDashboardButton 
-                  cardId="calendar-key-events" 
-                  cardTitle="Key Events Today"
-                  cardDescription="High-impact economic events for today"
-                />
-              </div>
+              <CardTitle>Key Events Today</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -174,14 +166,7 @@ export default function Calendar() {
           {/* Events Table */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>All Events</CardTitle>
-                <AddToDashboardButton 
-                  cardId="calendar-all-events" 
-                  cardTitle="All Calendar Events"
-                  cardDescription="Complete economic calendar event list"
-                />
-              </div>
+              <CardTitle>All Events</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto -mx-5">

@@ -23,9 +23,6 @@ export const AVAILABLE_CARDS: DashboardCardConfig[] = [
   { id: 'calendar-events', title: 'Calendar Events', description: 'Week ahead calendar preview', defaultVisible: false, category: 'overview' },
 ];
 
-// External cards that can be added from other pages
-const EXTERNAL_CARDS_KEY = 'streambias-external-cards';
-
 const STORAGE_KEY = 'streambias-dashboard-layout';
 
 interface DashboardLayout {
@@ -33,39 +30,10 @@ interface DashboardLayout {
   cardOrder: string[];
 }
 
-interface ExternalCard {
-  id: string;
-  title: string;
-  description: string;
-  category: 'metrics' | 'analysis' | 'overview';
-}
-
 const getDefaultLayout = (): DashboardLayout => ({
   visibleCards: AVAILABLE_CARDS.filter(c => c.defaultVisible).map(c => c.id),
   cardOrder: AVAILABLE_CARDS.filter(c => c.defaultVisible).map(c => c.id),
 });
-
-// Load external cards from storage
-const loadExternalCards = (): ExternalCard[] => {
-  try {
-    const saved = localStorage.getItem(EXTERNAL_CARDS_KEY);
-    if (saved) {
-      return JSON.parse(saved);
-    }
-  } catch (e) {
-    console.warn('Failed to load external cards:', e);
-  }
-  return [];
-};
-
-// Save external cards to storage
-const saveExternalCards = (cards: ExternalCard[]) => {
-  try {
-    localStorage.setItem(EXTERNAL_CARDS_KEY, JSON.stringify(cards));
-  } catch (e) {
-    console.warn('Failed to save external cards:', e);
-  }
-};
 
 export function useDashboardLayout() {
   const [layout, setLayout] = useState<DashboardLayout>(() => {
@@ -84,8 +52,7 @@ export function useDashboardLayout() {
     return getDefaultLayout();
   });
 
-  const [externalCards, setExternalCards] = useState<ExternalCard[]>(loadExternalCards);
-  const [isMoveMode, setIsMoveMode] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Persist layout changes
   useEffect(() => {
@@ -96,27 +63,8 @@ export function useDashboardLayout() {
     }
   }, [layout]);
 
-  // Persist external cards
-  useEffect(() => {
-    saveExternalCards(externalCards);
-  }, [externalCards]);
-
-  const toggleMoveMode = useCallback(() => {
-    setIsMoveMode(prev => !prev);
-  }, []);
-
-  // Legacy support - keep as alias
-  const toggleEditMode = toggleMoveMode;
-  const isEditMode = isMoveMode;
-
-  const registerExternalCard = useCallback((cardId: string, title: string, description: string) => {
-    setExternalCards(prev => {
-      // Don't add if already exists
-      if (prev.some(c => c.id === cardId) || AVAILABLE_CARDS.some(c => c.id === cardId)) {
-        return prev;
-      }
-      return [...prev, { id: cardId, title, description, category: 'overview' }];
-    });
+  const toggleEditMode = useCallback(() => {
+    setIsEditMode(prev => !prev);
   }, []);
 
   const addCard = useCallback((cardId: string) => {
@@ -163,7 +111,6 @@ export function useDashboardLayout() {
   const resetToDefault = useCallback(() => {
     const defaultLayout = getDefaultLayout();
     setLayout(defaultLayout);
-    setExternalCards([]);
   }, []);
 
   const isCardVisible = useCallback((cardId: string) => {
@@ -175,20 +122,13 @@ export function useDashboardLayout() {
   }, [layout]);
 
   const getAvailableToAdd = useCallback(() => {
-    const allCards = [...AVAILABLE_CARDS, ...externalCards.map(c => ({ ...c, defaultVisible: false }))];
-    return allCards.filter(card => !layout.visibleCards.includes(card.id));
-  }, [layout.visibleCards, externalCards]);
-
-  const getAllCards = useCallback(() => {
-    return [...AVAILABLE_CARDS, ...externalCards.map(c => ({ ...c, defaultVisible: false }))];
-  }, [externalCards]);
+    return AVAILABLE_CARDS.filter(card => !layout.visibleCards.includes(card.id));
+  }, [layout.visibleCards]);
 
   return {
     layout,
     isEditMode,
-    isMoveMode,
     toggleEditMode,
-    toggleMoveMode,
     addCard,
     removeCard,
     reorderCards,
@@ -197,8 +137,5 @@ export function useDashboardLayout() {
     isCardVisible,
     getVisibleCardsInOrder,
     getAvailableToAdd,
-    getAllCards,
-    registerExternalCard,
-    externalCards,
   };
 }
