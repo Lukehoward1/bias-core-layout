@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-export type RowType = 'kpi' | 'wide-narrow' | 'equal' | 'hero';
+export type RowType = 'kpi' | 'wide-narrow' | 'equal' | 'hero' | 'three-equal' | 'four-equal';
 
 export interface DashboardCardConfig {
   id: string;
@@ -187,6 +187,8 @@ export function useDashboardLayout() {
       case 'kpi': return 4;
       case 'wide-narrow': return 2;
       case 'equal': return 2;
+      case 'three-equal': return 3;
+      case 'four-equal': return 4;
       case 'hero': return 1;
       default: return 2;
     }

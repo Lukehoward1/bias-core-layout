@@ -33,6 +33,10 @@ const getGridClass = (rowType: RowType): string => {
       return 'grid-cols-1 lg:grid-cols-3';
     case 'equal':
       return 'grid-cols-1 lg:grid-cols-2';
+    case 'three-equal':
+      return 'grid-cols-1 md:grid-cols-3';
+    case 'four-equal':
+      return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4';
     case 'hero':
       return 'grid-cols-1';
     default:
@@ -47,6 +51,8 @@ const getSlotType = (rowType: RowType, slotIndex: number): 'wide' | 'narrow' | '
     case 'wide-narrow':
       return slotIndex === 0 ? 'wide' : 'narrow';
     case 'equal':
+    case 'three-equal':
+    case 'four-equal':
       return 'equal';
     case 'hero':
       return 'hero';
