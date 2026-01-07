@@ -1,15 +1,19 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { LockScreen } from "@/components/LockScreen";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, Minus, Clock, Calendar as CalendarIcon, Activity, ChevronDown, ChevronRight, AlertTriangle, BookOpen, Shield } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Clock, Calendar as CalendarIcon, Activity, ChevronDown, ChevronRight, AlertTriangle, BookOpen, Shield, X } from "lucide-react";
 import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
 import { defaultDashboardAssets } from "@/data/assets";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
+import { usePinnedDashboardCards } from "@/hooks/use-pinned-dashboard-cards";
 import { DashboardEditToolbar } from "@/components/dashboard/DashboardEditToolbar";
 import { DraggableDashboardCard } from "@/components/dashboard/DraggableDashboardCard";
 import { AddCardsModal } from "@/components/dashboard/AddCardsModal";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
 
 interface SessionData {
   name: string;
@@ -134,6 +138,9 @@ export default function Dashboard() {
     getAvailableToAdd,
   } = useDashboardLayout();
 
+  // Pinned cards from other pages
+  const { getPinnedCards, unpinCard } = usePinnedDashboardCards();
+
   // Use shared data sources
   const { watchlistAssets } = useWatchlist();
   const { getAssetBySymbol } = useAssets();
@@ -184,6 +191,108 @@ export default function Dashboard() {
 
   // Get visible cards in user-defined order
   const visibleCardIds = getVisibleCardsInOrder();
+  
+  // Get pinned cards
+  const pinnedCards = getPinnedCards();
+
+  // Sample equity data for pinned journal equity card
+  const journalEquityData = useMemo(() => {
+    const sampleTrades = [
+      { date: '2025-01-03', pnl: 450 },
+      { date: '2025-01-06', pnl: 300 },
+      { date: '2025-01-08', pnl: -400 },
+      { date: '2025-01-10', pnl: 480 },
+      { date: '2025-01-12', pnl: -400 },
+      { date: '2025-01-13', pnl: -73 },
+      { date: '2025-01-14', pnl: 1350 },
+      { date: '2025-01-15', pnl: 600 },
+    ];
+    let cumulative = 0;
+    return sampleTrades.map(t => {
+      cumulative += t.pnl;
+      return { 
+        date: t.date, 
+        equity: cumulative,
+        formattedDate: format(new Date(t.date), 'MMM d')
+      };
+    });
+  }, []);
+
+  // Render pinned cards from external sources
+  const renderPinnedCard = (pinnedCard: { id: string; sourceType: string }) => {
+    switch (pinnedCard.sourceType) {
+      case 'journal-equity':
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium">Journal Equity Curve</CardTitle>
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={journalEquityData}>
+                    <defs>
+                      <linearGradient id="pinnedEquityGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <XAxis 
+                      dataKey="formattedDate" 
+                      tick={{ fontSize: 10 }} 
+                      stroke="hsl(var(--muted-foreground))"
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                      tickLine={{ stroke: 'hsl(var(--border))' }}
+                    />
+                    <YAxis 
+                      tick={{ fontSize: 10 }} 
+                      stroke="hsl(var(--muted-foreground))"
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                      tickLine={{ stroke: 'hsl(var(--border))' }}
+                      tickFormatter={(value) => `£${value}`}
+                    />
+                    <Tooltip 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-card border border-border rounded-lg p-2 shadow-lg">
+                              <p className="text-xs text-muted-foreground">{data.formattedDate}</p>
+                              <p className={`text-sm font-semibold ${data.equity >= 0 ? 'text-success' : 'text-destructive'}`}>
+                                {data.equity >= 0 ? '+' : ''}£{data.equity.toLocaleString()}
+                              </p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="equity" 
+                      stroke="hsl(var(--primary))" 
+                      fill="url(#pinnedEquityGradient)"
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      default:
+        return (
+          <Card className="h-full">
+            <CardContent className="p-4 text-center text-muted-foreground">
+              Unknown pinned card type
+            </CardContent>
+          </Card>
+        );
+    }
+  };
 
   // Define all card render functions
   const renderCard = (cardId: string) => {
@@ -562,8 +671,32 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* Pinned Cards from Other Pages */}
+          {pinnedCards.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold text-foreground">Pinned Cards</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {pinnedCards.map(pinnedCard => (
+                  <div key={pinnedCard.id} className="relative">
+                    {isEditMode && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 z-10"
+                        onClick={() => unpinCard(pinnedCard.id)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+                    {renderPinnedCard(pinnedCard)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Empty state when no cards */}
-          {visibleCardIds.length === 0 && (
+          {visibleCardIds.length === 0 && pinnedCards.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <p className="text-muted-foreground mb-4">No cards on your Dashboard.</p>
               <p className="text-sm text-muted-foreground">
