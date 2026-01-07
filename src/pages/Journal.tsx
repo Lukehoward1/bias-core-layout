@@ -34,6 +34,7 @@ import { ReportsTradeLog } from "@/components/reports/ReportsTradeLog";
 import { ReportDateRangeFilter, DateRange } from "@/components/reports/ReportDateRangeFilter";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { useUserPlan } from "@/hooks/use-user-plan";
+import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 
 interface Trade {
   id: string;
@@ -122,8 +123,15 @@ function EquityCurveCard({ trades }: { trades: Trade[] }) {
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle>Equity Curve</CardTitle>
-          <Badge variant="outline" className="text-xs">MT5 - Live</Badge>
+          <div className="flex items-center gap-2">
+            <CardTitle>Equity Curve</CardTitle>
+            <Badge variant="outline" className="text-xs">MT5 - Live</Badge>
+          </div>
+          <AddToDashboardButton 
+            cardId="journal-equity-curve" 
+            cardTitle="Journal Equity Curve"
+            cardDescription="Equity curve from your trading journal"
+          />
         </div>
       </CardHeader>
       <CardContent>

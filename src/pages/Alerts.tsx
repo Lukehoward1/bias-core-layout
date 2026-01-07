@@ -11,6 +11,7 @@ import { AlertInbox } from "@/components/alerts/AlertInbox";
 import { TestAlertsPanel } from "@/components/alerts/TestAlertsPanel";
 import { ManualTimerPanel } from "@/components/alerts/ManualTimerPanel";
 import { useAlerts } from "@/hooks/use-alerts";
+import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 
 const news = [
   { title: 'Fed Signals Potential Rate Hold', currency: 'USD', time: '2h ago', sentiment: 'hawkish' },
@@ -104,7 +105,14 @@ export default function Alerts() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                 <Card className="lg:col-span-2">
                   <CardHeader>
-                    <CardTitle>Top News</CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Top News</CardTitle>
+                      <AddToDashboardButton 
+                        cardId="alerts-top-news" 
+                        cardTitle="Top News"
+                        cardDescription="Latest market-moving news headlines"
+                      />
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
@@ -133,7 +141,14 @@ export default function Alerts() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Session Timers</CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle>Session Timers</CardTitle>
+                      <AddToDashboardButton 
+                        cardId="alerts-session-timers" 
+                        cardTitle="Session Timers"
+                        cardDescription="Trading session countdown timers"
+                      />
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
@@ -163,7 +178,14 @@ export default function Alerts() {
 
               <Card className="mt-5">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                  <CardTitle>My Alerts & Timers</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle>My Alerts & Timers</CardTitle>
+                    <AddToDashboardButton 
+                      cardId="alerts-my-alerts" 
+                      cardTitle="My Alerts"
+                      cardDescription="Your configured alerts and timers"
+                    />
+                  </div>
                   <Button size="sm" className="h-8">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Alert
