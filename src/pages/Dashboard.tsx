@@ -3,17 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { LockScreen } from "@/components/LockScreen";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, Minus, Clock, Calendar as CalendarIcon, Activity, ChevronDown, ChevronRight, AlertTriangle, BookOpen, Shield, X } from "lucide-react";
-import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
-import { defaultDashboardAssets } from "@/data/assets";
-import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
-import { usePinnedDashboardCards } from "@/hooks/use-pinned-dashboard-cards";
+import { TrendingUp, Clock, Calendar as CalendarIcon, Activity, ChevronDown, AlertTriangle, BookOpen, Shield } from "lucide-react";
+import { useDashboardLayout, type DashboardCardEntry } from "@/hooks/use-dashboard-layout";
 import { DashboardEditToolbar } from "@/components/dashboard/DashboardEditToolbar";
 import { DraggableDashboardCard } from "@/components/dashboard/DraggableDashboardCard";
 import { AddCardsModal } from "@/components/dashboard/AddCardsModal";
+import { WatchlistOverviewCard } from "@/components/dashboard/WatchlistOverviewCard";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { format } from "date-fns";
-import { Button } from "@/components/ui/button";
 
 interface SessionData {
   name: string;
@@ -125,7 +122,7 @@ export default function Dashboard() {
   const sessionCardRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   
-  // Dashboard layout customization
+  // Unified dashboard layout (includes pinned cards)
   const {
     isEditMode,
     toggleEditMode,
@@ -133,39 +130,9 @@ export default function Dashboard() {
     removeCard,
     moveCard,
     resetToDefault,
-    isCardVisible,
     getVisibleCardsInOrder,
     getAvailableToAdd,
   } = useDashboardLayout();
-
-  // Pinned cards from other pages
-  const { getPinnedCards, unpinCard } = usePinnedDashboardCards();
-
-  // Use shared data sources
-  const { watchlistAssets } = useWatchlist();
-  const { getAssetBySymbol } = useAssets();
-
-  // Get bias snapshot assets: use watchlist if available, otherwise defaults
-  const biasSnapshotAssets = watchlistAssets.length > 0 
-    ? watchlistAssets.slice(0, 5)
-    : defaultDashboardAssets.map(symbol => getAssetBySymbol(symbol)).filter((asset): asset is NonNullable<typeof asset> => asset !== undefined);
-
-  const getBiasIcon = (bias: string) => {
-    if (bias === 'Bullish') return <TrendingUp className="h-4 w-4" />;
-    if (bias === 'Bearish') return <TrendingDown className="h-4 w-4" />;
-    return <Minus className="h-4 w-4" />;
-  };
-
-  const getBiasColor = (bias: string) => {
-    if (bias === 'Bullish') return 'text-success';
-    if (bias === 'Bearish') return 'text-destructive';
-    return 'text-muted-foreground';
-  };
-
-  const handleAssetClick = (symbol: string) => {
-    if (isEditMode) return; // Prevent navigation in edit mode
-    navigate(`/asset/${symbol}?from=Dashboard`);
-  };
 
   const handleDragStart = (cardId: string) => {
     setDraggingCardId(cardId);
@@ -212,104 +179,25 @@ export default function Dashboard() {
     return <LockScreen onUnlock={() => setIsUnlocked(true)} />;
   }
 
-  // Get visible cards in user-defined order
-  const visibleCardIds = getVisibleCardsInOrder();
-  
-  // Get pinned cards
-  const pinnedCards = getPinnedCards();
+  // Get all cards in user-defined order (both default and pinned)
+  const allCards = getVisibleCardsInOrder();
 
-  // Render pinned cards from external sources
-  const renderPinnedCard = (pinnedCard: { id: string; sourceType: string }) => {
-    switch (pinnedCard.sourceType) {
-      case 'journal-equity':
-        return (
-          <Card className="h-full">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium">Journal Equity Curve</CardTitle>
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-40">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={journalEquityData}>
-                    <defs>
-                      <linearGradient id="pinnedEquityGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <XAxis 
-                      dataKey="formattedDate" 
-                      tick={{ fontSize: 10 }} 
-                      stroke="hsl(var(--muted-foreground))"
-                      axisLine={{ stroke: 'hsl(var(--border))' }}
-                      tickLine={{ stroke: 'hsl(var(--border))' }}
-                    />
-                    <YAxis 
-                      tick={{ fontSize: 10 }} 
-                      stroke="hsl(var(--muted-foreground))"
-                      axisLine={{ stroke: 'hsl(var(--border))' }}
-                      tickLine={{ stroke: 'hsl(var(--border))' }}
-                      tickFormatter={(value) => `£${value}`}
-                    />
-                    <Tooltip 
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          return (
-                            <div className="bg-card border border-border rounded-lg p-2 shadow-lg">
-                              <p className="text-xs text-muted-foreground">{data.formattedDate}</p>
-                              <p className={`text-sm font-semibold ${data.equity >= 0 ? 'text-success' : 'text-destructive'}`}>
-                                {data.equity >= 0 ? '+' : ''}£{data.equity.toLocaleString()}
-                              </p>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="equity" 
-                      stroke="hsl(var(--primary))" 
-                      fill="url(#pinnedEquityGradient)"
-                      strokeWidth={2}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      default:
-        return (
-          <Card className="h-full">
-            <CardContent className="p-4 text-center text-muted-foreground">
-              Unknown pinned card type
-            </CardContent>
-          </Card>
-        );
-    }
-  };
-
-  // Define all card render functions
-  const renderCard = (cardId: string) => {
-    const cardContent = getCardContent(cardId);
+  // Render any card (default or pinned)
+  const renderCard = (cardEntry: DashboardCardEntry) => {
+    const cardContent = getCardContent(cardEntry);
     if (!cardContent) return null;
 
     return (
       <DraggableDashboardCard
-        key={cardId}
-        cardId={cardId}
+        key={cardEntry.id}
+        cardId={cardEntry.id}
         isEditMode={isEditMode}
         onRemove={removeCard}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
-        isDragging={draggingCardId === cardId}
-        isDragOver={dragOverCardId === cardId}
+        isDragging={draggingCardId === cardEntry.id}
+        isDragOver={dragOverCardId === cardEntry.id}
         className={cardContent.className}
       >
         {cardContent.element}
@@ -317,8 +205,14 @@ export default function Dashboard() {
     );
   };
 
-  const getCardContent = (cardId: string): { element: React.ReactNode; className?: string } | null => {
-    switch (cardId) {
+  const getCardContent = (cardEntry: DashboardCardEntry): { element: React.ReactNode; className?: string } | null => {
+    // Handle pinned cards first
+    if (cardEntry.isPinned) {
+      return getPinnedCardContent(cardEntry);
+    }
+
+    // Handle default dashboard cards
+    switch (cardEntry.id) {
       case 'todays-bias':
         return {
           element: (
@@ -397,39 +291,10 @@ export default function Dashboard() {
           ),
         };
 
-      case 'bias-snapshot':
+      case 'watchlist-overview':
         return {
           className: 'lg:col-span-2',
-          element: (
-            <Card className="h-full">
-              <CardHeader>
-                <CardTitle>Today's Bias Snapshot</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {biasSnapshotAssets.map((asset) => asset && (
-                    <div 
-                      key={asset.symbol} 
-                      onClick={() => handleAssetClick(asset.symbol)}
-                      className="flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="font-semibold text-foreground">{asset.symbol}</div>
-                        <div className={`flex items-center gap-1 text-sm font-medium ${getBiasColor(asset.biasDirection)}`}>
-                          {getBiasIcon(asset.biasDirection)}
-                          {asset.biasDirection}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="text-sm text-muted-foreground">{asset.biasConfidence}% confidence</div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ),
+          element: <WatchlistOverviewCard isEditMode={isEditMode} />,
         };
 
       case 'session-timers':
@@ -617,14 +482,95 @@ export default function Dashboard() {
     }
   };
 
+  const getPinnedCardContent = (cardEntry: DashboardCardEntry): { element: React.ReactNode; className?: string } | null => {
+    switch (cardEntry.sourceType) {
+      case 'journal-equity':
+        return {
+          className: 'lg:col-span-1',
+          element: (
+            <Card className="h-full">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium">Journal Equity Curve</CardTitle>
+                  <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={journalEquityData}>
+                      <defs>
+                        <linearGradient id="pinnedEquityGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <XAxis 
+                        dataKey="formattedDate" 
+                        tick={{ fontSize: 10 }} 
+                        stroke="hsl(var(--muted-foreground))"
+                        axisLine={{ stroke: 'hsl(var(--border))' }}
+                        tickLine={{ stroke: 'hsl(var(--border))' }}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 10 }} 
+                        stroke="hsl(var(--muted-foreground))"
+                        axisLine={{ stroke: 'hsl(var(--border))' }}
+                        tickLine={{ stroke: 'hsl(var(--border))' }}
+                        tickFormatter={(value) => `£${value}`}
+                      />
+                      <Tooltip 
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-card border border-border rounded-lg p-2 shadow-lg">
+                                <p className="text-xs text-muted-foreground">{data.formattedDate}</p>
+                                <p className={`text-sm font-semibold ${data.equity >= 0 ? 'text-success' : 'text-destructive'}`}>
+                                  {data.equity >= 0 ? '+' : ''}£{data.equity.toLocaleString()}
+                                </p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="equity" 
+                        stroke="hsl(var(--primary))" 
+                        fill="url(#pinnedEquityGradient)"
+                        strokeWidth={2}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          ),
+        };
+      default:
+        return {
+          element: (
+            <Card className="h-full">
+              <CardContent className="p-4 text-center text-muted-foreground">
+                Unknown pinned card type
+              </CardContent>
+            </Card>
+          ),
+        };
+    }
+  };
+
   // Group cards by their display category for layout
   const metricsCards = ['todays-bias', 'active-trades', 'next-session', 'high-impact-events'];
-  const analysisCards = ['bias-snapshot', 'session-timers'];
-  const overviewCards = ['upcoming-events', 'performance-overview', 'journal-summary', 'risk-snapshot', 'calendar-events'];
+  const analysisCards = ['watchlist-overview', 'session-timers', 'risk-snapshot'];
+  const overviewCards = ['upcoming-events', 'performance-overview', 'journal-summary', 'calendar-events'];
 
-  const visibleMetrics = visibleCardIds.filter(id => metricsCards.includes(id));
-  const visibleAnalysis = visibleCardIds.filter(id => analysisCards.includes(id));
-  const visibleOverview = visibleCardIds.filter(id => overviewCards.includes(id));
+  const visibleMetrics = allCards.filter(c => metricsCards.includes(c.id));
+  const visibleAnalysis = allCards.filter(c => analysisCards.includes(c.id));
+  const visibleOverview = allCards.filter(c => overviewCards.includes(c.id));
+  const pinnedCards = allCards.filter(c => c.isPinned);
 
   return (
     <div className="flex flex-col min-h-full bg-background">
@@ -653,50 +599,33 @@ export default function Dashboard() {
           {/* Key Metrics Row */}
           {visibleMetrics.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              {visibleMetrics.map(cardId => renderCard(cardId))}
+              {visibleMetrics.map(cardEntry => renderCard(cardEntry))}
             </div>
           )}
 
-          {/* Analysis Section */}
+          {/* Analysis Section (includes Watchlist Overview) */}
           {visibleAnalysis.length > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-              {visibleAnalysis.map(cardId => renderCard(cardId))}
+              {visibleAnalysis.map(cardEntry => renderCard(cardEntry))}
             </div>
           )}
 
           {/* Overview Section */}
           {visibleOverview.length > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              {visibleOverview.map(cardId => renderCard(cardId))}
+              {visibleOverview.map(cardEntry => renderCard(cardEntry))}
             </div>
           )}
 
-          {/* Pinned Cards from Other Pages */}
+          {/* Pinned Cards (now fully draggable in grid) */}
           {pinnedCards.length > 0 && (
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-foreground">Pinned Cards</h2>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {pinnedCards.map(pinnedCard => (
-                  <div key={pinnedCard.id} className="relative">
-                    {isEditMode && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 z-10"
-                        onClick={() => unpinCard(pinnedCard.id)}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    )}
-                    {renderPinnedCard(pinnedCard)}
-                  </div>
-                ))}
-              </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {pinnedCards.map(cardEntry => renderCard(cardEntry))}
             </div>
           )}
 
           {/* Empty state when no cards */}
-          {visibleCardIds.length === 0 && pinnedCards.length === 0 && (
+          {allCards.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <p className="text-muted-foreground mb-4">No cards on your Dashboard.</p>
               <p className="text-sm text-muted-foreground">

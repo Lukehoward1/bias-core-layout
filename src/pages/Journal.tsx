@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Star, Download, Pin, Check } from "lucide-react";
-import { usePinnedDashboardCards } from "@/hooks/use-pinned-dashboard-cards";
+import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, addMonths, subMonths, isWithinInterval, parseISO } from "date-fns";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -87,7 +87,7 @@ function StarRating({ rating, onRatingChange }: { rating: number; onRatingChange
 
 // Equity Curve Card Component
 function EquityCurveCard({ trades }: { trades: Trade[] }) {
-  const { isPinned, pinCard, unpinCard } = usePinnedDashboardCards();
+  const { isPinned, pinCard, unpinCard } = useDashboardLayout();
   const cardId = 'pinned-journal-equity';
   const pinned = isPinned(cardId);
 
