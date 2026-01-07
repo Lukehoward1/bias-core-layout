@@ -185,17 +185,7 @@ export default function Dashboard() {
     setDragOverCardId(null);
   };
 
-  if (!isUnlocked) {
-    return <LockScreen onUnlock={() => setIsUnlocked(true)} />;
-  }
-
-  // Get visible cards in user-defined order
-  const visibleCardIds = getVisibleCardsInOrder();
-  
-  // Get pinned cards
-  const pinnedCards = getPinnedCards();
-
-  // Sample equity data for pinned journal equity card
+  // Sample equity data for pinned journal equity card - must be before early return
   const journalEquityData = useMemo(() => {
     const sampleTrades = [
       { date: '2025-01-03', pnl: 450 },
@@ -217,6 +207,16 @@ export default function Dashboard() {
       };
     });
   }, []);
+
+  if (!isUnlocked) {
+    return <LockScreen onUnlock={() => setIsUnlocked(true)} />;
+  }
+
+  // Get visible cards in user-defined order
+  const visibleCardIds = getVisibleCardsInOrder();
+  
+  // Get pinned cards
+  const pinnedCards = getPinnedCards();
 
   // Render pinned cards from external sources
   const renderPinnedCard = (pinnedCard: { id: string; sourceType: string }) => {
