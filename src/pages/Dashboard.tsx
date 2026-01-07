@@ -3,14 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { LockScreen } from "@/components/LockScreen";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, Clock, Calendar as CalendarIcon, Activity, ChevronDown, AlertTriangle, BookOpen, Shield } from "lucide-react";
-import { useDashboardLayout, type DashboardCardEntry } from "@/hooks/use-dashboard-layout";
+import { TrendingUp, Clock, Calendar as CalendarIcon, Activity, ChevronDown, AlertTriangle, BookOpen, Shield, Plus } from "lucide-react";
+import { useDashboardLayout, type DashboardCardEntry, type RowType } from "@/hooks/use-dashboard-layout";
 import { DashboardEditToolbar } from "@/components/dashboard/DashboardEditToolbar";
-import { DraggableDashboardCard } from "@/components/dashboard/DraggableDashboardCard";
+import { DashboardRow } from "@/components/dashboard/DashboardRow";
 import { AddCardsModal } from "@/components/dashboard/AddCardsModal";
 import { WatchlistOverviewCard } from "@/components/dashboard/WatchlistOverviewCard";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
 
 interface SessionData {
   name: string;
@@ -119,19 +120,26 @@ export default function Dashboard() {
   const [showAddCardsModal, setShowAddCardsModal] = useState(false);
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
   const [dragOverCardId, setDragOverCardId] = useState<string | null>(null);
+  const [dragOverRowId, setDragOverRowId] = useState<string | null>(null);
   const sessionCardRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   
-  // Unified dashboard layout (includes pinned cards)
+  // Row-based dashboard layout
   const {
+    layout,
     isEditMode,
     toggleEditMode,
     addCard,
+    addRow,
+    changeRowType,
+    removeRow,
+    moveRow,
     removeCard,
     moveCard,
+    moveCardToRow,
     resetToDefault,
-    getVisibleCardsInOrder,
     getAvailableToAdd,
+    getMaxSlots,
   } = useDashboardLayout();
 
   const handleDragStart = (cardId: string) => {
@@ -144,12 +152,21 @@ export default function Dashboard() {
     }
   };
 
+  const handleDragOverRow = (rowId: string) => {
+    if (draggingCardId) {
+      setDragOverRowId(rowId);
+    }
+  };
+
   const handleDragEnd = () => {
     if (draggingCardId && dragOverCardId) {
       moveCard(draggingCardId, dragOverCardId);
+    } else if (draggingCardId && dragOverRowId) {
+      moveCardToRow(draggingCardId, dragOverRowId);
     }
     setDraggingCardId(null);
     setDragOverCardId(null);
+    setDragOverRowId(null);
   };
 
   // Sample equity data for pinned journal equity card - must be before early return
@@ -179,398 +196,341 @@ export default function Dashboard() {
     return <LockScreen onUnlock={() => setIsUnlocked(true)} />;
   }
 
-  // Get all cards in user-defined order (both default and pinned)
-  const allCards = getVisibleCardsInOrder();
-
-  // Render any card (default or pinned)
-  const renderCard = (cardEntry: DashboardCardEntry) => {
-    const cardContent = getCardContent(cardEntry);
-    if (!cardContent) return null;
-
-    return (
-      <DraggableDashboardCard
-        key={cardEntry.id}
-        cardId={cardEntry.id}
-        isEditMode={isEditMode}
-        onRemove={removeCard}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-        isDragging={draggingCardId === cardEntry.id}
-        isDragOver={dragOverCardId === cardEntry.id}
-        className={cardContent.className}
-      >
-        {cardContent.element}
-      </DraggableDashboardCard>
-    );
-  };
-
-  const getCardContent = (cardEntry: DashboardCardEntry): { element: React.ReactNode; className?: string } | null => {
+  // Render card content based on card ID and slot type
+  const renderCardContent = (cardEntry: DashboardCardEntry, slotType: 'wide' | 'narrow' | 'equal' | 'hero' | 'kpi'): React.ReactNode => {
     // Handle pinned cards first
     if (cardEntry.isPinned) {
-      return getPinnedCardContent(cardEntry);
+      return getPinnedCardContent(cardEntry, slotType);
     }
 
     // Handle default dashboard cards
     switch (cardEntry.id) {
       case 'todays-bias':
-        return {
-          element: (
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Today's Bias</CardTitle>
-                <TrendingUp className="h-4 w-4 text-success" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground">Bullish</div>
-                <p className="text-xs text-muted-foreground mt-1">85% confidence</p>
-              </CardContent>
-            </Card>
-          ),
-        };
+        return (
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Today's Bias</CardTitle>
+              <TrendingUp className="h-4 w-4 text-success" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">Bullish</div>
+              <p className="text-xs text-muted-foreground mt-1">85% confidence</p>
+            </CardContent>
+          </Card>
+        );
 
       case 'active-trades':
-        return {
-          element: (
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Active Trades</CardTitle>
-                <Activity className="h-4 w-4 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground">3</div>
-                <p className="text-xs text-success mt-1">+$2,450 unrealized</p>
-              </CardContent>
-            </Card>
-          ),
-        };
+        return (
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Active Trades</CardTitle>
+              <Activity className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">3</div>
+              <p className="text-xs text-success mt-1">+$2,450 unrealized</p>
+            </CardContent>
+          </Card>
+        );
 
       case 'next-session':
-        return {
-          element: (
-            <div className="relative h-full" ref={sessionCardRef}>
-              <Card 
-                className="cursor-pointer hover:bg-muted/30 transition-colors h-full"
-                onClick={() => !isEditMode && setShowSessionDropdown(!showSessionDropdown)}
-              >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Next Session</CardTitle>
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4 text-accent" />
-                    <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${showSessionDropdown ? 'rotate-180' : ''}`} />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-foreground">London</div>
-                  <p className="text-xs text-muted-foreground mt-1">Opens in 2h 15m</p>
-                </CardContent>
-              </Card>
-              <SessionTimerDropdown
-                isOpen={showSessionDropdown && !isEditMode}
-                onClose={() => setShowSessionDropdown(false)}
-                sessions={sessionsData}
-                anchorRef={sessionCardRef}
-              />
-            </div>
-          ),
-        };
+        return (
+          <div className="relative h-full" ref={sessionCardRef}>
+            <Card 
+              className="cursor-pointer hover:bg-muted/30 transition-colors h-full"
+              onClick={() => !isEditMode && setShowSessionDropdown(!showSessionDropdown)}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Next Session</CardTitle>
+                <div className="flex items-center gap-1">
+                  <Clock className="h-4 w-4 text-accent" />
+                  <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${showSessionDropdown ? 'rotate-180' : ''}`} />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">London</div>
+                <p className="text-xs text-muted-foreground mt-1">Opens in 2h 15m</p>
+              </CardContent>
+            </Card>
+            <SessionTimerDropdown
+              isOpen={showSessionDropdown && !isEditMode}
+              onClose={() => setShowSessionDropdown(false)}
+              sessions={sessionsData}
+              anchorRef={sessionCardRef}
+            />
+          </div>
+        );
 
       case 'high-impact-events':
-        return {
-          element: (
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">High Impact Events</CardTitle>
-                <CalendarIcon className="h-4 w-4 text-destructive" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground">5</div>
-                <p className="text-xs text-muted-foreground mt-1">Today</p>
-              </CardContent>
-            </Card>
-          ),
-        };
+        return (
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">High Impact Events</CardTitle>
+              <CalendarIcon className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">5</div>
+              <p className="text-xs text-muted-foreground mt-1">Today</p>
+            </CardContent>
+          </Card>
+        );
 
       case 'watchlist-overview':
-        return {
-          className: 'lg:col-span-2',
-          element: <WatchlistOverviewCard isEditMode={isEditMode} />,
-        };
+        return <WatchlistOverviewCard isEditMode={isEditMode} slotType={slotType} />;
 
       case 'session-timers':
-        return {
-          element: (
-            <Card className="h-full">
-              <CardHeader>
-                <CardTitle>Session Timers</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {sessionsData.map((session) => (
-                    <div key={session.name} className="relative p-3 bg-muted/50 rounded-lg border border-border overflow-hidden">
-                      <div 
-                        className="absolute left-0 top-0 bottom-0 w-[3px]" 
-                        style={{ backgroundColor: session.accent }}
-                      />
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium text-foreground text-sm">{session.name}</div>
-                          <div className="text-xs text-muted-foreground">{session.region}</div>
-                        </div>
-                        <div className={`text-xs ${session.status === 'active' ? 'text-success font-medium' : 'text-muted-foreground'}`}>
-                          {session.time}
-                        </div>
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle>Session Timers</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {sessionsData.map((session) => (
+                  <div key={session.name} className="relative p-3 bg-muted/50 rounded-lg border border-border overflow-hidden">
+                    <div 
+                      className="absolute left-0 top-0 bottom-0 w-[3px]" 
+                      style={{ backgroundColor: session.accent }}
+                    />
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium text-foreground text-sm">{session.name}</div>
+                        <div className="text-xs text-muted-foreground">{session.region}</div>
+                      </div>
+                      <div className={`text-xs ${session.status === 'active' ? 'text-success font-medium' : 'text-muted-foreground'}`}>
+                        {session.time}
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ),
-        };
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
 
       case 'upcoming-events':
-        return {
-          element: (
-            <Card className="h-full">
-              <CardHeader>
-                <CardTitle>Upcoming Events</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {[
-                    { time: '08:30', event: 'USD Non-Farm Payrolls', impact: 'high' },
-                    { time: '10:00', event: 'EUR CPI', impact: 'medium' },
-                    { time: '14:00', event: 'GBP Interest Rate', impact: 'high' },
-                  ].map((event, i) => (
-                    <div key={i} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                      <div className="text-sm font-medium text-muted-foreground min-w-[48px]">{event.time}</div>
-                      <div className="flex-1">
-                        <div className="text-sm font-medium text-foreground">{event.event}</div>
-                        <div className={`text-xs mt-1 ${event.impact === 'high' ? 'text-destructive' : 'text-accent'}`}>
-                          {event.impact.toUpperCase()} IMPACT
-                        </div>
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle>Upcoming Events</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {[
+                  { time: '08:30', event: 'USD Non-Farm Payrolls', impact: 'high' },
+                  { time: '10:00', event: 'EUR CPI', impact: 'medium' },
+                  { time: '14:00', event: 'GBP Interest Rate', impact: 'high' },
+                ].map((event, i) => (
+                  <div key={i} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                    <div className="text-sm font-medium text-muted-foreground min-w-[48px]">{event.time}</div>
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-foreground">{event.event}</div>
+                      <div className={`text-xs mt-1 ${event.impact === 'high' ? 'text-destructive' : 'text-accent'}`}>
+                        {event.impact.toUpperCase()} IMPACT
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ),
-        };
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
 
       case 'performance-overview':
-        return {
-          element: (
-            <Card className="h-full">
-              <CardHeader>
-                <CardTitle>Performance Overview</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">This Week</span>
-                    <span className="text-lg font-bold text-success">+$8,240</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">This Month</span>
-                    <span className="text-lg font-bold text-success">+$24,680</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Win Rate</span>
-                    <span className="text-lg font-bold text-foreground">68%</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Total Trades</span>
-                    <span className="text-lg font-bold text-foreground">127</span>
-                  </div>
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle>Performance Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">This Week</span>
+                  <span className="text-lg font-bold text-success">+$8,240</span>
                 </div>
-              </CardContent>
-            </Card>
-          ),
-        };
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">This Month</span>
+                  <span className="text-lg font-bold text-success">+$24,680</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Win Rate</span>
+                  <span className="text-lg font-bold text-foreground">68%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Total Trades</span>
+                  <span className="text-lg font-bold text-foreground">127</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
 
       case 'journal-summary':
-        return {
-          element: (
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle>Journal Summary</CardTitle>
-                <BookOpen className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Entries This Week</span>
-                    <span className="font-medium text-foreground">12</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Avg. Mood</span>
-                    <span className="font-medium text-success">Positive</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Last Entry</span>
-                    <span className="font-medium text-foreground">2h ago</span>
-                  </div>
+        return (
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle>Journal Summary</CardTitle>
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Entries This Week</span>
+                  <span className="font-medium text-foreground">12</span>
                 </div>
-              </CardContent>
-            </Card>
-          ),
-        };
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Avg. Mood</span>
+                  <span className="font-medium text-success">Positive</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Last Entry</span>
+                  <span className="font-medium text-foreground">2h ago</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
 
       case 'risk-snapshot':
-        return {
-          element: (
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle>Risk Snapshot</CardTitle>
-                <Shield className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Daily Drawdown</span>
-                    <span className="font-medium text-foreground">1.2%</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Max Position</span>
-                    <span className="font-medium text-foreground">2.5%</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Risk Status</span>
-                    <span className="font-medium text-success">Healthy</span>
-                  </div>
+        return (
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle>Risk Snapshot</CardTitle>
+              <Shield className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Daily Drawdown</span>
+                  <span className="font-medium text-foreground">1.2%</span>
                 </div>
-              </CardContent>
-            </Card>
-          ),
-        };
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Max Position</span>
+                  <span className="font-medium text-foreground">2.5%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Risk Status</span>
+                  <span className="font-medium text-success">Healthy</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
 
       case 'calendar-events':
-        return {
-          element: (
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle>Week Ahead</CardTitle>
-                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3 p-2 bg-muted/50 rounded-lg">
-                    <div className="text-xs font-medium text-muted-foreground min-w-[40px]">Mon</div>
-                    <div className="text-sm text-foreground">FOMC Minutes</div>
-                    <AlertTriangle className="h-3.5 w-3.5 text-destructive ml-auto shrink-0" />
-                  </div>
-                  <div className="flex items-start gap-3 p-2 bg-muted/50 rounded-lg">
-                    <div className="text-xs font-medium text-muted-foreground min-w-[40px]">Wed</div>
-                    <div className="text-sm text-foreground">CPI Data</div>
-                    <AlertTriangle className="h-3.5 w-3.5 text-destructive ml-auto shrink-0" />
-                  </div>
-                  <div className="flex items-start gap-3 p-2 bg-muted/50 rounded-lg">
-                    <div className="text-xs font-medium text-muted-foreground min-w-[40px]">Fri</div>
-                    <div className="text-sm text-foreground">NFP Release</div>
-                    <AlertTriangle className="h-3.5 w-3.5 text-destructive ml-auto shrink-0" />
-                  </div>
+        return (
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle>Week Ahead</CardTitle>
+              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 p-2 bg-muted/50 rounded-lg">
+                  <div className="text-xs font-medium text-muted-foreground min-w-[40px]">Mon</div>
+                  <div className="text-sm text-foreground">FOMC Minutes</div>
+                  <AlertTriangle className="h-3.5 w-3.5 text-destructive ml-auto shrink-0" />
                 </div>
-              </CardContent>
-            </Card>
-          ),
-        };
+                <div className="flex items-start gap-3 p-2 bg-muted/50 rounded-lg">
+                  <div className="text-xs font-medium text-muted-foreground min-w-[40px]">Wed</div>
+                  <div className="text-sm text-foreground">CPI Data</div>
+                  <AlertTriangle className="h-3.5 w-3.5 text-destructive ml-auto shrink-0" />
+                </div>
+                <div className="flex items-start gap-3 p-2 bg-muted/50 rounded-lg">
+                  <div className="text-xs font-medium text-muted-foreground min-w-[40px]">Fri</div>
+                  <div className="text-sm text-foreground">NFP Release</div>
+                  <AlertTriangle className="h-3.5 w-3.5 text-destructive ml-auto shrink-0" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
 
       default:
         return null;
     }
   };
 
-  const getPinnedCardContent = (cardEntry: DashboardCardEntry): { element: React.ReactNode; className?: string } | null => {
+  const getPinnedCardContent = (cardEntry: DashboardCardEntry, slotType: 'wide' | 'narrow' | 'equal' | 'hero' | 'kpi'): React.ReactNode => {
+    const chartHeight = slotType === 'hero' ? 'h-64' : 'h-40';
+    
     switch (cardEntry.sourceType) {
       case 'journal-equity':
-        return {
-          className: 'lg:col-span-1',
-          element: (
-            <Card className="h-full">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium">Journal Equity Curve</CardTitle>
-                  <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-40">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={journalEquityData}>
-                      <defs>
-                        <linearGradient id="pinnedEquityGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <XAxis 
-                        dataKey="formattedDate" 
-                        tick={{ fontSize: 10 }} 
-                        stroke="hsl(var(--muted-foreground))"
-                        axisLine={{ stroke: 'hsl(var(--border))' }}
-                        tickLine={{ stroke: 'hsl(var(--border))' }}
-                      />
-                      <YAxis 
-                        tick={{ fontSize: 10 }} 
-                        stroke="hsl(var(--muted-foreground))"
-                        axisLine={{ stroke: 'hsl(var(--border))' }}
-                        tickLine={{ stroke: 'hsl(var(--border))' }}
-                        tickFormatter={(value) => `£${value}`}
-                      />
-                      <Tooltip 
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload;
-                            return (
-                              <div className="bg-card border border-border rounded-lg p-2 shadow-lg">
-                                <p className="text-xs text-muted-foreground">{data.formattedDate}</p>
-                                <p className={`text-sm font-semibold ${data.equity >= 0 ? 'text-success' : 'text-destructive'}`}>
-                                  {data.equity >= 0 ? '+' : ''}£{data.equity.toLocaleString()}
-                                </p>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="equity" 
-                        stroke="hsl(var(--primary))" 
-                        fill="url(#pinnedEquityGradient)"
-                        strokeWidth={2}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          ),
-        };
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium">Journal Equity Curve</CardTitle>
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className={chartHeight}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={journalEquityData}>
+                    <defs>
+                      <linearGradient id="pinnedEquityGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <XAxis 
+                      dataKey="formattedDate" 
+                      tick={{ fontSize: 10 }} 
+                      stroke="hsl(var(--muted-foreground))"
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                      tickLine={{ stroke: 'hsl(var(--border))' }}
+                    />
+                    <YAxis 
+                      tick={{ fontSize: 10 }} 
+                      stroke="hsl(var(--muted-foreground))"
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                      tickLine={{ stroke: 'hsl(var(--border))' }}
+                      tickFormatter={(value) => `£${value}`}
+                    />
+                    <Tooltip 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-card border border-border rounded-lg p-2 shadow-lg">
+                              <p className="text-xs text-muted-foreground">{data.formattedDate}</p>
+                              <p className={`text-sm font-semibold ${data.equity >= 0 ? 'text-success' : 'text-destructive'}`}>
+                                {data.equity >= 0 ? '+' : ''}£{data.equity.toLocaleString()}
+                              </p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="equity" 
+                      stroke="hsl(var(--primary))" 
+                      fill="url(#pinnedEquityGradient)"
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        );
       default:
-        return {
-          element: (
-            <Card className="h-full">
-              <CardContent className="p-4 text-center text-muted-foreground">
-                Unknown pinned card type
-              </CardContent>
-            </Card>
-          ),
-        };
+        return (
+          <Card className="h-full">
+            <CardContent className="p-4 text-center text-muted-foreground">
+              Unknown pinned card type
+            </CardContent>
+          </Card>
+        );
     }
   };
 
-  // Group cards by their display category for layout
-  const metricsCards = ['todays-bias', 'active-trades', 'next-session', 'high-impact-events'];
-  const analysisCards = ['watchlist-overview', 'session-timers', 'risk-snapshot'];
-  const overviewCards = ['upcoming-events', 'performance-overview', 'journal-summary', 'calendar-events'];
-
-  const visibleMetrics = allCards.filter(c => metricsCards.includes(c.id));
-  const visibleAnalysis = allCards.filter(c => analysisCards.includes(c.id));
-  const visibleOverview = allCards.filter(c => overviewCards.includes(c.id));
-  const pinnedCards = allCards.filter(c => c.isPinned);
+  const handleAddRow = (afterRowId?: string) => {
+    addRow('equal', afterRowId);
+  };
 
   return (
     <div className="flex flex-col min-h-full bg-background">
@@ -584,7 +544,7 @@ export default function Dashboard() {
               <h1 className="text-3xl font-bold text-foreground">Welcome, Trader</h1>
               {isEditMode && (
                 <p className="text-sm text-muted-foreground">
-                  Drag cards to reorder • Click × to remove
+                  Drag cards to reorder • Click × to remove • Change row layouts
                 </p>
               )}
             </div>
@@ -596,36 +556,45 @@ export default function Dashboard() {
             />
           </div>
           
-          {/* Key Metrics Row */}
-          {visibleMetrics.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              {visibleMetrics.map(cardEntry => renderCard(cardEntry))}
-            </div>
-          )}
+          {/* Row-based layout */}
+          {layout.rows.map((row, index) => (
+            <DashboardRow
+              key={row.id}
+              row={row}
+              rowIndex={index}
+              totalRows={layout.rows.length}
+              isEditMode={isEditMode}
+              draggingCardId={draggingCardId}
+              dragOverCardId={dragOverCardId}
+              dragOverRowId={dragOverRowId}
+              renderCardContent={renderCardContent}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDragEnd={handleDragEnd}
+              onDragOverRow={handleDragOverRow}
+              onRemoveCard={removeCard}
+              onChangeRowType={changeRowType}
+              onMoveRow={moveRow}
+              onRemoveRow={removeRow}
+              onAddRow={handleAddRow}
+              maxSlots={getMaxSlots(row.type)}
+            />
+          ))}
 
-          {/* Analysis Section (includes Watchlist Overview) */}
-          {visibleAnalysis.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-              {visibleAnalysis.map(cardEntry => renderCard(cardEntry))}
-            </div>
-          )}
-
-          {/* Overview Section */}
-          {visibleOverview.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              {visibleOverview.map(cardEntry => renderCard(cardEntry))}
-            </div>
-          )}
-
-          {/* Pinned Cards (now fully draggable in grid) */}
-          {pinnedCards.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              {pinnedCards.map(cardEntry => renderCard(cardEntry))}
-            </div>
+          {/* Add row button in edit mode */}
+          {isEditMode && (
+            <Button
+              variant="outline"
+              className="w-full border-dashed gap-2"
+              onClick={() => handleAddRow()}
+            >
+              <Plus className="h-4 w-4" />
+              Add New Row
+            </Button>
           )}
 
           {/* Empty state when no cards */}
-          {allCards.length === 0 && (
+          {layout.rows.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <p className="text-muted-foreground mb-4">No cards on your Dashboard.</p>
               <p className="text-sm text-muted-foreground">

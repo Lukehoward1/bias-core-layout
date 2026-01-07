@@ -5,9 +5,10 @@ import { useWatchlist } from '@/hooks/use-watchlist';
 
 interface WatchlistOverviewCardProps {
   isEditMode?: boolean;
+  slotType?: 'wide' | 'narrow' | 'equal' | 'hero' | 'kpi';
 }
 
-export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps) {
+export function WatchlistOverviewCard({ isEditMode, slotType }: WatchlistOverviewCardProps) {
   const navigate = useNavigate();
   const { watchlistAssets } = useWatchlist();
 
