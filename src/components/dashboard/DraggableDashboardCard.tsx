@@ -1,11 +1,23 @@
-import { useRef, useState } from 'react';
-import { X, GripVertical } from 'lucide-react';
+import { useRef } from 'react';
+import { X, GripVertical, MoreHorizontal, Maximize2, Minimize2, Square, RectangleHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CardSize, getCardAllowedSizes, getCardTitle } from '@/hooks/use-dashboard-layout';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface DraggableDashboardCardProps {
   cardId: string;
+  sourceType?: string;
   isEditMode: boolean;
+  currentSize: CardSize;
   onRemove: (cardId: string) => void;
+  onSizeChange: (cardId: string, size: CardSize) => void;
   onDragStart: (cardId: string) => void;
   onDragOver: (cardId: string) => void;
   onDragEnd: () => void;
@@ -15,10 +27,27 @@ interface DraggableDashboardCardProps {
   className?: string;
 }
 
+const SIZE_LABELS: Record<CardSize, string> = {
+  compact: 'Compact',
+  standard: 'Standard',
+  wide: 'Wide',
+  hero: 'Hero',
+};
+
+const SIZE_ICONS: Record<CardSize, React.ReactNode> = {
+  compact: <Minimize2 className="h-3.5 w-3.5" />,
+  standard: <Square className="h-3.5 w-3.5" />,
+  wide: <RectangleHorizontal className="h-3.5 w-3.5" />,
+  hero: <Maximize2 className="h-3.5 w-3.5" />,
+};
+
 export function DraggableDashboardCard({
   cardId,
+  sourceType,
   isEditMode,
+  currentSize,
   onRemove,
+  onSizeChange,
   onDragStart,
   onDragOver,
   onDragEnd,
@@ -28,6 +57,8 @@ export function DraggableDashboardCard({
   className,
 }: DraggableDashboardCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
+  const allowedSizes = getCardAllowedSizes(cardId, sourceType);
+  const cardTitle = getCardTitle(cardId, sourceType);
 
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.effectAllowed = 'move';
@@ -78,6 +109,41 @@ export function DraggableDashboardCard({
           >
             <X className="h-3.5 w-3.5" />
           </button>
+
+          {/* Size menu */}
+          {allowedSizes.length > 1 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  onClick={(e) => e.stopPropagation()}
+                  className="absolute -top-2 right-6 z-10 p-1 rounded-full bg-muted text-muted-foreground hover:bg-muted/80 transition-colors shadow-md"
+                  aria-label="Change size"
+                >
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuLabel className="text-xs truncate">{cardTitle}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {allowedSizes.map((size) => (
+                  <DropdownMenuItem
+                    key={size}
+                    onClick={() => onSizeChange(cardId, size)}
+                    className={cn(
+                      'flex items-center gap-2 cursor-pointer',
+                      currentSize === size && 'bg-accent'
+                    )}
+                  >
+                    {SIZE_ICONS[size]}
+                    <span>{SIZE_LABELS[size]}</span>
+                    {currentSize === size && (
+                      <span className="ml-auto text-xs text-muted-foreground">✓</span>
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           
           {/* Edit mode outline */}
           <div className="absolute inset-0 border-2 border-dashed border-muted-foreground/30 rounded-lg pointer-events-none" />
