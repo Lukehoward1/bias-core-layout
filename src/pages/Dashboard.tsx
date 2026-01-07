@@ -4,13 +4,14 @@ import { AppHeader } from "@/components/AppHeader";
 import { LockScreen } from "@/components/LockScreen";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, Clock, Calendar as CalendarIcon, Activity, ChevronDown, AlertTriangle, BookOpen, Shield } from "lucide-react";
-import { useDashboardLayout, type DashboardCardEntry } from "@/hooks/use-dashboard-layout";
+import { useDashboardLayout, type DashboardCardEntry, type CardSize } from "@/hooks/use-dashboard-layout";
 import { DashboardEditToolbar } from "@/components/dashboard/DashboardEditToolbar";
 import { DraggableDashboardCard } from "@/components/dashboard/DraggableDashboardCard";
 import { AddCardsModal } from "@/components/dashboard/AddCardsModal";
 import { WatchlistOverviewCard } from "@/components/dashboard/WatchlistOverviewCard";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface SessionData {
   name: string;
@@ -113,6 +114,38 @@ function SessionTimerDropdown({
   );
 }
 
+// Get grid classes based on card size
+const getSizeClasses = (size: CardSize): string => {
+  switch (size) {
+    case 'compact':
+      return 'col-span-1';
+    case 'standard':
+      return 'col-span-1 lg:col-span-1';
+    case 'wide':
+      return 'col-span-1 lg:col-span-2';
+    case 'hero':
+      return 'col-span-full';
+    default:
+      return 'col-span-1';
+  }
+};
+
+// Get height classes based on card size
+const getHeightClasses = (size: CardSize): string => {
+  switch (size) {
+    case 'compact':
+      return 'min-h-[120px]';
+    case 'standard':
+      return 'min-h-[180px]';
+    case 'wide':
+      return 'min-h-[200px]';
+    case 'hero':
+      return 'min-h-[280px]';
+    default:
+      return '';
+  }
+};
+
 export default function Dashboard() {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [showSessionDropdown, setShowSessionDropdown] = useState(false);
@@ -129,6 +162,7 @@ export default function Dashboard() {
     addCard,
     removeCard,
     moveCard,
+    setCardSize,
     resetToDefault,
     getVisibleCardsInOrder,
     getAvailableToAdd,
@@ -179,33 +213,43 @@ export default function Dashboard() {
     return <LockScreen onUnlock={() => setIsUnlocked(true)} />;
   }
 
-  // Get all cards in user-defined order (both default and pinned)
+  // Get all cards in user-defined order
   const allCards = getVisibleCardsInOrder();
 
-  // Render any card (default or pinned)
+  // Separate hero cards from regular cards
+  const heroCards = allCards.filter(c => c.size === 'hero');
+  const regularCards = allCards.filter(c => c.size !== 'hero');
+
+  // Render any card
   const renderCard = (cardEntry: DashboardCardEntry) => {
     const cardContent = getCardContent(cardEntry);
     if (!cardContent) return null;
+
+    const sizeClasses = getSizeClasses(cardEntry.size);
+    const heightClasses = getHeightClasses(cardEntry.size);
 
     return (
       <DraggableDashboardCard
         key={cardEntry.id}
         cardId={cardEntry.id}
+        sourceType={cardEntry.sourceType}
         isEditMode={isEditMode}
+        currentSize={cardEntry.size}
         onRemove={removeCard}
+        onSizeChange={setCardSize}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
         isDragging={draggingCardId === cardEntry.id}
         isDragOver={dragOverCardId === cardEntry.id}
-        className={cardContent.className}
+        className={cn(sizeClasses, heightClasses)}
       >
-        {cardContent.element}
+        {cardContent}
       </DraggableDashboardCard>
     );
   };
 
-  const getCardContent = (cardEntry: DashboardCardEntry): { element: React.ReactNode; className?: string } | null => {
+  const getCardContent = (cardEntry: DashboardCardEntry): React.ReactNode | null => {
     // Handle pinned cards first
     if (cardEntry.isPinned) {
       return getPinnedCardContent(cardEntry);
@@ -214,363 +258,341 @@ export default function Dashboard() {
     // Handle default dashboard cards
     switch (cardEntry.id) {
       case 'todays-bias':
-        return {
-          element: (
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Today's Bias</CardTitle>
-                <TrendingUp className="h-4 w-4 text-success" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground">Bullish</div>
-                <p className="text-xs text-muted-foreground mt-1">85% confidence</p>
-              </CardContent>
-            </Card>
-          ),
-        };
+        return (
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Today's Bias</CardTitle>
+              <TrendingUp className="h-4 w-4 text-success" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">Bullish</div>
+              <p className="text-xs text-muted-foreground mt-1">85% confidence</p>
+            </CardContent>
+          </Card>
+        );
 
       case 'active-trades':
-        return {
-          element: (
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Active Trades</CardTitle>
-                <Activity className="h-4 w-4 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground">3</div>
-                <p className="text-xs text-success mt-1">+$2,450 unrealized</p>
-              </CardContent>
-            </Card>
-          ),
-        };
+        return (
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Active Trades</CardTitle>
+              <Activity className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">3</div>
+              <p className="text-xs text-success mt-1">+$2,450 unrealized</p>
+            </CardContent>
+          </Card>
+        );
 
       case 'next-session':
-        return {
-          element: (
-            <div className="relative h-full" ref={sessionCardRef}>
-              <Card 
-                className="cursor-pointer hover:bg-muted/30 transition-colors h-full"
-                onClick={() => !isEditMode && setShowSessionDropdown(!showSessionDropdown)}
-              >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Next Session</CardTitle>
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4 text-accent" />
-                    <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${showSessionDropdown ? 'rotate-180' : ''}`} />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-foreground">London</div>
-                  <p className="text-xs text-muted-foreground mt-1">Opens in 2h 15m</p>
-                </CardContent>
-              </Card>
-              <SessionTimerDropdown
-                isOpen={showSessionDropdown && !isEditMode}
-                onClose={() => setShowSessionDropdown(false)}
-                sessions={sessionsData}
-                anchorRef={sessionCardRef}
-              />
-            </div>
-          ),
-        };
+        return (
+          <div className="relative h-full" ref={sessionCardRef}>
+            <Card 
+              className="cursor-pointer hover:bg-muted/30 transition-colors h-full"
+              onClick={() => !isEditMode && setShowSessionDropdown(!showSessionDropdown)}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Next Session</CardTitle>
+                <div className="flex items-center gap-1">
+                  <Clock className="h-4 w-4 text-accent" />
+                  <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${showSessionDropdown ? 'rotate-180' : ''}`} />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">London</div>
+                <p className="text-xs text-muted-foreground mt-1">Opens in 2h 15m</p>
+              </CardContent>
+            </Card>
+            <SessionTimerDropdown
+              isOpen={showSessionDropdown && !isEditMode}
+              onClose={() => setShowSessionDropdown(false)}
+              sessions={sessionsData}
+              anchorRef={sessionCardRef}
+            />
+          </div>
+        );
 
       case 'high-impact-events':
-        return {
-          element: (
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">High Impact Events</CardTitle>
-                <CalendarIcon className="h-4 w-4 text-destructive" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground">5</div>
-                <p className="text-xs text-muted-foreground mt-1">Today</p>
-              </CardContent>
-            </Card>
-          ),
-        };
+        return (
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">High Impact Events</CardTitle>
+              <CalendarIcon className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">5</div>
+              <p className="text-xs text-muted-foreground mt-1">Today</p>
+            </CardContent>
+          </Card>
+        );
 
       case 'watchlist-overview':
-        return {
-          className: 'lg:col-span-2',
-          element: <WatchlistOverviewCard isEditMode={isEditMode} />,
-        };
+        return <WatchlistOverviewCard isEditMode={isEditMode} size={cardEntry.size} />;
 
       case 'session-timers':
-        return {
-          element: (
-            <Card className="h-full">
-              <CardHeader>
-                <CardTitle>Session Timers</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {sessionsData.map((session) => (
-                    <div key={session.name} className="relative p-3 bg-muted/50 rounded-lg border border-border overflow-hidden">
-                      <div 
-                        className="absolute left-0 top-0 bottom-0 w-[3px]" 
-                        style={{ backgroundColor: session.accent }}
-                      />
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium text-foreground text-sm">{session.name}</div>
-                          <div className="text-xs text-muted-foreground">{session.region}</div>
-                        </div>
-                        <div className={`text-xs ${session.status === 'active' ? 'text-success font-medium' : 'text-muted-foreground'}`}>
-                          {session.time}
-                        </div>
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle>Session Timers</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={cn(
+                "gap-3",
+                cardEntry.size === 'wide' ? "grid grid-cols-2" : "space-y-3"
+              )}>
+                {sessionsData.map((session) => (
+                  <div key={session.name} className="relative p-3 bg-muted/50 rounded-lg border border-border overflow-hidden">
+                    <div 
+                      className="absolute left-0 top-0 bottom-0 w-[3px]" 
+                      style={{ backgroundColor: session.accent }}
+                    />
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium text-foreground text-sm">{session.name}</div>
+                        <div className="text-xs text-muted-foreground">{session.region}</div>
+                      </div>
+                      <div className={`text-xs ${session.status === 'active' ? 'text-success font-medium' : 'text-muted-foreground'}`}>
+                        {session.time}
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ),
-        };
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
 
       case 'upcoming-events':
-        return {
-          element: (
-            <Card className="h-full">
-              <CardHeader>
-                <CardTitle>Upcoming Events</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {[
-                    { time: '08:30', event: 'USD Non-Farm Payrolls', impact: 'high' },
-                    { time: '10:00', event: 'EUR CPI', impact: 'medium' },
-                    { time: '14:00', event: 'GBP Interest Rate', impact: 'high' },
-                  ].map((event, i) => (
-                    <div key={i} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                      <div className="text-sm font-medium text-muted-foreground min-w-[48px]">{event.time}</div>
-                      <div className="flex-1">
-                        <div className="text-sm font-medium text-foreground">{event.event}</div>
-                        <div className={`text-xs mt-1 ${event.impact === 'high' ? 'text-destructive' : 'text-accent'}`}>
-                          {event.impact.toUpperCase()} IMPACT
-                        </div>
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle>Upcoming Events</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={cn(
+                "gap-3",
+                cardEntry.size === 'wide' ? "grid grid-cols-2" : "space-y-3"
+              )}>
+                {[
+                  { time: '08:30', event: 'USD Non-Farm Payrolls', impact: 'high' },
+                  { time: '10:00', event: 'EUR CPI', impact: 'medium' },
+                  { time: '14:00', event: 'GBP Interest Rate', impact: 'high' },
+                ].map((event, i) => (
+                  <div key={i} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                    <div className="text-sm font-medium text-muted-foreground min-w-[48px]">{event.time}</div>
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-foreground">{event.event}</div>
+                      <div className={`text-xs mt-1 ${event.impact === 'high' ? 'text-destructive' : 'text-accent'}`}>
+                        {event.impact.toUpperCase()} IMPACT
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ),
-        };
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
 
       case 'performance-overview':
-        return {
-          element: (
-            <Card className="h-full">
-              <CardHeader>
-                <CardTitle>Performance Overview</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">This Week</span>
-                    <span className="text-lg font-bold text-success">+$8,240</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">This Month</span>
-                    <span className="text-lg font-bold text-success">+$24,680</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Win Rate</span>
-                    <span className="text-lg font-bold text-foreground">68%</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Total Trades</span>
-                    <span className="text-lg font-bold text-foreground">127</span>
-                  </div>
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle>Performance Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={cn(
+                "gap-4",
+                cardEntry.size === 'wide' || cardEntry.size === 'hero' ? "grid grid-cols-2 lg:grid-cols-4" : "space-y-4"
+              )}>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">This Week</span>
+                  <span className="text-lg font-bold text-success">+$8,240</span>
                 </div>
-              </CardContent>
-            </Card>
-          ),
-        };
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">This Month</span>
+                  <span className="text-lg font-bold text-success">+$24,680</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Win Rate</span>
+                  <span className="text-lg font-bold text-foreground">68%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Total Trades</span>
+                  <span className="text-lg font-bold text-foreground">127</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
 
       case 'journal-summary':
-        return {
-          element: (
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle>Journal Summary</CardTitle>
-                <BookOpen className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Entries This Week</span>
-                    <span className="font-medium text-foreground">12</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Avg. Mood</span>
-                    <span className="font-medium text-success">Positive</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Last Entry</span>
-                    <span className="font-medium text-foreground">2h ago</span>
-                  </div>
+        return (
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle>Journal Summary</CardTitle>
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Entries This Week</span>
+                  <span className="font-medium text-foreground">12</span>
                 </div>
-              </CardContent>
-            </Card>
-          ),
-        };
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Avg. Mood</span>
+                  <span className="font-medium text-success">Positive</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Last Entry</span>
+                  <span className="font-medium text-foreground">2h ago</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
 
       case 'risk-snapshot':
-        return {
-          element: (
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle>Risk Snapshot</CardTitle>
-                <Shield className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Daily Drawdown</span>
-                    <span className="font-medium text-foreground">1.2%</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Max Position</span>
-                    <span className="font-medium text-foreground">2.5%</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Risk Status</span>
-                    <span className="font-medium text-success">Healthy</span>
-                  </div>
+        return (
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle>Risk Snapshot</CardTitle>
+              <Shield className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Daily Drawdown</span>
+                  <span className="font-medium text-foreground">1.2%</span>
                 </div>
-              </CardContent>
-            </Card>
-          ),
-        };
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Max Position</span>
+                  <span className="font-medium text-foreground">2.5%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Risk Status</span>
+                  <span className="font-medium text-success">Healthy</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
 
       case 'calendar-events':
-        return {
-          element: (
-            <Card className="h-full">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle>Week Ahead</CardTitle>
-                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3 p-2 bg-muted/50 rounded-lg">
-                    <div className="text-xs font-medium text-muted-foreground min-w-[40px]">Mon</div>
-                    <div className="text-sm text-foreground">FOMC Minutes</div>
-                    <AlertTriangle className="h-3.5 w-3.5 text-destructive ml-auto shrink-0" />
-                  </div>
-                  <div className="flex items-start gap-3 p-2 bg-muted/50 rounded-lg">
-                    <div className="text-xs font-medium text-muted-foreground min-w-[40px]">Wed</div>
-                    <div className="text-sm text-foreground">CPI Data</div>
-                    <AlertTriangle className="h-3.5 w-3.5 text-destructive ml-auto shrink-0" />
-                  </div>
-                  <div className="flex items-start gap-3 p-2 bg-muted/50 rounded-lg">
-                    <div className="text-xs font-medium text-muted-foreground min-w-[40px]">Fri</div>
-                    <div className="text-sm text-foreground">NFP Release</div>
-                    <AlertTriangle className="h-3.5 w-3.5 text-destructive ml-auto shrink-0" />
-                  </div>
+        return (
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle>Week Ahead</CardTitle>
+              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className={cn(
+                "gap-3",
+                cardEntry.size === 'wide' ? "grid grid-cols-3" : "space-y-3"
+              )}>
+                <div className="flex items-start gap-3 p-2 bg-muted/50 rounded-lg">
+                  <div className="text-xs font-medium text-muted-foreground min-w-[40px]">Mon</div>
+                  <div className="text-sm text-foreground">FOMC Minutes</div>
+                  <AlertTriangle className="h-3.5 w-3.5 text-destructive ml-auto shrink-0" />
                 </div>
-              </CardContent>
-            </Card>
-          ),
-        };
+                <div className="flex items-start gap-3 p-2 bg-muted/50 rounded-lg">
+                  <div className="text-xs font-medium text-muted-foreground min-w-[40px]">Wed</div>
+                  <div className="text-sm text-foreground">CPI Data</div>
+                  <AlertTriangle className="h-3.5 w-3.5 text-destructive ml-auto shrink-0" />
+                </div>
+                <div className="flex items-start gap-3 p-2 bg-muted/50 rounded-lg">
+                  <div className="text-xs font-medium text-muted-foreground min-w-[40px]">Fri</div>
+                  <div className="text-sm text-foreground">NFP Release</div>
+                  <AlertTriangle className="h-3.5 w-3.5 text-destructive ml-auto shrink-0" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
 
       default:
         return null;
     }
   };
 
-  const getPinnedCardContent = (cardEntry: DashboardCardEntry): { element: React.ReactNode; className?: string } | null => {
+  const getPinnedCardContent = (cardEntry: DashboardCardEntry): React.ReactNode | null => {
+    const isHeroOrWide = cardEntry.size === 'hero' || cardEntry.size === 'wide';
+    
     switch (cardEntry.sourceType) {
       case 'journal-equity':
-        return {
-          className: 'lg:col-span-1',
-          element: (
-            <Card className="h-full">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium">Journal Equity Curve</CardTitle>
-                  <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-40">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={journalEquityData}>
-                      <defs>
-                        <linearGradient id="pinnedEquityGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <XAxis 
-                        dataKey="formattedDate" 
-                        tick={{ fontSize: 10 }} 
-                        stroke="hsl(var(--muted-foreground))"
-                        axisLine={{ stroke: 'hsl(var(--border))' }}
-                        tickLine={{ stroke: 'hsl(var(--border))' }}
-                      />
-                      <YAxis 
-                        tick={{ fontSize: 10 }} 
-                        stroke="hsl(var(--muted-foreground))"
-                        axisLine={{ stroke: 'hsl(var(--border))' }}
-                        tickLine={{ stroke: 'hsl(var(--border))' }}
-                        tickFormatter={(value) => `£${value}`}
-                      />
-                      <Tooltip 
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload;
-                            return (
-                              <div className="bg-card border border-border rounded-lg p-2 shadow-lg">
-                                <p className="text-xs text-muted-foreground">{data.formattedDate}</p>
-                                <p className={`text-sm font-semibold ${data.equity >= 0 ? 'text-success' : 'text-destructive'}`}>
-                                  {data.equity >= 0 ? '+' : ''}£{data.equity.toLocaleString()}
-                                </p>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="equity" 
-                        stroke="hsl(var(--primary))" 
-                        fill="url(#pinnedEquityGradient)"
-                        strokeWidth={2}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          ),
-        };
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium">Journal Equity Curve</CardTitle>
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className={cn(
+                isHeroOrWide ? "h-56" : "h-40"
+              )}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={journalEquityData}>
+                    <defs>
+                      <linearGradient id="pinnedEquityGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <XAxis 
+                      dataKey="formattedDate" 
+                      tick={{ fontSize: 10 }} 
+                      stroke="hsl(var(--muted-foreground))"
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                      tickLine={{ stroke: 'hsl(var(--border))' }}
+                    />
+                    <YAxis 
+                      tick={{ fontSize: 10 }} 
+                      stroke="hsl(var(--muted-foreground))"
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                      tickLine={{ stroke: 'hsl(var(--border))' }}
+                      tickFormatter={(value) => `£${value}`}
+                    />
+                    <Tooltip 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-card border border-border rounded-lg p-2 shadow-lg">
+                              <p className="text-xs text-muted-foreground">{data.formattedDate}</p>
+                              <p className={`text-sm font-semibold ${data.equity >= 0 ? 'text-success' : 'text-destructive'}`}>
+                                {data.equity >= 0 ? '+' : ''}£{data.equity.toLocaleString()}
+                              </p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="equity" 
+                      stroke="hsl(var(--primary))" 
+                      fill="url(#pinnedEquityGradient)"
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        );
       default:
-        return {
-          element: (
-            <Card className="h-full">
-              <CardContent className="p-4 text-center text-muted-foreground">
-                Unknown pinned card type
-              </CardContent>
-            </Card>
-          ),
-        };
+        return (
+          <Card className="h-full">
+            <CardContent className="p-4 text-center text-muted-foreground">
+              Unknown pinned card type
+            </CardContent>
+          </Card>
+        );
     }
   };
-
-  // Group cards by their display category for layout
-  const metricsCards = ['todays-bias', 'active-trades', 'next-session', 'high-impact-events'];
-  const analysisCards = ['watchlist-overview', 'session-timers', 'risk-snapshot'];
-  const overviewCards = ['upcoming-events', 'performance-overview', 'journal-summary', 'calendar-events'];
-
-  const visibleMetrics = allCards.filter(c => metricsCards.includes(c.id));
-  const visibleAnalysis = allCards.filter(c => analysisCards.includes(c.id));
-  const visibleOverview = allCards.filter(c => overviewCards.includes(c.id));
-  const pinnedCards = allCards.filter(c => c.isPinned);
 
   return (
     <div className="flex flex-col min-h-full bg-background">
@@ -584,7 +606,7 @@ export default function Dashboard() {
               <h1 className="text-3xl font-bold text-foreground">Welcome, Trader</h1>
               {isEditMode && (
                 <p className="text-sm text-muted-foreground">
-                  Drag cards to reorder • Click × to remove
+                  Drag cards to reorder • Click ⋯ to resize • Click × to remove
                 </p>
               )}
             </div>
@@ -595,32 +617,18 @@ export default function Dashboard() {
               onOpenAddCards={() => setShowAddCardsModal(true)}
             />
           </div>
+
+          {/* Hero Row - Full width cards */}
+          {heroCards.length > 0 && (
+            <div className="space-y-5">
+              {heroCards.map(cardEntry => renderCard(cardEntry))}
+            </div>
+          )}
           
-          {/* Key Metrics Row */}
-          {visibleMetrics.length > 0 && (
+          {/* Unified Grid for all regular cards */}
+          {regularCards.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              {visibleMetrics.map(cardEntry => renderCard(cardEntry))}
-            </div>
-          )}
-
-          {/* Analysis Section (includes Watchlist Overview) */}
-          {visibleAnalysis.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-              {visibleAnalysis.map(cardEntry => renderCard(cardEntry))}
-            </div>
-          )}
-
-          {/* Overview Section */}
-          {visibleOverview.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              {visibleOverview.map(cardEntry => renderCard(cardEntry))}
-            </div>
-          )}
-
-          {/* Pinned Cards (now fully draggable in grid) */}
-          {pinnedCards.length > 0 && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              {pinnedCards.map(cardEntry => renderCard(cardEntry))}
+              {regularCards.map(cardEntry => renderCard(cardEntry))}
             </div>
           )}
 
