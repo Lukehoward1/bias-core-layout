@@ -226,13 +226,17 @@ export default function Journal() {
   };
 
   // Reports cards - compute all per-card pin states at page level
-  // Overview tab cards
+  // Overview tab cards - individual KPIs
   const overviewCardIds = {
-    kpis: 'reports-overview-kpis',
-    bestWorst: 'reports-overview-best-worst',
+    totalPnl: 'reports-kpi-total-pnl',
+    avgRR: 'reports-kpi-avg-rr',
+    winRate: 'reports-kpi-win-rate',
+    expectancy: 'reports-kpi-expectancy',
+    bestDay: 'reports-overview-best-day',
+    worstDay: 'reports-overview-worst-day',
     equity: 'reports-overview-equity',
-    rolling: 'reports-overview',
-    edge: 'reports-overview',
+    rolling30: 'reports-overview-rolling30',
+    edge: 'reports-overview-edge',
   };
   
   // Performance tab cards
@@ -304,9 +308,15 @@ export default function Journal() {
 
   // Create pin state objects for each tab
   const overviewPinStates = {
-    kpis: getCardPinState(overviewCardIds.kpis),
-    bestWorst: getCardPinState(overviewCardIds.bestWorst),
+    totalPnl: getCardPinState(overviewCardIds.totalPnl),
+    avgRR: getCardPinState(overviewCardIds.avgRR),
+    winRate: getCardPinState(overviewCardIds.winRate),
+    expectancy: getCardPinState(overviewCardIds.expectancy),
+    bestDay: getCardPinState(overviewCardIds.bestDay),
+    worstDay: getCardPinState(overviewCardIds.worstDay),
     equity: getCardPinState(overviewCardIds.equity),
+    rolling30: getCardPinState(overviewCardIds.rolling30),
+    edge: getCardPinState(overviewCardIds.edge),
   };
 
   const performancePinStates = {

@@ -460,9 +460,12 @@ export default function Dashboard() {
 
   const getPinnedCardContent = (cardEntry: DashboardCardEntry, slotType: 'wide' | 'narrow' | 'equal' | 'hero' | 'kpi'): React.ReactNode => {
     const chartHeight = slotType === 'hero' ? 'h-64' : 'h-40';
+    const cardId = cardEntry.id;
     
-    switch (cardEntry.sourceType) {
-      case 'journal-equity':
+    // Handle by cardId for consistent rendering
+    switch (cardId) {
+      // Journal Equity Curve
+      case 'pinned-journal-equity':
         return (
           <Card className="h-full">
             <CardHeader>
@@ -524,11 +527,198 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         );
-      default:
+
+      // Reports Overview - Individual KPI Cards
+      case 'reports-kpi-total-pnl':
         return (
           <Card className="h-full">
-            <CardContent className="p-4 text-center text-muted-foreground">
-              Unknown pinned card type
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total P&L</CardTitle>
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-success">+£2,307</p>
+            </CardContent>
+          </Card>
+        );
+
+      case 'reports-kpi-avg-rr':
+        return (
+          <Card className="h-full">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Avg R:R</CardTitle>
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-foreground">1.85</p>
+            </CardContent>
+          </Card>
+        );
+
+      case 'reports-kpi-win-rate':
+        return (
+          <Card className="h-full">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-foreground">66.7%</p>
+            </CardContent>
+          </Card>
+        );
+
+      case 'reports-kpi-expectancy':
+        return (
+          <Card className="h-full">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Expectancy</CardTitle>
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-success">£256/trade</p>
+            </CardContent>
+          </Card>
+        );
+
+      // Best/Worst Days
+      case 'reports-overview-best-day':
+        return (
+          <Card className="h-full bg-success/5 border-success/20">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-success" />
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Best Winning Day</CardTitle>
+                </div>
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-success">+£1,200</p>
+              <p className="text-xs text-muted-foreground mt-1">2025-01-14</p>
+            </CardContent>
+          </Card>
+        );
+
+      case 'reports-overview-worst-day':
+        return (
+          <Card className="h-full bg-destructive/5 border-destructive/20">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CalendarIcon className="h-4 w-4 text-destructive" />
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Worst Losing Day</CardTitle>
+                </div>
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-destructive">-£400</p>
+              <p className="text-xs text-muted-foreground mt-1">2025-01-12</p>
+            </CardContent>
+          </Card>
+        );
+
+      // Overview Equity Curve
+      case 'reports-overview-equity':
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium">Equity Curve</CardTitle>
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className={chartHeight}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={journalEquityData}>
+                    <defs>
+                      <linearGradient id="overviewEquityGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="formattedDate" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `£${v}`} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                      formatter={(value: number) => [`£${value.toLocaleString()}`, 'Equity']}
+                    />
+                    <Area type="monotone" dataKey="equity" stroke="hsl(var(--primary))" fill="url(#overviewEquityGradient)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      // Rolling 30-Day
+      case 'reports-overview-rolling30':
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium">Rolling 30-Day</CardTitle>
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className={chartHeight}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={journalEquityData.slice(-30)}>
+                    <XAxis dataKey="formattedDate" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `£${v}`} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                      formatter={(value: number) => [`£${value.toLocaleString()}`, 'Cumulative P&L']}
+                    />
+                    <Area type="monotone" dataKey="equity" stroke="hsl(var(--success))" fill="hsl(var(--success))" fillOpacity={0.2} strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      // Strongest Edge
+      case 'reports-overview-edge':
+        return (
+          <Card className="h-full border-primary/30 bg-primary/5">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium">Your Strongest Edge</CardTitle>
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">High-confidence setups with 4+ star ratings</p>
+            </CardContent>
+          </Card>
+        );
+
+      // Fallback: render a warning card with remove option
+      default:
+        return (
+          <Card className="h-full border-amber-500/30 bg-amber-500/5">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-amber-600">Unknown Card</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground mb-2">Card ID: {cardId}</p>
+              <p className="text-xs text-muted-foreground">This card type is not recognized. Use Edit mode to remove it.</p>
             </CardContent>
           </Card>
         );
