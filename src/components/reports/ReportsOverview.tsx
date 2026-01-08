@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, Calendar, Target, Zap } from "lucide-react";
+import { TrendingUp, Calendar, Zap } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
@@ -30,9 +30,15 @@ interface ReportsOverviewProps {
   trades: Trade[];
   dateRangeLabel: string;
   pinStates?: {
-    kpis: PinState;
-    bestWorst: PinState;
+    totalPnl: PinState;
+    avgRR: PinState;
+    winRate: PinState;
+    expectancy: PinState;
+    bestDay: PinState;
+    worstDay: PinState;
     equity: PinState;
+    rolling30: PinState;
+    edge: PinState;
   };
 }
 
@@ -112,86 +118,141 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates }: ReportsOv
         <PdfExportButton onClick={handleExportOverview} />
       </div>
 
-      {/* Key Metrics - with per-card pin */}
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Key Metrics</CardTitle>
-            {pinStates?.kpis && (
-              <AddToDashboardButton
-                isAdded={pinStates.kpis.isAdded}
-                onAdd={pinStates.kpis.onAdd}
-                onRemove={pinStates.kpis.onRemove}
-              />
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <p className="text-xs text-muted-foreground">Total P&L</p>
-              <p className={`text-2xl font-bold ${totalPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                {totalPnl >= 0 ? '+' : ''}£{totalPnl.toLocaleString()}
-              </p>
+      {/* Key Metrics - 4 individual pinnable cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total P&L Card */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Total P&L</CardTitle>
+              {pinStates?.totalPnl && (
+                <AddToDashboardButton
+                  isAdded={pinStates.totalPnl.isAdded}
+                  onAdd={pinStates.totalPnl.onAdd}
+                  onRemove={pinStates.totalPnl.onRemove}
+                />
+              )}
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Avg R:R</p>
-              <p className="text-2xl font-bold text-foreground">{avgRR.toFixed(2)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Win Rate</p>
-              <p className="text-2xl font-bold text-foreground">{winRate.toFixed(1)}%</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Expectancy</p>
-              <p className={`text-2xl font-bold ${expectancy >= 0 ? 'text-success' : 'text-destructive'}`}>
-                £{expectancy.toFixed(0)}/trade
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <p className={`text-2xl font-bold ${totalPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {totalPnl >= 0 ? '+' : ''}£{totalPnl.toLocaleString()}
+            </p>
+          </CardContent>
+        </Card>
 
-      {/* Best/Worst Day - with per-card pin */}
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle>Best & Worst Days</CardTitle>
-            {pinStates?.bestWorst && (
-              <AddToDashboardButton
-                isAdded={pinStates.bestWorst.isAdded}
-                onAdd={pinStates.bestWorst.onAdd}
-                onRemove={pinStates.bestWorst.onRemove}
-              />
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 rounded-lg bg-success/5 border border-success/20">
-              <div className="flex items-center gap-2 mb-2">
+        {/* Avg R:R Card */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Avg R:R</CardTitle>
+              {pinStates?.avgRR && (
+                <AddToDashboardButton
+                  isAdded={pinStates.avgRR.isAdded}
+                  onAdd={pinStates.avgRR.onAdd}
+                  onRemove={pinStates.avgRR.onRemove}
+                />
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <p className="text-2xl font-bold text-foreground">{avgRR.toFixed(2)}</p>
+          </CardContent>
+        </Card>
+
+        {/* Win Rate Card */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Win Rate</CardTitle>
+              {pinStates?.winRate && (
+                <AddToDashboardButton
+                  isAdded={pinStates.winRate.isAdded}
+                  onAdd={pinStates.winRate.onAdd}
+                  onRemove={pinStates.winRate.onRemove}
+                />
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <p className="text-2xl font-bold text-foreground">{winRate.toFixed(1)}%</p>
+          </CardContent>
+        </Card>
+
+        {/* Expectancy Card */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Expectancy</CardTitle>
+              {pinStates?.expectancy && (
+                <AddToDashboardButton
+                  isAdded={pinStates.expectancy.isAdded}
+                  onAdd={pinStates.expectancy.onAdd}
+                  onRemove={pinStates.expectancy.onRemove}
+                />
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <p className={`text-2xl font-bold ${expectancy >= 0 ? 'text-success' : 'text-destructive'}`}>
+              £{expectancy.toFixed(0)}/trade
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Best/Worst Day - 2 separate pinnable cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Best Winning Day Card */}
+        <Card className="bg-success/5 border-success/20">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-success" />
-                <p className="text-sm font-medium text-muted-foreground">Best Winning Day</p>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Best Winning Day</CardTitle>
               </div>
-              <p className="text-2xl font-bold text-success">
-                +£{bestDay?.pnl?.toLocaleString() || 0}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">{bestDay?.date || 'N/A'}</p>
+              {pinStates?.bestDay && (
+                <AddToDashboardButton
+                  isAdded={pinStates.bestDay.isAdded}
+                  onAdd={pinStates.bestDay.onAdd}
+                  onRemove={pinStates.bestDay.onRemove}
+                />
+              )}
             </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-success">
+              +£{bestDay?.pnl?.toLocaleString() || 0}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">{bestDay?.date || 'N/A'}</p>
+          </CardContent>
+        </Card>
 
-            <div className="p-4 rounded-lg bg-destructive/5 border border-destructive/20">
-              <div className="flex items-center gap-2 mb-2">
+        {/* Worst Losing Day Card */}
+        <Card className="bg-destructive/5 border-destructive/20">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-destructive" />
-                <p className="text-sm font-medium text-muted-foreground">Worst Losing Day</p>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Worst Losing Day</CardTitle>
               </div>
-              <p className="text-2xl font-bold text-destructive">
-                £{worstDay?.pnl?.toLocaleString() || 0}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">{worstDay?.date || 'N/A'}</p>
+              {pinStates?.worstDay && (
+                <AddToDashboardButton
+                  isAdded={pinStates.worstDay.isAdded}
+                  onAdd={pinStates.worstDay.onAdd}
+                  onRemove={pinStates.worstDay.onRemove}
+                />
+              )}
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-destructive">
+              £{worstDay?.pnl?.toLocaleString() || 0}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">{worstDay?.date || 'N/A'}</p>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Equity Curve - with per-card pin */}
       <Card>
@@ -243,7 +304,16 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates }: ReportsOv
       {/* Rolling 30-Day */}
       <Card>
         <CardHeader>
-          <CardTitle>Rolling 30-Day Performance</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Rolling 30-Day Performance</CardTitle>
+            {pinStates?.rolling30 && (
+              <AddToDashboardButton
+                isAdded={pinStates.rolling30.isAdded}
+                onAdd={pinStates.rolling30.onAdd}
+                onRemove={pinStates.rolling30.onRemove}
+              />
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="h-48">
@@ -276,9 +346,18 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates }: ReportsOv
       {/* Strongest Edge Summary */}
       <Card className="border-primary/30 bg-primary/5">
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-primary" />
-            <CardTitle>Your Strongest Edge This Month</CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-primary" />
+              <CardTitle>Your Strongest Edge This Month</CardTitle>
+            </div>
+            {pinStates?.edge && (
+              <AddToDashboardButton
+                isAdded={pinStates.edge.isAdded}
+                onAdd={pinStates.edge.onAdd}
+                onRemove={pinStates.edge.onRemove}
+              />
+            )}
           </div>
         </CardHeader>
         <CardContent>
