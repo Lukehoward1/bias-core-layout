@@ -54,11 +54,14 @@ export default function Alerts() {
   // Dashboard integration - single hook at page level
   const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
   
-  // Dashboard card states
+  // Dashboard card states - computed at page level for hook safety
   const topNewsCardId = 'top-news';
   const sessionTimersCardId = 'session-timers';
+  const myAlertsTimersCardId = 'alerts-my-alerts-timers';
+  
   const isTopNewsAdded = isCardOnDashboard(topNewsCardId);
   const isSessionTimersAdded = isCardOnDashboard(sessionTimersCardId);
+  const isMyAlertsTimersAdded = isCardOnDashboard(myAlertsTimersCardId);
   
   const handleAddCard = (cardId: string) => {
     addCard(cardId);
@@ -196,10 +199,17 @@ export default function Alerts() {
               <Card className="mt-5">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0">
                   <CardTitle>My Alerts & Timers</CardTitle>
-                  <Button size="sm" className="h-8">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Alert
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <AddToDashboardButton
+                      isAdded={isMyAlertsTimersAdded}
+                      onAdd={() => handleAddCard(myAlertsTimersCardId)}
+                      onRemove={() => handleRemoveCard(myAlertsTimersCardId)}
+                    />
+                    <Button size="sm" className="h-8">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Alert
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="overflow-x-auto -mx-5">
