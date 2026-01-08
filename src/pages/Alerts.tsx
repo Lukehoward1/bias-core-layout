@@ -131,7 +131,6 @@ export default function Alerts() {
                       isAdded={isTopNewsAdded}
                       onAdd={() => handleAddCard(topNewsCardId)}
                       onRemove={() => handleRemoveCard(topNewsCardId)}
-                      size="sm"
                     />
                   </CardHeader>
                   <CardContent>
@@ -166,7 +165,6 @@ export default function Alerts() {
                       isAdded={isSessionTimersAdded}
                       onAdd={() => handleAddCard(sessionTimersCardId)}
                       onRemove={() => handleRemoveCard(sessionTimersCardId)}
-                      size="sm"
                     />
                   </CardHeader>
                   <CardContent>

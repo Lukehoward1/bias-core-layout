@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Plus, Check } from 'lucide-react';
+import { Pin, PinOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface AddToDashboardButtonProps {
@@ -8,12 +8,12 @@ interface AddToDashboardButtonProps {
   onAdd: () => void;
   onRemove: () => void;
   size?: 'sm' | 'default';
-  variant?: 'default' | 'minimal';
   className?: string;
 }
 
 /**
- * A dumb UI component for the "Add to Dashboard" action.
+ * A dumb UI component for the "Pin to Dashboard" action.
+ * Uses a pin icon only - no text labels.
  * 
  * IMPORTANT: This component contains NO hooks.
  * All state and logic must be passed down from parent containers.
@@ -23,10 +23,10 @@ export function AddToDashboardButton({
   onAdd,
   onRemove,
   size = 'sm',
-  variant = 'default',
   className,
 }: AddToDashboardButtonProps) {
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (isAdded) {
       onRemove();
     } else {
@@ -34,48 +34,34 @@ export function AddToDashboardButton({
     }
   };
 
-  if (variant === 'minimal') {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant={isAdded ? 'secondary' : 'ghost'}
-            size="icon"
-            onClick={handleClick}
-            className={cn('h-7 w-7', className)}
-          >
-            {isAdded ? (
-              <Check className="h-3.5 w-3.5 text-success" />
-            ) : (
-              <Plus className="h-3.5 w-3.5" />
-            )}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          {isAdded ? 'Remove from Dashboard' : 'Add to Dashboard'}
-        </TooltipContent>
-      </Tooltip>
-    );
-  }
+  const iconSize = size === 'sm' ? 'h-4 w-4' : 'h-5 w-5';
+  const buttonSize = size === 'sm' ? 'h-8 w-8' : 'h-9 w-9';
 
   return (
-    <Button
-      variant={isAdded ? 'secondary' : 'outline'}
-      size={size}
-      onClick={handleClick}
-      className={cn('gap-1.5', className)}
-    >
-      {isAdded ? (
-        <>
-          <Check className="h-3.5 w-3.5" />
-          Added
-        </>
-      ) : (
-        <>
-          <Plus className="h-3.5 w-3.5" />
-          Add to Dashboard
-        </>
-      )}
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleClick}
+          className={cn(
+            buttonSize,
+            'rounded-full transition-colors',
+            isAdded && 'text-primary bg-primary/10 hover:bg-primary/20',
+            !isAdded && 'text-muted-foreground hover:text-foreground hover:bg-muted',
+            className
+          )}
+        >
+          {isAdded ? (
+            <Pin className={cn(iconSize, 'fill-current')} />
+          ) : (
+            <Pin className={iconSize} />
+          )}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">
+        {isAdded ? 'Unpin from Dashboard' : 'Pin to Dashboard'}
+      </TooltipContent>
+    </Tooltip>
   );
 }

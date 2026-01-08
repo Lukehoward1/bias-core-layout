@@ -8,8 +8,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Check } from 'lucide-react';
+import { Pin } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { DASHBOARD_CARD_REGISTRY, type DashboardSection } from '@/data/dashboardCardRegistry';
+import { cn } from '@/lib/utils';
 
 interface AddCardsModalProps {
   open: boolean;
@@ -51,9 +53,9 @@ export function AddCardsModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Add Cards to Dashboard</DialogTitle>
+          <DialogTitle>Pin Cards to Dashboard</DialogTitle>
           <DialogDescription>
-            Choose cards from Journal, Alerts, Calendar, Risk Tools, or Markets to add to your Dashboard.
+            Choose cards from Journal, Alerts, Calendar, Risk Tools, or Markets to pin to your Dashboard.
           </DialogDescription>
         </DialogHeader>
         
@@ -77,37 +79,49 @@ export function AddCardsModal({
                     return (
                       <Card 
                         key={card.id}
-                        className={`transition-colors ${isOnDashboard ? 'bg-muted/30 border-primary/20' : 'hover:bg-muted/50'}`}
+                        className={cn(
+                          'transition-colors cursor-pointer',
+                          isOnDashboard ? 'bg-primary/5 border-primary/20' : 'hover:bg-muted/50'
+                        )}
+                        onClick={() => {
+                          if (isOnDashboard) {
+                            onRemoveCard(card.id);
+                          } else {
+                            onAddCard(card.id);
+                          }
+                        }}
                       >
                         <CardContent className="p-3 flex items-center justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <p className="font-medium text-sm text-foreground">{card.title}</p>
                             <p className="text-xs text-muted-foreground truncate">{card.description}</p>
                           </div>
-                          <Button
-                            size="sm"
-                            variant={isOnDashboard ? 'secondary' : 'outline'}
-                            onClick={() => {
-                              if (isOnDashboard) {
-                                onRemoveCard(card.id);
-                              } else {
-                                onAddCard(card.id);
-                              }
-                            }}
-                            className="gap-1.5 shrink-0"
-                          >
-                            {isOnDashboard ? (
-                              <>
-                                <Check className="h-3.5 w-3.5" />
-                                Added
-                              </>
-                            ) : (
-                              <>
-                                <Plus className="h-3.5 w-3.5" />
-                                Add
-                              </>
-                            )}
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className={cn(
+                                  'h-8 w-8 rounded-full shrink-0 transition-colors',
+                                  isOnDashboard && 'text-primary bg-primary/10 hover:bg-primary/20',
+                                  !isOnDashboard && 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                                )}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (isOnDashboard) {
+                                    onRemoveCard(card.id);
+                                  } else {
+                                    onAddCard(card.id);
+                                  }
+                                }}
+                              >
+                                <Pin className={cn('h-4 w-4', isOnDashboard && 'fill-current')} />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="left">
+                              {isOnDashboard ? 'Unpin from Dashboard' : 'Pin to Dashboard'}
+                            </TooltipContent>
+                          </Tooltip>
                         </CardContent>
                       </Card>
                     );
