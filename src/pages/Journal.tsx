@@ -20,8 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Star, Download, Pin, Check } from "lucide-react";
-import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
+import { Plus, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Star, Download } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, addMonths, subMonths, isWithinInterval, parseISO } from "date-fns";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -35,6 +34,7 @@ import { ReportsRiskManagement } from "@/components/reports/ReportsRiskManagemen
 import { ReportsTradeLog } from "@/components/reports/ReportsTradeLog";
 import { ReportDateRangeFilter, DateRange } from "@/components/reports/ReportDateRangeFilter";
 import { usePdfExport } from "@/hooks/use-pdf-export";
+import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 
 interface Trade {
   id: string;
@@ -87,20 +87,6 @@ function StarRating({ rating, onRatingChange }: { rating: number; onRatingChange
 
 // Equity Curve Card Component
 function EquityCurveCard({ trades }: { trades: Trade[] }) {
-  const { isPinned, pinCard, unpinCard } = useDashboardLayout();
-  const cardId = 'pinned-journal-equity';
-  const pinned = isPinned(cardId);
-
-  const handlePinToggle = () => {
-    if (pinned) {
-      unpinCard(cardId);
-      toast.success('Removed from Dashboard');
-    } else {
-      pinCard(cardId, 'journal-equity');
-      toast.success('Added to Dashboard');
-    }
-  };
-
   const equityData = useMemo(() => {
     const sortedTrades = [...trades].sort((a, b) => a.date.localeCompare(b.date));
     let cumulative = 0;
@@ -139,24 +125,7 @@ function EquityCurveCard({ trades }: { trades: Trade[] }) {
         <div className="flex items-center justify-between">
           <CardTitle>Equity Curve</CardTitle>
           <div className="flex items-center gap-2">
-            <Button
-              variant={pinned ? 'secondary' : 'outline'}
-              size="sm"
-              onClick={handlePinToggle}
-              className="h-7 text-xs"
-            >
-              {pinned ? (
-                <>
-                  <Check className="h-3 w-3 mr-1" />
-                  Added
-                </>
-              ) : (
-                <>
-                  <Pin className="h-3 w-3 mr-1" />
-                  Add to Dashboard
-                </>
-              )}
-            </Button>
+            <AddToDashboardButton cardId="journal-equity-curve" />
             <Badge variant="outline" className="text-xs">MT5 - Live</Badge>
           </div>
         </div>
