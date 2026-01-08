@@ -138,7 +138,7 @@ export default function Dashboard() {
     moveCard,
     moveCardToRow,
     resetToDefault,
-    getAvailableToAdd,
+    getAllCards,
     getMaxSlots,
   } = useDashboardLayout();
 
@@ -609,7 +609,7 @@ export default function Dashboard() {
       <AddCardsModal
         open={showAddCardsModal}
         onOpenChange={setShowAddCardsModal}
-        availableCards={getAvailableToAdd()}
+        currentCardIds={getAllCards().map(c => c.id)}
         onAddCard={addCard}
       />
     </div>
