@@ -1,3 +1,4 @@
+// @refresh reset
 import { useState, useEffect, useCallback } from 'react';
 
 export type RowType = 'kpi' | 'wide-narrow' | 'equal' | 'hero' | 'three-equal' | 'four-equal';
@@ -429,14 +430,14 @@ export function useDashboardLayout() {
   }, [layout.rows]);
 
   // Check if a card is currently on the dashboard (by cardId)
-  const isCardOnDashboard = useCallback((cardId: string) => {
+  const isCardOnDashboard = (cardId: string) => {
     return layout.rows.some(r => r.cards.some(c => c.id === cardId));
-  }, [layout.rows]);
+  };
 
   // Get all card IDs currently on the dashboard
-  const getCurrentCardIds = useCallback((): string[] => {
+  const getCurrentCardIds = (): string[] => {
     return layout.rows.flatMap(r => r.cards.map(c => c.id));
-  }, [layout.rows]);
+  };
 
   // Add card to layout (finds appropriate row or creates new one)
   const addCard = useCallback((cardId: string, isPinned = false, sourceType?: string) => {

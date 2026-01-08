@@ -1,3 +1,4 @@
+import type { MouseEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Pin, Check } from "lucide-react";
@@ -7,7 +8,7 @@ import { toast } from "sonner";
 
 interface AddToDashboardButtonProps {
   cardId: string;
-  variant?: 'icon' | 'button';
+  variant?: "icon" | "button";
   className?: string;
 }
 
@@ -16,40 +17,36 @@ interface AddToDashboardButtonProps {
  * Only renders for cards that are registered as dashboard-eligible.
  * Shows "Added" state if already on dashboard.
  */
-export function AddToDashboardButton({ 
-  cardId, 
-  variant = 'button',
-  className = ''
+export function AddToDashboardButton({
+  cardId,
+  variant = "button",
+  className = "",
 }: AddToDashboardButtonProps) {
-  const { addCard, removeCard, isCardOnDashboard } = useDashboardLayout();
-  
+  const { addCard, isCardOnDashboard } = useDashboardLayout();
+
   // Only render if card is in the registry (dashboard-eligible)
-  if (!isCardDashboardEligible(cardId)) {
-    return null;
-  }
-  
+  if (!isCardDashboardEligible(cardId)) return null;
+
   const isAdded = isCardOnDashboard(cardId);
   const cardDef = getCardById(cardId);
-  const cardTitle = cardDef?.title || 'Card';
-  
-  const handleClick = (e: React.MouseEvent) => {
+  const cardTitle = cardDef?.title || "Card";
+
+  const handleClick = (e: MouseEvent) => {
     e.stopPropagation();
-    
-    if (isAdded) {
-      removeCard(cardId);
-      toast.success(`Removed "${cardTitle}" from Dashboard`);
-    } else {
-      addCard(cardId, false, cardDef?.sourceSection);
-      toast.success(`Added "${cardTitle}" to Dashboard`);
-    }
+
+    // Prevent duplicates
+    if (isAdded) return;
+
+    addCard(cardId, false, cardDef?.sourceSection);
+    toast.success(`Added "${cardTitle}" to Dashboard`);
   };
   
-  if (variant === 'icon') {
+  if (variant === "icon") {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
-            variant={isAdded ? 'secondary' : 'ghost'}
+            variant={isAdded ? "secondary" : "ghost"}
             size="icon"
             onClick={handleClick}
             className={`h-7 w-7 ${className}`}
@@ -62,7 +59,7 @@ export function AddToDashboardButton({
           </Button>
         </TooltipTrigger>
         <TooltipContent side="bottom">
-          {isAdded ? 'Remove from Dashboard' : 'Add to Dashboard'}
+          {isAdded ? "Added to Dashboard" : "Add to Dashboard"}
         </TooltipContent>
       </Tooltip>
     );
@@ -70,7 +67,7 @@ export function AddToDashboardButton({
   
   return (
     <Button
-      variant={isAdded ? 'secondary' : 'outline'}
+      variant={isAdded ? "secondary" : "outline"}
       size="sm"
       onClick={handleClick}
       className={`h-7 text-xs ${className}`}
