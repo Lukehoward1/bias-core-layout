@@ -20,15 +20,23 @@ interface Trade {
   rating?: number;
 }
 
+interface PinState {
+  isAdded: boolean;
+  onAdd: () => void;
+  onRemove: () => void;
+}
+
 interface ReportsOverviewProps {
   trades: Trade[];
   dateRangeLabel: string;
-  isAdded?: boolean;
-  onAdd?: () => void;
-  onRemove?: () => void;
+  pinStates?: {
+    kpis: PinState;
+    bestWorst: PinState;
+    equity: PinState;
+  };
 }
 
-export function ReportsOverview({ trades, dateRangeLabel, isAdded, onAdd, onRemove }: ReportsOverviewProps) {
+export function ReportsOverview({ trades, dateRangeLabel, pinStates }: ReportsOverviewProps) {
   const { exportToPdf } = usePdfExport();
   const totalPnl = trades.reduce((sum, t) => sum + t.pnl, 0);
   const winningTrades = trades.filter(t => t.pnl > 0);
@@ -99,94 +107,105 @@ export function ReportsOverview({ trades, dateRangeLabel, isAdded, onAdd, onRemo
 
   return (
     <div id="reports-overview" className="space-y-6">
-      {/* Header with export and pin */}
+      {/* Header with export */}
       <div className="flex items-center justify-end gap-2" data-pdf-exclude>
-        {isAdded !== undefined && onAdd && onRemove && (
-          <AddToDashboardButton isAdded={isAdded} onAdd={onAdd} onRemove={onRemove} />
-        )}
         <PdfExportButton onClick={handleExportOverview} />
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total P&L</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${totalPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-              {totalPnl >= 0 ? '+' : ''}£{totalPnl.toLocaleString()}
+      {/* Key Metrics - with per-card pin */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Key Metrics</CardTitle>
+            {pinStates?.kpis && (
+              <AddToDashboardButton
+                isAdded={pinStates.kpis.isAdded}
+                onAdd={pinStates.kpis.onAdd}
+                onRemove={pinStates.kpis.onRemove}
+              />
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Total P&L</p>
+              <p className={`text-2xl font-bold ${totalPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                {totalPnl >= 0 ? '+' : ''}£{totalPnl.toLocaleString()}
+              </p>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Avg R:R</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{avgRR.toFixed(2)}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{winRate.toFixed(1)}%</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Expectancy</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${expectancy >= 0 ? 'text-success' : 'text-destructive'}`}>
-              £{expectancy.toFixed(0)}/trade
+            <div>
+              <p className="text-xs text-muted-foreground">Avg R:R</p>
+              <p className="text-2xl font-bold text-foreground">{avgRR.toFixed(2)}</p>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Win Rate</p>
+              <p className="text-2xl font-bold text-foreground">{winRate.toFixed(1)}%</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Expectancy</p>
+              <p className={`text-2xl font-bold ${expectancy >= 0 ? 'text-success' : 'text-destructive'}`}>
+                £{expectancy.toFixed(0)}/trade
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Best/Worst Day */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-success" />
-              <CardTitle className="text-sm font-medium text-muted-foreground">Best Winning Day</CardTitle>
+      {/* Best/Worst Day - with per-card pin */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle>Best & Worst Days</CardTitle>
+            {pinStates?.bestWorst && (
+              <AddToDashboardButton
+                isAdded={pinStates.bestWorst.isAdded}
+                onAdd={pinStates.bestWorst.onAdd}
+                onRemove={pinStates.bestWorst.onRemove}
+              />
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-lg bg-success/5 border border-success/20">
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp className="h-4 w-4 text-success" />
+                <p className="text-sm font-medium text-muted-foreground">Best Winning Day</p>
+              </div>
+              <p className="text-2xl font-bold text-success">
+                +£{bestDay?.pnl?.toLocaleString() || 0}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">{bestDay?.date || 'N/A'}</p>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-success">
-              +£{bestDay?.pnl?.toLocaleString() || 0}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">{bestDay?.date || 'N/A'}</p>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-destructive" />
-              <CardTitle className="text-sm font-medium text-muted-foreground">Worst Losing Day</CardTitle>
+            <div className="p-4 rounded-lg bg-destructive/5 border border-destructive/20">
+              <div className="flex items-center gap-2 mb-2">
+                <Calendar className="h-4 w-4 text-destructive" />
+                <p className="text-sm font-medium text-muted-foreground">Worst Losing Day</p>
+              </div>
+              <p className="text-2xl font-bold text-destructive">
+                £{worstDay?.pnl?.toLocaleString() || 0}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">{worstDay?.date || 'N/A'}</p>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">
-              £{worstDay?.pnl?.toLocaleString() || 0}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">{worstDay?.date || 'N/A'}</p>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Equity Curve */}
+      {/* Equity Curve - with per-card pin */}
       <Card>
         <CardHeader>
-          <CardTitle>Equity Curve</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Equity Curve</CardTitle>
+            {pinStates?.equity && (
+              <AddToDashboardButton
+                isAdded={pinStates.equity.isAdded}
+                onAdd={pinStates.equity.onAdd}
+                onRemove={pinStates.equity.onRemove}
+              />
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="h-64">

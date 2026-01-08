@@ -19,18 +19,26 @@ interface Trade {
   rating?: number;
 }
 
+interface PinState {
+  isAdded: boolean;
+  onAdd: () => void;
+  onRemove: () => void;
+}
+
 interface ReportsPsychologyProps {
   trades: Trade[];
   dateRangeLabel: string;
-  isAdded?: boolean;
-  onAdd?: () => void;
-  onRemove?: () => void;
+  pinStates?: {
+    sentiment: PinState;
+    triggers: PinState;
+    improvement: PinState;
+  };
 }
 
 const POSITIVE_KEYWORDS = ['patient', 'perfect', 'confident', 'disciplined', 'calm', 'good setup', 'followed plan', 'great'];
 const NEGATIVE_KEYWORDS = ['fear', 'fomo', 'hesitation', 'revenge', 'late entry', 'early exit', 'overtrading', 'impatient', 'greedy', 'emotional'];
 
-export function ReportsPsychology({ trades, dateRangeLabel, isAdded, onAdd, onRemove }: ReportsPsychologyProps) {
+export function ReportsPsychology({ trades, dateRangeLabel, pinStates }: ReportsPsychologyProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats
@@ -116,61 +124,62 @@ export function ReportsPsychology({ trades, dateRangeLabel, isAdded, onAdd, onRe
 
   return (
     <div id="reports-psychology" className="space-y-6">
-      {/* Header with export and pin */}
+      {/* Header with export */}
       <div className="flex items-center justify-end gap-2" data-pdf-exclude>
-        {isAdded !== undefined && onAdd && onRemove && (
-          <AddToDashboardButton isAdded={isAdded} onAdd={onAdd} onRemove={onRemove} />
-        )}
         <PdfExportButton onClick={handleExport} />
       </div>
 
-      {/* Sentiment Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Brain className="h-4 w-4 text-primary" />
-              <CardTitle className="text-sm font-medium text-muted-foreground">Trades with Notes</CardTitle>
+      {/* Sentiment Summary - with per-card pin */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Sentiment Summary</CardTitle>
+            {pinStates?.sentiment && (
+              <AddToDashboardButton
+                isAdded={pinStates.sentiment.isAdded}
+                onAdd={pinStates.sentiment.onAdd}
+                onRemove={pinStates.sentiment.onRemove}
+              />
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 rounded-lg bg-muted/30 border">
+              <div className="flex items-center gap-2 mb-2">
+                <Brain className="h-4 w-4 text-primary" />
+                <p className="text-sm font-medium text-muted-foreground">Trades with Notes</p>
+              </div>
+              <p className="text-2xl font-bold text-foreground">{tradesWithNotes.length}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {Math.round((tradesWithNotes.length / trades.length) * 100)}% of all trades
+              </p>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{tradesWithNotes.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {Math.round((tradesWithNotes.length / trades.length) * 100)}% of all trades
-            </p>
-          </CardContent>
-        </Card>
 
-        <Card className="border-success/30 bg-success/5">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <ThumbsUp className="h-4 w-4 text-success" />
-              <CardTitle className="text-sm font-medium text-muted-foreground">Positive Notes</CardTitle>
+            <div className="p-4 rounded-lg bg-success/5 border border-success/30">
+              <div className="flex items-center gap-2 mb-2">
+                <ThumbsUp className="h-4 w-4 text-success" />
+                <p className="text-sm font-medium text-muted-foreground">Positive Notes</p>
+              </div>
+              <p className="text-2xl font-bold text-success">{positiveNotes.length}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Trades with confident/disciplined mentions
+              </p>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-success">{positiveNotes.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Trades with confident/disciplined mentions
-            </p>
-          </CardContent>
-        </Card>
 
-        <Card className="border-destructive/30 bg-destructive/5">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-              <CardTitle className="text-sm font-medium text-muted-foreground">Negative Notes</CardTitle>
+            <div className="p-4 rounded-lg bg-destructive/5 border border-destructive/30">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                <p className="text-sm font-medium text-muted-foreground">Negative Notes</p>
+              </div>
+              <p className="text-2xl font-bold text-destructive">{negativeNotes.length}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Trades with fear/FOMO/emotional mentions
+              </p>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{negativeNotes.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Trades with fear/FOMO/emotional mentions
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Word Cloud (simplified as tags) */}
       <Card>
@@ -199,12 +208,21 @@ export function ReportsPsychology({ trades, dateRangeLabel, isAdded, onAdd, onRe
         </CardContent>
       </Card>
 
-      {/* Emotional Triggers Heatmap */}
+      {/* Emotional Triggers Heatmap - with per-card pin */}
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-            <CardTitle>Emotional Triggers vs Outcomes</CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              <CardTitle>Emotional Triggers vs Outcomes</CardTitle>
+            </div>
+            {pinStates?.triggers && (
+              <AddToDashboardButton
+                isAdded={pinStates.triggers.isAdded}
+                onAdd={pinStates.triggers.onAdd}
+                onRemove={pinStates.triggers.onRemove}
+              />
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -296,12 +314,21 @@ export function ReportsPsychology({ trades, dateRangeLabel, isAdded, onAdd, onRe
         </CardContent>
       </Card>
 
-      {/* Improvement Focus */}
+      {/* Improvement Focus - with per-card pin */}
       <Card className="border-primary/30 bg-primary/5">
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <Target className="h-5 w-5 text-primary" />
-            <CardTitle>Your Improvement Focus This Month</CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-primary" />
+              <CardTitle>Your Improvement Focus This Month</CardTitle>
+            </div>
+            {pinStates?.improvement && (
+              <AddToDashboardButton
+                isAdded={pinStates.improvement.isAdded}
+                onAdd={pinStates.improvement.onAdd}
+                onRemove={pinStates.improvement.onRemove}
+              />
+            )}
           </div>
         </CardHeader>
         <CardContent>

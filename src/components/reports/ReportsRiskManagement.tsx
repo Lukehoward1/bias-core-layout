@@ -20,15 +20,23 @@ interface Trade {
   rating?: number;
 }
 
+interface PinState {
+  isAdded: boolean;
+  onAdd: () => void;
+  onRemove: () => void;
+}
+
 interface ReportsRiskManagementProps {
   trades: Trade[];
   dateRangeLabel: string;
-  isAdded?: boolean;
-  onAdd?: () => void;
-  onRemove?: () => void;
+  pinStates?: {
+    kpis: PinState;
+    distribution: PinState;
+    discipline: PinState;
+  };
 }
 
-export function ReportsRiskManagement({ trades, dateRangeLabel, isAdded, onAdd, onRemove }: ReportsRiskManagementProps) {
+export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates }: ReportsRiskManagementProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats for PDF export
@@ -114,58 +122,61 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, isAdded, onAdd, 
 
   return (
     <div id="reports-risk" className="space-y-6">
-      {/* Header with export and pin */}
+      {/* Header with export */}
       <div className="flex items-center justify-end gap-2" data-pdf-exclude>
-        {isAdded !== undefined && onAdd && onRemove && (
-          <AddToDashboardButton isAdded={isAdded} onAdd={onAdd} onRemove={onRemove} />
-        )}
         <PdfExportButton onClick={handleExport} />
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Avg Risk/Trade</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">£{Math.round(avgRisk)}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Max Risk Taken</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">£{Math.round(maxRisk)}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Max Single Loss</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">-£{maxLoss.toLocaleString()}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Losses</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">-£{totalLoss.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground mt-1">{losingTrades.length} losing trades</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Risk Distribution */}
+      {/* Key Metrics - with per-card pin */}
       <Card>
         <CardHeader>
-          <CardTitle>Risk Distribution per Trade</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Risk KPIs</CardTitle>
+            {pinStates?.kpis && (
+              <AddToDashboardButton
+                isAdded={pinStates.kpis.isAdded}
+                onAdd={pinStates.kpis.onAdd}
+                onRemove={pinStates.kpis.onRemove}
+              />
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Avg Risk/Trade</p>
+              <p className="text-2xl font-bold text-foreground">£{Math.round(avgRisk)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Max Risk Taken</p>
+              <p className="text-2xl font-bold text-foreground">£{Math.round(maxRisk)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Max Single Loss</p>
+              <p className="text-2xl font-bold text-destructive">-£{maxLoss.toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Total Losses</p>
+              <p className="text-2xl font-bold text-destructive">-£{totalLoss.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground mt-1">{losingTrades.length} losing trades</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Risk Distribution - with per-card pin */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Risk Distribution per Trade</CardTitle>
+            {pinStates?.distribution && (
+              <AddToDashboardButton
+                isAdded={pinStates.distribution.isAdded}
+                onAdd={pinStates.distribution.onAdd}
+                onRemove={pinStates.distribution.onRemove}
+              />
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="h-48">
@@ -256,12 +267,21 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, isAdded, onAdd, 
         </CardContent>
       </Card>
 
-      {/* Risk Discipline Score */}
+      {/* Risk Discipline Score - with per-card pin */}
       <Card className="border-primary/30 bg-primary/5">
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-primary" />
-            <CardTitle>Your Risk Discipline Score</CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" />
+              <CardTitle>Your Risk Discipline Score</CardTitle>
+            </div>
+            {pinStates?.discipline && (
+              <AddToDashboardButton
+                isAdded={pinStates.discipline.isAdded}
+                onAdd={pinStates.discipline.onAdd}
+                onRemove={pinStates.discipline.onRemove}
+              />
+            )}
           </div>
         </CardHeader>
         <CardContent>
