@@ -4,6 +4,7 @@ import { TrendingUp, Calendar, Target, Zap } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
+import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 
 interface Trade {
   id: string;
@@ -22,9 +23,12 @@ interface Trade {
 interface ReportsOverviewProps {
   trades: Trade[];
   dateRangeLabel: string;
+  isAdded?: boolean;
+  onAdd?: () => void;
+  onRemove?: () => void;
 }
 
-export function ReportsOverview({ trades, dateRangeLabel }: ReportsOverviewProps) {
+export function ReportsOverview({ trades, dateRangeLabel, isAdded, onAdd, onRemove }: ReportsOverviewProps) {
   const { exportToPdf } = usePdfExport();
   const totalPnl = trades.reduce((sum, t) => sum + t.pnl, 0);
   const winningTrades = trades.filter(t => t.pnl > 0);
@@ -95,14 +99,19 @@ export function ReportsOverview({ trades, dateRangeLabel }: ReportsOverviewProps
 
   return (
     <div id="reports-overview" className="space-y-6">
+      {/* Header with export and pin */}
+      <div className="flex items-center justify-end gap-2" data-pdf-exclude>
+        {isAdded !== undefined && onAdd && onRemove && (
+          <AddToDashboardButton isAdded={isAdded} onAdd={onAdd} onRemove={onRemove} />
+        )}
+        <PdfExportButton onClick={handleExportOverview} />
+      </div>
+
       {/* Key Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total P&L</CardTitle>
-              <PdfExportButton onClick={handleExportOverview} data-pdf-exclude />
-            </div>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total P&L</CardTitle>
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${totalPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
