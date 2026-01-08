@@ -137,7 +137,6 @@ function EquityCurveCard({ trades, isAdded, onAdd, onRemove }: EquityCurveCardPr
               isAdded={isAdded}
               onAdd={onAdd}
               onRemove={onRemove}
-              size="sm"
             />
             <Badge variant="outline" className="text-xs">MT5 - Live</Badge>
           </div>

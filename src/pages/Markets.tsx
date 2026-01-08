@@ -16,6 +16,9 @@ import {
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
+import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
+import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
+import { toast } from "sonner";
 
 type MarketType = 'Watchlist' | 'All' | 'FX' | 'Crypto' | 'Indices' | 'Commodities' | 'ETFs' | 'Futures';
 
@@ -26,6 +29,23 @@ export default function Markets() {
   
   const { assets } = useAssets();
   const { watchlist, toggleWatchlist, isInWatchlist, watchlistAssets } = useWatchlist();
+  
+  // Dashboard integration - single hook at page level
+  const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
+  
+  // Dashboard card state
+  const watchlistOverviewCardId = 'watchlist-overview';
+  const isWatchlistOverviewAdded = isCardOnDashboard(watchlistOverviewCardId);
+  
+  const handleAddCard = () => {
+    addCard(watchlistOverviewCardId);
+    toast.success('Added to Dashboard');
+  };
+  
+  const handleRemoveCard = () => {
+    removeCard(watchlistOverviewCardId);
+    toast.success('Removed from Dashboard');
+  };
   
   // Set default filter based on URL param or watchlist
   const [selectedType, setSelectedType] = useState<MarketType>(() => {
@@ -126,11 +146,16 @@ export default function Markets() {
           {/* Watchlist Overview Bar */}
           {(selectedType === 'Watchlist' || selectedType === 'All') && watchlistAssets.length > 0 && (
             <Card className="bg-muted/30">
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Activity className="h-5 w-5 text-primary" />
                   My Watchlist Overview
                 </CardTitle>
+                <AddToDashboardButton
+                  isAdded={isWatchlistOverviewAdded}
+                  onAdd={handleAddCard}
+                  onRemove={handleRemoveCard}
+                />
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="space-y-2">

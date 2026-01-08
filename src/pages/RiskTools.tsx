@@ -178,7 +178,6 @@ export default function RiskTools() {
                 isAdded={isQuickCalcAdded}
                 onAdd={handleAddCard}
                 onRemove={handleRemoveCard}
-                size="sm"
               />
             </CardHeader>
             <CardContent>

@@ -164,7 +164,6 @@ export default function Calendar() {
                 isAdded={isUpcomingEventsAdded}
                 onAdd={() => handleAddCard(upcomingEventsCardId)}
                 onRemove={() => handleRemoveCard(upcomingEventsCardId)}
-                size="sm"
               />
             </CardHeader>
             <CardContent>
