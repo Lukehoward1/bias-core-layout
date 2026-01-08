@@ -10,8 +10,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
+import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
+import { toast } from "sonner";
 
 export default function RiskTools() {
+  // Dashboard integration - single hook at page level
+  const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
+  
+  const quickCalcCardId = 'quick-calculator';
+  const isQuickCalcAdded = isCardOnDashboard(quickCalcCardId);
+  
+  const handleAddCard = () => {
+    addCard(quickCalcCardId);
+    toast.success('Added to Dashboard');
+  };
+  
+  const handleRemoveCard = () => {
+    removeCard(quickCalcCardId);
+    toast.success('Removed from Dashboard');
+  };
+
   return (
     <div className="flex flex-col min-h-full bg-background">
       <AppHeader title="Risk Tools" />
@@ -150,9 +169,17 @@ export default function RiskTools() {
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Quick Calculator (Linked to Account)</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">Uses your connected account and current chart (coming soon)</p>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle>Quick Calculator (Linked to Account)</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">Uses your connected account and current chart (coming soon)</p>
+              </div>
+              <AddToDashboardButton
+                isAdded={isQuickCalcAdded}
+                onAdd={handleAddCard}
+                onRemove={handleRemoveCard}
+                size="sm"
+              />
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

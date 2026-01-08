@@ -7,86 +7,115 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus } from 'lucide-react';
-import { DashboardCardConfig } from '@/hooks/use-dashboard-layout';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Check } from 'lucide-react';
+import { DASHBOARD_CARD_REGISTRY, type DashboardSection } from '@/data/dashboardCardRegistry';
 
 interface AddCardsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  availableCards: DashboardCardConfig[];
+  /** Set of card IDs currently on the dashboard */
+  cardsOnDashboard: Set<string>;
   onAddCard: (cardId: string) => void;
+  onRemoveCard: (cardId: string) => void;
 }
+
+const sectionLabels: Record<DashboardSection, string> = {
+  journal: 'Journal',
+  reports: 'Reports & Performance',
+  alerts: 'Alerts',
+  calendar: 'Calendar',
+  'risk-tools': 'Risk Tools',
+  markets: 'Markets & Watchlist',
+};
+
+const sectionOrder: DashboardSection[] = ['markets', 'journal', 'reports', 'alerts', 'calendar', 'risk-tools'];
 
 export function AddCardsModal({
   open,
   onOpenChange,
-  availableCards,
+  cardsOnDashboard,
   onAddCard,
+  onRemoveCard,
 }: AddCardsModalProps) {
-  const groupedCards = availableCards.reduce((acc, card) => {
-    if (!acc[card.category]) {
-      acc[card.category] = [];
+  // Group cards by section
+  const groupedCards = DASHBOARD_CARD_REGISTRY.reduce((acc, card) => {
+    if (!acc[card.section]) {
+      acc[card.section] = [];
     }
-    acc[card.category].push(card);
+    acc[card.section].push(card);
     return acc;
-  }, {} as Record<string, DashboardCardConfig[]>);
-
-  const categoryLabels: Record<string, string> = {
-    metrics: 'Key Metrics',
-    analysis: 'Analysis & Data',
-    overview: 'Overview & Summaries',
-  };
+  }, {} as Record<DashboardSection, typeof DASHBOARD_CARD_REGISTRY>);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Add Cards</DialogTitle>
+          <DialogTitle>Add Cards to Dashboard</DialogTitle>
           <DialogDescription>
-            Choose cards to add to your Dashboard. Each card displays specific trading information.
+            Choose cards from Journal, Alerts, Calendar, Risk Tools, or Markets to add to your Dashboard.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="max-h-[60vh] overflow-y-auto space-y-6 py-4">
-          {availableCards.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">
-              All available cards are already on your Dashboard.
-            </p>
-          ) : (
-            Object.entries(groupedCards).map(([category, cards]) => (
-              <div key={category}>
-                <h4 className="text-sm font-medium text-muted-foreground mb-3">
-                  {categoryLabels[category] || category}
+        <div className="max-h-[60vh] overflow-y-auto space-y-6 py-4 pr-1">
+          {sectionOrder.map((section) => {
+            const cards = groupedCards[section];
+            if (!cards || cards.length === 0) return null;
+
+            return (
+              <div key={section}>
+                <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                  {sectionLabels[section]}
+                  <Badge variant="outline" className="text-[10px] font-normal">
+                    {cards.filter(c => cardsOnDashboard.has(c.id)).length}/{cards.length}
+                  </Badge>
                 </h4>
                 <div className="space-y-2">
-                  {cards.map((card) => (
-                    <Card 
-                      key={card.id}
-                      className="hover:bg-muted/50 transition-colors"
-                    >
-                      <CardContent className="p-3 flex items-center justify-between">
-                        <div>
-                          <p className="font-medium text-sm text-foreground">{card.title}</p>
-                          <p className="text-xs text-muted-foreground">{card.description}</p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            onAddCard(card.id);
-                          }}
-                          className="gap-1 shrink-0"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                          Add
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
+                  {cards.map((card) => {
+                    const isOnDashboard = cardsOnDashboard.has(card.id);
+                    
+                    return (
+                      <Card 
+                        key={card.id}
+                        className={`transition-colors ${isOnDashboard ? 'bg-muted/30 border-primary/20' : 'hover:bg-muted/50'}`}
+                      >
+                        <CardContent className="p-3 flex items-center justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-sm text-foreground">{card.title}</p>
+                            <p className="text-xs text-muted-foreground truncate">{card.description}</p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant={isOnDashboard ? 'secondary' : 'outline'}
+                            onClick={() => {
+                              if (isOnDashboard) {
+                                onRemoveCard(card.id);
+                              } else {
+                                onAddCard(card.id);
+                              }
+                            }}
+                            className="gap-1.5 shrink-0"
+                          >
+                            {isOnDashboard ? (
+                              <>
+                                <Check className="h-3.5 w-3.5" />
+                                Added
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="h-3.5 w-3.5" />
+                                Add
+                              </>
+                            )}
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               </div>
-            ))
-          )}
+            );
+          })}
         </div>
       </DialogContent>
     </Dialog>

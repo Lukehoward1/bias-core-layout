@@ -138,9 +138,16 @@ export default function Dashboard() {
     moveCard,
     moveCardToRow,
     resetToDefault,
-    getAvailableToAdd,
     getMaxSlots,
+    isCardOnDashboard,
   } = useDashboardLayout();
+
+  // Compute set of card IDs on dashboard for modal
+  const cardsOnDashboardSet = useMemo(() => {
+    const ids = new Set<string>();
+    layout.rows.forEach(row => row.cards.forEach(card => ids.add(card.id)));
+    return ids;
+  }, [layout]);
 
   const handleDragStart = (cardId: string) => {
     setDraggingCardId(cardId);
@@ -609,8 +616,9 @@ export default function Dashboard() {
       <AddCardsModal
         open={showAddCardsModal}
         onOpenChange={setShowAddCardsModal}
-        availableCards={getAvailableToAdd()}
+        cardsOnDashboard={cardsOnDashboardSet}
         onAddCard={addCard}
+        onRemoveCard={removeCard}
       />
     </div>
   );

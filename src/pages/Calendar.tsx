@@ -13,6 +13,9 @@ import {
 } from "@/components/ui/select";
 import { Filter } from "lucide-react";
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
+import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
+import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
+import { toast } from "sonner";
 
 const keyEvents = [
   { time: '08:30', currency: 'USD', event: 'Non-Farm Payrolls', impact: 'high' },
@@ -35,6 +38,23 @@ export default function Calendar() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Dashboard integration - single hook at page level
+  const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
+  
+  // Dashboard card states
+  const upcomingEventsCardId = 'upcoming-events';
+  const isUpcomingEventsAdded = isCardOnDashboard(upcomingEventsCardId);
+  
+  const handleAddCard = (cardId: string) => {
+    addCard(cardId);
+    toast.success('Added to Dashboard');
+  };
+  
+  const handleRemoveCard = (cardId: string) => {
+    removeCard(cardId);
+    toast.success('Removed from Dashboard');
+  };
 
   // Auto-open event modal if navigated with event parameter
   useEffect(() => {
@@ -138,8 +158,14 @@ export default function Calendar() {
 
           {/* Key Events */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle>Key Events Today</CardTitle>
+              <AddToDashboardButton
+                isAdded={isUpcomingEventsAdded}
+                onAdd={() => handleAddCard(upcomingEventsCardId)}
+                onRemove={() => handleRemoveCard(upcomingEventsCardId)}
+                size="sm"
+              />
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
