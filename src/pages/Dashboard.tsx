@@ -12,6 +12,8 @@ import { WatchlistOverviewCard } from "@/components/dashboard/WatchlistOverviewC
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { getCardRenderer, warnMissingRenderers } from "@/data/dashboardCardRenderers";
+import { DASHBOARD_CARD_REGISTRY } from "@/data/dashboardCardRegistry";
 
 interface SessionData {
   name: string;
@@ -197,6 +199,12 @@ export default function Dashboard() {
         formattedDate: format(new Date(t.date), 'MMM d')
       };
     });
+  }, []);
+
+  // Developer check: warn about missing renderers at mount
+  useEffect(() => {
+    const registryCardIds = DASHBOARD_CARD_REGISTRY.map(c => c.id);
+    warnMissingRenderers(registryCardIds);
   }, []);
 
   if (!isUnlocked) {
@@ -459,335 +467,30 @@ export default function Dashboard() {
   };
 
   const getPinnedCardContent = (cardEntry: DashboardCardEntry, slotType: 'wide' | 'narrow' | 'equal' | 'hero' | 'kpi'): React.ReactNode => {
-    const chartHeight = slotType === 'hero' ? 'h-64' : 'h-40';
     const cardId = cardEntry.id;
     
-    // Handle by cardId for consistent rendering
-    switch (cardId) {
-      // Journal Equity Curve
-      case 'pinned-journal-equity':
-        return (
-          <Card className="h-full">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium">Journal Equity Curve</CardTitle>
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className={chartHeight}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={journalEquityData}>
-                    <defs>
-                      <linearGradient id="pinnedEquityGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <XAxis 
-                      dataKey="formattedDate" 
-                      tick={{ fontSize: 10 }} 
-                      stroke="hsl(var(--muted-foreground))"
-                      axisLine={{ stroke: 'hsl(var(--border))' }}
-                      tickLine={{ stroke: 'hsl(var(--border))' }}
-                    />
-                    <YAxis 
-                      tick={{ fontSize: 10 }} 
-                      stroke="hsl(var(--muted-foreground))"
-                      axisLine={{ stroke: 'hsl(var(--border))' }}
-                      tickLine={{ stroke: 'hsl(var(--border))' }}
-                      tickFormatter={(value) => `£${value}`}
-                    />
-                    <Tooltip 
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          return (
-                            <div className="bg-card border border-border rounded-lg p-2 shadow-lg">
-                              <p className="text-xs text-muted-foreground">{data.formattedDate}</p>
-                              <p className={`text-sm font-semibold ${data.equity >= 0 ? 'text-success' : 'text-destructive'}`}>
-                                {data.equity >= 0 ? '+' : ''}£{data.equity.toLocaleString()}
-                              </p>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="equity" 
-                      stroke="hsl(var(--primary))" 
-                      fill="url(#pinnedEquityGradient)"
-                      strokeWidth={2}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        );
-
-      // Reports Overview - Individual KPI Cards
-      case 'reports-kpi-total-pnl':
-        return (
-          <Card className="h-full">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total P&L</CardTitle>
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-success">+£2,307</p>
-            </CardContent>
-          </Card>
-        );
-
-      case 'reports-kpi-avg-rr':
-        return (
-          <Card className="h-full">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Avg R:R</CardTitle>
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-foreground">1.85</p>
-            </CardContent>
-          </Card>
-        );
-
-      case 'reports-kpi-win-rate':
-        return (
-          <Card className="h-full">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-foreground">66.7%</p>
-            </CardContent>
-          </Card>
-        );
-
-      case 'reports-kpi-expectancy':
-        return (
-          <Card className="h-full">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Expectancy</CardTitle>
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-success">£256/trade</p>
-            </CardContent>
-          </Card>
-        );
-
-      // Best/Worst Days
-      case 'reports-overview-best-day':
-        return (
-          <Card className="h-full bg-success/5 border-success/20">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-success" />
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Best Winning Day</CardTitle>
-                </div>
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-success">+£1,200</p>
-              <p className="text-xs text-muted-foreground mt-1">2025-01-14</p>
-            </CardContent>
-          </Card>
-        );
-
-      case 'reports-overview-worst-day':
-        return (
-          <Card className="h-full bg-destructive/5 border-destructive/20">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CalendarIcon className="h-4 w-4 text-destructive" />
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Worst Losing Day</CardTitle>
-                </div>
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-destructive">-£400</p>
-              <p className="text-xs text-muted-foreground mt-1">2025-01-12</p>
-            </CardContent>
-          </Card>
-        );
-
-      // Overview Equity Curve
-      case 'reports-overview-equity':
-        return (
-          <Card className="h-full">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium">Equity Curve</CardTitle>
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className={chartHeight}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={journalEquityData}>
-                    <defs>
-                      <linearGradient id="overviewEquityGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="formattedDate" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `£${v}`} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
-                      formatter={(value: number) => [`£${value.toLocaleString()}`, 'Equity']}
-                    />
-                    <Area type="monotone" dataKey="equity" stroke="hsl(var(--primary))" fill="url(#overviewEquityGradient)" strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        );
-
-      // Rolling 30-Day
-      case 'reports-overview-rolling30':
-        return (
-          <Card className="h-full">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium">Rolling 30-Day</CardTitle>
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className={chartHeight}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={journalEquityData.slice(-30)}>
-                    <XAxis dataKey="formattedDate" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `£${v}`} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
-                      formatter={(value: number) => [`£${value.toLocaleString()}`, 'Cumulative P&L']}
-                    />
-                    <Area type="monotone" dataKey="equity" stroke="hsl(var(--success))" fill="hsl(var(--success))" fillOpacity={0.2} strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        );
-
-      // Strongest Edge
-      case 'reports-overview-edge':
-        return (
-          <Card className="h-full border-primary/30 bg-primary/5">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium">Your Strongest Edge</CardTitle>
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">High-confidence setups with 4+ star ratings</p>
-            </CardContent>
-          </Card>
-        );
-
-      // Session Comparison (from Reports → Sessions)
-      case 'reports-sessions-comparison':
-        return (
-          <Card className="h-full">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium">Session Comparison</CardTitle>
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="p-3 rounded-lg bg-success/5 border border-success/20">
-                  <p className="text-xs text-muted-foreground">London</p>
-                  <p className="text-lg font-bold text-success">71%</p>
-                  <p className="text-xs text-muted-foreground">Win Rate</p>
-                </div>
-                <div className="p-3 rounded-lg bg-muted/50 border border-border">
-                  <p className="text-xs text-muted-foreground">New York</p>
-                  <p className="text-lg font-bold text-foreground">65%</p>
-                  <p className="text-xs text-muted-foreground">Win Rate</p>
-                </div>
-                <div className="p-3 rounded-lg bg-muted/50 border border-border">
-                  <p className="text-xs text-muted-foreground">Asian</p>
-                  <p className="text-lg font-bold text-foreground">58%</p>
-                  <p className="text-xs text-muted-foreground">Win Rate</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-
-      // Best & Worst Setups (from Reports → Setup Quality)
-      case 'reports-setup-best-worst':
-        return (
-          <Card className="h-full">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium">Best & Worst Setups</CardTitle>
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 rounded-lg border-success/30 bg-success/5 border">
-                  <div className="flex items-center gap-1 mb-1">
-                    <TrendingUp className="h-3.5 w-3.5 text-success" />
-                    <p className="text-xs font-medium text-muted-foreground">Best</p>
-                  </div>
-                  <p className="text-sm font-bold text-success">5 Star</p>
-                  <p className="text-xs text-muted-foreground">£320/trade</p>
-                </div>
-                <div className="p-3 rounded-lg border-destructive/30 bg-destructive/5 border">
-                  <div className="flex items-center gap-1 mb-1">
-                    <CalendarIcon className="h-3.5 w-3.5 text-destructive" />
-                    <p className="text-xs font-medium text-muted-foreground">Worst</p>
-                  </div>
-                  <p className="text-sm font-bold text-destructive">1 Star</p>
-                  <p className="text-xs text-muted-foreground">-£85/trade</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-
-      // Fallback: render a warning card with remove option
-      default:
-        return (
-          <Card className="h-full border-amber-500/30 bg-amber-500/5">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-amber-600">Unknown Card</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground mb-2">Card ID: {cardId}</p>
-              <p className="text-xs text-muted-foreground">This card type is not recognized. Use Edit mode to remove it.</p>
-            </CardContent>
-          </Card>
-        );
+    // Look up renderer from centralized registry
+    const renderer = getCardRenderer(cardId);
+    
+    if (renderer) {
+      return renderer({ slotType });
     }
+    
+    // Fallback: render a warning card with remove option for unknown cards
+    return (
+      <Card className="h-full border-amber-500/30 bg-amber-500/5">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium text-amber-600">Unknown Card</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-xs text-muted-foreground mb-2">Card ID: {cardId}</p>
+          <p className="text-xs text-muted-foreground">This card type is not recognized. Use Edit mode to remove it.</p>
+        </CardContent>
+      </Card>
+    );
   };
 
   const handleAddRow = (afterRowId?: string) => {

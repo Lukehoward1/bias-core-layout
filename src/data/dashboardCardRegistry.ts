@@ -103,6 +103,16 @@ export const DASHBOARD_CARD_REGISTRY: DashboardCardDefinition[] = [
     allowedRowTypes: ['equal', 'hero', 'wide-narrow', 'three-equal'],
     dashboardEligible: true,
   },
+  {
+    id: 'alerts-my-alerts-timers',
+    title: 'My Alerts & Timers',
+    description: 'Your custom price alerts and session timers',
+    section: 'alerts',
+    category: 'overview',
+    defaultRowType: 'equal',
+    allowedRowTypes: ['equal', 'wide-narrow', 'hero'],
+    dashboardEligible: true,
+  },
 
   // ============ Calendar ============
   {
