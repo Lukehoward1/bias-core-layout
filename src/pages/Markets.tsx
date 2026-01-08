@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
-import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 
 type MarketType = 'Watchlist' | 'All' | 'FX' | 'Crypto' | 'Indices' | 'Commodities' | 'ETFs' | 'Futures';
 
@@ -128,13 +127,10 @@ export default function Markets() {
           {(selectedType === 'Watchlist' || selectedType === 'All') && watchlistAssets.length > 0 && (
             <Card className="bg-muted/30">
               <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Activity className="h-5 w-5 text-primary" />
-                    My Watchlist Overview
-                  </CardTitle>
-                  <AddToDashboardButton cardId="watchlist-overview" />
-                </div>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Activity className="h-5 w-5 text-primary" />
+                  My Watchlist Overview
+                </CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="space-y-2">

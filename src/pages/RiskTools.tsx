@@ -10,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 
 export default function RiskTools() {
   return (
@@ -152,13 +151,8 @@ export default function RiskTools() {
 
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Quick Calculator (Linked to Account)</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">Uses your connected account and current chart (coming soon)</p>
-                </div>
-                <AddToDashboardButton cardId="risk-quick-calculator" />
-              </div>
+              <CardTitle>Quick Calculator (Linked to Account)</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">Uses your connected account and current chart (coming soon)</p>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

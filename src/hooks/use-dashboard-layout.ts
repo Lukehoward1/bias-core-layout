@@ -1,4 +1,3 @@
-// @refresh reset
 import { useState, useEffect, useCallback } from 'react';
 
 export type RowType = 'kpi' | 'wide-narrow' | 'equal' | 'hero' | 'three-equal' | 'four-equal';
@@ -429,16 +428,6 @@ export function useDashboardLayout() {
     return layout.rows.some(r => r.cards.some(c => c.id === cardId && c.isPinned));
   }, [layout.rows]);
 
-  // Check if a card is currently on the dashboard (by cardId)
-  const isCardOnDashboard = (cardId: string) => {
-    return layout.rows.some(r => r.cards.some(c => c.id === cardId));
-  };
-
-  // Get all card IDs currently on the dashboard
-  const getCurrentCardIds = (): string[] => {
-    return layout.rows.flatMap(r => r.cards.map(c => c.id));
-  };
-
   // Add card to layout (finds appropriate row or creates new one)
   const addCard = useCallback((cardId: string, isPinned = false, sourceType?: string) => {
     setLayout(prev => {
@@ -499,8 +488,5 @@ export function useDashboardLayout() {
     pinCard,
     unpinCard,
     isPinned,
-    // Dashboard card check API
-    isCardOnDashboard,
-    getCurrentCardIds,
   };
 }

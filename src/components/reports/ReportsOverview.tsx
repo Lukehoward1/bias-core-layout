@@ -4,7 +4,6 @@ import { TrendingUp, Calendar, Target, Zap } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
-import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 
 interface Trade {
   id: string;
@@ -102,10 +101,7 @@ export function ReportsOverview({ trades, dateRangeLabel }: ReportsOverviewProps
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total P&L</CardTitle>
-              <div className="flex items-center gap-1">
-                <AddToDashboardButton cardId="reports-total-pnl" variant="icon" />
-                <PdfExportButton onClick={handleExportOverview} data-pdf-exclude />
-              </div>
+              <PdfExportButton onClick={handleExportOverview} data-pdf-exclude />
             </div>
           </CardHeader>
           <CardContent>
@@ -117,10 +113,7 @@ export function ReportsOverview({ trades, dateRangeLabel }: ReportsOverviewProps
 
         <Card>
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Avg R:R</CardTitle>
-              <AddToDashboardButton cardId="reports-avg-rr" variant="icon" />
-            </div>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Avg R:R</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">{avgRR.toFixed(2)}</div>
@@ -129,10 +122,7 @@ export function ReportsOverview({ trades, dateRangeLabel }: ReportsOverviewProps
 
         <Card>
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>
-              <AddToDashboardButton cardId="reports-win-rate" variant="icon" />
-            </div>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">{winRate.toFixed(1)}%</div>
@@ -141,10 +131,7 @@ export function ReportsOverview({ trades, dateRangeLabel }: ReportsOverviewProps
 
         <Card>
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Expectancy</CardTitle>
-              <AddToDashboardButton cardId="reports-expectancy" variant="icon" />
-            </div>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Expectancy</CardTitle>
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${expectancy >= 0 ? 'text-success' : 'text-destructive'}`}>
@@ -158,12 +145,9 @@ export function ReportsOverview({ trades, dateRangeLabel }: ReportsOverviewProps
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-success" />
-                <CardTitle className="text-sm font-medium text-muted-foreground">Best Winning Day</CardTitle>
-              </div>
-              <AddToDashboardButton cardId="reports-best-day" variant="icon" />
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-success" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Best Winning Day</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
@@ -176,12 +160,9 @@ export function ReportsOverview({ trades, dateRangeLabel }: ReportsOverviewProps
 
         <Card>
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-destructive" />
-                <CardTitle className="text-sm font-medium text-muted-foreground">Worst Losing Day</CardTitle>
-              </div>
-              <AddToDashboardButton cardId="reports-worst-day" variant="icon" />
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-destructive" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Worst Losing Day</CardTitle>
             </div>
           </CardHeader>
           <CardContent>

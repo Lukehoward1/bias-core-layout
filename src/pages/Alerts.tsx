@@ -11,7 +11,6 @@ import { AlertInbox } from "@/components/alerts/AlertInbox";
 import { TestAlertsPanel } from "@/components/alerts/TestAlertsPanel";
 import { ManualTimerPanel } from "@/components/alerts/ManualTimerPanel";
 import { useAlerts } from "@/hooks/use-alerts";
-import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 
 const news = [
   { title: 'Fed Signals Potential Rate Hold', currency: 'USD', time: '2h ago', sentiment: 'hawkish' },
@@ -105,10 +104,7 @@ export default function Alerts() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                 <Card className="lg:col-span-2">
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle>Top News</CardTitle>
-                      <AddToDashboardButton cardId="alerts-top-news" />
-                    </div>
+                    <CardTitle>Top News</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
@@ -137,10 +133,7 @@ export default function Alerts() {
 
                 <Card>
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle>Session Timers</CardTitle>
-                      <AddToDashboardButton cardId="session-timers" />
-                    </div>
+                    <CardTitle>Session Timers</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
