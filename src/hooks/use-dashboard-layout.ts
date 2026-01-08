@@ -428,6 +428,16 @@ export function useDashboardLayout() {
     return layout.rows.some(r => r.cards.some(c => c.id === cardId && c.isPinned));
   }, [layout.rows]);
 
+  // Check if a card is currently on the dashboard (by cardId)
+  const isCardOnDashboard = useCallback((cardId: string) => {
+    return layout.rows.some(r => r.cards.some(c => c.id === cardId));
+  }, [layout.rows]);
+
+  // Get all card IDs currently on the dashboard
+  const getCurrentCardIds = useCallback((): string[] => {
+    return layout.rows.flatMap(r => r.cards.map(c => c.id));
+  }, [layout.rows]);
+
   // Add card to layout (finds appropriate row or creates new one)
   const addCard = useCallback((cardId: string, isPinned = false, sourceType?: string) => {
     setLayout(prev => {
@@ -488,5 +498,8 @@ export function useDashboardLayout() {
     pinCard,
     unpinCard,
     isPinned,
+    // Dashboard card check API
+    isCardOnDashboard,
+    getCurrentCardIds,
   };
 }
