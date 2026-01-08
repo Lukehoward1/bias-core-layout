@@ -81,6 +81,117 @@ const getDefaultLayout = (): DashboardLayout => ({
   ],
 });
 
+const isRowType = (value: unknown): value is RowType => {
+  return (
+    value === 'kpi' ||
+    value === 'wide-narrow' ||
+    value === 'equal' ||
+    value === 'hero' ||
+    value === 'three-equal' ||
+    value === 'four-equal'
+  );
+};
+
+const getMaxSlotsForRowType = (rowType: RowType): number => {
+  switch (rowType) {
+    case 'kpi':
+      return 4;
+    case 'wide-narrow':
+      return 2;
+    case 'equal':
+      return 2;
+    case 'three-equal':
+      return 3;
+    case 'four-equal':
+      return 4;
+    case 'hero':
+      return 1;
+    default:
+      return 2;
+  }
+};
+
+/**
+ * Ensures persisted layout data can never crash rendering or break hook order.
+ * If localStorage is corrupted or from an older schema, we fall back to defaults.
+ */
+const normalizeLayout = (raw: unknown): DashboardLayout => {
+  const fallback = getDefaultLayout();
+
+  if (!raw || typeof raw !== 'object') return fallback;
+
+  const rowsRaw = (raw as { rows?: unknown }).rows;
+  if (!Array.isArray(rowsRaw)) return fallback;
+
+  const normalizedRows: DashboardRow[] = rowsRaw
+    .filter(Boolean)
+    .map((row): DashboardRow | null => {
+      if (!row || typeof row !== 'object') return null;
+
+      const r = row as Partial<DashboardRow> & { cards?: unknown };
+
+      const id = typeof r.id === 'string' ? r.id : generateRowId();
+      const type: RowType = isRowType(r.type) ? r.type : 'equal';
+      const isFixed = Boolean(r.isFixed);
+
+      const cardsRaw = Array.isArray(r.cards) ? r.cards : [];
+      const cards: DashboardCardEntry[] = cardsRaw
+        .filter(Boolean)
+        .map((c): DashboardCardEntry | null => {
+          if (!c || typeof c !== 'object') return null;
+          const ce = c as Partial<DashboardCardEntry>;
+          if (typeof ce.id !== 'string' || !ce.id) return null;
+          return {
+            id: ce.id,
+            isPinned: Boolean(ce.isPinned),
+            sourceType: typeof ce.sourceType === 'string' ? ce.sourceType : undefined,
+          };
+        })
+        .filter((c): c is DashboardCardEntry => Boolean(c));
+
+      // De-dupe by id while preserving order
+      const seen = new Set<string>();
+      const deduped = cards.filter((c) => {
+        if (seen.has(c.id)) return false;
+        seen.add(c.id);
+        return true;
+      });
+
+      const maxSlots = getMaxSlotsForRowType(type);
+      return {
+        id,
+        type,
+        isFixed,
+        cards: deduped.slice(0, maxSlots),
+      };
+    })
+    .filter((r): r is DashboardRow => Boolean(r));
+
+  // Ensure KPI row always exists as the first row and is fixed.
+  const requiredKpiIds = ['todays-bias', 'active-trades', 'next-session', 'high-impact-events'];
+  const existingKpi = normalizedRows.find((r) => r.id === 'kpi-row' || r.type === 'kpi' || r.isFixed);
+
+  const existingKpiIds = (existingKpi?.cards ?? [])
+    .map((c) => c.id)
+    .filter((id) => requiredKpiIds.includes(id));
+
+  const finalKpiIds = [...existingKpiIds, ...requiredKpiIds.filter((id) => !existingKpiIds.includes(id))].slice(0, 4);
+
+  const kpiRow: DashboardRow = {
+    id: 'kpi-row',
+    type: 'kpi',
+    isFixed: true,
+    cards: finalKpiIds.map((id) => ({ id, isPinned: false })),
+  };
+
+  const nonKpiRows = normalizedRows.filter((r) => r !== existingKpi && !r.isFixed && r.type !== 'kpi');
+
+  return {
+    rows: [kpiRow, ...nonKpiRows],
+  };
+};
+
+
 // Migrate from old v2 format
 const migrateOldLayout = (): DashboardLayout | null => {
   try {
@@ -149,16 +260,13 @@ export function useDashboardLayout() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.rows && Array.isArray(parsed.rows)) {
-          return parsed;
-        }
+        return normalizeLayout(JSON.parse(saved));
       }
-      
+
       // Try migrating from old format
       const migrated = migrateOldLayout();
       if (migrated) {
-        return migrated;
+        return normalizeLayout(migrated);
       }
     } catch (e) {
       console.warn('Failed to load dashboard layout:', e);
@@ -182,17 +290,9 @@ export function useDashboardLayout() {
   }, []);
 
   // Get max slots for a row type
-  const getMaxSlots = (rowType: RowType): number => {
-    switch (rowType) {
-      case 'kpi': return 4;
-      case 'wide-narrow': return 2;
-      case 'equal': return 2;
-      case 'three-equal': return 3;
-      case 'four-equal': return 4;
-      case 'hero': return 1;
-      default: return 2;
-    }
-  };
+  const getMaxSlots = useCallback((rowType: RowType): number => {
+    return getMaxSlotsForRowType(rowType);
+  }, []);
 
   // Add a card to a specific row
   const addCardToRow = useCallback((rowId: string, cardId: string, isPinned = false, sourceType?: string) => {
