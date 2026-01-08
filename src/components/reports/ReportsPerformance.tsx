@@ -3,6 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pi
 import { format, parseISO, getDay } from "date-fns";
 import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
+import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 
 interface Trade {
   id: string;
@@ -21,12 +22,15 @@ interface Trade {
 interface ReportsPerformanceProps {
   trades: Trade[];
   dateRangeLabel: string;
+  isAdded?: boolean;
+  onAdd?: () => void;
+  onRemove?: () => void;
 }
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--success))', 'hsl(var(--destructive))', 'hsl(var(--accent))'];
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export function ReportsPerformance({ trades, dateRangeLabel }: ReportsPerformanceProps) {
+export function ReportsPerformance({ trades, dateRangeLabel, isAdded, onAdd, onRemove }: ReportsPerformanceProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats

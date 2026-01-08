@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recha
 import { Shield, AlertTriangle, TrendingDown, Target } from "lucide-react";
 import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
+import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 
 interface Trade {
   id: string;
@@ -22,9 +23,12 @@ interface Trade {
 interface ReportsRiskManagementProps {
   trades: Trade[];
   dateRangeLabel: string;
+  isAdded?: boolean;
+  onAdd?: () => void;
+  onRemove?: () => void;
 }
 
-export function ReportsRiskManagement({ trades, dateRangeLabel }: ReportsRiskManagementProps) {
+export function ReportsRiskManagement({ trades, dateRangeLabel, isAdded, onAdd, onRemove }: ReportsRiskManagementProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats for PDF export
@@ -110,8 +114,11 @@ export function ReportsRiskManagement({ trades, dateRangeLabel }: ReportsRiskMan
 
   return (
     <div id="reports-risk" className="space-y-6">
-      {/* Header with export */}
-      <div className="flex items-center justify-end" data-pdf-exclude>
+      {/* Header with export and pin */}
+      <div className="flex items-center justify-end gap-2" data-pdf-exclude>
+        {isAdded !== undefined && onAdd && onRemove && (
+          <AddToDashboardButton isAdded={isAdded} onAdd={onAdd} onRemove={onRemove} />
+        )}
         <PdfExportButton onClick={handleExport} />
       </div>
 

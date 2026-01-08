@@ -210,6 +210,51 @@ export default function Journal() {
     removeCard(equityCurveCardId);
     toast.success('Removed from Dashboard');
   };
+  
+  // Daily Performance card
+  const dailyPerformanceCardId = 'daily-performance';
+  const isDailyPerformanceAdded = isCardOnDashboard(dailyPerformanceCardId);
+  
+  const handleAddDailyPerformance = () => {
+    addCard(dailyPerformanceCardId, true, 'daily-performance');
+    toast.success('Added to Dashboard');
+  };
+  
+  const handleRemoveDailyPerformance = () => {
+    removeCard(dailyPerformanceCardId);
+    toast.success('Removed from Dashboard');
+  };
+
+  // Reports cards - compute all pin states at page level
+  const reportCardIds = {
+    overview: 'reports-overview',
+    performance: 'reports-performance',
+    sessions: 'reports-sessions',
+    assets: 'reports-assets',
+    setupQuality: 'reports-setup-quality',
+    psychology: 'reports-psychology',
+    risk: 'reports-risk',
+  };
+
+  const reportCardStates = {
+    overview: isCardOnDashboard(reportCardIds.overview),
+    performance: isCardOnDashboard(reportCardIds.performance),
+    sessions: isCardOnDashboard(reportCardIds.sessions),
+    assets: isCardOnDashboard(reportCardIds.assets),
+    setupQuality: isCardOnDashboard(reportCardIds.setupQuality),
+    psychology: isCardOnDashboard(reportCardIds.psychology),
+    risk: isCardOnDashboard(reportCardIds.risk),
+  };
+
+  const handleAddReportCard = (cardId: string) => {
+    addCard(cardId, true, cardId);
+    toast.success('Added to Dashboard');
+  };
+
+  const handleRemoveReportCard = (cardId: string) => {
+    removeCard(cardId);
+    toast.success('Removed from Dashboard');
+  };
 
   // Date range filter for Reports
   const [dateRange, setDateRange] = useState<DateRange>({
@@ -447,6 +492,11 @@ export default function Journal() {
                   <div className="flex items-center justify-between">
                     <CardTitle>Daily Performance</CardTitle>
                     <div className="flex items-center gap-2">
+                      <AddToDashboardButton
+                        isAdded={isDailyPerformanceAdded}
+                        onAdd={handleAddDailyPerformance}
+                        onRemove={handleRemoveDailyPerformance}
+                      />
                       <Button 
                         variant="ghost" 
                         size="icon" 
@@ -750,25 +800,67 @@ export default function Journal() {
                 </div>
 
                 <TabsContent value="overview" className="mt-5">
-                  <ReportsOverview trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
+                  <ReportsOverview 
+                    trades={filteredTrades} 
+                    dateRangeLabel={dateRangeLabel}
+                    isAdded={reportCardStates.overview}
+                    onAdd={() => handleAddReportCard(reportCardIds.overview)}
+                    onRemove={() => handleRemoveReportCard(reportCardIds.overview)}
+                  />
                 </TabsContent>
                 <TabsContent value="performance" className="mt-5">
-                  <ReportsPerformance trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
+                  <ReportsPerformance 
+                    trades={filteredTrades} 
+                    dateRangeLabel={dateRangeLabel}
+                    isAdded={reportCardStates.performance}
+                    onAdd={() => handleAddReportCard(reportCardIds.performance)}
+                    onRemove={() => handleRemoveReportCard(reportCardIds.performance)}
+                  />
                 </TabsContent>
                 <TabsContent value="sessions" className="mt-5">
-                  <ReportsSessions trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
+                  <ReportsSessions 
+                    trades={filteredTrades} 
+                    dateRangeLabel={dateRangeLabel}
+                    isAdded={reportCardStates.sessions}
+                    onAdd={() => handleAddReportCard(reportCardIds.sessions)}
+                    onRemove={() => handleRemoveReportCard(reportCardIds.sessions)}
+                  />
                 </TabsContent>
                 <TabsContent value="assets" className="mt-5">
-                  <ReportsAssets trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
+                  <ReportsAssets 
+                    trades={filteredTrades} 
+                    dateRangeLabel={dateRangeLabel}
+                    isAdded={reportCardStates.assets}
+                    onAdd={() => handleAddReportCard(reportCardIds.assets)}
+                    onRemove={() => handleRemoveReportCard(reportCardIds.assets)}
+                  />
                 </TabsContent>
                 <TabsContent value="setup" className="mt-5">
-                  <ReportsSetupQuality trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
+                  <ReportsSetupQuality 
+                    trades={filteredTrades} 
+                    dateRangeLabel={dateRangeLabel}
+                    isAdded={reportCardStates.setupQuality}
+                    onAdd={() => handleAddReportCard(reportCardIds.setupQuality)}
+                    onRemove={() => handleRemoveReportCard(reportCardIds.setupQuality)}
+                  />
                 </TabsContent>
                 <TabsContent value="psychology" className="mt-5">
-                  <ReportsPsychology trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
+                  <ReportsPsychology 
+                    trades={filteredTrades} 
+                    dateRangeLabel={dateRangeLabel}
+                    isAdded={reportCardStates.psychology}
+                    onAdd={() => handleAddReportCard(reportCardIds.psychology)}
+                    onRemove={() => handleRemoveReportCard(reportCardIds.psychology)}
+                  />
                 </TabsContent>
                 <TabsContent value="risk" className="mt-5">
-                  <ReportsRiskManagement trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
+                  <ReportsRiskManagement 
+                    trades={filteredTrades} 
+                    dateRangeLabel={dateRangeLabel}
+                    isAdded={reportCardStates.risk}
+                    onAdd={() => handleAddReportCard(reportCardIds.risk)}
+                    onRemove={() => handleRemoveReportCard(reportCardIds.risk)}
+                  />
                 </TabsContent>
                 <TabsContent value="tradelog" className="mt-5">
                   <ReportsTradeLog trades={filteredTrades} dateRangeLabel={dateRangeLabel} />

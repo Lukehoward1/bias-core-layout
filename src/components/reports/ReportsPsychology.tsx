@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Brain, AlertTriangle, ThumbsUp, Target, TrendingUp, Heart } from "lucide-react";
 import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
+import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 
 interface Trade {
   id: string;
@@ -21,12 +22,15 @@ interface Trade {
 interface ReportsPsychologyProps {
   trades: Trade[];
   dateRangeLabel: string;
+  isAdded?: boolean;
+  onAdd?: () => void;
+  onRemove?: () => void;
 }
 
 const POSITIVE_KEYWORDS = ['patient', 'perfect', 'confident', 'disciplined', 'calm', 'good setup', 'followed plan', 'great'];
 const NEGATIVE_KEYWORDS = ['fear', 'fomo', 'hesitation', 'revenge', 'late entry', 'early exit', 'overtrading', 'impatient', 'greedy', 'emotional'];
 
-export function ReportsPsychology({ trades, dateRangeLabel }: ReportsPsychologyProps) {
+export function ReportsPsychology({ trades, dateRangeLabel, isAdded, onAdd, onRemove }: ReportsPsychologyProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats
@@ -112,8 +116,11 @@ export function ReportsPsychology({ trades, dateRangeLabel }: ReportsPsychologyP
 
   return (
     <div id="reports-psychology" className="space-y-6">
-      {/* Header with export */}
-      <div className="flex items-center justify-end" data-pdf-exclude>
+      {/* Header with export and pin */}
+      <div className="flex items-center justify-end gap-2" data-pdf-exclude>
+        {isAdded !== undefined && onAdd && onRemove && (
+          <AddToDashboardButton isAdded={isAdded} onAdd={onAdd} onRemove={onRemove} />
+        )}
         <PdfExportButton onClick={handleExport} />
       </div>
 

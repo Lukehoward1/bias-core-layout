@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recha
 import { TrendingUp, TrendingDown, Star, Target } from "lucide-react";
 import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
+import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 
 interface Trade {
   id: string;
@@ -22,9 +23,12 @@ interface Trade {
 interface ReportsAssetsProps {
   trades: Trade[];
   dateRangeLabel: string;
+  isAdded?: boolean;
+  onAdd?: () => void;
+  onRemove?: () => void;
 }
 
-export function ReportsAssets({ trades, dateRangeLabel }: ReportsAssetsProps) {
+export function ReportsAssets({ trades, dateRangeLabel, isAdded, onAdd, onRemove }: ReportsAssetsProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats
@@ -85,15 +89,20 @@ export function ReportsAssets({ trades, dateRangeLabel }: ReportsAssetsProps) {
 
   return (
     <div id="reports-assets" className="space-y-6">
+      {/* Header with export and pin */}
+      <div className="flex items-center justify-end gap-2" data-pdf-exclude>
+        {isAdded !== undefined && onAdd && onRemove && (
+          <AddToDashboardButton isAdded={isAdded} onAdd={onAdd} onRemove={onRemove} />
+        )}
+        <PdfExportButton onClick={handleExport} />
+      </div>
+
       {/* Top Insight Card */}
       <Card className="border-primary/30 bg-primary/5">
         <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
-              <CardTitle>Your Most Profitable Pair This Month</CardTitle>
-            </div>
-            <PdfExportButton onClick={handleExport} data-pdf-exclude />
+          <div className="flex items-center gap-2">
+            <Target className="h-5 w-5 text-primary" />
+            <CardTitle>Your Most Profitable Pair This Month</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
