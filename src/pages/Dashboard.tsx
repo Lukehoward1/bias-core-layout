@@ -706,6 +706,71 @@ export default function Dashboard() {
           </Card>
         );
 
+      // Session Comparison (from Reports → Sessions)
+      case 'reports-sessions-comparison':
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium">Session Comparison</CardTitle>
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="p-3 rounded-lg bg-success/5 border border-success/20">
+                  <p className="text-xs text-muted-foreground">London</p>
+                  <p className="text-lg font-bold text-success">71%</p>
+                  <p className="text-xs text-muted-foreground">Win Rate</p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                  <p className="text-xs text-muted-foreground">New York</p>
+                  <p className="text-lg font-bold text-foreground">65%</p>
+                  <p className="text-xs text-muted-foreground">Win Rate</p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                  <p className="text-xs text-muted-foreground">Asian</p>
+                  <p className="text-lg font-bold text-foreground">58%</p>
+                  <p className="text-xs text-muted-foreground">Win Rate</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      // Best & Worst Setups (from Reports → Setup Quality)
+      case 'reports-setup-best-worst':
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium">Best & Worst Setups</CardTitle>
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg border-success/30 bg-success/5 border">
+                  <div className="flex items-center gap-1 mb-1">
+                    <TrendingUp className="h-3.5 w-3.5 text-success" />
+                    <p className="text-xs font-medium text-muted-foreground">Best</p>
+                  </div>
+                  <p className="text-sm font-bold text-success">5 Star</p>
+                  <p className="text-xs text-muted-foreground">£320/trade</p>
+                </div>
+                <div className="p-3 rounded-lg border-destructive/30 bg-destructive/5 border">
+                  <div className="flex items-center gap-1 mb-1">
+                    <CalendarIcon className="h-3.5 w-3.5 text-destructive" />
+                    <p className="text-xs font-medium text-muted-foreground">Worst</p>
+                  </div>
+                  <p className="text-sm font-bold text-destructive">1 Star</p>
+                  <p className="text-xs text-muted-foreground">-£85/trade</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+
       // Fallback: render a warning card with remove option
       default:
         return (
