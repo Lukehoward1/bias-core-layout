@@ -1,32 +1,27 @@
 import { useState, useEffect, useCallback } from 'react';
+import { DASHBOARD_CARD_REGISTRY, type DashboardCardDefinition } from '@/data/dashboardCardRegistry';
 
 export type RowType = 'kpi' | 'wide-narrow' | 'equal' | 'hero' | 'three-equal' | 'four-equal';
+
+// Re-export for backwards compatibility
+export type { DashboardCardDefinition };
 
 export interface DashboardCardConfig {
   id: string;
   title: string;
   description: string;
-  defaultVisible: boolean;
   category: 'metrics' | 'analysis' | 'overview';
-  isPinned?: boolean;
-  sourceType?: 'journal-equity' | 'journal-summary' | 'alerts-timers' | 'calendar-events' | 'custom';
   allowedRowTypes?: RowType[];
 }
 
-// All available dashboard cards with metadata
-export const AVAILABLE_CARDS: DashboardCardConfig[] = [
-  { id: 'todays-bias', title: "Today's Bias", description: 'Current market bias direction', defaultVisible: true, category: 'metrics', allowedRowTypes: ['kpi'] },
-  { id: 'active-trades', title: 'Active Trades', description: 'Current open positions', defaultVisible: true, category: 'metrics', allowedRowTypes: ['kpi'] },
-  { id: 'next-session', title: 'Next Session', description: 'Upcoming trading session timer', defaultVisible: true, category: 'metrics', allowedRowTypes: ['kpi'] },
-  { id: 'high-impact-events', title: 'High Impact Events', description: 'Important economic events today', defaultVisible: true, category: 'metrics', allowedRowTypes: ['kpi'] },
-  { id: 'watchlist-overview', title: 'Watchlist Overview', description: 'Your watchlist with key levels', defaultVisible: true, category: 'analysis', allowedRowTypes: ['wide-narrow', 'equal', 'hero'] },
-  { id: 'session-timers', title: 'Session Timers', description: 'All trading session countdowns', defaultVisible: true, category: 'analysis', allowedRowTypes: ['wide-narrow', 'equal', 'hero'] },
-  { id: 'upcoming-events', title: 'Upcoming Events', description: 'Calendar of upcoming economic events', defaultVisible: true, category: 'overview', allowedRowTypes: ['equal', 'hero'] },
-  { id: 'performance-overview', title: 'Performance Overview', description: 'Trading performance summary', defaultVisible: true, category: 'overview', allowedRowTypes: ['equal', 'hero'] },
-  { id: 'journal-summary', title: 'Journal Summary', description: 'Recent journal entries overview', defaultVisible: false, category: 'overview', allowedRowTypes: ['equal', 'hero'] },
-  { id: 'risk-snapshot', title: 'Risk Snapshot', description: 'Current risk exposure summary', defaultVisible: false, category: 'analysis', allowedRowTypes: ['wide-narrow', 'equal'] },
-  { id: 'calendar-events', title: 'Calendar Events', description: 'Week ahead calendar preview', defaultVisible: false, category: 'overview', allowedRowTypes: ['equal', 'hero'] },
-];
+// Derive AVAILABLE_CARDS from registry for backwards compatibility
+export const AVAILABLE_CARDS: DashboardCardConfig[] = DASHBOARD_CARD_REGISTRY.map(card => ({
+  id: card.id,
+  title: card.title,
+  description: card.description,
+  category: card.category,
+  allowedRowTypes: card.allowedRowTypes,
+}));
 
 const STORAGE_KEY = 'streambias-dashboard-layout-v3';
 
@@ -567,6 +562,11 @@ export function useDashboardLayout() {
     });
   }, []);
 
+  // Check if a card is currently on the dashboard (by ID)
+  const isCardOnDashboard = useCallback((cardId: string): boolean => {
+    return layout.rows.some(r => r.cards.some(c => c.id === cardId));
+  }, [layout.rows]);
+
   return {
     layout,
     isEditMode,
@@ -588,5 +588,7 @@ export function useDashboardLayout() {
     pinCard,
     unpinCard,
     isPinned,
+    // Check if card exists on dashboard
+    isCardOnDashboard,
   };
 }

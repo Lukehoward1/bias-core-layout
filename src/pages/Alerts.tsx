@@ -11,6 +11,9 @@ import { AlertInbox } from "@/components/alerts/AlertInbox";
 import { TestAlertsPanel } from "@/components/alerts/TestAlertsPanel";
 import { ManualTimerPanel } from "@/components/alerts/ManualTimerPanel";
 import { useAlerts } from "@/hooks/use-alerts";
+import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
+import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
+import { toast } from "sonner";
 
 const news = [
   { title: 'Fed Signals Potential Rate Hold', currency: 'USD', time: '2h ago', sentiment: 'hawkish' },
@@ -47,6 +50,25 @@ export default function Alerts() {
     clearAllAlerts,
     updatePreferences
   } = useAlerts();
+  
+  // Dashboard integration - single hook at page level
+  const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
+  
+  // Dashboard card states
+  const topNewsCardId = 'top-news';
+  const sessionTimersCardId = 'session-timers';
+  const isTopNewsAdded = isCardOnDashboard(topNewsCardId);
+  const isSessionTimersAdded = isCardOnDashboard(sessionTimersCardId);
+  
+  const handleAddCard = (cardId: string) => {
+    addCard(cardId);
+    toast.success('Added to Dashboard');
+  };
+  
+  const handleRemoveCard = (cardId: string) => {
+    removeCard(cardId);
+    toast.success('Removed from Dashboard');
+  };
 
   const unreadCount = alerts.filter(a => !a.read).length;
 
@@ -103,8 +125,14 @@ export default function Alerts() {
             <TabsContent value="overview" className="mt-6">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                 <Card className="lg:col-span-2">
-                  <CardHeader>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0">
                     <CardTitle>Top News</CardTitle>
+                    <AddToDashboardButton
+                      isAdded={isTopNewsAdded}
+                      onAdd={() => handleAddCard(topNewsCardId)}
+                      onRemove={() => handleRemoveCard(topNewsCardId)}
+                      size="sm"
+                    />
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
@@ -132,8 +160,14 @@ export default function Alerts() {
                 </Card>
 
                 <Card>
-                  <CardHeader>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0">
                     <CardTitle>Session Timers</CardTitle>
+                    <AddToDashboardButton
+                      isAdded={isSessionTimersAdded}
+                      onAdd={() => handleAddCard(sessionTimersCardId)}
+                      onRemove={() => handleRemoveCard(sessionTimersCardId)}
+                      size="sm"
+                    />
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
