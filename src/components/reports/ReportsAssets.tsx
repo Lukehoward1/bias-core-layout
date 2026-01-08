@@ -20,15 +20,22 @@ interface Trade {
   rating?: number;
 }
 
+interface PinState {
+  isAdded: boolean;
+  onAdd: () => void;
+  onRemove: () => void;
+}
+
 interface ReportsAssetsProps {
   trades: Trade[];
   dateRangeLabel: string;
-  isAdded?: boolean;
-  onAdd?: () => void;
-  onRemove?: () => void;
+  pinStates?: {
+    pnlChart: PinState;
+    table: PinState;
+  };
 }
 
-export function ReportsAssets({ trades, dateRangeLabel, isAdded, onAdd, onRemove }: ReportsAssetsProps) {
+export function ReportsAssets({ trades, dateRangeLabel, pinStates }: ReportsAssetsProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats
@@ -89,11 +96,8 @@ export function ReportsAssets({ trades, dateRangeLabel, isAdded, onAdd, onRemove
 
   return (
     <div id="reports-assets" className="space-y-6">
-      {/* Header with export and pin */}
+      {/* Header with export */}
       <div className="flex items-center justify-end gap-2" data-pdf-exclude>
-        {isAdded !== undefined && onAdd && onRemove && (
-          <AddToDashboardButton isAdded={isAdded} onAdd={onAdd} onRemove={onRemove} />
-        )}
         <PdfExportButton onClick={handleExport} />
       </div>
 
@@ -118,10 +122,19 @@ export function ReportsAssets({ trades, dateRangeLabel, isAdded, onAdd, onRemove
         </CardContent>
       </Card>
 
-      {/* P&L by Pair Chart */}
+      {/* P&L by Pair Chart - with per-card pin */}
       <Card>
         <CardHeader>
-          <CardTitle>P&L by Instrument</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>P&L by Instrument</CardTitle>
+            {pinStates?.pnlChart && (
+              <AddToDashboardButton
+                isAdded={pinStates.pnlChart.isAdded}
+                onAdd={pinStates.pnlChart.onAdd}
+                onRemove={pinStates.pnlChart.onRemove}
+              />
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="h-64">
@@ -197,10 +210,19 @@ export function ReportsAssets({ trades, dateRangeLabel, isAdded, onAdd, onRemove
         </Card>
       </div>
 
-      {/* Detailed Stats Table */}
+      {/* Detailed Stats Table - with per-card pin */}
       <Card>
         <CardHeader>
-          <CardTitle>Instrument Statistics</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Instrument Statistics</CardTitle>
+            {pinStates?.table && (
+              <AddToDashboardButton
+                isAdded={pinStates.table.isAdded}
+                onAdd={pinStates.table.onAdd}
+                onRemove={pinStates.table.onRemove}
+              />
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">

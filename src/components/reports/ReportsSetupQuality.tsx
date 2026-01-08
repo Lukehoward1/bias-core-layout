@@ -20,17 +20,24 @@ interface Trade {
   rating?: number;
 }
 
+interface PinState {
+  isAdded: boolean;
+  onAdd: () => void;
+  onRemove: () => void;
+}
+
 interface ReportsSetupQualityProps {
   trades: Trade[];
   dateRangeLabel: string;
-  isAdded?: boolean;
-  onAdd?: () => void;
-  onRemove?: () => void;
+  pinStates?: {
+    bestWorst: PinState;
+    patterns: PinState;
+  };
 }
 
 const KEYWORDS = ['late entry', 'fear', 'hesitation', 'fomo', 'missed level', 'early exit', 'overtrading', 'revenge', 'perfect', 'patient'];
 
-export function ReportsSetupQuality({ trades, dateRangeLabel, isAdded, onAdd, onRemove }: ReportsSetupQualityProps) {
+export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates }: ReportsSetupQualityProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats
@@ -115,70 +122,75 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, isAdded, onAdd, on
 
   return (
     <div id="reports-setup" className="space-y-6">
-      {/* Header with export and pin */}
+      {/* Header with export */}
       <div className="flex items-center justify-end gap-2" data-pdf-exclude>
-        {isAdded !== undefined && onAdd && onRemove && (
-          <AddToDashboardButton isAdded={isAdded} onAdd={onAdd} onRemove={onRemove} />
-        )}
         <PdfExportButton onClick={handleExport} />
       </div>
 
-      {/* Best & Worst Setup */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="border-success/30 bg-success/5">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-success" />
-              <CardTitle className="text-base">Best Setup</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-3">
-              <div className="flex">
-                {[...Array(bestSetup?.ratingNum || 0)].map((_, i) => (
-                  <Star key={i} className="h-5 w-5 text-yellow-400 fill-yellow-400" />
-                ))}
+      {/* Best & Worst Setup - with per-card pin */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Best & Worst Setups</CardTitle>
+            {pinStates?.bestWorst && (
+              <AddToDashboardButton
+                isAdded={pinStates.bestWorst.isAdded}
+                onAdd={pinStates.bestWorst.onAdd}
+                onRemove={pinStates.bestWorst.onRemove}
+              />
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-lg border-success/30 bg-success/5 border">
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp className="h-5 w-5 text-success" />
+                <p className="text-base font-medium">Best Setup</p>
               </div>
-              <span className="text-sm text-muted-foreground">
-                {bestSetup?.trades || 0} trades
-              </span>
+              <div className="flex items-center gap-3">
+                <div className="flex">
+                  {[...Array(bestSetup?.ratingNum || 0)].map((_, i) => (
+                    <Star key={i} className="h-5 w-5 text-yellow-400 fill-yellow-400" />
+                  ))}
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {bestSetup?.trades || 0} trades
+                </span>
+              </div>
+              <p className="text-2xl font-bold text-success mt-2">
+                £{bestSetup?.expectancy?.toLocaleString() || 0}/trade expectancy
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {bestSetup?.winRate || 0}% win rate
+              </p>
             </div>
-            <p className="text-2xl font-bold text-success mt-2">
-              £{bestSetup?.expectancy?.toLocaleString() || 0}/trade expectancy
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {bestSetup?.winRate || 0}% win rate
-            </p>
-          </CardContent>
-        </Card>
 
-        <Card className="border-destructive/30 bg-destructive/5">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <TrendingDown className="h-5 w-5 text-destructive" />
-              <CardTitle className="text-base">Worst Setup</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-3">
-              <div className="flex">
-                {[...Array(worstSetup?.ratingNum || 0)].map((_, i) => (
-                  <Star key={i} className="h-5 w-5 text-yellow-400 fill-yellow-400" />
-                ))}
+            <div className="p-4 rounded-lg border-destructive/30 bg-destructive/5 border">
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingDown className="h-5 w-5 text-destructive" />
+                <p className="text-base font-medium">Worst Setup</p>
               </div>
-              <span className="text-sm text-muted-foreground">
-                {worstSetup?.trades || 0} trades
-              </span>
+              <div className="flex items-center gap-3">
+                <div className="flex">
+                  {[...Array(worstSetup?.ratingNum || 0)].map((_, i) => (
+                    <Star key={i} className="h-5 w-5 text-yellow-400 fill-yellow-400" />
+                  ))}
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {worstSetup?.trades || 0} trades
+                </span>
+              </div>
+              <p className="text-2xl font-bold text-destructive mt-2">
+                £{worstSetup?.expectancy?.toLocaleString() || 0}/trade expectancy
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {worstSetup?.winRate || 0}% win rate
+              </p>
             </div>
-            <p className="text-2xl font-bold text-destructive mt-2">
-              £{worstSetup?.expectancy?.toLocaleString() || 0}/trade expectancy
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {worstSetup?.winRate || 0}% win rate
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Setup Performance by Rating */}
       <Card>
@@ -267,12 +279,21 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, isAdded, onAdd, on
         </CardContent>
       </Card>
 
-      {/* Notes Keyword Extraction */}
+      {/* Notes Keyword Extraction - with per-card pin */}
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-            <CardTitle>Common Patterns in Notes</CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              <CardTitle>Common Patterns in Notes</CardTitle>
+            </div>
+            {pinStates?.patterns && (
+              <AddToDashboardButton
+                isAdded={pinStates.patterns.isAdded}
+                onAdd={pinStates.patterns.onAdd}
+                onRemove={pinStates.patterns.onRemove}
+              />
+            )}
           </div>
         </CardHeader>
         <CardContent>

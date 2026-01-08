@@ -225,35 +225,121 @@ export default function Journal() {
     toast.success('Removed from Dashboard');
   };
 
-  // Reports cards - compute all pin states at page level
-  const reportCardIds = {
-    overview: 'reports-overview',
-    performance: 'reports-performance',
-    sessions: 'reports-sessions',
-    assets: 'reports-assets',
-    setupQuality: 'reports-setup-quality',
-    psychology: 'reports-psychology',
-    risk: 'reports-risk',
+  // Reports cards - compute all per-card pin states at page level
+  // Overview tab cards
+  const overviewCardIds = {
+    kpis: 'reports-overview-kpis',
+    bestWorst: 'reports-overview-best-worst',
+    equity: 'reports-overview-equity',
+    rolling: 'reports-overview',
+    edge: 'reports-overview',
+  };
+  
+  // Performance tab cards
+  const performanceCardIds = {
+    byDay: 'reports-performance-by-day',
+    bySession: 'reports-performance-by-session',
+    distribution: 'reports-performance-distribution',
+    holdTime: 'reports-performance',
+    duration: 'reports-performance',
+    heatmap: 'reports-performance',
   };
 
-  const reportCardStates = {
-    overview: isCardOnDashboard(reportCardIds.overview),
-    performance: isCardOnDashboard(reportCardIds.performance),
-    sessions: isCardOnDashboard(reportCardIds.sessions),
-    assets: isCardOnDashboard(reportCardIds.assets),
-    setupQuality: isCardOnDashboard(reportCardIds.setupQuality),
-    psychology: isCardOnDashboard(reportCardIds.psychology),
-    risk: isCardOnDashboard(reportCardIds.risk),
+  // Sessions tab cards
+  const sessionsCardIds = {
+    cards: 'reports-sessions',
+    comparison: 'reports-sessions-comparison',
+    pnl: 'reports-sessions',
+    recommendations: 'reports-sessions-recommendations',
   };
 
-  const handleAddReportCard = (cardId: string) => {
-    addCard(cardId, true, cardId);
-    toast.success('Added to Dashboard');
+  // Assets tab cards
+  const assetsCardIds = {
+    topInsight: 'reports-assets',
+    pnlChart: 'reports-assets-pnl',
+    bestWorst: 'reports-assets',
+    table: 'reports-assets-table',
   };
 
-  const handleRemoveReportCard = (cardId: string) => {
-    removeCard(cardId);
-    toast.success('Removed from Dashboard');
+  // Setup Quality tab cards
+  const setupCardIds = {
+    bestWorst: 'reports-setup-best-worst',
+    performance: 'reports-setup-quality',
+    stats: 'reports-setup-quality',
+    patterns: 'reports-setup-patterns',
+    timeline: 'reports-setup-quality',
+  };
+
+  // Psychology tab cards
+  const psychologyCardIds = {
+    sentiment: 'reports-psychology-sentiment',
+    terms: 'reports-psychology',
+    triggers: 'reports-psychology-triggers',
+    mistakes: 'reports-psychology',
+    confident: 'reports-psychology',
+    improvement: 'reports-psychology-improvement',
+  };
+
+  // Risk tab cards
+  const riskCardIds = {
+    kpis: 'reports-risk-kpis',
+    distribution: 'reports-risk-distribution',
+    excessive: 'reports-risk',
+    ruin: 'reports-risk',
+    discipline: 'reports-risk-discipline',
+  };
+
+  // Compute per-card states
+  const getCardPinState = (cardId: string) => ({
+    isAdded: isCardOnDashboard(cardId),
+    onAdd: () => {
+      addCard(cardId, true, cardId);
+      toast.success('Pinned to Dashboard');
+    },
+    onRemove: () => {
+      removeCard(cardId);
+      toast.success('Unpinned from Dashboard');
+    },
+  });
+
+  // Create pin state objects for each tab
+  const overviewPinStates = {
+    kpis: getCardPinState(overviewCardIds.kpis),
+    bestWorst: getCardPinState(overviewCardIds.bestWorst),
+    equity: getCardPinState(overviewCardIds.equity),
+  };
+
+  const performancePinStates = {
+    byDay: getCardPinState(performanceCardIds.byDay),
+    bySession: getCardPinState(performanceCardIds.bySession),
+    distribution: getCardPinState(performanceCardIds.distribution),
+  };
+
+  const sessionsPinStates = {
+    comparison: getCardPinState(sessionsCardIds.comparison),
+    recommendations: getCardPinState(sessionsCardIds.recommendations),
+  };
+
+  const assetsPinStates = {
+    pnlChart: getCardPinState(assetsCardIds.pnlChart),
+    table: getCardPinState(assetsCardIds.table),
+  };
+
+  const setupPinStates = {
+    bestWorst: getCardPinState(setupCardIds.bestWorst),
+    patterns: getCardPinState(setupCardIds.patterns),
+  };
+
+  const psychologyPinStates = {
+    sentiment: getCardPinState(psychologyCardIds.sentiment),
+    triggers: getCardPinState(psychologyCardIds.triggers),
+    improvement: getCardPinState(psychologyCardIds.improvement),
+  };
+
+  const riskPinStates = {
+    kpis: getCardPinState(riskCardIds.kpis),
+    distribution: getCardPinState(riskCardIds.distribution),
+    discipline: getCardPinState(riskCardIds.discipline),
   };
 
   // Date range filter for Reports
@@ -803,63 +889,49 @@ export default function Journal() {
                   <ReportsOverview 
                     trades={filteredTrades} 
                     dateRangeLabel={dateRangeLabel}
-                    isAdded={reportCardStates.overview}
-                    onAdd={() => handleAddReportCard(reportCardIds.overview)}
-                    onRemove={() => handleRemoveReportCard(reportCardIds.overview)}
+                    pinStates={overviewPinStates}
                   />
                 </TabsContent>
                 <TabsContent value="performance" className="mt-5">
                   <ReportsPerformance 
                     trades={filteredTrades} 
                     dateRangeLabel={dateRangeLabel}
-                    isAdded={reportCardStates.performance}
-                    onAdd={() => handleAddReportCard(reportCardIds.performance)}
-                    onRemove={() => handleRemoveReportCard(reportCardIds.performance)}
+                    pinStates={performancePinStates}
                   />
                 </TabsContent>
                 <TabsContent value="sessions" className="mt-5">
                   <ReportsSessions 
                     trades={filteredTrades} 
                     dateRangeLabel={dateRangeLabel}
-                    isAdded={reportCardStates.sessions}
-                    onAdd={() => handleAddReportCard(reportCardIds.sessions)}
-                    onRemove={() => handleRemoveReportCard(reportCardIds.sessions)}
+                    pinStates={sessionsPinStates}
                   />
                 </TabsContent>
                 <TabsContent value="assets" className="mt-5">
                   <ReportsAssets 
                     trades={filteredTrades} 
                     dateRangeLabel={dateRangeLabel}
-                    isAdded={reportCardStates.assets}
-                    onAdd={() => handleAddReportCard(reportCardIds.assets)}
-                    onRemove={() => handleRemoveReportCard(reportCardIds.assets)}
+                    pinStates={assetsPinStates}
                   />
                 </TabsContent>
                 <TabsContent value="setup" className="mt-5">
                   <ReportsSetupQuality 
                     trades={filteredTrades} 
                     dateRangeLabel={dateRangeLabel}
-                    isAdded={reportCardStates.setupQuality}
-                    onAdd={() => handleAddReportCard(reportCardIds.setupQuality)}
-                    onRemove={() => handleRemoveReportCard(reportCardIds.setupQuality)}
+                    pinStates={setupPinStates}
                   />
                 </TabsContent>
                 <TabsContent value="psychology" className="mt-5">
                   <ReportsPsychology 
                     trades={filteredTrades} 
                     dateRangeLabel={dateRangeLabel}
-                    isAdded={reportCardStates.psychology}
-                    onAdd={() => handleAddReportCard(reportCardIds.psychology)}
-                    onRemove={() => handleRemoveReportCard(reportCardIds.psychology)}
+                    pinStates={psychologyPinStates}
                   />
                 </TabsContent>
                 <TabsContent value="risk" className="mt-5">
                   <ReportsRiskManagement 
                     trades={filteredTrades} 
                     dateRangeLabel={dateRangeLabel}
-                    isAdded={reportCardStates.risk}
-                    onAdd={() => handleAddReportCard(reportCardIds.risk)}
-                    onRemove={() => handleRemoveReportCard(reportCardIds.risk)}
+                    pinStates={riskPinStates}
                   />
                 </TabsContent>
                 <TabsContent value="tradelog" className="mt-5">

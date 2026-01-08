@@ -19,18 +19,26 @@ interface Trade {
   rating?: number;
 }
 
+interface PinState {
+  isAdded: boolean;
+  onAdd: () => void;
+  onRemove: () => void;
+}
+
 interface ReportsPerformanceProps {
   trades: Trade[];
   dateRangeLabel: string;
-  isAdded?: boolean;
-  onAdd?: () => void;
-  onRemove?: () => void;
+  pinStates?: {
+    byDay: PinState;
+    bySession: PinState;
+    distribution: PinState;
+  };
 }
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--success))', 'hsl(var(--destructive))', 'hsl(var(--accent))'];
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export function ReportsPerformance({ trades, dateRangeLabel, isAdded, onAdd, onRemove }: ReportsPerformanceProps) {
+export function ReportsPerformance({ trades, dateRangeLabel, pinStates }: ReportsPerformanceProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats
@@ -108,12 +116,23 @@ export function ReportsPerformance({ trades, dateRangeLabel, isAdded, onAdd, onR
 
   return (
     <div id="reports-performance" className="space-y-6">
-      {/* Win Rate by Day */}
+      {/* Header with export */}
+      <div className="flex items-center justify-end gap-2" data-pdf-exclude>
+        <PdfExportButton onClick={handleExport} />
+      </div>
+
+      {/* Win Rate by Day - with per-card pin */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Win Rate by Day of Week</CardTitle>
-            <PdfExportButton onClick={handleExport} data-pdf-exclude />
+            {pinStates?.byDay && (
+              <AddToDashboardButton
+                isAdded={pinStates.byDay.isAdded}
+                onAdd={pinStates.byDay.onAdd}
+                onRemove={pinStates.byDay.onRemove}
+              />
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -139,10 +158,19 @@ export function ReportsPerformance({ trades, dateRangeLabel, isAdded, onAdd, onR
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Win Rate by Session */}
+        {/* Win Rate by Session - with per-card pin */}
         <Card>
           <CardHeader>
-            <CardTitle>Win Rate by Session</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Win Rate by Session</CardTitle>
+              {pinStates?.bySession && (
+                <AddToDashboardButton
+                  isAdded={pinStates.bySession.isAdded}
+                  onAdd={pinStates.bySession.onAdd}
+                  onRemove={pinStates.bySession.onRemove}
+                />
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="h-64">
@@ -165,10 +193,19 @@ export function ReportsPerformance({ trades, dateRangeLabel, isAdded, onAdd, onR
           </CardContent>
         </Card>
 
-        {/* Trade Distribution */}
+        {/* Trade Distribution - with per-card pin */}
         <Card>
           <CardHeader>
-            <CardTitle>Trade Distribution (Long/Short)</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Trade Distribution (Long/Short)</CardTitle>
+              {pinStates?.distribution && (
+                <AddToDashboardButton
+                  isAdded={pinStates.distribution.isAdded}
+                  onAdd={pinStates.distribution.onAdd}
+                  onRemove={pinStates.distribution.onRemove}
+                />
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="h-64">

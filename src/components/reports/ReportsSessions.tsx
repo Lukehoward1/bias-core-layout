@@ -20,15 +20,22 @@ interface Trade {
   rating?: number;
 }
 
+interface PinState {
+  isAdded: boolean;
+  onAdd: () => void;
+  onRemove: () => void;
+}
+
 interface ReportsSessionsProps {
   trades: Trade[];
   dateRangeLabel: string;
-  isAdded?: boolean;
-  onAdd?: () => void;
-  onRemove?: () => void;
+  pinStates?: {
+    comparison: PinState;
+    recommendations: PinState;
+  };
 }
 
-export function ReportsSessions({ trades, dateRangeLabel, isAdded, onAdd, onRemove }: ReportsSessionsProps) {
+export function ReportsSessions({ trades, dateRangeLabel, pinStates }: ReportsSessionsProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats
@@ -98,11 +105,8 @@ export function ReportsSessions({ trades, dateRangeLabel, isAdded, onAdd, onRemo
 
   return (
     <div id="reports-sessions" className="space-y-6">
-      {/* Header with export and pin */}
+      {/* Header with export */}
       <div className="flex items-center justify-end gap-2" data-pdf-exclude>
-        {isAdded !== undefined && onAdd && onRemove && (
-          <AddToDashboardButton isAdded={isAdded} onAdd={onAdd} onRemove={onRemove} />
-        )}
         <PdfExportButton onClick={handleExport} />
       </div>
 
@@ -151,10 +155,19 @@ export function ReportsSessions({ trades, dateRangeLabel, isAdded, onAdd, onRemo
         ))}
       </div>
 
-      {/* Comparison Chart */}
+      {/* Comparison Chart - with per-card pin */}
       <Card>
         <CardHeader>
-          <CardTitle>Session Performance Comparison</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Session Performance Comparison</CardTitle>
+            {pinStates?.comparison && (
+              <AddToDashboardButton
+                isAdded={pinStates.comparison.isAdded}
+                onAdd={pinStates.comparison.onAdd}
+                onRemove={pinStates.comparison.onRemove}
+              />
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="h-64">
@@ -208,40 +221,48 @@ export function ReportsSessions({ trades, dateRangeLabel, isAdded, onAdd, onRemo
         </CardContent>
       </Card>
 
-      {/* Recommendations */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="border-success/30 bg-success/5">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-success" />
-              <CardTitle className="text-base">Recommended to Trade More</CardTitle>
+      {/* Recommendations - with per-card pin */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Session Recommendations</CardTitle>
+            {pinStates?.recommendations && (
+              <AddToDashboardButton
+                isAdded={pinStates.recommendations.isAdded}
+                onAdd={pinStates.recommendations.onAdd}
+                onRemove={pinStates.recommendations.onRemove}
+              />
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-lg border-success/30 bg-success/5 border">
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp className="h-5 w-5 text-success" />
+                <p className="text-base font-medium">Recommended to Trade More</p>
+              </div>
+              <p className="text-sm text-foreground font-medium">{strongest.name} Session</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Your highest win rate ({strongest.winRate}%) and best P&L (£{strongest.pnl.toLocaleString()}).
+                Consider increasing position sizes during this session.
+              </p>
             </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-foreground font-medium">{strongest.name} Session</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Your highest win rate ({strongest.winRate}%) and best P&L (£{strongest.pnl.toLocaleString()}).
-              Consider increasing position sizes during this session.
-            </p>
-          </CardContent>
-        </Card>
 
-        <Card className="border-destructive/30 bg-destructive/5">
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-destructive" />
-              <CardTitle className="text-base">Consider Reducing Exposure</CardTitle>
+            <div className="p-4 rounded-lg border-destructive/30 bg-destructive/5 border">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertCircle className="h-5 w-5 text-destructive" />
+                <p className="text-base font-medium">Consider Reducing Exposure</p>
+              </div>
+              <p className="text-sm text-foreground font-medium">{weakest.name} Session</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Lowest win rate ({weakest.winRate}%) and P&L (£{weakest.pnl.toLocaleString()}).
+                Review your setups for this session or reduce size.
+              </p>
             </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-foreground font-medium">{weakest.name} Session</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Lowest win rate ({weakest.winRate}%) and P&L (£{weakest.pnl.toLocaleString()}).
-              Review your setups for this session or reduce size.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
