@@ -63,6 +63,11 @@ export function GlobalNotifications() {
     
     // Click-through routing based on alert type and routeTo
     if (alert.routeTo) {
+      // If there's an eventId, append it as query param for calendar deep-linking
+      if (alert.eventId && alert.routeTo === '/calendar') {
+        navigate(`/calendar?eventId=${encodeURIComponent(alert.eventId)}`);
+        return;
+      }
       navigate(alert.routeTo);
       return;
     }
@@ -81,7 +86,12 @@ export function GlobalNotifications() {
       case 'news':
       case 'summary':
       case 'breaking':
-        navigate('/calendar');
+        // Deep-link to specific event if eventId is present
+        if (alert.eventId) {
+          navigate(`/calendar?eventId=${encodeURIComponent(alert.eventId)}`);
+        } else {
+          navigate('/calendar');
+        }
         break;
       case 'risk':
       case 'exposure':

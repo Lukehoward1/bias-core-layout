@@ -48,7 +48,9 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         title: 'USD CPI Release',
         message: 'US CPI data releasing in 30 minutes. High volatility expected on USD pairs.',
         severity: 'high',
-        relatedAsset: 'USD'
+        relatedAsset: 'USD',
+        eventId: 'us-cpi-2025-01',
+        routeTo: '/calendar'
       }
     },
     {
@@ -59,7 +61,9 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         title: 'BREAKING: Fed Emergency Statement',
         message: 'Unscheduled Federal Reserve announcement incoming. Markets may react sharply.',
         severity: 'high',
-        relatedAsset: 'USD'
+        relatedAsset: 'USD',
+        eventId: 'nfp-2025-01',
+        routeTo: '/calendar'
       }
     },
     {
@@ -70,7 +74,9 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         title: 'NFP Result Summary',
         message: 'Actual: 256K vs Forecast: 164K — Better than expected (Bullish USD)',
         severity: 'info',
-        relatedAsset: 'USD'
+        relatedAsset: 'USD',
+        eventId: 'nfp-2025-01',
+        routeTo: '/calendar'
       }
     },
     {

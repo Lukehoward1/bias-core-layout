@@ -23,9 +23,11 @@ export interface AlertItem {
   read: boolean;
   severity: AlertSeverity;
   relatedAsset?: string;
-  // Click-through routing
+  // Click-through routing with deep-link support
   routeTo?: string;
   routeParams?: Record<string, string>;
+  // Deep-link for calendar events
+  eventId?: string;
 }
 
 // Custom Price Alert Types

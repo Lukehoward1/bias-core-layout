@@ -36,6 +36,9 @@ export interface CardRenderContext {
 /**
  * Registry of card renderers - single source of truth for how each pinned card renders on the dashboard.
  * When a new card is added to dashboardCardRegistry.ts, add its render function here.
+ * 
+ * NOTE: Cards rendered here ARE on the dashboard - no need for "Pinned" labels.
+ * The pin state is authoritative from the dashboard layout, not displayed on cards.
  */
 export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.ReactNode> = {
   // ============ Journal Equity Curve ============
@@ -44,10 +47,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
     return (
       <Card className="h-full">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium">Journal Equity Curve</CardTitle>
-            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-          </div>
+          <CardTitle className="text-sm font-medium">Journal Equity Curve</CardTitle>
         </CardHeader>
         <CardContent>
           <div className={chartHeight}>
@@ -78,10 +78,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-kpi-total-pnl': () => (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium text-muted-foreground">Total P&L</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-        </div>
+        <CardTitle className="text-sm font-medium text-muted-foreground">Total P&L</CardTitle>
       </CardHeader>
       <CardContent>
         <p className="text-2xl font-bold text-success">+£2,307</p>
@@ -92,10 +89,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-kpi-avg-rr': () => (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium text-muted-foreground">Avg R:R</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-        </div>
+        <CardTitle className="text-sm font-medium text-muted-foreground">Avg R:R</CardTitle>
       </CardHeader>
       <CardContent>
         <p className="text-2xl font-bold text-foreground">1.85</p>
@@ -106,10 +100,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-kpi-win-rate': () => (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-        </div>
+        <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>
       </CardHeader>
       <CardContent>
         <p className="text-2xl font-bold text-foreground">66.7%</p>
@@ -120,10 +111,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-kpi-expectancy': () => (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium text-muted-foreground">Expectancy</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-        </div>
+        <CardTitle className="text-sm font-medium text-muted-foreground">Expectancy</CardTitle>
       </CardHeader>
       <CardContent>
         <p className="text-2xl font-bold text-success">£256/trade</p>
@@ -135,12 +123,9 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-overview-best-day': () => (
     <Card className="h-full bg-success/5 border-success/20">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-success" />
-            <CardTitle className="text-sm font-medium text-muted-foreground">Best Winning Day</CardTitle>
-          </div>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        <div className="flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-success" />
+          <CardTitle className="text-sm font-medium text-muted-foreground">Best Winning Day</CardTitle>
         </div>
       </CardHeader>
       <CardContent>
@@ -153,12 +138,9 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-overview-worst-day': () => (
     <Card className="h-full bg-destructive/5 border-destructive/20">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <TrendingDown className="h-4 w-4 text-destructive" />
-            <CardTitle className="text-sm font-medium text-muted-foreground">Worst Losing Day</CardTitle>
-          </div>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        <div className="flex items-center gap-2">
+          <TrendingDown className="h-4 w-4 text-destructive" />
+          <CardTitle className="text-sm font-medium text-muted-foreground">Worst Losing Day</CardTitle>
         </div>
       </CardHeader>
       <CardContent>
@@ -173,10 +155,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
     return (
       <Card className="h-full">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium">Equity Curve</CardTitle>
-            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-          </div>
+          <CardTitle className="text-sm font-medium">Equity Curve</CardTitle>
         </CardHeader>
         <CardContent>
           <div className={chartHeight}>
@@ -208,10 +187,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
     return (
       <Card className="h-full">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium">Rolling 30-Day</CardTitle>
-            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-          </div>
+          <CardTitle className="text-sm font-medium">Rolling 30-Day</CardTitle>
         </CardHeader>
         <CardContent>
           <div className={chartHeight}>
@@ -235,10 +211,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-overview-edge': () => (
     <Card className="h-full border-primary/30 bg-primary/5">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">Your Strongest Edge</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-        </div>
+        <CardTitle className="text-sm font-medium">Your Strongest Edge</CardTitle>
       </CardHeader>
       <CardContent>
         <p className="text-sm text-muted-foreground">High-confidence setups with 4+ star ratings</p>
@@ -250,10 +223,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-sessions-comparison': () => (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">Session Comparison</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-        </div>
+        <CardTitle className="text-sm font-medium">Session Comparison</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-3 gap-3 text-center">
@@ -280,10 +250,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-sessions-recommendations': () => (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">Session Recommendations</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-        </div>
+        <CardTitle className="text-sm font-medium">Session Recommendations</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
@@ -306,10 +273,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-assets-pnl': () => (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">P&L by Instrument</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-        </div>
+        <CardTitle className="text-sm font-medium">P&L by Instrument</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
@@ -337,10 +301,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-assets-table': () => (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">Instrument Statistics</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-        </div>
+        <CardTitle className="text-sm font-medium">Instrument Statistics</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
@@ -374,10 +335,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-setup-best-worst': () => (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">Best & Worst Setups</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-        </div>
+        <CardTitle className="text-sm font-medium">Best & Worst Setups</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 gap-3">
@@ -405,10 +363,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-setup-patterns': () => (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">Common Patterns</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-        </div>
+        <CardTitle className="text-sm font-medium">Common Patterns</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
@@ -427,10 +382,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-psychology-sentiment': () => (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">Sentiment Summary</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-        </div>
+        <CardTitle className="text-sm font-medium">Sentiment Summary</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex items-center justify-center gap-4">
@@ -451,10 +403,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-psychology-triggers': () => (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">Emotional Triggers</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-        </div>
+        <CardTitle className="text-sm font-medium">Emotional Triggers</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
@@ -479,10 +428,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-psychology-improvement': () => (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">Improvement Focus</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-        </div>
+        <CardTitle className="text-sm font-medium">Improvement Focus</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
@@ -500,10 +446,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-risk-kpis': () => (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">Risk KPIs</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-        </div>
+        <CardTitle className="text-sm font-medium">Risk KPIs</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-3 gap-3 text-center">
@@ -529,10 +472,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
     return (
       <Card className="h-full">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium">Risk Distribution</CardTitle>
-            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-          </div>
+          <CardTitle className="text-sm font-medium">Risk Distribution</CardTitle>
         </CardHeader>
         <CardContent>
           <div className={chartHeight + " flex items-center justify-center"}>
@@ -556,10 +496,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-risk-discipline': () => (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">Risk Discipline Score</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-        </div>
+        <CardTitle className="text-sm font-medium">Risk Discipline Score</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex items-center justify-center">
@@ -591,10 +528,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-performance-by-day': () => (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">Win Rate by Day</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-        </div>
+        <CardTitle className="text-sm font-medium">Win Rate by Day</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
@@ -618,10 +552,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-performance-by-session': () => (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">Win Rate by Session</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-        </div>
+        <CardTitle className="text-sm font-medium">Win Rate by Session</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 gap-3">
@@ -644,10 +575,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'reports-performance-distribution': () => (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">Trade Distribution</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-        </div>
+        <CardTitle className="text-sm font-medium">Trade Distribution</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex items-center justify-center gap-6">
@@ -674,9 +602,9 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'alerts-my-alerts-timers': () => (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Bell className="h-4 w-4 text-primary" />
           <CardTitle className="text-sm font-medium">My Alerts & Timers</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
         </div>
       </CardHeader>
       <CardContent>
@@ -708,12 +636,9 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'alerts-price-alerts': () => (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Target className="h-4 w-4 text-primary" />
-            <CardTitle className="text-sm font-medium">Active Price Alerts</CardTitle>
-          </div>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        <div className="flex items-center gap-2">
+          <Target className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Active Price Alerts</CardTitle>
         </div>
       </CardHeader>
       <CardContent>
@@ -742,12 +667,9 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'quick-calculator': () => (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Calculator className="h-4 w-4 text-primary" />
-            <CardTitle className="text-sm font-medium">Quick Risk Calculator</CardTitle>
-          </div>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        <div className="flex items-center gap-2">
+          <Calculator className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Quick Risk Calculator</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -778,12 +700,9 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'position-size-calculator': () => (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Ruler className="h-4 w-4 text-primary" />
-            <CardTitle className="text-sm font-medium">Position Size</CardTitle>
-          </div>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        <div className="flex items-center gap-2">
+          <Ruler className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Position Size</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -806,12 +725,9 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'rr-calculator': () => (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Scale className="h-4 w-4 text-primary" />
-            <CardTitle className="text-sm font-medium">Risk:Reward</CardTitle>
-          </div>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        <div className="flex items-center gap-2">
+          <Scale className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Risk:Reward</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -838,12 +754,9 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'daily-risk-limit': () => (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-primary" />
-            <CardTitle className="text-sm font-medium">Daily Risk Limit</CardTitle>
-          </div>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Daily Risk Limit</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -871,12 +784,9 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'max-drawdown-guard': () => (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Shield className="h-4 w-4 text-primary" />
-            <CardTitle className="text-sm font-medium">Max Drawdown</CardTitle>
-          </div>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        <div className="flex items-center gap-2">
+          <Shield className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Max Drawdown</CardTitle>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -899,10 +809,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'top-news': () => (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium">Top News</CardTitle>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
-        </div>
+        <CardTitle className="text-sm font-medium">Top News</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
@@ -937,12 +844,9 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'session-timers': () => (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-primary" />
-            <CardTitle className="text-sm font-medium">Session Timers</CardTitle>
-          </div>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        <div className="flex items-center gap-2">
+          <Clock className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Session Timers</CardTitle>
         </div>
       </CardHeader>
       <CardContent>
@@ -975,12 +879,9 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'high-impact-events': () => (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-destructive" />
-            <CardTitle className="text-sm font-medium">High Impact Events</CardTitle>
-          </div>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-destructive" />
+          <CardTitle className="text-sm font-medium">High Impact Events</CardTitle>
         </div>
       </CardHeader>
       <CardContent>
@@ -1013,12 +914,9 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   'upcoming-events': () => (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CalendarIcon className="h-4 w-4 text-primary" />
-            <CardTitle className="text-sm font-medium">Upcoming Events</CardTitle>
-          </div>
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        <div className="flex items-center gap-2">
+          <CalendarIcon className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Upcoming Events</CardTitle>
         </div>
       </CardHeader>
       <CardContent>
