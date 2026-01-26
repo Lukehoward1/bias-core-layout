@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,20 +16,23 @@ import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
+// Each event now has a unique ID for deep-linking
 const keyEvents = [
-  { time: '08:30', currency: 'USD', event: 'Non-Farm Payrolls', impact: 'high' },
-  { time: '10:00', currency: 'EUR', event: 'ECB Interest Rate Decision', impact: 'high' },
-  { time: '14:00', currency: 'GBP', event: 'BOE Interest Rate Decision', impact: 'high' },
+  { id: 'nfp-2025-01', time: '08:30', currency: 'USD', event: 'Non-Farm Payrolls', impact: 'high' },
+  { id: 'ecb-rate-2025-01', time: '10:00', currency: 'EUR', event: 'ECB Interest Rate Decision', impact: 'high' },
+  { id: 'boe-rate-2025-01', time: '14:00', currency: 'GBP', event: 'BOE Interest Rate Decision', impact: 'high' },
 ];
 
 const events = [
-  { time: '08:30', currency: 'USD', event: 'Non-Farm Payrolls', previous: '180K', forecast: '190K', actual: '—', impact: 'high' },
-  { time: '08:30', currency: 'USD', event: 'Unemployment Rate', previous: '3.9%', forecast: '3.9%', actual: '—', impact: 'high' },
-  { time: '09:00', currency: 'EUR', event: 'German Factory Orders', previous: '-0.2%', forecast: '0.5%', actual: '—', impact: 'medium' },
-  { time: '10:00', currency: 'EUR', event: 'ECB Interest Rate Decision', previous: '4.50%', forecast: '4.50%', actual: '—', impact: 'high' },
-  { time: '12:30', currency: 'CAD', event: 'Employment Change', previous: '42.0K', forecast: '25.0K', actual: '—', impact: 'medium' },
-  { time: '14:00', currency: 'GBP', event: 'BOE Interest Rate Decision', previous: '5.25%', forecast: '5.25%', actual: '—', impact: 'high' },
+  { id: 'nfp-2025-01', time: '08:30', currency: 'USD', event: 'Non-Farm Payrolls', previous: '180K', forecast: '190K', actual: '—', impact: 'high' },
+  { id: 'unemployment-2025-01', time: '08:30', currency: 'USD', event: 'Unemployment Rate', previous: '3.9%', forecast: '3.9%', actual: '—', impact: 'high' },
+  { id: 'german-factory-2025-01', time: '09:00', currency: 'EUR', event: 'German Factory Orders', previous: '-0.2%', forecast: '0.5%', actual: '—', impact: 'medium' },
+  { id: 'ecb-rate-2025-01', time: '10:00', currency: 'EUR', event: 'ECB Interest Rate Decision', previous: '4.50%', forecast: '4.50%', actual: '—', impact: 'high' },
+  { id: 'cad-employment-2025-01', time: '12:30', currency: 'CAD', event: 'Employment Change', previous: '42.0K', forecast: '25.0K', actual: '—', impact: 'medium' },
+  { id: 'boe-rate-2025-01', time: '14:00', currency: 'GBP', event: 'BOE Interest Rate Decision', previous: '5.25%', forecast: '5.25%', actual: '—', impact: 'high' },
+  { id: 'us-cpi-2025-01', time: '14:30', currency: 'USD', event: 'US CPI', previous: '3.1%', forecast: '3.0%', actual: '—', impact: 'high' },
 ];
 
 type CalendarEvent = typeof events[0];
@@ -38,6 +41,8 @@ export default function Calendar() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
+  const eventRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
   
   // Dashboard integration - single hook at page level
   const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
@@ -48,19 +53,58 @@ export default function Calendar() {
   
   const handleAddCard = (cardId: string) => {
     addCard(cardId);
-    toast.success('Added to Dashboard');
+    toast.success('Pinned to Dashboard');
   };
   
   const handleRemoveCard = (cardId: string) => {
     removeCard(cardId);
-    toast.success('Removed from Dashboard');
+    toast.success('Unpinned from Dashboard');
   };
 
-  // Auto-open event modal if navigated with event parameter
+  // Register event row ref
+  const setEventRef = useCallback((eventId: string, element: HTMLTableRowElement | null) => {
+    if (element) {
+      eventRefs.current.set(eventId, element);
+    } else {
+      eventRefs.current.delete(eventId);
+    }
+  }, []);
+
+  // Handle deep-link navigation via eventId query param
   useEffect(() => {
-    const eventParam = searchParams.get('event');
-    if (eventParam) {
-      // Find matching event by name (case-insensitive partial match)
+    const eventId = searchParams.get('eventId');
+    const eventParam = searchParams.get('event'); // Legacy support
+    
+    if (eventId) {
+      // Find matching event by ID
+      const matchingEvent = events.find(e => e.id === eventId);
+      
+      if (matchingEvent) {
+        // Scroll to event and highlight it
+        setHighlightedEventId(matchingEvent.id);
+        
+        // Wait for refs to be set, then scroll
+        setTimeout(() => {
+          const element = eventRefs.current.get(matchingEvent.id);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          
+          // Open the event details modal
+          setSelectedEvent(matchingEvent);
+          setIsModalOpen(true);
+        }, 100);
+        
+        // Remove highlight after 3 seconds
+        setTimeout(() => {
+          setHighlightedEventId(null);
+        }, 3000);
+      }
+      
+      // Clear the search param after processing
+      setSearchParams({}, { replace: true });
+    } else if (eventParam) {
+      // Legacy: Find matching event by name (case-insensitive partial match)
       const matchingEvent = events.find(e => 
         e.event.toLowerCase().includes(eventParam.toLowerCase()) ||
         eventParam.toLowerCase().includes(e.event.toLowerCase())
@@ -89,7 +133,7 @@ export default function Calendar() {
 
   const handleKeyEventClick = (keyEvent: typeof keyEvents[0]) => {
     // Find the matching full event data
-    const fullEvent = events.find(e => e.event === keyEvent.event && e.currency === keyEvent.currency);
+    const fullEvent = events.find(e => e.id === keyEvent.id);
     if (fullEvent) {
       setSelectedEvent(fullEvent);
       setIsModalOpen(true);
@@ -170,8 +214,11 @@ export default function Calendar() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 {keyEvents.map((event, i) => (
                   <div 
-                    key={i} 
-                    className="p-4 bg-muted/50 rounded-lg border border-border cursor-pointer hover:bg-muted/70 hover:border-primary/30 transition-all"
+                    key={event.id} 
+                    className={cn(
+                      "p-4 bg-muted/50 rounded-lg border border-border cursor-pointer hover:bg-muted/70 hover:border-primary/30 transition-all",
+                      highlightedEventId === event.id && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                    )}
                     onClick={() => handleKeyEventClick(event)}
                   >
                     <div className="flex items-center justify-between mb-2">
@@ -208,10 +255,14 @@ export default function Calendar() {
                     </tr>
                   </thead>
                   <tbody>
-                    {events.map((event, i) => (
+                    {events.map((event) => (
                       <tr 
-                        key={i} 
-                        className="border-b border-border hover:bg-muted/50 transition-colors cursor-pointer"
+                        key={event.id}
+                        ref={(el) => setEventRef(event.id, el)}
+                        className={cn(
+                          "border-b border-border hover:bg-muted/50 transition-all cursor-pointer",
+                          highlightedEventId === event.id && "bg-primary/10 ring-2 ring-inset ring-primary"
+                        )}
                         onClick={() => handleEventClick(event)}
                       >
                         <td className="py-3 px-5 text-sm text-foreground">{event.time}</td>
