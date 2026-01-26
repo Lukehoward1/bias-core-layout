@@ -37,8 +37,8 @@ const App = () => (
         <AlertsProvider>
           <Toaster />
           <Sonner />
-          <GlobalNotifications />
           <BrowserRouter>
+            <GlobalNotifications />
             <Routes>
               <Route element={<AppLayout />}>
                 <Route path="/" element={<Dashboard />} />
