@@ -1,7 +1,8 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, Calendar as CalendarIcon, Clock, Bell, AlertTriangle, Activity, Target, Shield, Brain, BarChart3, PieChart } from 'lucide-react';
+import { TrendingUp, TrendingDown, Calendar as CalendarIcon, Clock, Bell, AlertTriangle, Activity, Target, Shield, Brain, BarChart3, PieChart, Calculator, Ruler, Scale, ShieldCheck } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { Progress } from '@/components/ui/progress';
 
 // Sample equity data for charts
 const getSampleEquityData = () => {
@@ -733,6 +734,163 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
           </div>
         </div>
         <p className="text-xs text-muted-foreground mt-3 text-center">2 active alerts</p>
+      </CardContent>
+    </Card>
+  ),
+
+  // ============ Risk Tools ============
+  'quick-calculator': () => (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Calculator className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-medium">Quick Risk Calculator</CardTitle>
+          </div>
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <p className="text-xs text-muted-foreground">Balance</p>
+            <p className="text-sm font-medium">$10,000</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Risk</p>
+            <p className="text-sm font-medium">1%</p>
+          </div>
+        </div>
+        <div className="p-3 rounded-lg bg-muted/50 border border-border">
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-muted-foreground">Position Size</span>
+            <span className="text-lg font-bold text-primary">0.33 lots</span>
+          </div>
+          <div className="flex justify-between items-center mt-1">
+            <span className="text-xs text-muted-foreground">Risk Amount</span>
+            <span className="text-sm font-medium text-destructive">$100</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  ),
+
+  'position-size-calculator': () => (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Ruler className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-medium">Position Size</CardTitle>
+          </div>
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <div className="flex justify-between items-center">
+          <span className="text-xs text-muted-foreground">Lot Size</span>
+          <span className="text-lg font-bold text-primary">0.67</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-xs text-muted-foreground">R:R</span>
+          <span className="text-sm font-medium text-foreground">2.00</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-xs text-muted-foreground">Risk</span>
+          <span className="text-sm font-medium text-destructive">$200</span>
+        </div>
+      </CardContent>
+    </Card>
+  ),
+
+  'rr-calculator': () => (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Scale className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-medium">Risk:Reward</CardTitle>
+          </div>
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex justify-between items-center">
+          <span className="text-xs text-muted-foreground">Ratio</span>
+          <span className="text-2xl font-bold text-success">1:2.00</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="flex items-center gap-1">
+            <TrendingDown className="h-3 w-3 text-destructive" />
+            <span className="text-muted-foreground">Risk:</span>
+            <span className="text-destructive font-medium">$100</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <TrendingUp className="h-3 w-3 text-success" />
+            <span className="text-muted-foreground">Reward:</span>
+            <span className="text-success font-medium">$200</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  ),
+
+  'daily-risk-limit': () => (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-medium">Daily Risk Limit</CardTitle>
+          </div>
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="space-y-1.5">
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Used: 30%</span>
+            <span className="font-medium text-success">$350 left</span>
+          </div>
+          <Progress value={30} className="h-2" />
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div>
+            <p className="text-muted-foreground">Limit</p>
+            <p className="font-medium">$500</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Used Today</p>
+            <p className="font-medium text-destructive">$150</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  ),
+
+  'max-drawdown-guard': () => (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Shield className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-medium">Max Drawdown</CardTitle>
+          </div>
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex justify-between items-center">
+          <span className="text-xs text-muted-foreground">Current DD</span>
+          <span className="text-lg font-bold text-foreground">6.0%</span>
+        </div>
+        <div className="space-y-1.5">
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>Limit: 10%</span>
+            <span>$400 left</span>
+          </div>
+          <Progress value={60} className="h-2" />
+        </div>
       </CardContent>
     </Card>
   ),
