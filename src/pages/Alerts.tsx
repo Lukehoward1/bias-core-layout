@@ -4,13 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, Plus, Settings, Inbox, Bell, FlaskConical } from "lucide-react";
-import { AlertToast } from "@/components/alerts/AlertToast";
+import { Clock, Plus, Settings, Inbox, Bell, FlaskConical, Target } from "lucide-react";
 import { AlertPreferencesPanel } from "@/components/alerts/AlertPreferencesPanel";
 import { AlertInbox } from "@/components/alerts/AlertInbox";
 import { TestAlertsPanel } from "@/components/alerts/TestAlertsPanel";
 import { ManualTimerPanel } from "@/components/alerts/ManualTimerPanel";
-import { useAlerts } from "@/hooks/use-alerts";
+import { PriceAlertsPanel } from "@/components/alerts/PriceAlertsPanel";
+import { AlertsSoundToggle } from "@/components/alerts/AlertsSoundToggle";
+import { CreatePriceAlertModal } from "@/components/alerts/CreatePriceAlertModal";
+import { useAlertsContext } from "@/contexts/AlertsContext";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { toast } from "sonner";
@@ -30,26 +32,22 @@ const sessions = [
   { name: 'New York', status: 'closed', time: 'Opens in 5:45:12', accent: '#F77F00', region: 'US Markets' },
 ];
 
-const myAlerts = [
-  { type: 'Price Alert', what: 'EURUSD > 1.0850', when: 'Ongoing', delivery: 'Push', status: 'active' },
-  { type: 'News Alert', what: 'USD High Impact', when: 'Today 08:30', delivery: 'Email', status: 'pending' },
-  { type: 'Session Timer', what: 'London Open', when: 'In 2h 15m', delivery: 'Push', status: 'active' },
-];
-
 export default function Alerts() {
   const [activeTab, setActiveTab] = useState('overview');
+  const [showCreatePriceAlert, setShowCreatePriceAlert] = useState(false);
+  
   const {
     alerts,
     preferences,
-    isQuietHours,
     addAlert,
     markRead,
     markAllRead,
-    dismissAlert,
     deleteAlert,
     clearAllAlerts,
-    updatePreferences
-  } = useAlerts();
+    updatePreferences,
+    unreadCount,
+    priceAlerts
+  } = useAlertsContext();
   
   // Dashboard integration - single hook at page level
   const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
@@ -58,10 +56,12 @@ export default function Alerts() {
   const topNewsCardId = 'top-news';
   const sessionTimersCardId = 'session-timers';
   const myAlertsTimersCardId = 'alerts-my-alerts-timers';
+  const priceAlertsCardId = 'alerts-price-alerts';
   
   const isTopNewsAdded = isCardOnDashboard(topNewsCardId);
   const isSessionTimersAdded = isCardOnDashboard(sessionTimersCardId);
   const isMyAlertsTimersAdded = isCardOnDashboard(myAlertsTimersCardId);
+  const isPriceAlertsAdded = isCardOnDashboard(priceAlertsCardId);
   
   const handleAddCard = (cardId: string) => {
     addCard(cardId);
@@ -73,56 +73,62 @@ export default function Alerts() {
     toast.success('Removed from Dashboard');
   };
 
-  const unreadCount = alerts.filter(a => !a.read).length;
-
   const handleTimerComplete = (label: string) => {
     addAlert({
       type: 'timer',
       title: 'Timer Complete',
       message: `Your timer "${label}" has finished.`,
-      severity: 'info'
+      severity: 'info',
+      routeTo: '/alerts'
     });
   };
+
+  const activePriceAlertsCount = priceAlerts.filter(a => !a.triggered && a.enabled).length;
 
   return (
     <div className="flex flex-col min-h-full bg-background">
       <AppHeader title="Alerts" />
       
-      {/* Toast Notifications */}
-      <AlertToast
-        alerts={alerts}
-        onDismiss={dismissAlert}
-        onMarkRead={markRead}
-        quietHours={isQuietHours}
-      />
-      
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Tabs Navigation */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="h-9">
-              <TabsTrigger value="overview" className="text-sm gap-2">
-                <Bell className="h-4 w-4" />
-                Overview
-              </TabsTrigger>
-              <TabsTrigger value="inbox" className="text-sm gap-2">
-                <Inbox className="h-4 w-4" />
-                Inbox
-                {unreadCount > 0 && (
-                  <Badge variant="destructive" className="text-[10px] h-5 px-1.5 ml-1">
-                    {unreadCount}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="preferences" className="text-sm gap-2">
-                <Settings className="h-4 w-4" />
-                Preferences
-              </TabsTrigger>
-              <TabsTrigger value="testing" className="text-sm gap-2">
-                <FlaskConical className="h-4 w-4" />
-                Test
-              </TabsTrigger>
-            </TabsList>
+            <div className="flex items-center justify-between mb-4">
+              <TabsList className="h-9">
+                <TabsTrigger value="overview" className="text-sm gap-2">
+                  <Bell className="h-4 w-4" />
+                  Overview
+                </TabsTrigger>
+                <TabsTrigger value="price-alerts" className="text-sm gap-2">
+                  <Target className="h-4 w-4" />
+                  Price Alerts
+                  {activePriceAlertsCount > 0 && (
+                    <Badge variant="secondary" className="text-[10px] h-5 px-1.5 ml-1">
+                      {activePriceAlertsCount}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="inbox" className="text-sm gap-2">
+                  <Inbox className="h-4 w-4" />
+                  Inbox
+                  {unreadCount > 0 && (
+                    <Badge variant="destructive" className="text-[10px] h-5 px-1.5 ml-1">
+                      {unreadCount}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="preferences" className="text-sm gap-2">
+                  <Settings className="h-4 w-4" />
+                  Preferences
+                </TabsTrigger>
+                <TabsTrigger value="testing" className="text-sm gap-2">
+                  <FlaskConical className="h-4 w-4" />
+                  Test
+                </TabsTrigger>
+              </TabsList>
+              
+              <AlertsSoundToggle />
+            </div>
 
             {/* Overview Tab */}
             <TabsContent value="overview" className="mt-6">
@@ -205,7 +211,7 @@ export default function Alerts() {
                       onAdd={() => handleAddCard(myAlertsTimersCardId)}
                       onRemove={() => handleRemoveCard(myAlertsTimersCardId)}
                     />
-                    <Button size="sm" className="h-8">
+                    <Button size="sm" className="h-8" onClick={() => setShowCreatePriceAlert(true)}>
                       <Plus className="h-4 w-4 mr-2" />
                       Add Alert
                     </Button>
@@ -219,23 +225,25 @@ export default function Alerts() {
                           <th className="text-left py-3 px-5 text-xs font-medium text-muted-foreground">Type</th>
                           <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">What</th>
                           <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">When</th>
-                          <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Delivery</th>
                           <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Status</th>
                           <th className="text-left py-3 px-5 text-xs font-medium text-muted-foreground">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {myAlerts.map((alert, i) => (
-                          <tr key={i} className="border-b border-border hover:bg-muted/50 transition-colors">
-                            <td className="py-3 px-5 text-sm text-foreground">{alert.type}</td>
-                            <td className="py-3 px-4 text-sm text-foreground font-medium">{alert.what}</td>
-                            <td className="py-3 px-4 text-sm text-muted-foreground">{alert.when}</td>
-                            <td className="py-3 px-4">
-                              <Badge variant="outline" className="text-xs">{alert.delivery}</Badge>
+                        {priceAlerts.filter(a => !a.triggered).map((alert) => (
+                          <tr key={alert.id} className="border-b border-border hover:bg-muted/50 transition-colors">
+                            <td className="py-3 px-5 text-sm text-foreground">
+                              <Badge variant="outline" className="text-xs">Price</Badge>
+                            </td>
+                            <td className="py-3 px-4 text-sm text-foreground font-medium">
+                              {alert.assetDisplayName} {alert.direction} {alert.price}
+                            </td>
+                            <td className="py-3 px-4 text-sm text-muted-foreground">
+                              {alert.triggerType === 'wick' ? 'Touch' : `Close ${alert.timeframe}`}
                             </td>
                             <td className="py-3 px-4">
-                              <Badge variant={alert.status === 'active' ? 'default' : 'secondary'} className="text-xs">
-                                {alert.status}
+                              <Badge variant={alert.enabled ? 'default' : 'secondary'} className="text-xs">
+                                {alert.enabled ? 'Active' : 'Paused'}
                               </Badge>
                             </td>
                             <td className="py-3 px-5">
@@ -243,11 +251,53 @@ export default function Alerts() {
                             </td>
                           </tr>
                         ))}
+                        {priceAlerts.filter(a => !a.triggered).length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="py-8 text-center text-muted-foreground text-sm">
+                              No active alerts. Click "Add Alert" to create one.
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* Price Alerts Tab */}
+            <TabsContent value="price-alerts" className="mt-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <PriceAlertsPanel />
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                    <CardTitle className="text-base">Price Alerts Summary</CardTitle>
+                    <AddToDashboardButton
+                      isAdded={isPriceAlertsAdded}
+                      onAdd={() => handleAddCard(priceAlertsCardId)}
+                      onRemove={() => handleRemoveCard(priceAlertsCardId)}
+                    />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-4 bg-muted/50 rounded-lg border border-border">
+                        <p className="text-2xl font-bold text-foreground">{activePriceAlertsCount}</p>
+                        <p className="text-xs text-muted-foreground">Active Alerts</p>
+                      </div>
+                      <div className="p-4 bg-muted/50 rounded-lg border border-border">
+                        <p className="text-2xl font-bold text-foreground">{priceAlerts.filter(a => a.triggered).length}</p>
+                        <p className="text-xs text-muted-foreground">Triggered Today</p>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <Button className="w-full" onClick={() => setShowCreatePriceAlert(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create New Price Alert
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
 
             {/* Inbox Tab */}
@@ -288,6 +338,11 @@ export default function Alerts() {
           </Tabs>
         </div>
       </div>
+      
+      <CreatePriceAlertModal
+        open={showCreatePriceAlert}
+        onOpenChange={setShowCreatePriceAlert}
+      />
     </div>
   );
 }

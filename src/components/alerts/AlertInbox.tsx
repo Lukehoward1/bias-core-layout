@@ -13,9 +13,12 @@ import {
   AlertTriangle, 
   Calendar, 
   Radio,
-  Trash2
+  Trash2,
+  Target,
+  BarChart2,
+  ShieldAlert
 } from "lucide-react";
-import type { AlertItem } from "./AlertToast";
+import type { AlertItem, AlertType } from "@/types/alerts";
 import { cn } from "@/lib/utils";
 
 interface AlertInboxProps {
@@ -32,13 +35,16 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
   const filteredAlerts = filter === 'unread' ? alerts.filter(a => !a.read) : alerts;
   const unreadCount = alerts.filter(a => !a.read).length;
 
-  const getIcon = (type: AlertItem['type']) => {
+  const getIcon = (type: AlertType) => {
     switch (type) {
       case 'session': return <Clock className="h-4 w-4" />;
       case 'news': return <Calendar className="h-4 w-4" />;
       case 'bias': return <TrendingUp className="h-4 w-4" />;
       case 'exposure': return <AlertTriangle className="h-4 w-4" />;
       case 'breaking': return <Radio className="h-4 w-4" />;
+      case 'price': return <Target className="h-4 w-4" />;
+      case 'level': return <BarChart2 className="h-4 w-4" />;
+      case 'risk': return <ShieldAlert className="h-4 w-4" />;
       default: return <Bell className="h-4 w-4" />;
     }
   };

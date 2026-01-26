@@ -1,0 +1,172 @@
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { 
+  Target, 
+  Plus, 
+  Trash2, 
+  ArrowUp, 
+  ArrowDown, 
+  CheckCircle2,
+  Clock
+} from "lucide-react";
+import { useAlertsContext } from "@/contexts/AlertsContext";
+import { CreatePriceAlertModal } from "./CreatePriceAlertModal";
+import { cn } from "@/lib/utils";
+
+export function PriceAlertsPanel() {
+  const { priceAlerts, togglePriceAlert, deletePriceAlert } = useAlertsContext();
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const activeAlerts = priceAlerts.filter(a => !a.triggered);
+  const triggeredAlerts = priceAlerts.filter(a => a.triggered);
+
+  const formatTime = (date: Date) => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+  };
+
+  return (
+    <>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Target className="h-4 w-4 text-primary" />
+            Custom Price Alerts
+          </CardTitle>
+          <Button size="sm" className="h-8" onClick={() => setShowCreateModal(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            New Alert
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Active Alerts */}
+          <div>
+            <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5" />
+              Active ({activeAlerts.length})
+            </h4>
+            <ScrollArea className="h-[200px]">
+              {activeAlerts.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No active price alerts</p>
+                  <p className="text-xs mt-1">Create one to get started</p>
+                </div>
+              ) : (
+                <div className="space-y-2 pr-4">
+                  {activeAlerts.map(alert => (
+                    <div
+                      key={alert.id}
+                      className={cn(
+                        "p-3 rounded-lg border transition-colors",
+                        alert.enabled ? "bg-card border-border" : "bg-muted/30 border-border/50"
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-2 flex-1 min-w-0">
+                          {alert.direction === 'above' ? (
+                            <ArrowUp className="h-4 w-4 text-green-500 mt-0.5" />
+                          ) : (
+                            <ArrowDown className="h-4 w-4 text-red-500 mt-0.5" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium text-sm truncate">
+                                {alert.assetDisplayName}
+                              </span>
+                              <Badge variant="outline" className="text-[10px]">
+                                {alert.triggerType === 'wick' ? 'Touch' : `Close ${alert.timeframe}`}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {alert.direction === 'above' ? 'Above' : 'Below'} {alert.price}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={alert.enabled}
+                            onCheckedChange={() => togglePriceAlert(alert.id)}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => deletePriceAlert(alert.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+
+          {/* Triggered Alerts (History) */}
+          <div>
+            <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              History ({triggeredAlerts.length})
+            </h4>
+            <ScrollArea className="h-[150px]">
+              {triggeredAlerts.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  <p className="text-xs">No triggered alerts yet</p>
+                </div>
+              ) : (
+                <div className="space-y-2 pr-4">
+                  {triggeredAlerts.slice(0, 10).map(alert => (
+                    <div
+                      key={alert.id}
+                      className="p-2.5 rounded-lg bg-muted/30 border border-border/50"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                          <span className="text-sm truncate">
+                            {alert.assetDisplayName} {alert.direction} {alert.price}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                          {alert.triggeredAt ? formatTime(alert.triggeredAt) : 'Unknown'}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                          onClick={() => deletePriceAlert(alert.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+        </CardContent>
+      </Card>
+
+      <CreatePriceAlertModal
+        open={showCreateModal}
+        onOpenChange={setShowCreateModal}
+      />
+    </>
+  );
+}

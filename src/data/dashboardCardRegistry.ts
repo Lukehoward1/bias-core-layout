@@ -113,8 +113,17 @@ export const DASHBOARD_CARD_REGISTRY: DashboardCardDefinition[] = [
     allowedRowTypes: ['equal', 'wide-narrow', 'hero'],
     dashboardEligible: true,
   },
+  {
+    id: 'alerts-price-alerts',
+    title: 'Active Price Alerts',
+    description: 'Your custom price level alerts',
+    section: 'alerts',
+    category: 'overview',
+    defaultRowType: 'equal',
+    allowedRowTypes: ['equal', 'wide-narrow'],
+    dashboardEligible: true,
+  },
 
-  // ============ Calendar ============
   {
     id: 'upcoming-events',
     title: 'Upcoming Events',

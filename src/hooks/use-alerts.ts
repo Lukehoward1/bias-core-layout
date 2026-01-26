@@ -1,36 +1,18 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import type { AlertItem } from "@/components/alerts/AlertToast";
-import type { AlertPreferences } from "@/components/alerts/AlertPreferencesPanel";
+import type { AlertItem, AlertPreferences } from "@/types/alerts";
+import { defaultAlertPreferences } from "@/types/alerts";
 import { useWatchlist } from "@/hooks/use-watchlist";
-
-const defaultPreferences: AlertPreferences = {
-  sessionReminders: true,
-  sessionReminderOffsets: [15, 5],
-  sessionOverlaps: true,
-  sessionStatus: false,
-  highImpactNews: true,
-  eventSpecificNews: [],
-  breakingNews: true,
-  postEventSummaries: true,
-  biasFlipAlerts: true,
-  biasFlipTimeframes: ['H4', 'Daily'],
-  biasAlignmentAlerts: true,
-  dailySummary: true,
-  weeklySummary: false,
-  preNewsExposure: true,
-  lowLiquidity: true,
-  quietHoursEnabled: false,
-  quietHoursStart: '22:00',
-  quietHoursEnd: '06:00',
-  relevantCurrencies: ['USD', 'EUR', 'GBP']
-};
 
 export function useAlerts() {
   const { watchlist, watchlistCurrencies } = useWatchlist();
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [preferences, setPreferences] = useState<AlertPreferences>(() => {
     const saved = localStorage.getItem('alertPreferences');
-    return saved ? JSON.parse(saved) : defaultPreferences;
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return { ...defaultAlertPreferences, ...parsed };
+    }
+    return defaultAlertPreferences;
   });
 
   // Combine watchlist-derived currencies with manually selected currencies
@@ -52,6 +34,11 @@ export function useAlerts() {
     // Bias alerts are watchlist-only
     if (alert.type === 'bias') {
       return alert.relatedAsset ? watchlist.includes(alert.relatedAsset) : false;
+    }
+    
+    // Price alerts always relevant (user created them)
+    if (alert.type === 'price') {
+      return true;
     }
     
     // For other alerts, check currency relevance

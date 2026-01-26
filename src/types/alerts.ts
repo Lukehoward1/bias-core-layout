@@ -1,0 +1,109 @@
+// Alert types and interfaces for the comprehensive alerts system
+
+export type AlertType = 
+  | 'session' 
+  | 'news' 
+  | 'bias' 
+  | 'exposure' 
+  | 'summary' 
+  | 'timer' 
+  | 'breaking'
+  | 'price'
+  | 'level'
+  | 'risk';
+
+export type AlertSeverity = 'info' | 'warning' | 'high';
+
+export interface AlertItem {
+  id: string;
+  type: AlertType;
+  title: string;
+  message: string;
+  timestamp: Date;
+  read: boolean;
+  severity: AlertSeverity;
+  relatedAsset?: string;
+  // Click-through routing
+  routeTo?: string;
+  routeParams?: Record<string, string>;
+}
+
+// Custom Price Alert Types
+export type PriceAlertTriggerType = 'wick' | 'close';
+export type PriceAlertDirection = 'above' | 'below';
+export type PriceAlertTimeframe = '1m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1D' | '1W';
+
+export interface PriceAlert {
+  id: string;
+  asset: string;
+  assetDisplayName: string;
+  direction: PriceAlertDirection;
+  triggerType: PriceAlertTriggerType;
+  price: number;
+  timeframe?: PriceAlertTimeframe; // Required only for 'close' type
+  enabled: boolean;
+  triggered: boolean;
+  triggeredAt?: Date;
+  createdAt: Date;
+  lastCheckedPrice?: number;
+}
+
+// Alert Preferences (extended)
+export interface AlertPreferences {
+  // Session alerts
+  sessionReminders: boolean;
+  sessionReminderOffsets: number[];
+  sessionOverlaps: boolean;
+  sessionStatus: boolean;
+  
+  // News alerts
+  highImpactNews: boolean;
+  eventSpecificNews: string[];
+  breakingNews: boolean;
+  postEventSummaries: boolean;
+  
+  // Bias alerts
+  biasFlipAlerts: boolean;
+  biasFlipTimeframes: ('H4' | 'Daily')[];
+  biasAlignmentAlerts: boolean;
+  dailySummary: boolean;
+  weeklySummary: boolean;
+  
+  // Risk alerts
+  preNewsExposure: boolean;
+  lowLiquidity: boolean;
+  
+  // Delivery
+  quietHoursEnabled: boolean;
+  quietHoursStart: string;
+  quietHoursEnd: string;
+  
+  // Sound
+  soundEnabled: boolean;
+  
+  // Currency relevance
+  relevantCurrencies: string[];
+}
+
+export const defaultAlertPreferences: AlertPreferences = {
+  sessionReminders: true,
+  sessionReminderOffsets: [15, 5],
+  sessionOverlaps: true,
+  sessionStatus: false,
+  highImpactNews: true,
+  eventSpecificNews: [],
+  breakingNews: true,
+  postEventSummaries: true,
+  biasFlipAlerts: true,
+  biasFlipTimeframes: ['H4', 'Daily'],
+  biasAlignmentAlerts: true,
+  dailySummary: true,
+  weeklySummary: false,
+  preNewsExposure: true,
+  lowLiquidity: true,
+  quietHoursEnabled: false,
+  quietHoursStart: '22:00',
+  quietHoursEnd: '06:00',
+  soundEnabled: true,
+  relevantCurrencies: ['USD', 'EUR', 'GBP']
+};

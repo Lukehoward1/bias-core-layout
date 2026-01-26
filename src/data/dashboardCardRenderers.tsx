@@ -702,6 +702,40 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
       </CardContent>
     </Card>
   ),
+
+  // ============ Alerts - Price Alerts ============
+  'alerts-price-alerts': () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Target className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-medium">Active Price Alerts</CardTitle>
+          </div>
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-success" />
+              <span className="text-sm text-foreground">EUR/USD above 1.0850</span>
+            </div>
+            <span className="text-xs text-muted-foreground">Touch</span>
+          </div>
+          <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+            <div className="flex items-center gap-2">
+              <TrendingDown className="h-4 w-4 text-destructive" />
+              <span className="text-sm text-foreground">Gold below 2020.00</span>
+            </div>
+            <span className="text-xs text-muted-foreground">Close 1H</span>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground mt-3 text-center">2 active alerts</p>
+      </CardContent>
+    </Card>
+  ),
 };
 
 /**
