@@ -57,11 +57,13 @@ export default function Alerts() {
   const sessionTimersCardId = 'session-timers';
   const myAlertsTimersCardId = 'alerts-my-alerts-timers';
   const priceAlertsCardId = 'alerts-price-alerts';
+  const highImpactCardId = 'high-impact-events';
   
   const isTopNewsAdded = isCardOnDashboard(topNewsCardId);
   const isSessionTimersAdded = isCardOnDashboard(sessionTimersCardId);
   const isMyAlertsTimersAdded = isCardOnDashboard(myAlertsTimersCardId);
   const isPriceAlertsAdded = isCardOnDashboard(priceAlertsCardId);
+  const isHighImpactAdded = isCardOnDashboard(highImpactCardId);
   
   const handleAddCard = (cardId: string) => {
     addCard(cardId);

@@ -894,6 +894,156 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
       </CardContent>
     </Card>
   ),
+
+  // ============ Top News ============
+  'top-news': () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-medium">Top News</CardTitle>
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {[
+            { title: 'Fed Signals Rate Hold', currency: 'USD', time: '2h ago', sentiment: 'hawkish' },
+            { title: 'ECB Minutes Divided', currency: 'EUR', time: '4h ago', sentiment: 'mixed' },
+            { title: 'BOE Hints at Cut', currency: 'GBP', time: '5h ago', sentiment: 'dovish' },
+          ].map((item, i) => (
+            <div key={i} className="p-2 rounded-lg bg-muted/50 border border-border">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-foreground truncate">{item.title}</p>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{item.currency}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                      item.sentiment === 'hawkish' ? 'bg-success/20 text-success' : 
+                      item.sentiment === 'dovish' ? 'bg-warning/20 text-warning' : 
+                      'bg-muted text-muted-foreground'
+                    }`}>{item.sentiment}</span>
+                  </div>
+                </div>
+                <span className="text-[10px] text-muted-foreground whitespace-nowrap">{item.time}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  ),
+
+  // ============ Session Timers ============
+  'session-timers': () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-medium">Session Timers</CardTitle>
+          </div>
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {[
+            { name: 'Sydney', status: 'closed', time: 'Opens 8:30', accent: '#2EC4B6' },
+            { name: 'Asia', status: 'open', time: 'Closes 1:23', accent: '#4361EE' },
+            { name: 'London', status: 'closed', time: 'Opens 2:15', accent: '#F4D35E' },
+            { name: 'New York', status: 'closed', time: 'Opens 5:45', accent: '#F77F00' },
+          ].map((session, i) => (
+            <div key={i} className="relative p-2 rounded-lg bg-muted/50 border border-border overflow-hidden">
+              <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: session.accent }} />
+              <div className="flex items-center justify-between pl-2">
+                <div>
+                  <p className="text-xs font-medium text-foreground">{session.name}</p>
+                  <p className="text-[10px] text-muted-foreground">{session.time}</p>
+                </div>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                  session.status === 'open' ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'
+                }`}>{session.status}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  ),
+
+  // ============ High Impact Events ============
+  'high-impact-events': () => (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+            <CardTitle className="text-sm font-medium">High Impact Events</CardTitle>
+          </div>
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {[
+            { event: 'US CPI', currency: 'USD', time: '14:30', impact: 'high' },
+            { event: 'ECB Rate Decision', currency: 'EUR', time: '13:15', impact: 'high' },
+            { event: 'UK Employment', currency: 'GBP', time: '09:00', impact: 'medium' },
+          ].map((item, i) => (
+            <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-border">
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                <div>
+                  <p className="text-xs font-medium text-foreground">{item.event}</p>
+                  <span className="text-[10px] text-muted-foreground">{item.currency}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground">{item.time}</span>
+                <span className={`w-2 h-2 rounded-full ${item.impact === 'high' ? 'bg-destructive' : 'bg-warning'}`} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  ),
+
+  // ============ Upcoming Events ============
+  'upcoming-events': () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CalendarIcon className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-medium">Upcoming Events</CardTitle>
+          </div>
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Pinned</span>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {[
+            { event: 'FOMC Minutes', currency: 'USD', date: 'Wed 19:00', impact: 'high' },
+            { event: 'UK CPI', currency: 'GBP', date: 'Wed 09:00', impact: 'high' },
+            { event: 'EU Flash PMI', currency: 'EUR', date: 'Thu 10:00', impact: 'medium' },
+            { event: 'US Initial Claims', currency: 'USD', date: 'Thu 13:30', impact: 'medium' },
+          ].map((item, i) => (
+            <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+              <div className="flex items-center gap-2">
+                <div className={`w-1.5 h-1.5 rounded-full ${item.impact === 'high' ? 'bg-destructive' : 'bg-warning'}`} />
+                <div>
+                  <p className="text-xs font-medium text-foreground">{item.event}</p>
+                  <span className="text-[10px] text-muted-foreground">{item.currency}</span>
+                </div>
+              </div>
+              <span className="text-[10px] text-muted-foreground">{item.date}</span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  ),
 };
 
 /**
