@@ -3,42 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Clock, Bell, TrendingUp, AlertTriangle, Calendar, Radio, Moon } from "lucide-react";
-
-export interface AlertPreferences {
-  // Session alerts
-  sessionReminders: boolean;
-  sessionReminderOffsets: number[];
-  sessionOverlaps: boolean;
-  sessionStatus: boolean;
-  
-  // News alerts
-  highImpactNews: boolean;
-  eventSpecificNews: string[];
-  breakingNews: boolean;
-  postEventSummaries: boolean;
-  
-  // Bias alerts
-  biasFlipAlerts: boolean;
-  biasFlipTimeframes: ('H4' | 'Daily')[];
-  biasAlignmentAlerts: boolean;
-  dailySummary: boolean;
-  weeklySummary: boolean;
-  
-  // Risk alerts
-  preNewsExposure: boolean;
-  lowLiquidity: boolean;
-  
-  // Delivery
-  quietHoursEnabled: boolean;
-  quietHoursStart: string;
-  quietHoursEnd: string;
-  
-  // Currency relevance
-  relevantCurrencies: string[];
-}
+import { Clock, Bell, TrendingUp, AlertTriangle, Calendar, Moon, Volume2 } from "lucide-react";
+import type { AlertPreferences } from "@/types/alerts";
 
 interface AlertPreferencesPanelProps {
   preferences: AlertPreferences;

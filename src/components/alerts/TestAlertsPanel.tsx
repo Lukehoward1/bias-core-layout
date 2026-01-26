@@ -9,9 +9,10 @@ import {
   AlertTriangle, 
   Radio,
   Bell,
-  Zap
+  Zap,
+  Target
 } from "lucide-react";
-import type { AlertItem } from "./AlertToast";
+import type { AlertItem } from "@/types/alerts";
 
 interface TestAlertsPanelProps {
   onTriggerAlert: (alert: Omit<AlertItem, 'id' | 'timestamp' | 'read'>) => void;
@@ -123,6 +124,30 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         title: 'Daily Bias Summary',
         message: 'Your watchlist: 4 Bullish, 2 Bearish, 1 Neutral. Top mover: XAUUSD +1.2%',
         severity: 'info'
+      }
+    },
+    {
+      label: 'Price Alert (Wick)',
+      icon: <Target className="h-3.5 w-3.5" />,
+      alert: {
+        type: 'price',
+        title: 'Gold wicked above 2025.50',
+        message: 'Your price alert for XAUUSD was triggered.',
+        severity: 'info',
+        relatedAsset: 'XAUUSD',
+        routeTo: '/asset/XAUUSD'
+      }
+    },
+    {
+      label: 'Price Alert (Close)',
+      icon: <Target className="h-3.5 w-3.5" />,
+      alert: {
+        type: 'price',
+        title: 'EUR/USD closed above 1.0850 on 15m',
+        message: 'Candle close confirmed above your alert level.',
+        severity: 'info',
+        relatedAsset: 'EURUSD',
+        routeTo: '/asset/EURUSD'
       }
     }
   ];
