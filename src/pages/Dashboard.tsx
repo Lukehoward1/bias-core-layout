@@ -225,12 +225,12 @@ export default function Dashboard() {
     switch (cardEntry.id) {
       case 'todays-bias':
         return (
-          <Card className="h-full">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <Card className="h-full flex flex-col">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 flex-shrink-0">
               <CardTitle className="text-sm font-medium text-muted-foreground">Today's Bias</CardTitle>
               <TrendingUp className="h-4 w-4 text-success" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 flex flex-col justify-center">
               <div className="text-2xl font-bold text-foreground">Bullish</div>
               <p className="text-xs text-muted-foreground mt-1">85% confidence</p>
             </CardContent>
@@ -239,12 +239,12 @@ export default function Dashboard() {
 
       case 'active-trades':
         return (
-          <Card className="h-full">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <Card className="h-full flex flex-col">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 flex-shrink-0">
               <CardTitle className="text-sm font-medium text-muted-foreground">Active Trades</CardTitle>
               <Activity className="h-4 w-4 text-primary" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 flex flex-col justify-center">
               <div className="text-2xl font-bold text-foreground">3</div>
               <p className="text-xs text-success mt-1">+$2,450 unrealized</p>
             </CardContent>
@@ -255,17 +255,17 @@ export default function Dashboard() {
         return (
           <div className="relative h-full" ref={sessionCardRef}>
             <Card 
-              className="cursor-pointer hover:bg-muted/30 transition-colors h-full"
+              className="cursor-pointer hover:bg-muted/30 transition-colors h-full flex flex-col"
               onClick={() => !isEditMode && setShowSessionDropdown(!showSessionDropdown)}
             >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 flex-shrink-0">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Next Session</CardTitle>
                 <div className="flex items-center gap-1">
                   <Clock className="h-4 w-4 text-accent" />
                   <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${showSessionDropdown ? 'rotate-180' : ''}`} />
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex-1 flex flex-col justify-center">
                 <div className="text-2xl font-bold text-foreground">London</div>
                 <p className="text-xs text-muted-foreground mt-1">Opens in 2h 15m</p>
               </CardContent>
@@ -281,14 +281,14 @@ export default function Dashboard() {
 
       case 'high-impact-events':
         return (
-          <Card className="h-full">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">High Impact Events</CardTitle>
+          <Card className="h-full flex flex-col">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 flex-shrink-0">
+              <CardTitle className="text-sm font-medium text-muted-foreground">High Impact</CardTitle>
               <CalendarIcon className="h-4 w-4 text-destructive" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 flex flex-col justify-center">
               <div className="text-2xl font-bold text-foreground">5</div>
-              <p className="text-xs text-muted-foreground mt-1">Today</p>
+              <p className="text-xs text-muted-foreground mt-1">Events today</p>
             </CardContent>
           </Card>
         );

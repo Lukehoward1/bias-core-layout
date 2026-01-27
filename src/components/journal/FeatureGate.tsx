@@ -137,22 +137,22 @@ export function CardFeatureGate({
     <div className={cn("relative", className)}>
       {/* Blurred content - subtle blur that still shows structure */}
       <div 
-        className="blur-[6px] pointer-events-none select-none opacity-60" 
+        className="blur-[5px] pointer-events-none select-none opacity-50" 
         aria-hidden="true"
       >
         {children}
       </div>
 
-      {/* Minimal overlay - just a lock icon and tier badge */}
+      {/* Minimal overlay - subtle lock indicator */}
       <Link 
         to="/billing"
-        className="absolute inset-0 flex items-center justify-center bg-background/30 rounded-lg cursor-pointer group transition-colors hover:bg-background/40"
+        className="absolute inset-0 flex items-center justify-center bg-background/20 rounded-lg cursor-pointer group transition-colors hover:bg-background/30"
       >
-        <div className="flex flex-col items-center gap-2">
-          <div className="h-8 w-8 rounded-full bg-muted/80 flex items-center justify-center group-hover:bg-muted transition-colors">
-            <Lock className="h-4 w-4 text-muted-foreground" />
+        <div className="flex flex-col items-center gap-1.5">
+          <div className="h-7 w-7 rounded-full bg-muted/70 flex items-center justify-center group-hover:bg-muted/90 transition-colors">
+            <Lock className="h-3.5 w-3.5 text-muted-foreground" />
           </div>
-          <span className="text-xs font-medium text-muted-foreground bg-muted/80 px-2 py-0.5 rounded-full group-hover:bg-muted transition-colors">
+          <span className="text-[10px] font-medium text-muted-foreground/80 bg-muted/60 px-1.5 py-0.5 rounded group-hover:bg-muted/80 transition-colors">
             {planLabel}
           </span>
         </div>
