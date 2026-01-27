@@ -1,14 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calculator, DollarSign, TrendingUp, LinkIcon, RefreshCw, Info } from "lucide-react";
+import { Calculator, DollarSign, TrendingUp, LinkIcon, RefreshCw, ArrowRight } from "lucide-react";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
-import { useLinkedAccount } from "@/hooks/use-linked-account";
-import { AccountLinkingModal } from "@/components/account/AccountLinkingModal";
+import { useLinkedAccounts, type LinkedAccount } from "@/hooks/use-linked-accounts";
 import { 
   getFXInstruments, 
   getFuturesInstruments, 
@@ -29,8 +29,23 @@ const RISK_PRESETS = [0.5, 1, 1.5, 2];
 const RISK_STORAGE_KEY = 'globalRiskPreset';
 
 export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false }: QuickRiskCalculatorProps) {
-  // Account linking
-  const { account, isConnected, balance, currency, refreshBalance, isLoading: isAccountLoading } = useLinkedAccount();
+  const navigate = useNavigate();
+  
+  // Account linking - use multi-account hook
+  const { 
+    accounts, 
+    primaryAccount, 
+    isLoading: isAccountLoading,
+    refreshAccount,
+    setPrimaryAccount,
+  } = useLinkedAccounts();
+
+  // Derived state
+  const hasLinkedAccounts = accounts.length > 0;
+  const activeAccount = primaryAccount;
+  const isConnected = hasLinkedAccounts && activeAccount?.isConnected;
+  const balance = activeAccount?.balance ?? null;
+  const currency = activeAccount?.currency ?? 'GBP';
   
   // State
   const [manualBalance, setManualBalance] = useState<number>(10000);
@@ -38,9 +53,8 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
   const [assetCategory, setAssetCategory] = useState<'FX' | 'Futures'>('FX');
   const [selectedInstrument, setSelectedInstrument] = useState<string>('EURUSD');
   const [stopDistance, setStopDistance] = useState<number>(30);
-  const [showLinkingModal, setShowLinkingModal] = useState(false);
 
-  // Mode indicator - always Manual for now (Linked when account connected)
+  // Mode indicator
   const mode = isConnected ? 'Linked' : 'Manual';
 
   // Get instruments based on category
@@ -147,7 +161,6 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
   }
 
   return (
-    <>
     <Card className="h-full">
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -179,51 +192,67 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                 )}
               </div>
 
-              {isConnected && balance !== null ? (
+              {isConnected && balance !== null && activeAccount ? (
                 // Connected account display
                 <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-2xl font-bold text-foreground">
-                        {currency === 'GBP' ? '£' : '$'}{balance.toLocaleString()}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {account?.broker} • Updated {account?.lastUpdated.toLocaleTimeString()}
-                      </p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-2xl font-bold text-foreground">
+                          {currency === 'GBP' ? '£' : '$'}{balance.toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className="text-xs text-muted-foreground truncate">
+                          {activeAccount.name} • {activeAccount.broker}
+                        </p>
+                        {accounts.length > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs text-primary hover:text-primary/80 h-auto py-0.5 px-1"
+                            onClick={() => navigate('/brokerage')}
+                          >
+                            Change
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      onClick={refreshBalance}
+                      onClick={() => activeAccount && refreshAccount(activeAccount.id)}
                       disabled={isAccountLoading}
-                      className="h-8 w-8"
+                      className="h-8 w-8 shrink-0"
                     >
                       <RefreshCw className={cn("h-4 w-4", isAccountLoading && "animate-spin")} />
                     </Button>
                   </div>
                 </div>
               ) : (
-                // Manual mode with improved callout
+                // No linked account - prompt to link
                 <div className="space-y-3">
-                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <Info className="h-5 w-5 text-primary mt-0.5" />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-foreground">Manual mode</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Enter your balance below. When account linking is available, this will auto-sync.
-                          </p>
-                        </div>
+                  <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <LinkIcon className="h-5 w-5 text-muted-foreground" />
                       </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-xs text-primary hover:text-primary/80 shrink-0 h-auto py-1 px-2"
-                        onClick={() => setShowLinkingModal(true)}
-                      >
-                        Learn more
-                      </Button>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-foreground">No account linked</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Link a trading account to auto-sync your balance, or enter it manually below.
+                        </p>
+                        <Button 
+                          variant="outline"
+                          size="sm"
+                          className="mt-3 gap-2"
+                          onClick={() => navigate('/brokerage')}
+                        >
+                          <LinkIcon className="h-3 w-3" />
+                          Link account
+                          <ArrowRight className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                   <div>
@@ -429,12 +458,5 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
         </div>
       </CardContent>
     </Card>
-    
-    {/* Account Linking Modal */}
-    <AccountLinkingModal 
-      open={showLinkingModal} 
-      onOpenChange={setShowLinkingModal} 
-    />
-    </>
   );
 }

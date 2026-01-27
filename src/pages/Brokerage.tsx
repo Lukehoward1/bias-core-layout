@@ -10,10 +10,13 @@ import {
   Grid3X3, 
   Sparkles,
   ChevronRight,
-  ArrowRight
+  ArrowRight,
+  Link2
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { ConnectedAccountsList } from "@/components/account/ConnectedAccountsList";
+import { ConnectAccountModal } from "@/components/account/ConnectAccountModal";
 
 // Broker data
 const brokers = [
@@ -84,7 +87,7 @@ const propFirms = [
 ];
 
 export default function Brokerage() {
-  const [activeTab, setActiveTab] = useState("brokers");
+  const [activeTab, setActiveTab] = useState("connections");
   const [smartMatchStep, setSmartMatchStep] = useState(0);
   const [smartMatchAnswers, setSmartMatchAnswers] = useState({
     assetType: "",
@@ -92,6 +95,7 @@ export default function Brokerage() {
     accountType: "",
     priority: ""
   });
+  const [showConnectModal, setShowConnectModal] = useState(false);
 
   const handleSmartMatchAnswer = (question: string, answer: string) => {
     setSmartMatchAnswers(prev => ({ ...prev, [question]: answer }));
@@ -126,12 +130,17 @@ export default function Brokerage() {
 
   return (
     <div className="flex flex-col min-h-full bg-background">
-      <AppHeader title="Brokerage" />
+      <AppHeader title="Brokerage Connections" />
       
       <div className="flex-1 p-4 sm:p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full max-w-lg grid-cols-4 mb-6">
+            <TabsList className="grid w-full max-w-2xl grid-cols-5 mb-6">
+              <TabsTrigger value="connections" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                <Link2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Connections</span>
+                <span className="sm:hidden">Conn</span>
+              </TabsTrigger>
               <TabsTrigger value="brokers" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
                 <Building2 className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span className="hidden sm:inline">Brokers</span>
@@ -153,6 +162,22 @@ export default function Brokerage() {
                 <span className="sm:hidden">Match</span>
               </TabsTrigger>
             </TabsList>
+
+            {/* Connections Tab - NEW */}
+            <TabsContent value="connections" className="space-y-6">
+              <div className="text-center mb-8">
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-2">Connected Accounts</h2>
+                <p className="text-sm text-muted-foreground">
+                  Connect an account to auto-sync balance and streamline risk sizing.
+                </p>
+              </div>
+
+              <Card className="bg-card border-border">
+                <CardContent className="pt-6">
+                  <ConnectedAccountsList onConnectClick={() => setShowConnectModal(true)} />
+                </CardContent>
+              </Card>
+            </TabsContent>
 
             {/* Brokers Tab */}
             <TabsContent value="brokers" className="space-y-6">
@@ -544,6 +569,9 @@ export default function Brokerage() {
           </Tabs>
         </div>
       </div>
+
+      {/* Connect Account Modal */}
+      <ConnectAccountModal open={showConnectModal} onOpenChange={setShowConnectModal} />
     </div>
   );
 }
