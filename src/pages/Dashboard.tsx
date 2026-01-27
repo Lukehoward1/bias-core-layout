@@ -213,12 +213,15 @@ export default function Dashboard() {
 
   // Render card content based on card ID and slot type
   const renderCardContent = (cardEntry: DashboardCardEntry, slotType: 'wide' | 'narrow' | 'equal' | 'hero' | 'kpi'): React.ReactNode => {
-    // Handle pinned cards first
-    if (cardEntry.isPinned) {
-      return getPinnedCardContent(cardEntry, slotType);
+    const cardId = cardEntry.id;
+    
+    // First, try the centralized renderer (covers pinned and registry cards)
+    const renderer = getCardRenderer(cardId);
+    if (renderer) {
+      return renderer({ slotType });
     }
 
-    // Handle default dashboard cards
+    // Handle default dashboard-native cards (legacy hardcoded)
     switch (cardEntry.id) {
       case 'todays-bias':
         return (
@@ -462,36 +465,26 @@ export default function Dashboard() {
         );
 
       default:
-        return null;
+        // Unknown card - render warning (this case should rarely happen now)
+        return (
+          <Card className="h-full border-warning/30 bg-warning/5">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-warning">Unknown Card</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-warning" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground mb-2">Card ID: {cardEntry.id}</p>
+              <p className="text-xs text-muted-foreground">This card type is not recognized. Use Edit mode to remove it.</p>
+            </CardContent>
+          </Card>
+        );
     }
   };
 
-  const getPinnedCardContent = (cardEntry: DashboardCardEntry, slotType: 'wide' | 'narrow' | 'equal' | 'hero' | 'kpi'): React.ReactNode => {
-    const cardId = cardEntry.id;
-    
-    // Look up renderer from centralized registry
-    const renderer = getCardRenderer(cardId);
-    
-    if (renderer) {
-      return renderer({ slotType });
-    }
-    
-    // Fallback: render a warning card with remove option for unknown cards
-    return (
-      <Card className="h-full border-amber-500/30 bg-amber-500/5">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium text-amber-600">Unknown Card</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <p className="text-xs text-muted-foreground mb-2">Card ID: {cardId}</p>
-          <p className="text-xs text-muted-foreground">This card type is not recognized. Use Edit mode to remove it.</p>
-        </CardContent>
-      </Card>
-    );
-  };
+  // Legacy function - kept for backwards compatibility but no longer needed
+  // as renderCardContent now handles all cards through centralized renderers
 
   const handleAddRow = (afterRowId?: string) => {
     addRow('equal', afterRowId);

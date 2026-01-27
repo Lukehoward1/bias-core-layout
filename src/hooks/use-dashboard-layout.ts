@@ -137,11 +137,8 @@ const normalizeLayout = (raw: unknown): DashboardLayout => {
           const ce = c as Partial<DashboardCardEntry>;
           if (typeof ce.id !== 'string' || !ce.id) return null;
           // Safety filter: only keep cards that exist in the registry
-          // (skip this check for built-in default cards that may not be pinned)
-          const isBuiltIn = ['todays-bias', 'active-trades', 'next-session', 'high-impact-events', 
-            'watchlist-overview', 'session-timers', 'upcoming-events', 'performance-overview',
-            'journal-summary', 'risk-snapshot', 'calendar-events', 'top-news'].includes(ce.id);
-          if (!isBuiltIn && !isCardEligible(ce.id)) {
+          // isCardEligible checks the full registry, no need for a hardcoded built-in list
+          if (!isCardEligible(ce.id)) {
             console.warn(`Filtered unknown card from layout: ${ce.id}`);
             return null;
           }
