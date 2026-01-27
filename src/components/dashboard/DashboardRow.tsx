@@ -28,7 +28,8 @@ interface DashboardRowProps {
 const getGridClass = (rowType: RowType): string => {
   switch (rowType) {
     case 'kpi':
-      return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4';
+      // KPI row: auto-rows ensures all cards have equal, compact height
+      return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 auto-rows-fr';
     case 'wide-narrow':
       return 'grid-cols-1 lg:grid-cols-3';
     case 'equal':
