@@ -81,6 +81,28 @@ export const DASHBOARD_CARD_REGISTRY: DashboardCardDefinition[] = [
     allowedRowTypes: ['wide-narrow', 'equal', 'hero', 'three-equal', 'four-equal'],
     dashboardEligible: true,
   },
+  
+  // ============ Dashboard Native Cards ============
+  {
+    id: 'performance-overview',
+    title: 'Performance Overview',
+    description: 'Weekly and monthly performance summary',
+    section: 'reports',
+    category: 'overview',
+    defaultRowType: 'equal',
+    allowedRowTypes: ['equal', 'wide-narrow', 'hero'],
+    dashboardEligible: true,
+  },
+  {
+    id: 'risk-snapshot',
+    title: 'Risk Snapshot',
+    description: 'Current risk exposure and limits',
+    section: 'risk-tools',
+    category: 'overview',
+    defaultRowType: 'equal',
+    allowedRowTypes: ['equal', 'wide-narrow'],
+    dashboardEligible: true,
+  },
 
   // ============ Alerts ============
   {
