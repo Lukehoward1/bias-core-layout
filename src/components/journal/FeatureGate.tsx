@@ -1,0 +1,107 @@
+import { ReactNode } from "react";
+import { Link } from "react-router-dom";
+import { Lock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+interface FeatureGateProps {
+  /** Whether the feature is locked for the current plan */
+  isLocked: boolean;
+  /** Content to show (will be blurred if locked) */
+  children: ReactNode;
+  /** Feature name for the upgrade prompt */
+  featureName?: string;
+  /** Required plan to unlock (for display) */
+  requiredPlan?: "standard" | "premium";
+  /** Custom message for the overlay */
+  message?: string;
+  /** Additional class names for the container */
+  className?: string;
+  /** Whether to show a compact overlay (for smaller cards) */
+  compact?: boolean;
+}
+
+/**
+ * Wraps content with a blur overlay and upgrade prompt when the feature is locked.
+ * Uses a non-intrusive inline prompt - no modals or blocking dialogs.
+ */
+export function FeatureGate({
+  isLocked,
+  children,
+  featureName = "This feature",
+  requiredPlan = "standard",
+  message,
+  className,
+  compact = false,
+}: FeatureGateProps) {
+  if (!isLocked) {
+    return <>{children}</>;
+  }
+
+  const planLabel = requiredPlan === "premium" ? "Premium" : "Standard";
+  const defaultMessage = `${featureName} is available on ${planLabel} and above.`;
+
+  return (
+    <div className={cn("relative", className)}>
+      {/* Blurred content */}
+      <div 
+        className="blur-sm pointer-events-none select-none" 
+        aria-hidden="true"
+      >
+        {children}
+      </div>
+
+      {/* Overlay with upgrade prompt */}
+      <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[2px] rounded-lg">
+        <div className={cn(
+          "text-center px-4",
+          compact ? "max-w-[200px]" : "max-w-sm"
+        )}>
+          <div className={cn(
+            "mx-auto rounded-full bg-muted flex items-center justify-center mb-3",
+            compact ? "h-8 w-8" : "h-10 w-10"
+          )}>
+            <Lock className={cn(
+              "text-muted-foreground",
+              compact ? "h-4 w-4" : "h-5 w-5"
+            )} />
+          </div>
+          <p className={cn(
+            "text-muted-foreground mb-3",
+            compact ? "text-xs" : "text-sm"
+          )}>
+            {message || defaultMessage}
+          </p>
+          <Button 
+            asChild 
+            size={compact ? "sm" : "default"}
+            variant="outline"
+            className={cn(compact && "h-7 text-xs px-3")}
+          >
+            <Link to="/billing">
+              View Plans
+            </Link>
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A smaller, inline badge-style lock indicator for headers/titles
+ */
+interface LockedBadgeProps {
+  requiredPlan?: "standard" | "premium";
+}
+
+export function LockedBadge({ requiredPlan = "standard" }: LockedBadgeProps) {
+  const planLabel = requiredPlan === "premium" ? "Premium" : "Standard";
+  
+  return (
+    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+      <Lock className="h-3 w-3" />
+      {planLabel}
+    </span>
+  );
+}

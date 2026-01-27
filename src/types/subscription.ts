@@ -4,8 +4,22 @@
 export type SubscriptionPlan = 'free' | 'standard' | 'premium';
 
 export interface PlanLimits {
+  // Brokerage connections
   maxLinkedAccounts: number;
   canLinkAccounts: boolean;
+  
+  // Journal features
+  journal: {
+    manualEntry: boolean;        // All plans
+    viewTrades: boolean;         // All plans
+    equityCurve: boolean;        // All plans
+    analytics: boolean;          // Standard+
+    reports: boolean;            // Standard+
+    exportReports: boolean;      // Standard+
+    autoJournaling: boolean;     // Standard+
+    advancedComparisons: boolean; // Premium only
+    deepAggregation: boolean;    // Premium only
+  };
 }
 
 // Centralized plan limits configuration - easy to modify
@@ -13,14 +27,47 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
   free: {
     maxLinkedAccounts: 0,
     canLinkAccounts: false,
+    journal: {
+      manualEntry: true,
+      viewTrades: true,
+      equityCurve: true,
+      analytics: false,
+      reports: false,
+      exportReports: false,
+      autoJournaling: false,
+      advancedComparisons: false,
+      deepAggregation: false,
+    },
   },
   standard: {
     maxLinkedAccounts: 2,
     canLinkAccounts: true,
+    journal: {
+      manualEntry: true,
+      viewTrades: true,
+      equityCurve: true,
+      analytics: true,
+      reports: true,
+      exportReports: true,
+      autoJournaling: true,
+      advancedComparisons: false,
+      deepAggregation: false,
+    },
   },
   premium: {
     maxLinkedAccounts: 5,
     canLinkAccounts: true,
+    journal: {
+      manualEntry: true,
+      viewTrades: true,
+      equityCurve: true,
+      analytics: true,
+      reports: true,
+      exportReports: true,
+      autoJournaling: true,
+      advancedComparisons: true,
+      deepAggregation: true,
+    },
   },
 };
 
@@ -41,4 +88,29 @@ export function getRemainingAccountSlots(plan: SubscriptionPlan, currentCount: n
   const limits = getPlanLimits(plan);
   if (!limits.canLinkAccounts) return 0;
   return Math.max(0, limits.maxLinkedAccounts - currentCount);
+}
+
+// Journal-specific permission checks
+export function canAccessJournalAnalytics(plan: SubscriptionPlan): boolean {
+  return getPlanLimits(plan).journal.analytics;
+}
+
+export function canAccessJournalReports(plan: SubscriptionPlan): boolean {
+  return getPlanLimits(plan).journal.reports;
+}
+
+export function canExportJournalReports(plan: SubscriptionPlan): boolean {
+  return getPlanLimits(plan).journal.exportReports;
+}
+
+export function canUseAutoJournaling(plan: SubscriptionPlan): boolean {
+  return getPlanLimits(plan).journal.autoJournaling;
+}
+
+export function canAccessAdvancedComparisons(plan: SubscriptionPlan): boolean {
+  return getPlanLimits(plan).journal.advancedComparisons;
+}
+
+export function canAccessDeepAggregation(plan: SubscriptionPlan): boolean {
+  return getPlanLimits(plan).journal.deepAggregation;
 }
