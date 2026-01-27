@@ -11,8 +11,11 @@ interface UseSubscriptionReturn {
   setPlan: (plan: SubscriptionPlan) => void;
 }
 
+// Default to 'premium' for development/testing until billing is integrated
+const DEFAULT_PLAN: SubscriptionPlan = 'premium';
+
 export function useSubscription(): UseSubscriptionReturn {
-  const [plan, setPlanState] = useState<SubscriptionPlan>('free');
+  const [plan, setPlanState] = useState<SubscriptionPlan>(DEFAULT_PLAN);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load plan from localStorage on mount
