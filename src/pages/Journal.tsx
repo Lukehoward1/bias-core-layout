@@ -20,9 +20,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Star, Download } from "lucide-react";
+import { Plus, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Star, Download, Lock, Zap } from "lucide-react";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
+import { useSubscription } from "@/hooks/use-subscription";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
+import { FeatureGate, LockedBadge } from "@/components/journal/FeatureGate";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, addMonths, subMonths, isWithinInterval, parseISO } from "date-fns";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -36,6 +38,7 @@ import { ReportsRiskManagement } from "@/components/reports/ReportsRiskManagemen
 import { ReportsTradeLog } from "@/components/reports/ReportsTradeLog";
 import { ReportDateRangeFilter, DateRange } from "@/components/reports/ReportDateRangeFilter";
 import { usePdfExport } from "@/hooks/use-pdf-export";
+import { Link } from "react-router-dom";
 
 interface Trade {
   id: string;
@@ -193,6 +196,12 @@ export default function Journal() {
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [noteValue, setNoteValue] = useState('');
   const { exportAllReports } = usePdfExport();
+  
+  // Subscription for tier gating
+  const { plan, limits } = useSubscription();
+  const canAccessReports = limits.journal.reports;
+  const canExportReports = limits.journal.exportReports;
+  const canUseAutoJournaling = limits.journal.autoJournaling;
   
   // Dashboard integration - single hook at page level
   const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
@@ -537,6 +546,41 @@ export default function Journal() {
             </TabsList>
 
             <TabsContent value="journal" className="space-y-6 mt-5">
+              {/* Auto-Journaling Status Indicator */}
+              <Card className={!canUseAutoJournaling ? "border-muted" : "border-primary/30 bg-primary/5"}>
+                <CardContent className="py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                        canUseAutoJournaling ? "bg-primary/10" : "bg-muted"
+                      }`}>
+                        {canUseAutoJournaling ? (
+                          <Zap className="h-5 w-5 text-primary" />
+                        ) : (
+                          <Lock className="h-5 w-5 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium">Auto-Journaling</p>
+                          {!canUseAutoJournaling && <LockedBadge requiredPlan="standard" />}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {canUseAutoJournaling 
+                            ? "Trades sync automatically from linked accounts" 
+                            : "Automatically sync trades from your broker"}
+                        </p>
+                      </div>
+                    </div>
+                    {!canUseAutoJournaling && (
+                      <Button variant="outline" size="sm" asChild>
+                        <Link to="/billing">Upgrade</Link>
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 <Card>
                   <CardHeader className="pb-2">
@@ -883,70 +927,89 @@ export default function Journal() {
                       firstTradeDate={firstTradeDate}
                       lastTradeDate={lastTradeDate}
                     />
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="h-8 gap-1.5 text-xs"
-                      onClick={handleExportAllReports}
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      Export All
-                    </Button>
+                    {canExportReports ? (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 gap-1.5 text-xs"
+                        onClick={handleExportAllReports}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Export All
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 gap-1.5 text-xs opacity-60"
+                        disabled
+                      >
+                        <Lock className="h-3 w-3" />
+                        Export All
+                      </Button>
+                    )}
                   </div>
                 </div>
 
-                <TabsContent value="overview" className="mt-5">
-                  <ReportsOverview 
-                    trades={filteredTrades} 
-                    dateRangeLabel={dateRangeLabel}
-                    pinStates={overviewPinStates}
-                  />
-                </TabsContent>
-                <TabsContent value="performance" className="mt-5">
-                  <ReportsPerformance 
-                    trades={filteredTrades} 
-                    dateRangeLabel={dateRangeLabel}
-                    pinStates={performancePinStates}
-                  />
-                </TabsContent>
-                <TabsContent value="sessions" className="mt-5">
-                  <ReportsSessions 
-                    trades={filteredTrades} 
-                    dateRangeLabel={dateRangeLabel}
-                    pinStates={sessionsPinStates}
-                  />
-                </TabsContent>
-                <TabsContent value="assets" className="mt-5">
-                  <ReportsAssets 
-                    trades={filteredTrades} 
-                    dateRangeLabel={dateRangeLabel}
-                    pinStates={assetsPinStates}
-                  />
-                </TabsContent>
-                <TabsContent value="setup" className="mt-5">
-                  <ReportsSetupQuality 
-                    trades={filteredTrades} 
-                    dateRangeLabel={dateRangeLabel}
-                    pinStates={setupPinStates}
-                  />
-                </TabsContent>
-                <TabsContent value="psychology" className="mt-5">
-                  <ReportsPsychology 
-                    trades={filteredTrades} 
-                    dateRangeLabel={dateRangeLabel}
-                    pinStates={psychologyPinStates}
-                  />
-                </TabsContent>
-                <TabsContent value="risk" className="mt-5">
-                  <ReportsRiskManagement 
-                    trades={filteredTrades} 
-                    dateRangeLabel={dateRangeLabel}
-                    pinStates={riskPinStates}
-                  />
-                </TabsContent>
-                <TabsContent value="tradelog" className="mt-5">
-                  <ReportsTradeLog trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
-                </TabsContent>
+                {/* Gated Reports Content */}
+                <FeatureGate 
+                  isLocked={!canAccessReports} 
+                  featureName="Reports & Analytics"
+                  requiredPlan="standard"
+                >
+                  <TabsContent value="overview" className="mt-5">
+                    <ReportsOverview 
+                      trades={filteredTrades} 
+                      dateRangeLabel={dateRangeLabel}
+                      pinStates={overviewPinStates}
+                    />
+                  </TabsContent>
+                  <TabsContent value="performance" className="mt-5">
+                    <ReportsPerformance 
+                      trades={filteredTrades} 
+                      dateRangeLabel={dateRangeLabel}
+                      pinStates={performancePinStates}
+                    />
+                  </TabsContent>
+                  <TabsContent value="sessions" className="mt-5">
+                    <ReportsSessions 
+                      trades={filteredTrades} 
+                      dateRangeLabel={dateRangeLabel}
+                      pinStates={sessionsPinStates}
+                    />
+                  </TabsContent>
+                  <TabsContent value="assets" className="mt-5">
+                    <ReportsAssets 
+                      trades={filteredTrades} 
+                      dateRangeLabel={dateRangeLabel}
+                      pinStates={assetsPinStates}
+                    />
+                  </TabsContent>
+                  <TabsContent value="setup" className="mt-5">
+                    <ReportsSetupQuality 
+                      trades={filteredTrades} 
+                      dateRangeLabel={dateRangeLabel}
+                      pinStates={setupPinStates}
+                    />
+                  </TabsContent>
+                  <TabsContent value="psychology" className="mt-5">
+                    <ReportsPsychology 
+                      trades={filteredTrades} 
+                      dateRangeLabel={dateRangeLabel}
+                      pinStates={psychologyPinStates}
+                    />
+                  </TabsContent>
+                  <TabsContent value="risk" className="mt-5">
+                    <ReportsRiskManagement 
+                      trades={filteredTrades} 
+                      dateRangeLabel={dateRangeLabel}
+                      pinStates={riskPinStates}
+                    />
+                  </TabsContent>
+                  <TabsContent value="tradelog" className="mt-5">
+                    <ReportsTradeLog trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
+                  </TabsContent>
+                </FeatureGate>
               </Tabs>
             </TabsContent>
           </Tabs>
