@@ -5,6 +5,7 @@ import { TrendingUp, TrendingDown, Star, Target } from "lucide-react";
 import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
+import { CardFeatureGate, TierBadge } from "@/components/journal/FeatureGate";
 
 interface Trade {
   id: string;
@@ -29,13 +30,14 @@ interface PinState {
 interface ReportsAssetsProps {
   trades: Trade[];
   dateRangeLabel: string;
+  isLocked?: boolean;
   pinStates?: {
     pnlChart: PinState;
     table: PinState;
   };
 }
 
-export function ReportsAssets({ trades, dateRangeLabel, pinStates }: ReportsAssetsProps) {
+export function ReportsAssets({ trades, dateRangeLabel, pinStates, isLocked = false }: ReportsAssetsProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats
@@ -63,6 +65,7 @@ export function ReportsAssets({ trades, dateRangeLabel, pinStates }: ReportsAsse
       },
     });
   };
+
   // Group trades by pair
   const pairStats = trades.reduce((acc, t) => {
     if (!acc[t.pair]) {
@@ -81,12 +84,11 @@ export function ReportsAssets({ trades, dateRangeLabel, pinStates }: ReportsAsse
     trades: p.wins + p.losses,
     winRate: p.wins + p.losses > 0 ? Math.round((p.wins / (p.wins + p.losses)) * 100) : 0,
     avgRating: p.ratings.length > 0 ? (p.ratings.reduce((a, b) => a + b, 0) / p.ratings.length).toFixed(1) : 'N/A',
-    avgRR: p.wins > 0 ? ((p.pnl / p.wins) / 100).toFixed(1) : '0',
+    avgRRVal: p.wins > 0 ? ((p.pnl / p.wins) / 100).toFixed(1) : '0',
     confidence: p.ratings.length > 0 ? Math.round((p.ratings.reduce((a, b) => a + b, 0) / p.ratings.length) * 20) : 50,
   })).sort((a, b) => b.pnl - a.pnl);
 
   const bestPair = pairData[0];
-  const worstPair = pairData[pairData.length - 1];
 
   const chartData = pairData.slice(0, 8).map(p => ({
     pair: p.pair,
@@ -104,22 +106,27 @@ export function ReportsAssets({ trades, dateRangeLabel, pinStates }: ReportsAsse
       {/* Top Insight Card */}
       <Card className="border-primary/30 bg-primary/5">
         <CardHeader className="pb-2">
-          <div className="flex items-center gap-2">
-            <Target className="h-5 w-5 text-primary" />
-            <CardTitle>Your Most Profitable Pair This Month</CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-primary" />
+              <CardTitle>Your Most Profitable Pair This Month</CardTitle>
+            </div>
+            {isLocked && <TierBadge requiredPlan="standard" />}
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4">
-            <Badge className="text-lg px-3 py-1">{bestPair?.pair || 'N/A'}</Badge>
-            <span className="text-2xl font-bold text-success">
-              +£{bestPair?.pnl?.toLocaleString() || 0}
-            </span>
-            <span className="text-sm text-muted-foreground">
-              ({bestPair?.trades || 0} trades, {bestPair?.winRate || 0}% win rate)
-            </span>
-          </div>
-        </CardContent>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <Badge className="text-lg px-3 py-1">{bestPair?.pair || 'N/A'}</Badge>
+              <span className="text-2xl font-bold text-success">
+                +£{bestPair?.pnl?.toLocaleString() || 0}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                ({bestPair?.trades || 0} trades, {bestPair?.winRate || 0}% win rate)
+              </span>
+            </div>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* P&L by Pair Chart - with per-card pin */}
@@ -127,86 +134,101 @@ export function ReportsAssets({ trades, dateRangeLabel, pinStates }: ReportsAsse
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>P&L by Instrument</CardTitle>
-            {pinStates?.pnlChart && (
-              <AddToDashboardButton
-                isAdded={pinStates.pnlChart.isAdded}
-                onAdd={pinStates.pnlChart.onAdd}
-                onRemove={pinStates.pnlChart.onRemove}
-              />
-            )}
+            <div className="flex items-center gap-1.5">
+              {isLocked && <TierBadge requiredPlan="standard" />}
+              {!isLocked && pinStates?.pnlChart && (
+                <AddToDashboardButton
+                  isAdded={pinStates.pnlChart.isAdded}
+                  onAdd={pinStates.pnlChart.onAdd}
+                  onRemove={pinStates.pnlChart.onRemove}
+                />
+              )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <XAxis dataKey="pair" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value: number) => [`£${value.toLocaleString()}`, 'P&L']}
-                />
-                <Bar 
-                  dataKey="pnl" 
-                  fill="hsl(var(--primary))"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <XAxis dataKey="pair" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                    formatter={(value: number) => [`£${value.toLocaleString()}`, 'P&L']}
+                  />
+                  <Bar 
+                    dataKey="pnl" 
+                    fill="hsl(var(--primary))"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* Best & Worst Performers */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-success" />
-              <CardTitle className="text-base">Best Performing</CardTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-success" />
+                <CardTitle className="text-base">Best Performing</CardTitle>
+              </div>
+              {isLocked && <TierBadge requiredPlan="standard" />}
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {pairData.slice(0, 3).map((p, idx) => (
-                <div key={p.pair} className="flex items-center justify-between p-2 rounded-lg bg-success/5 border border-success/20">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">#{idx + 1}</span>
-                    <Badge variant="outline">{p.pair}</Badge>
+          <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+            <CardContent>
+              <div className="space-y-3">
+                {pairData.slice(0, 3).map((p, idx) => (
+                  <div key={p.pair} className="flex items-center justify-between p-2 rounded-lg bg-success/5 border border-success/20">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">#{idx + 1}</span>
+                      <Badge variant="outline">{p.pair}</Badge>
+                    </div>
+                    <span className="text-sm font-bold text-success">+£{p.pnl.toLocaleString()}</span>
                   </div>
-                  <span className="text-sm font-bold text-success">+£{p.pnl.toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
+                ))}
+              </div>
+            </CardContent>
+          </CardFeatureGate>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <TrendingDown className="h-4 w-4 text-destructive" />
-              <CardTitle className="text-base">Worst Performing</CardTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TrendingDown className="h-4 w-4 text-destructive" />
+                <CardTitle className="text-base">Worst Performing</CardTitle>
+              </div>
+              {isLocked && <TierBadge requiredPlan="standard" />}
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {pairData.slice(-3).reverse().map((p, idx) => (
-                <div key={p.pair} className="flex items-center justify-between p-2 rounded-lg bg-destructive/5 border border-destructive/20">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">#{idx + 1}</span>
-                    <Badge variant="outline">{p.pair}</Badge>
+          <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+            <CardContent>
+              <div className="space-y-3">
+                {pairData.slice(-3).reverse().map((p, idx) => (
+                  <div key={p.pair} className="flex items-center justify-between p-2 rounded-lg bg-destructive/5 border border-destructive/20">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">#{idx + 1}</span>
+                      <Badge variant="outline">{p.pair}</Badge>
+                    </div>
+                    <span className={`text-sm font-bold ${p.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                      {p.pnl >= 0 ? '+' : ''}£{p.pnl.toLocaleString()}
+                    </span>
                   </div>
-                  <span className={`text-sm font-bold ${p.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                    {p.pnl >= 0 ? '+' : ''}£{p.pnl.toLocaleString()}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
+                ))}
+              </div>
+            </CardContent>
+          </CardFeatureGate>
         </Card>
       </div>
 
@@ -215,64 +237,69 @@ export function ReportsAssets({ trades, dateRangeLabel, pinStates }: ReportsAsse
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Instrument Statistics</CardTitle>
-            {pinStates?.table && (
-              <AddToDashboardButton
-                isAdded={pinStates.table.isAdded}
-                onAdd={pinStates.table.onAdd}
-                onRemove={pinStates.table.onRemove}
-              />
-            )}
+            <div className="flex items-center gap-1.5">
+              {isLocked && <TierBadge requiredPlan="standard" />}
+              {!isLocked && pinStates?.table && (
+                <AddToDashboardButton
+                  isAdded={pinStates.table.isAdded}
+                  onAdd={pinStates.table.onAdd}
+                  onRemove={pinStates.table.onRemove}
+                />
+              )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Pair</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Trades</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Win Rate</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">P&L</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Avg Rating</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Confidence</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pairData.map((p) => (
-                  <tr key={p.pair} className="border-b border-border/50 hover:bg-muted/30">
-                    <td className="py-3 px-3">
-                      <Badge variant="outline">{p.pair}</Badge>
-                    </td>
-                    <td className="py-3 px-3 text-sm text-foreground">{p.trades}</td>
-                    <td className="py-3 px-3 text-sm text-foreground">{p.winRate}%</td>
-                    <td className="py-3 px-3">
-                      <span className={`text-sm font-medium ${p.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        {p.pnl >= 0 ? '+' : ''}£{p.pnl.toLocaleString()}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3">
-                      <div className="flex items-center gap-1">
-                        <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
-                        <span className="text-sm">{p.avgRating}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-primary rounded-full" 
-                            style={{ width: `${p.confidence}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground">{p.confidence}%</span>
-                      </div>
-                    </td>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Pair</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Trades</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Win Rate</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">P&L</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Avg Rating</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Confidence</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
+                </thead>
+                <tbody>
+                  {pairData.map((p) => (
+                    <tr key={p.pair} className="border-b border-border/50 hover:bg-muted/30">
+                      <td className="py-3 px-3">
+                        <Badge variant="outline">{p.pair}</Badge>
+                      </td>
+                      <td className="py-3 px-3 text-sm text-foreground">{p.trades}</td>
+                      <td className="py-3 px-3 text-sm text-foreground">{p.winRate}%</td>
+                      <td className="py-3 px-3">
+                        <span className={`text-sm font-medium ${p.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                          {p.pnl >= 0 ? '+' : ''}£{p.pnl.toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-1">
+                          <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
+                          <span className="text-sm">{p.avgRating}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-primary rounded-full" 
+                              style={{ width: `${p.confidence}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground">{p.confidence}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
     </div>
   );

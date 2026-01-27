@@ -1,9 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { format, parseISO, getDay } from "date-fns";
 import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
+import { CardFeatureGate, TierBadge } from "@/components/journal/FeatureGate";
 
 interface Trade {
   id: string;
@@ -28,6 +29,7 @@ interface PinState {
 interface ReportsPerformanceProps {
   trades: Trade[];
   dateRangeLabel: string;
+  isLocked?: boolean;
   pinStates?: {
     byDay: PinState;
     bySession: PinState;
@@ -35,10 +37,9 @@ interface ReportsPerformanceProps {
   };
 }
 
-const COLORS = ['hsl(var(--primary))', 'hsl(var(--success))', 'hsl(var(--destructive))', 'hsl(var(--accent))'];
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export function ReportsPerformance({ trades, dateRangeLabel, pinStates }: ReportsPerformanceProps) {
+export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked = false }: ReportsPerformanceProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats
@@ -66,12 +67,13 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates }: Report
       },
     });
   };
+
   // Win rate by day of week
   const dayStats = DAYS.map((day, idx) => {
     const dayTrades = trades.filter(t => getDay(parseISO(t.date)) === idx);
     const wins = dayTrades.filter(t => t.pnl > 0).length;
-    const winRate = dayTrades.length > 0 ? (wins / dayTrades.length) * 100 : 0;
-    return { day, winRate: Math.round(winRate), trades: dayTrades.length };
+    const winRateVal = dayTrades.length > 0 ? (wins / dayTrades.length) * 100 : 0;
+    return { day, winRate: Math.round(winRateVal), trades: dayTrades.length };
   });
 
   // Win rate by session (simplified time-based)
@@ -126,35 +128,40 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates }: Report
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Win Rate by Day of Week</CardTitle>
-            {pinStates?.byDay && (
-              <AddToDashboardButton
-                isAdded={pinStates.byDay.isAdded}
-                onAdd={pinStates.byDay.onAdd}
-                onRemove={pinStates.byDay.onRemove}
-              />
-            )}
+            <div className="flex items-center gap-1.5">
+              {isLocked && <TierBadge requiredPlan="standard" />}
+              {!isLocked && pinStates?.byDay && (
+                <AddToDashboardButton
+                  isAdded={pinStates.byDay.isAdded}
+                  onAdd={pinStates.byDay.onAdd}
+                  onRemove={pinStates.byDay.onRemove}
+                />
+              )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dayStats}>
-                <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="%" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value: number, name: string) => [`${value}%`, 'Win Rate']}
-                  labelFormatter={(label) => `${label} (${dayStats.find(d => d.day === label)?.trades || 0} trades)`}
-                />
-                <Bar dataKey="winRate" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={dayStats}>
+                  <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="%" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                    formatter={(value: number) => [`${value}%`, 'Win Rate']}
+                    labelFormatter={(label) => `${label} (${dayStats.find(d => d.day === label)?.trades || 0} trades)`}
+                  />
+                  <Bar dataKey="winRate" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -163,34 +170,39 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates }: Report
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Win Rate by Session</CardTitle>
-              {pinStates?.bySession && (
-                <AddToDashboardButton
-                  isAdded={pinStates.bySession.isAdded}
-                  onAdd={pinStates.bySession.onAdd}
-                  onRemove={pinStates.bySession.onRemove}
-                />
-              )}
+              <div className="flex items-center gap-1.5">
+                {isLocked && <TierBadge requiredPlan="standard" />}
+                {!isLocked && pinStates?.bySession && (
+                  <AddToDashboardButton
+                    isAdded={pinStates.bySession.isAdded}
+                    onAdd={pinStates.bySession.onAdd}
+                    onRemove={pinStates.bySession.onRemove}
+                  />
+                )}
+              </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={sessionStats} layout="vertical">
-                  <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="%" />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={70} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
-                    formatter={(value: number) => [`${value}%`, 'Win Rate']}
-                  />
-                  <Bar dataKey="winRate" fill="hsl(var(--accent))" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
+          <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={sessionStats} layout="vertical">
+                    <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="%" />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={70} />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                      formatter={(value: number) => [`${value}%`, 'Win Rate']}
+                    />
+                    <Bar dataKey="winRate" fill="hsl(var(--accent))" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </CardFeatureGate>
         </Card>
 
         {/* Trade Distribution - with per-card pin */}
@@ -198,125 +210,145 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates }: Report
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Trade Distribution (Long/Short)</CardTitle>
-              {pinStates?.distribution && (
-                <AddToDashboardButton
-                  isAdded={pinStates.distribution.isAdded}
-                  onAdd={pinStates.distribution.onAdd}
-                  onRemove={pinStates.distribution.onRemove}
-                />
-              )}
+              <div className="flex items-center gap-1.5">
+                {isLocked && <TierBadge requiredPlan="standard" />}
+                {!isLocked && pinStates?.distribution && (
+                  <AddToDashboardButton
+                    isAdded={pinStates.distribution.isAdded}
+                    onAdd={pinStates.distribution.onAdd}
+                    onRemove={pinStates.distribution.onRemove}
+                  />
+                )}
+              </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={distributionData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}`}
-                  >
-                    {distributionData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
+          <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={distributionData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                      label={({ name, value }) => `${name}: ${value}`}
+                    >
+                      {distributionData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </CardFeatureGate>
         </Card>
       </div>
 
       {/* Average Hold Time */}
       <Card>
         <CardHeader>
-          <CardTitle>Average Hold Time: Winners vs Losers</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={holdTimeData}>
-                <XAxis dataKey="type" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="h" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value: number) => [`${value} hours`, 'Avg Hold Time']}
-                />
-                <Bar dataKey="avgHours" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="flex items-center justify-between">
+            <CardTitle>Average Hold Time: Winners vs Losers</CardTitle>
+            {isLocked && <TierBadge requiredPlan="standard" />}
           </div>
-        </CardContent>
+        </CardHeader>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={holdTimeData}>
+                  <XAxis dataKey="type" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="h" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                    formatter={(value: number) => [`${value} hours`, 'Avg Hold Time']}
+                  />
+                  <Bar dataKey="avgHours" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* P&L by Trade Duration */}
       <Card>
         <CardHeader>
-          <CardTitle>P&L by Trade Duration</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={durationPnl}>
-                <XAxis dataKey="duration" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value: number, name: string) => {
-                    if (name === 'pnl') return [`£${value.toLocaleString()}`, 'P&L'];
-                    return [value, 'Trades'];
-                  }}
-                />
-                <Bar dataKey="pnl" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="flex items-center justify-between">
+            <CardTitle>P&L by Trade Duration</CardTitle>
+            {isLocked && <TierBadge requiredPlan="standard" />}
           </div>
-        </CardContent>
+        </CardHeader>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={durationPnl}>
+                  <XAxis dataKey="duration" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                    formatter={(value: number, name: string) => {
+                      if (name === 'pnl') return [`£${value.toLocaleString()}`, 'P&L'];
+                      return [value, 'Trades'];
+                    }}
+                  />
+                  <Bar dataKey="pnl" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* Monthly Heatmap */}
       <Card>
         <CardHeader>
-          <CardTitle>Monthly Performance Heatmap</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-4 md:grid-cols-6 gap-3">
-            {monthlyHeatmap.map((m, idx) => (
-              <div 
-                key={idx}
-                className={`p-3 rounded-lg text-center border ${
-                  m.pnl > 0 ? 'bg-success/10 border-success/30' : 'bg-destructive/10 border-destructive/30'
-                }`}
-              >
-                <p className="text-xs text-muted-foreground">{m.month}</p>
-                <p className={`text-sm font-bold ${m.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                  {m.pnl >= 0 ? '+' : ''}£{m.pnl.toLocaleString()}
-                </p>
-                <p className="text-xs text-muted-foreground">{m.trades} trades</p>
-              </div>
-            ))}
+          <div className="flex items-center justify-between">
+            <CardTitle>Monthly Performance Heatmap</CardTitle>
+            {isLocked && <TierBadge requiredPlan="standard" />}
           </div>
-        </CardContent>
+        </CardHeader>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="grid grid-cols-4 md:grid-cols-6 gap-3">
+              {monthlyHeatmap.map((m, idx) => (
+                <div 
+                  key={idx}
+                  className={`p-3 rounded-lg text-center border ${
+                    m.pnl > 0 ? 'bg-success/10 border-success/30' : 'bg-destructive/10 border-destructive/30'
+                  }`}
+                >
+                  <p className="text-xs text-muted-foreground">{m.month}</p>
+                  <p className={`text-sm font-bold ${m.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {m.pnl >= 0 ? '+' : ''}£{m.pnl.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{m.trades} trades</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
     </div>
   );

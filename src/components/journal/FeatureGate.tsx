@@ -105,3 +105,80 @@ export function LockedBadge({ requiredPlan = "standard" }: LockedBadgeProps) {
     </span>
   );
 }
+
+/**
+ * Card-level feature gate that blurs only the card content (not the header/title).
+ * Shows the card structure but obscures metrics, charts, and data.
+ */
+interface CardFeatureGateProps {
+  /** Whether the feature is locked for the current plan */
+  isLocked: boolean;
+  /** Card content to show (will be blurred if locked) */
+  children: ReactNode;
+  /** Required plan to unlock */
+  requiredPlan?: "standard" | "premium";
+  /** Additional class names */
+  className?: string;
+}
+
+export function CardFeatureGate({
+  isLocked,
+  children,
+  requiredPlan = "standard",
+  className,
+}: CardFeatureGateProps) {
+  if (!isLocked) {
+    return <>{children}</>;
+  }
+
+  const planLabel = requiredPlan === "premium" ? "Premium" : "Standard";
+
+  return (
+    <div className={cn("relative", className)}>
+      {/* Blurred content - subtle blur that still shows structure */}
+      <div 
+        className="blur-[6px] pointer-events-none select-none opacity-60" 
+        aria-hidden="true"
+      >
+        {children}
+      </div>
+
+      {/* Minimal overlay - just a lock icon and tier badge */}
+      <Link 
+        to="/billing"
+        className="absolute inset-0 flex items-center justify-center bg-background/30 rounded-lg cursor-pointer group transition-colors hover:bg-background/40"
+      >
+        <div className="flex flex-col items-center gap-2">
+          <div className="h-8 w-8 rounded-full bg-muted/80 flex items-center justify-center group-hover:bg-muted transition-colors">
+            <Lock className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <span className="text-xs font-medium text-muted-foreground bg-muted/80 px-2 py-0.5 rounded-full group-hover:bg-muted transition-colors">
+            {planLabel}
+          </span>
+        </div>
+      </Link>
+    </div>
+  );
+}
+
+/**
+ * Tier badge to show in card headers when content is locked
+ */
+interface TierBadgeProps {
+  requiredPlan?: "standard" | "premium";
+  className?: string;
+}
+
+export function TierBadge({ requiredPlan = "standard", className }: TierBadgeProps) {
+  const planLabel = requiredPlan === "premium" ? "Premium" : "Standard";
+  
+  return (
+    <span className={cn(
+      "inline-flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70 bg-muted/50 px-1.5 py-0.5 rounded",
+      className
+    )}>
+      <Lock className="h-2.5 w-2.5" />
+      {planLabel}
+    </span>
+  );
+}

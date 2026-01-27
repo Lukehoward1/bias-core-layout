@@ -1,10 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { TrendingUp, TrendingDown, Target, AlertCircle } from "lucide-react";
+import { TrendingUp, AlertCircle } from "lucide-react";
 import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
+import { CardFeatureGate, TierBadge } from "@/components/journal/FeatureGate";
 
 interface Trade {
   id: string;
@@ -29,13 +30,14 @@ interface PinState {
 interface ReportsSessionsProps {
   trades: Trade[];
   dateRangeLabel: string;
+  isLocked?: boolean;
   pinStates?: {
     comparison: PinState;
     recommendations: PinState;
   };
 }
 
-export function ReportsSessions({ trades, dateRangeLabel, pinStates }: ReportsSessionsProps) {
+export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = false }: ReportsSessionsProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats
@@ -63,6 +65,7 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates }: ReportsSe
       },
     });
   };
+
   // Session performance data (placeholder - would need trade timestamps)
   const sessionData = [
     { 
@@ -120,37 +123,42 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates }: ReportsSe
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">{session.name} Session</CardTitle>
-                {session.name === strongest.name && (
-                  <Badge className="bg-success/20 text-success text-xs">Strongest</Badge>
-                )}
-                {session.name === weakest.name && (
-                  <Badge variant="destructive" className="text-xs">Weakest</Badge>
-                )}
+                <div className="flex items-center gap-1.5">
+                  {isLocked && <TierBadge requiredPlan="standard" />}
+                  {session.name === strongest.name && !isLocked && (
+                    <Badge className="bg-success/20 text-success text-xs">Strongest</Badge>
+                  )}
+                  {session.name === weakest.name && !isLocked && (
+                    <Badge variant="destructive" className="text-xs">Weakest</Badge>
+                  )}
+                </div>
               </div>
               <p className="text-xs text-muted-foreground">{session.hours}</p>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Win Rate</p>
-                  <p className="text-lg font-bold text-foreground">{session.winRate}%</p>
+            <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Win Rate</p>
+                    <p className="text-lg font-bold text-foreground">{session.winRate}%</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total P&L</p>
+                    <p className={`text-lg font-bold ${session.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                      {session.pnl >= 0 ? '+' : ''}£{session.pnl.toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Avg R:R</p>
+                    <p className="text-lg font-bold text-foreground">{session.avgRR}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Trades</p>
+                    <p className="text-lg font-bold text-foreground">{session.trades}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Total P&L</p>
-                  <p className={`text-lg font-bold ${session.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                    {session.pnl >= 0 ? '+' : ''}£{session.pnl.toLocaleString()}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Avg R:R</p>
-                  <p className="text-lg font-bold text-foreground">{session.avgRR}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Trades</p>
-                  <p className="text-lg font-bold text-foreground">{session.trades}</p>
-                </div>
-              </div>
-            </CardContent>
+              </CardContent>
+            </CardFeatureGate>
           </Card>
         ))}
       </div>
@@ -160,65 +168,75 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates }: ReportsSe
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Session Performance Comparison</CardTitle>
-            {pinStates?.comparison && (
-              <AddToDashboardButton
-                isAdded={pinStates.comparison.isAdded}
-                onAdd={pinStates.comparison.onAdd}
-                onRemove={pinStates.comparison.onRemove}
-              />
-            )}
+            <div className="flex items-center gap-1.5">
+              {isLocked && <TierBadge requiredPlan="standard" />}
+              {!isLocked && pinStates?.comparison && (
+                <AddToDashboardButton
+                  isAdded={pinStates.comparison.isAdded}
+                  onAdd={pinStates.comparison.onAdd}
+                  onRemove={pinStates.comparison.onRemove}
+                />
+              )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value: number, name: string) => {
-                    if (name === 'winRate') return [`${value}%`, 'Win Rate'];
-                    if (name === 'pnl') return [`£${value.toLocaleString()}`, 'P&L'];
-                    if (name === 'avgRR') return [`${(value / 100).toFixed(1)}`, 'Avg R:R'];
-                    return [value, name];
-                  }}
-                />
-                <Bar dataKey="winRate" name="winRate" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                    formatter={(value: number, name: string) => {
+                      if (name === 'winRate') return [`${value}%`, 'Win Rate'];
+                      if (name === 'pnl') return [`£${value.toLocaleString()}`, 'P&L'];
+                      if (name === 'avgRR') return [`${(value / 100).toFixed(1)}`, 'Avg R:R'];
+                      return [value, name];
+                    }}
+                  />
+                  <Bar dataKey="winRate" name="winRate" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* P&L by Session */}
       <Card>
         <CardHeader>
-          <CardTitle>P&L by Session</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} layout="vertical">
-                <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={70} />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value: number) => [`£${value.toLocaleString()}`, 'P&L']}
-                />
-                <Bar dataKey="pnl" fill="hsl(var(--success))" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="flex items-center justify-between">
+            <CardTitle>P&L by Session</CardTitle>
+            {isLocked && <TierBadge requiredPlan="standard" />}
           </div>
-        </CardContent>
+        </CardHeader>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} layout="vertical">
+                  <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={70} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                    formatter={(value: number) => [`£${value.toLocaleString()}`, 'P&L']}
+                  />
+                  <Bar dataKey="pnl" fill="hsl(var(--success))" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* Recommendations - with per-card pin */}
@@ -226,42 +244,47 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates }: ReportsSe
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Session Recommendations</CardTitle>
-            {pinStates?.recommendations && (
-              <AddToDashboardButton
-                isAdded={pinStates.recommendations.isAdded}
-                onAdd={pinStates.recommendations.onAdd}
-                onRemove={pinStates.recommendations.onRemove}
-              />
-            )}
+            <div className="flex items-center gap-1.5">
+              {isLocked && <TierBadge requiredPlan="standard" />}
+              {!isLocked && pinStates?.recommendations && (
+                <AddToDashboardButton
+                  isAdded={pinStates.recommendations.isAdded}
+                  onAdd={pinStates.recommendations.onAdd}
+                  onRemove={pinStates.recommendations.onRemove}
+                />
+              )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 rounded-lg border-success/30 bg-success/5 border">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="h-5 w-5 text-success" />
-                <p className="text-base font-medium">Recommended to Trade More</p>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-lg border-success/30 bg-success/5 border">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingUp className="h-5 w-5 text-success" />
+                  <p className="text-base font-medium">Recommended to Trade More</p>
+                </div>
+                <p className="text-sm text-foreground font-medium">{strongest.name} Session</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Your highest win rate ({strongest.winRate}%) and best P&L (£{strongest.pnl.toLocaleString()}).
+                  Consider increasing position sizes during this session.
+                </p>
               </div>
-              <p className="text-sm text-foreground font-medium">{strongest.name} Session</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Your highest win rate ({strongest.winRate}%) and best P&L (£{strongest.pnl.toLocaleString()}).
-                Consider increasing position sizes during this session.
-              </p>
-            </div>
 
-            <div className="p-4 rounded-lg border-destructive/30 bg-destructive/5 border">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertCircle className="h-5 w-5 text-destructive" />
-                <p className="text-base font-medium">Consider Reducing Exposure</p>
+              <div className="p-4 rounded-lg border-destructive/30 bg-destructive/5 border">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="h-5 w-5 text-destructive" />
+                  <p className="text-base font-medium">Consider Reducing Exposure</p>
+                </div>
+                <p className="text-sm text-foreground font-medium">{weakest.name} Session</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Lowest win rate ({weakest.winRate}%) and P&L (£{weakest.pnl.toLocaleString()}).
+                  Review your setups for this session or reduce size.
+                </p>
               </div>
-              <p className="text-sm text-foreground font-medium">{weakest.name} Session</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Lowest win rate ({weakest.winRate}%) and P&L (£{weakest.pnl.toLocaleString()}).
-                Review your setups for this session or reduce size.
-              </p>
             </div>
-          </div>
-        </CardContent>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
     </div>
   );
