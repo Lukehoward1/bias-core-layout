@@ -5,9 +5,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calculator, DollarSign, TrendingUp, LinkIcon, AlertCircle, RefreshCw } from "lucide-react";
+import { Calculator, DollarSign, TrendingUp, LinkIcon, RefreshCw, Info } from "lucide-react";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { useLinkedAccount } from "@/hooks/use-linked-account";
+import { AccountLinkingModal } from "@/components/account/AccountLinkingModal";
 import { 
   getFXInstruments, 
   getFuturesInstruments, 
@@ -37,6 +38,10 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
   const [assetCategory, setAssetCategory] = useState<'FX' | 'Futures'>('FX');
   const [selectedInstrument, setSelectedInstrument] = useState<string>('EURUSD');
   const [stopDistance, setStopDistance] = useState<number>(30);
+  const [showLinkingModal, setShowLinkingModal] = useState(false);
+
+  // Mode indicator - always Manual for now (Linked when account connected)
+  const mode = isConnected ? 'Linked' : 'Manual';
 
   // Get instruments based on category
   const instruments = useMemo(() => {
@@ -142,12 +147,16 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
   }
 
   return (
+    <>
     <Card className="h-full">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Calculator className="h-5 w-5 text-primary" />
             <CardTitle>Quick Risk Calculator</CardTitle>
+            <Badge variant="secondary" className="text-xs font-normal gap-1">
+              Mode: {mode}
+            </Badge>
           </div>
           {onAdd && onRemove && (
             <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />
@@ -194,17 +203,27 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                   </div>
                 </div>
               ) : (
-                // Manual input with empty state prompt
+                // Manual mode with improved callout
                 <div className="space-y-3">
-                  <div className="p-4 rounded-lg bg-muted/50 border border-dashed border-border">
-                    <div className="flex items-start gap-3">
-                      <AlertCircle className="h-5 w-5 text-muted-foreground mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-foreground">No account linked</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Link a trading account to auto-sync your balance, or enter manually below.
-                        </p>
+                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <Info className="h-5 w-5 text-primary mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-foreground">Manual mode</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Enter your balance below. When account linking is available, this will auto-sync.
+                          </p>
+                        </div>
                       </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-xs text-primary hover:text-primary/80 shrink-0 h-auto py-1 px-2"
+                        onClick={() => setShowLinkingModal(true)}
+                      >
+                        Learn more
+                      </Button>
                     </div>
                   </div>
                   <div>
@@ -410,5 +429,12 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
         </div>
       </CardContent>
     </Card>
+    
+    {/* Account Linking Modal */}
+    <AccountLinkingModal 
+      open={showLinkingModal} 
+      onOpenChange={setShowLinkingModal} 
+    />
+    </>
   );
 }
