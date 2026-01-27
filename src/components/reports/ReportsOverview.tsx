@@ -5,6 +5,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "rec
 import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
+import { CardFeatureGate, TierBadge } from "@/components/journal/FeatureGate";
 
 interface Trade {
   id: string;
@@ -29,6 +30,7 @@ interface PinState {
 interface ReportsOverviewProps {
   trades: Trade[];
   dateRangeLabel: string;
+  isLocked?: boolean;
   pinStates?: {
     totalPnl: PinState;
     avgRR: PinState;
@@ -42,7 +44,7 @@ interface ReportsOverviewProps {
   };
 }
 
-export function ReportsOverview({ trades, dateRangeLabel, pinStates }: ReportsOverviewProps) {
+export function ReportsOverview({ trades, dateRangeLabel, pinStates, isLocked = false }: ReportsOverviewProps) {
   const { exportToPdf } = usePdfExport();
   const totalPnl = trades.reduce((sum, t) => sum + t.pnl, 0);
   const winningTrades = trades.filter(t => t.pnl > 0);
@@ -125,20 +127,25 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates }: ReportsOv
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-xs font-medium text-muted-foreground">Total P&L</CardTitle>
-              {pinStates?.totalPnl && (
-                <AddToDashboardButton
-                  isAdded={pinStates.totalPnl.isAdded}
-                  onAdd={pinStates.totalPnl.onAdd}
-                  onRemove={pinStates.totalPnl.onRemove}
-                />
-              )}
+              <div className="flex items-center gap-1.5">
+                {isLocked && <TierBadge requiredPlan="standard" />}
+                {!isLocked && pinStates?.totalPnl && (
+                  <AddToDashboardButton
+                    isAdded={pinStates.totalPnl.isAdded}
+                    onAdd={pinStates.totalPnl.onAdd}
+                    onRemove={pinStates.totalPnl.onRemove}
+                  />
+                )}
+              </div>
             </div>
           </CardHeader>
-          <CardContent className="pt-0">
-            <p className={`text-2xl font-bold ${totalPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-              {totalPnl >= 0 ? '+' : ''}£{totalPnl.toLocaleString()}
-            </p>
-          </CardContent>
+          <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+            <CardContent className="pt-0">
+              <p className={`text-2xl font-bold ${totalPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                {totalPnl >= 0 ? '+' : ''}£{totalPnl.toLocaleString()}
+              </p>
+            </CardContent>
+          </CardFeatureGate>
         </Card>
 
         {/* Avg R:R Card */}
@@ -146,18 +153,23 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates }: ReportsOv
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-xs font-medium text-muted-foreground">Avg R:R</CardTitle>
-              {pinStates?.avgRR && (
-                <AddToDashboardButton
-                  isAdded={pinStates.avgRR.isAdded}
-                  onAdd={pinStates.avgRR.onAdd}
-                  onRemove={pinStates.avgRR.onRemove}
-                />
-              )}
+              <div className="flex items-center gap-1.5">
+                {isLocked && <TierBadge requiredPlan="standard" />}
+                {!isLocked && pinStates?.avgRR && (
+                  <AddToDashboardButton
+                    isAdded={pinStates.avgRR.isAdded}
+                    onAdd={pinStates.avgRR.onAdd}
+                    onRemove={pinStates.avgRR.onRemove}
+                  />
+                )}
+              </div>
             </div>
           </CardHeader>
-          <CardContent className="pt-0">
-            <p className="text-2xl font-bold text-foreground">{avgRR.toFixed(2)}</p>
-          </CardContent>
+          <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+            <CardContent className="pt-0">
+              <p className="text-2xl font-bold text-foreground">{avgRR.toFixed(2)}</p>
+            </CardContent>
+          </CardFeatureGate>
         </Card>
 
         {/* Win Rate Card */}
@@ -165,18 +177,23 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates }: ReportsOv
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-xs font-medium text-muted-foreground">Win Rate</CardTitle>
-              {pinStates?.winRate && (
-                <AddToDashboardButton
-                  isAdded={pinStates.winRate.isAdded}
-                  onAdd={pinStates.winRate.onAdd}
-                  onRemove={pinStates.winRate.onRemove}
-                />
-              )}
+              <div className="flex items-center gap-1.5">
+                {isLocked && <TierBadge requiredPlan="standard" />}
+                {!isLocked && pinStates?.winRate && (
+                  <AddToDashboardButton
+                    isAdded={pinStates.winRate.isAdded}
+                    onAdd={pinStates.winRate.onAdd}
+                    onRemove={pinStates.winRate.onRemove}
+                  />
+                )}
+              </div>
             </div>
           </CardHeader>
-          <CardContent className="pt-0">
-            <p className="text-2xl font-bold text-foreground">{winRate.toFixed(1)}%</p>
-          </CardContent>
+          <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+            <CardContent className="pt-0">
+              <p className="text-2xl font-bold text-foreground">{winRate.toFixed(1)}%</p>
+            </CardContent>
+          </CardFeatureGate>
         </Card>
 
         {/* Expectancy Card */}
@@ -184,20 +201,25 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates }: ReportsOv
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-xs font-medium text-muted-foreground">Expectancy</CardTitle>
-              {pinStates?.expectancy && (
-                <AddToDashboardButton
-                  isAdded={pinStates.expectancy.isAdded}
-                  onAdd={pinStates.expectancy.onAdd}
-                  onRemove={pinStates.expectancy.onRemove}
-                />
-              )}
+              <div className="flex items-center gap-1.5">
+                {isLocked && <TierBadge requiredPlan="standard" />}
+                {!isLocked && pinStates?.expectancy && (
+                  <AddToDashboardButton
+                    isAdded={pinStates.expectancy.isAdded}
+                    onAdd={pinStates.expectancy.onAdd}
+                    onRemove={pinStates.expectancy.onRemove}
+                  />
+                )}
+              </div>
             </div>
           </CardHeader>
-          <CardContent className="pt-0">
-            <p className={`text-2xl font-bold ${expectancy >= 0 ? 'text-success' : 'text-destructive'}`}>
-              £{expectancy.toFixed(0)}/trade
-            </p>
-          </CardContent>
+          <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+            <CardContent className="pt-0">
+              <p className={`text-2xl font-bold ${expectancy >= 0 ? 'text-success' : 'text-destructive'}`}>
+                £{expectancy.toFixed(0)}/trade
+              </p>
+            </CardContent>
+          </CardFeatureGate>
         </Card>
       </div>
 
@@ -211,21 +233,26 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates }: ReportsOv
                 <TrendingUp className="h-4 w-4 text-success" />
                 <CardTitle className="text-sm font-medium text-muted-foreground">Best Winning Day</CardTitle>
               </div>
-              {pinStates?.bestDay && (
-                <AddToDashboardButton
-                  isAdded={pinStates.bestDay.isAdded}
-                  onAdd={pinStates.bestDay.onAdd}
-                  onRemove={pinStates.bestDay.onRemove}
-                />
-              )}
+              <div className="flex items-center gap-1.5">
+                {isLocked && <TierBadge requiredPlan="standard" />}
+                {!isLocked && pinStates?.bestDay && (
+                  <AddToDashboardButton
+                    isAdded={pinStates.bestDay.isAdded}
+                    onAdd={pinStates.bestDay.onAdd}
+                    onRemove={pinStates.bestDay.onRemove}
+                  />
+                )}
+              </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-success">
-              +£{bestDay?.pnl?.toLocaleString() || 0}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">{bestDay?.date || 'N/A'}</p>
-          </CardContent>
+          <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+            <CardContent>
+              <p className="text-2xl font-bold text-success">
+                +£{bestDay?.pnl?.toLocaleString() || 0}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">{bestDay?.date || 'N/A'}</p>
+            </CardContent>
+          </CardFeatureGate>
         </Card>
 
         {/* Worst Losing Day Card */}
@@ -236,21 +263,26 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates }: ReportsOv
                 <Calendar className="h-4 w-4 text-destructive" />
                 <CardTitle className="text-sm font-medium text-muted-foreground">Worst Losing Day</CardTitle>
               </div>
-              {pinStates?.worstDay && (
-                <AddToDashboardButton
-                  isAdded={pinStates.worstDay.isAdded}
-                  onAdd={pinStates.worstDay.onAdd}
-                  onRemove={pinStates.worstDay.onRemove}
-                />
-              )}
+              <div className="flex items-center gap-1.5">
+                {isLocked && <TierBadge requiredPlan="standard" />}
+                {!isLocked && pinStates?.worstDay && (
+                  <AddToDashboardButton
+                    isAdded={pinStates.worstDay.isAdded}
+                    onAdd={pinStates.worstDay.onAdd}
+                    onRemove={pinStates.worstDay.onRemove}
+                  />
+                )}
+              </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-destructive">
-              £{worstDay?.pnl?.toLocaleString() || 0}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">{worstDay?.date || 'N/A'}</p>
-          </CardContent>
+          <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+            <CardContent>
+              <p className="text-2xl font-bold text-destructive">
+                £{worstDay?.pnl?.toLocaleString() || 0}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">{worstDay?.date || 'N/A'}</p>
+            </CardContent>
+          </CardFeatureGate>
         </Card>
       </div>
 
@@ -259,46 +291,51 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates }: ReportsOv
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Equity Curve</CardTitle>
-            {pinStates?.equity && (
-              <AddToDashboardButton
-                isAdded={pinStates.equity.isAdded}
-                onAdd={pinStates.equity.onAdd}
-                onRemove={pinStates.equity.onRemove}
-              />
-            )}
+            <div className="flex items-center gap-1.5">
+              {isLocked && <TierBadge requiredPlan="standard" />}
+              {!isLocked && pinStates?.equity && (
+                <AddToDashboardButton
+                  isAdded={pinStates.equity.isAdded}
+                  onAdd={pinStates.equity.onAdd}
+                  onRemove={pinStates.equity.onRemove}
+                />
+              )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={equityData}>
-                <defs>
-                  <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value: number) => [`£${value.toLocaleString()}`, 'Equity']}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="equity" 
-                  stroke="hsl(var(--primary))" 
-                  fill="url(#equityGradient)"
-                  strokeWidth={2}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={equityData}>
+                  <defs>
+                    <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                    formatter={(value: number) => [`£${value.toLocaleString()}`, 'Equity']}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="equity" 
+                    stroke="hsl(var(--primary))" 
+                    fill="url(#equityGradient)"
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* Rolling 30-Day */}
@@ -306,41 +343,46 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates }: ReportsOv
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Rolling 30-Day Performance</CardTitle>
-            {pinStates?.rolling30 && (
-              <AddToDashboardButton
-                isAdded={pinStates.rolling30.isAdded}
-                onAdd={pinStates.rolling30.onAdd}
-                onRemove={pinStates.rolling30.onRemove}
-              />
-            )}
+            <div className="flex items-center gap-1.5">
+              {isLocked && <TierBadge requiredPlan="standard" />}
+              {!isLocked && pinStates?.rolling30 && (
+                <AddToDashboardButton
+                  isAdded={pinStates.rolling30.isAdded}
+                  onAdd={pinStates.rolling30.onAdd}
+                  onRemove={pinStates.rolling30.onRemove}
+                />
+              )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={rollingData}>
-                <XAxis dataKey="day" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value: number) => [`£${value.toLocaleString()}`, 'Cumulative P&L']}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="pnl" 
-                  stroke="hsl(var(--success))" 
-                  fill="hsl(var(--success))"
-                  fillOpacity={0.2}
-                  strokeWidth={2}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={rollingData}>
+                  <XAxis dataKey="day" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                    formatter={(value: number) => [`£${value.toLocaleString()}`, 'Cumulative P&L']}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="pnl" 
+                    stroke="hsl(var(--success))" 
+                    fill="hsl(var(--success))"
+                    fillOpacity={0.2}
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* Strongest Edge Summary */}
@@ -351,22 +393,27 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates }: ReportsOv
               <Zap className="h-5 w-5 text-primary" />
               <CardTitle>Your Strongest Edge This Month</CardTitle>
             </div>
-            {pinStates?.edge && (
-              <AddToDashboardButton
-                isAdded={pinStates.edge.isAdded}
-                onAdd={pinStates.edge.onAdd}
-                onRemove={pinStates.edge.onRemove}
-              />
-            )}
+            <div className="flex items-center gap-1.5">
+              {isLocked && <TierBadge requiredPlan="standard" />}
+              {!isLocked && pinStates?.edge && (
+                <AddToDashboardButton
+                  isAdded={pinStates.edge.isAdded}
+                  onAdd={pinStates.edge.onAdd}
+                  onRemove={pinStates.edge.onRemove}
+                />
+              )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">{bestEdge}</p>
-          <div className="flex gap-2 mt-3">
-            <Badge variant="outline" className="text-xs">Based on ratings</Badge>
-            <Badge variant="outline" className="text-xs">P&L consistency</Badge>
-          </div>
-        </CardContent>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <p className="text-sm text-muted-foreground">{bestEdge}</p>
+            <div className="flex gap-2 mt-3">
+              <Badge variant="outline" className="text-xs">Based on ratings</Badge>
+              <Badge variant="outline" className="text-xs">P&L consistency</Badge>
+            </div>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
     </div>
   );

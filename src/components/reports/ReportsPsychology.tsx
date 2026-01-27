@@ -1,9 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Brain, AlertTriangle, ThumbsUp, Target, TrendingUp, Heart } from "lucide-react";
+import { Brain, AlertTriangle, ThumbsUp, Target, Heart } from "lucide-react";
 import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
+import { CardFeatureGate, TierBadge } from "@/components/journal/FeatureGate";
 
 interface Trade {
   id: string;
@@ -28,6 +29,7 @@ interface PinState {
 interface ReportsPsychologyProps {
   trades: Trade[];
   dateRangeLabel: string;
+  isLocked?: boolean;
   pinStates?: {
     sentiment: PinState;
     triggers: PinState;
@@ -38,7 +40,7 @@ interface ReportsPsychologyProps {
 const POSITIVE_KEYWORDS = ['patient', 'perfect', 'confident', 'disciplined', 'calm', 'good setup', 'followed plan', 'great'];
 const NEGATIVE_KEYWORDS = ['fear', 'fomo', 'hesitation', 'revenge', 'late entry', 'early exit', 'overtrading', 'impatient', 'greedy', 'emotional'];
 
-export function ReportsPsychology({ trades, dateRangeLabel, pinStates }: ReportsPsychologyProps) {
+export function ReportsPsychology({ trades, dateRangeLabel, pinStates, isLocked = false }: ReportsPsychologyProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats
@@ -66,6 +68,7 @@ export function ReportsPsychology({ trades, dateRangeLabel, pinStates }: Reports
       },
     });
   };
+
   // Sentiment analysis
   const tradesWithNotes = trades.filter(t => t.notes && t.notes.trim().length > 0);
   
@@ -96,9 +99,9 @@ export function ReportsPsychology({ trades, dateRangeLabel, pinStates }: Reports
   // Emotional trigger analysis
   const triggerAnalysis = NEGATIVE_KEYWORDS.map(trigger => {
     const triggerTrades = trades.filter(t => t.notes?.toLowerCase().includes(trigger));
-    const totalPnl = triggerTrades.reduce((sum, t) => sum + t.pnl, 0);
-    const avgPnl = triggerTrades.length > 0 ? totalPnl / triggerTrades.length : 0;
-    return { trigger, count: triggerTrades.length, avgPnl, totalPnl };
+    const totalPnlVal = triggerTrades.reduce((sum, t) => sum + t.pnl, 0);
+    const avgPnl = triggerTrades.length > 0 ? totalPnlVal / triggerTrades.length : 0;
+    return { trigger, count: triggerTrades.length, avgPnl, totalPnl: totalPnlVal };
   }).filter(t => t.count > 0).sort((a, b) => a.avgPnl - b.avgPnl);
 
   // Top mistakes
@@ -134,78 +137,88 @@ export function ReportsPsychology({ trades, dateRangeLabel, pinStates }: Reports
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Sentiment Summary</CardTitle>
-            {pinStates?.sentiment && (
-              <AddToDashboardButton
-                isAdded={pinStates.sentiment.isAdded}
-                onAdd={pinStates.sentiment.onAdd}
-                onRemove={pinStates.sentiment.onRemove}
-              />
-            )}
+            <div className="flex items-center gap-1.5">
+              {isLocked && <TierBadge requiredPlan="standard" />}
+              {!isLocked && pinStates?.sentiment && (
+                <AddToDashboardButton
+                  isAdded={pinStates.sentiment.isAdded}
+                  onAdd={pinStates.sentiment.onAdd}
+                  onRemove={pinStates.sentiment.onRemove}
+                />
+              )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-lg bg-muted/30 border">
-              <div className="flex items-center gap-2 mb-2">
-                <Brain className="h-4 w-4 text-primary" />
-                <p className="text-sm font-medium text-muted-foreground">Trades with Notes</p>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-lg bg-muted/30 border">
+                <div className="flex items-center gap-2 mb-2">
+                  <Brain className="h-4 w-4 text-primary" />
+                  <p className="text-sm font-medium text-muted-foreground">Trades with Notes</p>
+                </div>
+                <p className="text-2xl font-bold text-foreground">{tradesWithNotes.length}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {Math.round((tradesWithNotes.length / trades.length) * 100)}% of all trades
+                </p>
               </div>
-              <p className="text-2xl font-bold text-foreground">{tradesWithNotes.length}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {Math.round((tradesWithNotes.length / trades.length) * 100)}% of all trades
-              </p>
-            </div>
 
-            <div className="p-4 rounded-lg bg-success/5 border border-success/30">
-              <div className="flex items-center gap-2 mb-2">
-                <ThumbsUp className="h-4 w-4 text-success" />
-                <p className="text-sm font-medium text-muted-foreground">Positive Notes</p>
+              <div className="p-4 rounded-lg bg-success/5 border border-success/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <ThumbsUp className="h-4 w-4 text-success" />
+                  <p className="text-sm font-medium text-muted-foreground">Positive Notes</p>
+                </div>
+                <p className="text-2xl font-bold text-success">{positiveNotes.length}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Trades with confident/disciplined mentions
+                </p>
               </div>
-              <p className="text-2xl font-bold text-success">{positiveNotes.length}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Trades with confident/disciplined mentions
-              </p>
-            </div>
 
-            <div className="p-4 rounded-lg bg-destructive/5 border border-destructive/30">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="h-4 w-4 text-destructive" />
-                <p className="text-sm font-medium text-muted-foreground">Negative Notes</p>
+              <div className="p-4 rounded-lg bg-destructive/5 border border-destructive/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                  <p className="text-sm font-medium text-muted-foreground">Negative Notes</p>
+                </div>
+                <p className="text-2xl font-bold text-destructive">{negativeNotes.length}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Trades with fear/FOMO/emotional mentions
+                </p>
               </div>
-              <p className="text-2xl font-bold text-destructive">{negativeNotes.length}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Trades with fear/FOMO/emotional mentions
-              </p>
             </div>
-          </div>
-        </CardContent>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* Word Cloud (simplified as tags) */}
       <Card>
         <CardHeader>
-          <CardTitle>Common Terms in Notes</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Common Terms in Notes</CardTitle>
+            {isLocked && <TierBadge requiredPlan="standard" />}
+          </div>
         </CardHeader>
-        <CardContent>
-          {topWords.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {topWords.map((w) => (
-                <Badge 
-                  key={w.word} 
-                  variant="secondary"
-                  className="text-sm px-3 py-1"
-                  style={{ fontSize: `${Math.min(16, 10 + w.count * 2)}px` }}
-                >
-                  {w.word} ({w.count})
-                </Badge>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Add notes to your trades to build a word frequency analysis.
-            </p>
-          )}
-        </CardContent>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            {topWords.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {topWords.map((w) => (
+                  <Badge 
+                    key={w.word} 
+                    variant="secondary"
+                    className="text-sm px-3 py-1"
+                    style={{ fontSize: `${Math.min(16, 10 + w.count * 2)}px` }}
+                  >
+                    {w.word} ({w.count})
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Add notes to your trades to build a word frequency analysis.
+              </p>
+            )}
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* Emotional Triggers Heatmap - with per-card pin */}
@@ -216,102 +229,117 @@ export function ReportsPsychology({ trades, dateRangeLabel, pinStates }: Reports
               <AlertTriangle className="h-5 w-5 text-amber-500" />
               <CardTitle>Emotional Triggers vs Outcomes</CardTitle>
             </div>
-            {pinStates?.triggers && (
-              <AddToDashboardButton
-                isAdded={pinStates.triggers.isAdded}
-                onAdd={pinStates.triggers.onAdd}
-                onRemove={pinStates.triggers.onRemove}
-              />
-            )}
+            <div className="flex items-center gap-1.5">
+              {isLocked && <TierBadge requiredPlan="standard" />}
+              {!isLocked && pinStates?.triggers && (
+                <AddToDashboardButton
+                  isAdded={pinStates.triggers.isAdded}
+                  onAdd={pinStates.triggers.onAdd}
+                  onRemove={pinStates.triggers.onRemove}
+                />
+              )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          {triggerAnalysis.length > 0 ? (
-            <div className="space-y-3">
-              {triggerAnalysis.map((t) => (
-                <div 
-                  key={t.trigger}
-                  className={`p-3 rounded-lg border flex items-center justify-between ${
-                    t.avgPnl < 0 ? 'bg-destructive/5 border-destructive/30' : 'bg-success/5 border-success/30'
-                  }`}
-                >
-                  <div>
-                    <p className="text-sm font-medium capitalize">{t.trigger}</p>
-                    <p className="text-xs text-muted-foreground">{t.count} occurrences</p>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            {triggerAnalysis.length > 0 ? (
+              <div className="space-y-3">
+                {triggerAnalysis.map((t) => (
+                  <div 
+                    key={t.trigger}
+                    className={`p-3 rounded-lg border flex items-center justify-between ${
+                      t.avgPnl < 0 ? 'bg-destructive/5 border-destructive/30' : 'bg-success/5 border-success/30'
+                    }`}
+                  >
+                    <div>
+                      <p className="text-sm font-medium capitalize">{t.trigger}</p>
+                      <p className="text-xs text-muted-foreground">{t.count} occurrences</p>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-sm font-bold ${t.avgPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                        {t.avgPnl >= 0 ? '+' : ''}£{Math.round(t.avgPnl)}/trade
+                      </p>
+                      <p className={`text-xs ${t.totalPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                        Total: {t.totalPnl >= 0 ? '+' : ''}£{t.totalPnl.toLocaleString()}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className={`text-sm font-bold ${t.avgPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                      {t.avgPnl >= 0 ? '+' : ''}£{Math.round(t.avgPnl)}/trade
-                    </p>
-                    <p className={`text-xs ${t.totalPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                      Total: {t.totalPnl >= 0 ? '+' : ''}£{t.totalPnl.toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Add emotional notes to trades (fear, FOMO, hesitation, etc.) to analyze triggers.
-            </p>
-          )}
-        </CardContent>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Add emotional notes to trades (fear, FOMO, hesitation, etc.) to analyze triggers.
+              </p>
+            )}
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* Top Emotional Mistakes */}
       {topMistakes.length > 0 && (
         <Card className="border-destructive/30">
           <CardHeader>
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-              <CardTitle>Top Emotional Mistakes</CardTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+                <CardTitle>Top Emotional Mistakes</CardTitle>
+              </div>
+              {isLocked && <TierBadge requiredPlan="standard" />}
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {topMistakes.map((m, idx) => (
-                <div key={m.trigger} className="flex items-center gap-3">
-                  <span className="text-lg font-bold text-muted-foreground">#{idx + 1}</span>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium capitalize">{m.trigger}</p>
-                    <p className="text-xs text-destructive">
-                      Cost: £{Math.abs(m.totalPnl).toLocaleString()} ({m.count} trades)
-                    </p>
+          <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+            <CardContent>
+              <div className="space-y-3">
+                {topMistakes.map((m, idx) => (
+                  <div key={m.trigger} className="flex items-center gap-3">
+                    <span className="text-lg font-bold text-muted-foreground">#{idx + 1}</span>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium capitalize">{m.trigger}</p>
+                      <p className="text-xs text-destructive">
+                        Cost: £{Math.abs(m.totalPnl).toLocaleString()} ({m.count} trades)
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
+                ))}
+              </div>
+            </CardContent>
+          </CardFeatureGate>
         </Card>
       )}
 
       {/* Most Confident Trades */}
       <Card className="border-success/30 bg-success/5">
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <Heart className="h-5 w-5 text-success" />
-            <CardTitle>Most Confident Winning Trades</CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Heart className="h-5 w-5 text-success" />
+              <CardTitle>Most Confident Winning Trades</CardTitle>
+            </div>
+            {isLocked && <TierBadge requiredPlan="standard" />}
           </div>
         </CardHeader>
-        <CardContent>
-          {confidentTrades.length > 0 ? (
-            <div className="space-y-3">
-              {confidentTrades.map((t) => (
-                <div key={t.id} className="flex items-center justify-between p-2 rounded-lg bg-background/50">
-                  <div>
-                    <Badge variant="outline">{t.pair}</Badge>
-                    <span className="text-xs text-muted-foreground ml-2">{t.date}</span>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            {confidentTrades.length > 0 ? (
+              <div className="space-y-3">
+                {confidentTrades.map((t) => (
+                  <div key={t.id} className="flex items-center justify-between p-2 rounded-lg bg-background/50">
+                    <div>
+                      <Badge variant="outline">{t.pair}</Badge>
+                      <span className="text-xs text-muted-foreground ml-2">{t.date}</span>
+                    </div>
+                    <span className="text-sm font-bold text-success">+£{t.pnl.toLocaleString()}</span>
                   </div>
-                  <span className="text-sm font-bold text-success">+£{t.pnl.toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Rate your best trades 4-5 stars to track confident winners.
-            </p>
-          )}
-        </CardContent>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Rate your best trades 4-5 stars to track confident winners.
+              </p>
+            )}
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* Improvement Focus - with per-card pin */}
@@ -322,18 +350,23 @@ export function ReportsPsychology({ trades, dateRangeLabel, pinStates }: Reports
               <Target className="h-5 w-5 text-primary" />
               <CardTitle>Your Improvement Focus This Month</CardTitle>
             </div>
-            {pinStates?.improvement && (
-              <AddToDashboardButton
-                isAdded={pinStates.improvement.isAdded}
-                onAdd={pinStates.improvement.onAdd}
-                onRemove={pinStates.improvement.onRemove}
-              />
-            )}
+            <div className="flex items-center gap-1.5">
+              {isLocked && <TierBadge requiredPlan="standard" />}
+              {!isLocked && pinStates?.improvement && (
+                <AddToDashboardButton
+                  isAdded={pinStates.improvement.isAdded}
+                  onAdd={pinStates.improvement.onAdd}
+                  onRemove={pinStates.improvement.onRemove}
+                />
+              )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-foreground">{getImprovementFocus()}</p>
-        </CardContent>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <p className="text-sm text-foreground">{getImprovementFocus()}</p>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
     </div>
   );

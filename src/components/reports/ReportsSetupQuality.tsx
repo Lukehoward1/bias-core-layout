@@ -5,6 +5,7 @@ import { Star, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
 import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
+import { CardFeatureGate, TierBadge } from "@/components/journal/FeatureGate";
 
 interface Trade {
   id: string;
@@ -29,6 +30,7 @@ interface PinState {
 interface ReportsSetupQualityProps {
   trades: Trade[];
   dateRangeLabel: string;
+  isLocked?: boolean;
   pinStates?: {
     bestWorst: PinState;
     patterns: PinState;
@@ -37,7 +39,7 @@ interface ReportsSetupQualityProps {
 
 const KEYWORDS = ['late entry', 'fear', 'hesitation', 'fomo', 'missed level', 'early exit', 'overtrading', 'revenge', 'perfect', 'patient'];
 
-export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates }: ReportsSetupQualityProps) {
+export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates, isLocked = false }: ReportsSetupQualityProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats
@@ -65,21 +67,22 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates }: Repor
       },
     });
   };
+
   // Group by rating
   const ratingGroups = [1, 2, 3, 4, 5].map(rating => {
     const ratedTrades = trades.filter(t => t.rating === rating);
     const wins = ratedTrades.filter(t => t.pnl > 0).length;
-    const winRate = ratedTrades.length > 0 ? (wins / ratedTrades.length) * 100 : 0;
-    const totalPnl = ratedTrades.reduce((sum, t) => sum + t.pnl, 0);
-    const avgPnl = ratedTrades.length > 0 ? totalPnl / ratedTrades.length : 0;
-    const expectancy = winRate / 100 * avgPnl;
+    const winRateVal = ratedTrades.length > 0 ? (wins / ratedTrades.length) * 100 : 0;
+    const totalPnlVal = ratedTrades.reduce((sum, t) => sum + t.pnl, 0);
+    const avgPnl = ratedTrades.length > 0 ? totalPnlVal / ratedTrades.length : 0;
+    const expectancy = winRateVal / 100 * avgPnl;
     
     return {
       rating: `${rating} Star`,
       ratingNum: rating,
       trades: ratedTrades.length,
-      winRate: Math.round(winRate),
-      totalPnl,
+      winRate: Math.round(winRateVal),
+      totalPnl: totalPnlVal,
       avgPnl: Math.round(avgPnl),
       expectancy: Math.round(expectancy),
     };
@@ -132,151 +135,166 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates }: Repor
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Best & Worst Setups</CardTitle>
-            {pinStates?.bestWorst && (
-              <AddToDashboardButton
-                isAdded={pinStates.bestWorst.isAdded}
-                onAdd={pinStates.bestWorst.onAdd}
-                onRemove={pinStates.bestWorst.onRemove}
-              />
-            )}
+            <div className="flex items-center gap-1.5">
+              {isLocked && <TierBadge requiredPlan="standard" />}
+              {!isLocked && pinStates?.bestWorst && (
+                <AddToDashboardButton
+                  isAdded={pinStates.bestWorst.isAdded}
+                  onAdd={pinStates.bestWorst.onAdd}
+                  onRemove={pinStates.bestWorst.onRemove}
+                />
+              )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 rounded-lg border-success/30 bg-success/5 border">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="h-5 w-5 text-success" />
-                <p className="text-base font-medium">Best Setup</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex">
-                  {[...Array(bestSetup?.ratingNum || 0)].map((_, i) => (
-                    <Star key={i} className="h-5 w-5 text-yellow-400 fill-yellow-400" />
-                  ))}
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-lg border-success/30 bg-success/5 border">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingUp className="h-5 w-5 text-success" />
+                  <p className="text-base font-medium">Best Setup</p>
                 </div>
-                <span className="text-sm text-muted-foreground">
-                  {bestSetup?.trades || 0} trades
-                </span>
+                <div className="flex items-center gap-3">
+                  <div className="flex">
+                    {[...Array(bestSetup?.ratingNum || 0)].map((_, i) => (
+                      <Star key={i} className="h-5 w-5 text-yellow-400 fill-yellow-400" />
+                    ))}
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {bestSetup?.trades || 0} trades
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-success mt-2">
+                  £{bestSetup?.expectancy?.toLocaleString() || 0}/trade expectancy
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {bestSetup?.winRate || 0}% win rate
+                </p>
               </div>
-              <p className="text-2xl font-bold text-success mt-2">
-                £{bestSetup?.expectancy?.toLocaleString() || 0}/trade expectancy
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {bestSetup?.winRate || 0}% win rate
-              </p>
-            </div>
 
-            <div className="p-4 rounded-lg border-destructive/30 bg-destructive/5 border">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingDown className="h-5 w-5 text-destructive" />
-                <p className="text-base font-medium">Worst Setup</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex">
-                  {[...Array(worstSetup?.ratingNum || 0)].map((_, i) => (
-                    <Star key={i} className="h-5 w-5 text-yellow-400 fill-yellow-400" />
-                  ))}
+              <div className="p-4 rounded-lg border-destructive/30 bg-destructive/5 border">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingDown className="h-5 w-5 text-destructive" />
+                  <p className="text-base font-medium">Worst Setup</p>
                 </div>
-                <span className="text-sm text-muted-foreground">
-                  {worstSetup?.trades || 0} trades
-                </span>
+                <div className="flex items-center gap-3">
+                  <div className="flex">
+                    {[...Array(worstSetup?.ratingNum || 0)].map((_, i) => (
+                      <Star key={i} className="h-5 w-5 text-yellow-400 fill-yellow-400" />
+                    ))}
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {worstSetup?.trades || 0} trades
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-destructive mt-2">
+                  £{worstSetup?.expectancy?.toLocaleString() || 0}/trade expectancy
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {worstSetup?.winRate || 0}% win rate
+                </p>
               </div>
-              <p className="text-2xl font-bold text-destructive mt-2">
-                £{worstSetup?.expectancy?.toLocaleString() || 0}/trade expectancy
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {worstSetup?.winRate || 0}% win rate
-              </p>
             </div>
-          </div>
-        </CardContent>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* Setup Performance by Rating */}
       <Card>
         <CardHeader>
-          <CardTitle>Setup Performance by Rating</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={allSetups}>
-                <XAxis dataKey="rating" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value: number, name: string) => {
-                    if (name === 'expectancy') return [`£${value}`, 'Expectancy'];
-                    if (name === 'winRate') return [`${value}%`, 'Win Rate'];
-                    return [value, name];
-                  }}
-                />
-                <Bar dataKey="expectancy" name="expectancy" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="flex items-center justify-between">
+            <CardTitle>Setup Performance by Rating</CardTitle>
+            {isLocked && <TierBadge requiredPlan="standard" />}
           </div>
-        </CardContent>
+        </CardHeader>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={allSetups}>
+                  <XAxis dataKey="rating" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                    formatter={(value: number, name: string) => {
+                      if (name === 'expectancy') return [`£${value}`, 'Expectancy'];
+                      if (name === 'winRate') return [`${value}%`, 'Win Rate'];
+                      return [value, name];
+                    }}
+                  />
+                  <Bar dataKey="expectancy" name="expectancy" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* Detailed Stats Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Setup Statistics</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Rating</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Trades</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Win Rate</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Total P&L</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Avg P&L</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Expectancy</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allSetups.map((s) => (
-                  <tr key={s.rating} className="border-b border-border/50 hover:bg-muted/30">
-                    <td className="py-3 px-3">
-                      <div className="flex items-center gap-1">
-                        {s.ratingNum > 0 ? (
-                          [...Array(s.ratingNum)].map((_, i) => (
-                            <Star key={i} className="h-3 w-3 text-yellow-400 fill-yellow-400" />
-                          ))
-                        ) : (
-                          <span className="text-sm text-muted-foreground">Unrated</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="py-3 px-3 text-sm text-foreground">{s.trades}</td>
-                    <td className="py-3 px-3 text-sm text-foreground">{s.winRate}%</td>
-                    <td className="py-3 px-3">
-                      <span className={`text-sm font-medium ${s.totalPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        {s.totalPnl >= 0 ? '+' : ''}£{s.totalPnl.toLocaleString()}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3">
-                      <span className={`text-sm ${s.avgPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        £{s.avgPnl}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3">
-                      <span className={`text-sm font-medium ${s.expectancy >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        £{s.expectancy}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="flex items-center justify-between">
+            <CardTitle>Setup Statistics</CardTitle>
+            {isLocked && <TierBadge requiredPlan="standard" />}
           </div>
-        </CardContent>
+        </CardHeader>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Rating</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Trades</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Win Rate</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Total P&L</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Avg P&L</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Expectancy</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allSetups.map((s) => (
+                    <tr key={s.rating} className="border-b border-border/50 hover:bg-muted/30">
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-1">
+                          {s.ratingNum > 0 ? (
+                            [...Array(s.ratingNum)].map((_, i) => (
+                              <Star key={i} className="h-3 w-3 text-yellow-400 fill-yellow-400" />
+                            ))
+                          ) : (
+                            <span className="text-sm text-muted-foreground">Unrated</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 text-sm text-foreground">{s.trades}</td>
+                      <td className="py-3 px-3 text-sm text-foreground">{s.winRate}%</td>
+                      <td className="py-3 px-3">
+                        <span className={`text-sm font-medium ${s.totalPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                          {s.totalPnl >= 0 ? '+' : ''}£{s.totalPnl.toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className={`text-sm ${s.avgPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                          £{s.avgPnl}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className={`text-sm font-medium ${s.expectancy >= 0 ? 'text-success' : 'text-destructive'}`}>
+                          £{s.expectancy}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* Notes Keyword Extraction - with per-card pin */}
@@ -287,67 +305,77 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates }: Repor
               <AlertTriangle className="h-5 w-5 text-amber-500" />
               <CardTitle>Common Patterns in Notes</CardTitle>
             </div>
-            {pinStates?.patterns && (
-              <AddToDashboardButton
-                isAdded={pinStates.patterns.isAdded}
-                onAdd={pinStates.patterns.onAdd}
-                onRemove={pinStates.patterns.onRemove}
-              />
-            )}
+            <div className="flex items-center gap-1.5">
+              {isLocked && <TierBadge requiredPlan="standard" />}
+              {!isLocked && pinStates?.patterns && (
+                <AddToDashboardButton
+                  isAdded={pinStates.patterns.isAdded}
+                  onAdd={pinStates.patterns.onAdd}
+                  onRemove={pinStates.patterns.onRemove}
+                />
+              )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          {keywordCounts.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {keywordCounts.map((kw) => (
-                <Badge 
-                  key={kw.keyword} 
-                  variant="secondary"
-                  className="text-sm px-3 py-1"
-                >
-                  {kw.keyword} ({kw.count})
-                </Badge>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Add notes to your trades to identify patterns like "late entry", "fear", "hesitation", etc.
-            </p>
-          )}
-        </CardContent>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            {keywordCounts.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {keywordCounts.map((kw) => (
+                  <Badge 
+                    key={kw.keyword} 
+                    variant="secondary"
+                    className="text-sm px-3 py-1"
+                  >
+                    {kw.keyword} ({kw.count})
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Add notes to your trades to identify patterns like "late entry", "fear", "hesitation", etc.
+              </p>
+            )}
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* High-Rated Setup Performance Over Time */}
       {timeData.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>4-5 Star Setup Performance Over Time</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={timeData}>
-                  <XAxis dataKey="trade" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
-                    formatter={(value: number) => [`£${value.toLocaleString()}`, 'Cumulative P&L']}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="cumPnl" 
-                    stroke="hsl(var(--success))" 
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+            <div className="flex items-center justify-between">
+              <CardTitle>4-5 Star Setup Performance Over Time</CardTitle>
+              {isLocked && <TierBadge requiredPlan="standard" />}
             </div>
-          </CardContent>
+          </CardHeader>
+          <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+            <CardContent>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={timeData}>
+                    <XAxis dataKey="trade" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                      formatter={(value: number) => [`£${value.toLocaleString()}`, 'Cumulative P&L']}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="cumPnl" 
+                      stroke="hsl(var(--success))" 
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </CardFeatureGate>
         </Card>
       )}
     </div>

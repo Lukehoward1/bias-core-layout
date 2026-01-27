@@ -1,10 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { Shield, AlertTriangle, TrendingDown, Target } from "lucide-react";
+import { Shield, AlertTriangle, TrendingDown } from "lucide-react";
 import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
+import { CardFeatureGate, TierBadge } from "@/components/journal/FeatureGate";
 
 interface Trade {
   id: string;
@@ -29,6 +30,7 @@ interface PinState {
 interface ReportsRiskManagementProps {
   trades: Trade[];
   dateRangeLabel: string;
+  isLocked?: boolean;
   pinStates?: {
     kpis: PinState;
     distribution: PinState;
@@ -36,7 +38,7 @@ interface ReportsRiskManagementProps {
   };
 }
 
-export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates }: ReportsRiskManagementProps) {
+export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLocked = false }: ReportsRiskManagementProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats for PDF export
@@ -64,6 +66,7 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates }: Rep
       },
     });
   };
+
   // Calculate risk metrics (using lots as proxy for risk)
   const risks = trades.map(t => t.lots * 100); // Convert to pseudo £ risk
   const avgRisk = risks.length > 0 ? risks.reduce((a, b) => a + b, 0) / risks.length : 0;
@@ -132,36 +135,41 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates }: Rep
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Risk KPIs</CardTitle>
-            {pinStates?.kpis && (
-              <AddToDashboardButton
-                isAdded={pinStates.kpis.isAdded}
-                onAdd={pinStates.kpis.onAdd}
-                onRemove={pinStates.kpis.onRemove}
-              />
-            )}
+            <div className="flex items-center gap-1.5">
+              {isLocked && <TierBadge requiredPlan="standard" />}
+              {!isLocked && pinStates?.kpis && (
+                <AddToDashboardButton
+                  isAdded={pinStates.kpis.isAdded}
+                  onAdd={pinStates.kpis.onAdd}
+                  onRemove={pinStates.kpis.onRemove}
+                />
+              )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <p className="text-xs text-muted-foreground">Avg Risk/Trade</p>
-              <p className="text-2xl font-bold text-foreground">£{Math.round(avgRisk)}</p>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Avg Risk/Trade</p>
+                <p className="text-2xl font-bold text-foreground">£{Math.round(avgRisk)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Max Risk Taken</p>
+                <p className="text-2xl font-bold text-foreground">£{Math.round(maxRisk)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Max Single Loss</p>
+                <p className="text-2xl font-bold text-destructive">-£{maxLoss.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Losses</p>
+                <p className="text-2xl font-bold text-destructive">-£{totalLoss.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground mt-1">{losingTrades.length} losing trades</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Max Risk Taken</p>
-              <p className="text-2xl font-bold text-foreground">£{Math.round(maxRisk)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Max Single Loss</p>
-              <p className="text-2xl font-bold text-destructive">-£{maxLoss.toLocaleString()}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Total Losses</p>
-              <p className="text-2xl font-bold text-destructive">-£{totalLoss.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground mt-1">{losingTrades.length} losing trades</p>
-            </div>
-          </div>
-        </CardContent>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* Risk Distribution - with per-card pin */}
@@ -169,102 +177,117 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates }: Rep
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Risk Distribution per Trade</CardTitle>
-            {pinStates?.distribution && (
-              <AddToDashboardButton
-                isAdded={pinStates.distribution.isAdded}
-                onAdd={pinStates.distribution.onAdd}
-                onRemove={pinStates.distribution.onRemove}
-              />
-            )}
+            <div className="flex items-center gap-1.5">
+              {isLocked && <TierBadge requiredPlan="standard" />}
+              {!isLocked && pinStates?.distribution && (
+                <AddToDashboardButton
+                  isAdded={pinStates.distribution.isAdded}
+                  onAdd={pinStates.distribution.onAdd}
+                  onRemove={pinStates.distribution.onRemove}
+                />
+              )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={riskBuckets}>
-                <XAxis dataKey="range" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px'
-                  }}
-                  formatter={(value: number) => [value, 'Trades']}
-                />
-                <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={riskBuckets}>
+                  <XAxis dataKey="range" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                    formatter={(value: number) => [value, 'Trades']}
+                  />
+                  <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* Excessive Risk Trades */}
       <Card className={excessiveRiskTrades.length > 0 ? 'border-amber-500/30' : ''}>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <AlertTriangle className={`h-5 w-5 ${excessiveRiskTrades.length > 0 ? 'text-amber-500' : 'text-muted-foreground'}`} />
-            <CardTitle>Trades Exceeding Planned Risk</CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className={`h-5 w-5 ${excessiveRiskTrades.length > 0 ? 'text-amber-500' : 'text-muted-foreground'}`} />
+              <CardTitle>Trades Exceeding Planned Risk</CardTitle>
+            </div>
+            {isLocked && <TierBadge requiredPlan="standard" />}
           </div>
         </CardHeader>
-        <CardContent>
-          {excessiveRiskTrades.length > 0 ? (
-            <div className="space-y-2">
-              <p className="text-sm text-amber-500 font-medium">
-                {excessiveRiskTrades.length} trades exceeded normal risk levels (&gt;£150)
-              </p>
-              <div className="space-y-2 mt-3">
-                {excessiveRiskTrades.slice(0, 5).map((t) => (
-                  <div key={t.id} className="flex items-center justify-between p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                    <div>
-                      <Badge variant="outline">{t.pair}</Badge>
-                      <span className="text-xs text-muted-foreground ml-2">{t.date}</span>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            {excessiveRiskTrades.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-sm text-amber-500 font-medium">
+                  {excessiveRiskTrades.length} trades exceeded normal risk levels (&gt;£150)
+                </p>
+                <div className="space-y-2 mt-3">
+                  {excessiveRiskTrades.slice(0, 5).map((t) => (
+                    <div key={t.id} className="flex items-center justify-between p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                      <div>
+                        <Badge variant="outline">{t.pair}</Badge>
+                        <span className="text-xs text-muted-foreground ml-2">{t.date}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-medium">£{Math.round(t.lots * 100)} risk</span>
+                        <span className={`text-xs ml-2 ${t.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                          {t.pnl >= 0 ? '+' : ''}£{t.pnl}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-sm font-medium">£{Math.round(t.lots * 100)} risk</span>
-                      <span className={`text-xs ml-2 ${t.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        {t.pnl >= 0 ? '+' : ''}£{t.pnl}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          ) : (
-            <p className="text-sm text-success">
-              ✓ All trades within acceptable risk limits
-            </p>
-          )}
-        </CardContent>
+            ) : (
+              <p className="text-sm text-success">
+                ✓ All trades within acceptable risk limits
+              </p>
+            )}
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* Risk of Ruin */}
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <TrendingDown className="h-5 w-5 text-muted-foreground" />
-            <CardTitle>Risk of Ruin Estimation</CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TrendingDown className="h-5 w-5 text-muted-foreground" />
+              <CardTitle>Risk of Ruin Estimation</CardTitle>
+            </div>
+            {isLocked && <TierBadge requiredPlan="standard" />}
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4">
-            <div className="text-3xl font-bold text-foreground">
-              {riskOfRuin > 100 ? '>100' : Math.round(riskOfRuin)}%
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <div className="text-3xl font-bold text-foreground">
+                {riskOfRuin > 100 ? '>100' : Math.round(riskOfRuin)}%
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-muted-foreground">
+                  Based on your current win rate of {Math.round(winRate * 100)}%
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {riskOfRuin < 10 
+                    ? 'Low risk - maintain current approach'
+                    : riskOfRuin < 30 
+                      ? 'Moderate risk - ensure proper position sizing'
+                      : 'High risk - review strategy and risk management'}
+                </p>
+              </div>
             </div>
-            <div className="flex-1">
-              <p className="text-sm text-muted-foreground">
-                Based on your current win rate of {Math.round(winRate * 100)}%
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {riskOfRuin < 10 
-                  ? 'Low risk - maintain current approach'
-                  : riskOfRuin < 30 
-                    ? 'Moderate risk - ensure proper position sizing'
-                    : 'High risk - review strategy and risk management'}
-              </p>
-            </div>
-          </div>
-        </CardContent>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* Risk Discipline Score - with per-card pin */}
@@ -275,56 +298,61 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates }: Rep
               <Shield className="h-5 w-5 text-primary" />
               <CardTitle>Your Risk Discipline Score</CardTitle>
             </div>
-            {pinStates?.discipline && (
-              <AddToDashboardButton
-                isAdded={pinStates.discipline.isAdded}
-                onAdd={pinStates.discipline.onAdd}
-                onRemove={pinStates.discipline.onRemove}
-              />
-            )}
+            <div className="flex items-center gap-1.5">
+              {isLocked && <TierBadge requiredPlan="standard" />}
+              {!isLocked && pinStates?.discipline && (
+                <AddToDashboardButton
+                  isAdded={pinStates.discipline.isAdded}
+                  onAdd={pinStates.discipline.onAdd}
+                  onRemove={pinStates.discipline.onRemove}
+                />
+              )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-6">
-            <div className="relative w-24 h-24">
-              <svg className="w-24 h-24 transform -rotate-90">
-                <circle
-                  cx="48"
-                  cy="48"
-                  r="40"
-                  stroke="hsl(var(--muted))"
-                  strokeWidth="8"
-                  fill="none"
-                />
-                <circle
-                  cx="48"
-                  cy="48"
-                  r="40"
-                  stroke={disciplineScore >= 60 ? 'hsl(var(--success))' : 'hsl(var(--destructive))'}
-                  strokeWidth="8"
-                  fill="none"
-                  strokeDasharray={`${(disciplineScore / 100) * 251.2} 251.2`}
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-2xl font-bold">{disciplineScore}</span>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="flex items-center gap-6">
+              <div className="relative w-24 h-24">
+                <svg className="w-24 h-24 transform -rotate-90">
+                  <circle
+                    cx="48"
+                    cy="48"
+                    r="40"
+                    stroke="hsl(var(--muted))"
+                    strokeWidth="8"
+                    fill="none"
+                  />
+                  <circle
+                    cx="48"
+                    cy="48"
+                    r="40"
+                    stroke={disciplineScore >= 60 ? 'hsl(var(--success))' : 'hsl(var(--destructive))'}
+                    strokeWidth="8"
+                    fill="none"
+                    strokeDasharray={`${(disciplineScore / 100) * 251.2} 251.2`}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-2xl font-bold">{disciplineScore}</span>
+                </div>
+              </div>
+              <div>
+                <p className={`text-lg font-bold ${disciplineScore >= 60 ? 'text-success' : 'text-destructive'}`}>
+                  {getScoreLabel(disciplineScore)}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {disciplineScore >= 80 
+                    ? 'Outstanding risk management discipline!'
+                    : disciplineScore >= 60
+                      ? 'Good discipline, minor improvements possible.'
+                      : 'Focus on consistent position sizing and risk limits.'}
+                </p>
               </div>
             </div>
-            <div>
-              <p className={`text-lg font-bold ${disciplineScore >= 60 ? 'text-success' : 'text-destructive'}`}>
-                {getScoreLabel(disciplineScore)}
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {disciplineScore >= 80 
-                  ? 'Outstanding risk management discipline!'
-                  : disciplineScore >= 60
-                    ? 'Good discipline, minor improvements possible.'
-                    : 'Focus on consistent position sizing and risk limits.'}
-              </p>
-            </div>
-          </div>
-        </CardContent>
+          </CardContent>
+        </CardFeatureGate>
       </Card>
 
       {/* Slippage Placeholder */}

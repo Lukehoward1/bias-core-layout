@@ -24,7 +24,7 @@ import { Plus, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Star, Downlo
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { useSubscription } from "@/hooks/use-subscription";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
-import { FeatureGate, LockedBadge } from "@/components/journal/FeatureGate";
+import { LockedBadge } from "@/components/journal/FeatureGate";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, addMonths, subMonths, isWithinInterval, parseISO } from "date-fns";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -951,65 +951,66 @@ export default function Journal() {
                   </div>
                 </div>
 
-                {/* Gated Reports Content */}
-                <FeatureGate 
-                  isLocked={!canAccessReports} 
-                  featureName="Reports & Analytics"
-                  requiredPlan="standard"
-                >
-                  <TabsContent value="overview" className="mt-5">
-                    <ReportsOverview 
-                      trades={filteredTrades} 
-                      dateRangeLabel={dateRangeLabel}
-                      pinStates={overviewPinStates}
-                    />
-                  </TabsContent>
-                  <TabsContent value="performance" className="mt-5">
-                    <ReportsPerformance 
-                      trades={filteredTrades} 
-                      dateRangeLabel={dateRangeLabel}
-                      pinStates={performancePinStates}
-                    />
-                  </TabsContent>
-                  <TabsContent value="sessions" className="mt-5">
-                    <ReportsSessions 
-                      trades={filteredTrades} 
-                      dateRangeLabel={dateRangeLabel}
-                      pinStates={sessionsPinStates}
-                    />
-                  </TabsContent>
-                  <TabsContent value="assets" className="mt-5">
-                    <ReportsAssets 
-                      trades={filteredTrades} 
-                      dateRangeLabel={dateRangeLabel}
-                      pinStates={assetsPinStates}
-                    />
-                  </TabsContent>
-                  <TabsContent value="setup" className="mt-5">
-                    <ReportsSetupQuality 
-                      trades={filteredTrades} 
-                      dateRangeLabel={dateRangeLabel}
-                      pinStates={setupPinStates}
-                    />
-                  </TabsContent>
-                  <TabsContent value="psychology" className="mt-5">
-                    <ReportsPsychology 
-                      trades={filteredTrades} 
-                      dateRangeLabel={dateRangeLabel}
-                      pinStates={psychologyPinStates}
-                    />
-                  </TabsContent>
-                  <TabsContent value="risk" className="mt-5">
-                    <ReportsRiskManagement 
-                      trades={filteredTrades} 
-                      dateRangeLabel={dateRangeLabel}
-                      pinStates={riskPinStates}
-                    />
-                  </TabsContent>
-                  <TabsContent value="tradelog" className="mt-5">
-                    <ReportsTradeLog trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
-                  </TabsContent>
-                </FeatureGate>
+                {/* Reports Content - each component handles its own card-level gating */}
+                <TabsContent value="overview" className="mt-5">
+                  <ReportsOverview 
+                    trades={filteredTrades} 
+                    dateRangeLabel={dateRangeLabel}
+                    pinStates={overviewPinStates}
+                    isLocked={!canAccessReports}
+                  />
+                </TabsContent>
+                <TabsContent value="performance" className="mt-5">
+                  <ReportsPerformance 
+                    trades={filteredTrades} 
+                    dateRangeLabel={dateRangeLabel}
+                    pinStates={performancePinStates}
+                    isLocked={!canAccessReports}
+                  />
+                </TabsContent>
+                <TabsContent value="sessions" className="mt-5">
+                  <ReportsSessions 
+                    trades={filteredTrades} 
+                    dateRangeLabel={dateRangeLabel}
+                    pinStates={sessionsPinStates}
+                    isLocked={!canAccessReports}
+                  />
+                </TabsContent>
+                <TabsContent value="assets" className="mt-5">
+                  <ReportsAssets 
+                    trades={filteredTrades} 
+                    dateRangeLabel={dateRangeLabel}
+                    pinStates={assetsPinStates}
+                    isLocked={!canAccessReports}
+                  />
+                </TabsContent>
+                <TabsContent value="setup" className="mt-5">
+                  <ReportsSetupQuality 
+                    trades={filteredTrades} 
+                    dateRangeLabel={dateRangeLabel}
+                    pinStates={setupPinStates}
+                    isLocked={!canAccessReports}
+                  />
+                </TabsContent>
+                <TabsContent value="psychology" className="mt-5">
+                  <ReportsPsychology 
+                    trades={filteredTrades} 
+                    dateRangeLabel={dateRangeLabel}
+                    pinStates={psychologyPinStates}
+                    isLocked={!canAccessReports}
+                  />
+                </TabsContent>
+                <TabsContent value="risk" className="mt-5">
+                  <ReportsRiskManagement 
+                    trades={filteredTrades} 
+                    dateRangeLabel={dateRangeLabel}
+                    pinStates={riskPinStates}
+                    isLocked={!canAccessReports}
+                  />
+                </TabsContent>
+                <TabsContent value="tradelog" className="mt-5">
+                  <ReportsTradeLog trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
+                </TabsContent>
               </Tabs>
             </TabsContent>
           </Tabs>
