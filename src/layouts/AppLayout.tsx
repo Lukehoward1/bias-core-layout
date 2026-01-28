@@ -1,6 +1,8 @@
 import { Outlet } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppSidebarProvider, useAppSidebar } from "@/hooks/use-app-sidebar";
+import { useSessionLock } from "@/hooks/use-session-lock";
+import { LockScreen } from "@/components/LockScreen";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
@@ -24,7 +26,13 @@ function MobileHeader() {
 
 function AppLayoutContent() {
   const { collapsed } = useAppSidebar();
+  const { isLocked, unlock } = useSessionLock();
   const isMobile = useIsMobile();
+
+  // Show lock screen as overlay when session is locked
+  if (isLocked) {
+    return <LockScreen onUnlock={unlock} />;
+  }
   
   return (
     <div className="flex min-h-screen w-full">
