@@ -28,30 +28,38 @@ function AppLayoutContent() {
   const { collapsed } = useAppSidebar();
   const { isLocked, unlock } = useSessionLock();
   const isMobile = useIsMobile();
-
-  // Show lock screen as overlay when session is locked
-  if (isLocked) {
-    return <LockScreen onUnlock={unlock} />;
-  }
   
   return (
-    <div className="flex min-h-screen w-full">
-      <AppSidebar />
+    <>
+      {/* Lock screen overlay - renders ABOVE the app, fully unmounts when unlocked */}
+      {isLocked && <LockScreen onUnlock={unlock} />}
       
-      {/* Spacer div to account for fixed sidebar - desktop only */}
-      {!isMobile && (
-        <div className={`${collapsed ? 'w-16' : 'w-60'} flex-shrink-0 transition-all duration-300`} />
-      )}
-      
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        {/* Mobile header with hamburger */}
-        {isMobile && <MobileHeader />}
+      {/* Main app - always mounted but hidden behind lock screen when locked */}
+      <div 
+        className="flex min-h-screen w-full"
+        style={{ 
+          visibility: isLocked ? 'hidden' : 'visible',
+          pointerEvents: isLocked ? 'none' : 'auto'
+        }}
+        aria-hidden={isLocked}
+      >
+        <AppSidebar />
         
-        <main className="flex-1 overflow-y-auto">
-          <Outlet />
-        </main>
+        {/* Spacer div to account for fixed sidebar - desktop only */}
+        {!isMobile && (
+          <div className={`${collapsed ? 'w-16' : 'w-60'} flex-shrink-0 transition-all duration-300`} />
+        )}
+        
+        <div className="flex-1 flex flex-col h-screen overflow-hidden">
+          {/* Mobile header with hamburger */}
+          {isMobile && <MobileHeader />}
+          
+          <main className="flex-1 overflow-y-auto">
+            <Outlet />
+          </main>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
