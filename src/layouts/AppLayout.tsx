@@ -34,15 +34,8 @@ function AppLayoutContent() {
       {/* Lock screen overlay - renders ABOVE the app, fully unmounts when unlocked */}
       {isLocked && <LockScreen onUnlock={unlock} />}
       
-      {/* Main app - always mounted but hidden behind lock screen when locked */}
-      <div 
-        className="flex min-h-screen w-full"
-        style={{ 
-          visibility: isLocked ? 'hidden' : 'visible',
-          pointerEvents: isLocked ? 'none' : 'auto'
-        }}
-        aria-hidden={isLocked}
-      >
+      {/* Main app - remains mounted; lock overlay above blocks interaction while locked */}
+      <div className="flex min-h-screen w-full" aria-hidden={isLocked}>
         <AppSidebar />
         
         {/* Spacer div to account for fixed sidebar - desktop only */}
