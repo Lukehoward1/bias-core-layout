@@ -9,7 +9,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, User, LogOut, Sparkles } from "lucide-react";
+import { ChevronDown, User, LogOut, Sparkles, Lock } from "lucide-react";
+import { useSessionLock } from "@/hooks/use-session-lock";
 
 interface AppHeaderProps {
   title: string;
@@ -17,6 +18,8 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ title, rightContent }: AppHeaderProps) {
+  const { lock } = useSessionLock();
+
   return (
     <header className="h-14 border-b border-border bg-card flex items-center justify-between px-6 gap-6 shrink-0 sticky top-0 z-30">
       <h1 className="text-xl font-semibold text-foreground shrink-0">{title}</h1>
@@ -59,6 +62,11 @@ export function AppHeader({ title, rightContent }: AppHeaderProps) {
               <User className="mr-2.5 h-4 w-4" />
               Profile
             </DropdownMenuItem>
+            <DropdownMenuItem className="py-2" onClick={lock}>
+              <Lock className="mr-2.5 h-4 w-4" />
+              Lock now
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem className="py-2">
               <LogOut className="mr-2.5 h-4 w-4" />
               Sign out

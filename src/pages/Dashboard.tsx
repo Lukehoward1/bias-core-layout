@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
-import { LockScreen } from "@/components/LockScreen";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, Clock, Calendar as CalendarIcon, Activity, ChevronDown, AlertTriangle, BookOpen, Shield, Plus } from "lucide-react";
 import { useDashboardLayout, type DashboardCardEntry, type RowType } from "@/hooks/use-dashboard-layout";
@@ -117,7 +116,6 @@ function SessionTimerDropdown({
 }
 
 export default function Dashboard() {
-  const [isUnlocked, setIsUnlocked] = useState(false);
   const [showSessionDropdown, setShowSessionDropdown] = useState(false);
   const [showAddCardsModal, setShowAddCardsModal] = useState(false);
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
@@ -206,10 +204,6 @@ export default function Dashboard() {
     const registryCardIds = DASHBOARD_CARD_REGISTRY.map(c => c.id);
     warnMissingRenderers(registryCardIds);
   }, []);
-
-  if (!isUnlocked) {
-    return <LockScreen onUnlock={() => setIsUnlocked(true)} />;
-  }
 
   // Render card content based on card ID and slot type
   const renderCardContent = (cardEntry: DashboardCardEntry, slotType: 'wide' | 'narrow' | 'equal' | 'hero' | 'kpi'): React.ReactNode => {
