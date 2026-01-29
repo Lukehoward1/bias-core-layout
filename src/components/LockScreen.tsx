@@ -152,16 +152,19 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
 
   const handleNewsClick = (e: React.MouseEvent, eventId: string, eventName: string) => {
     e.stopPropagation();
+    onUnlock(); // Unlock first, then navigate
     navigate(`/calendar?event=${encodeURIComponent(eventName)}`);
   };
 
   const handleViewAllNews = (e: React.MouseEvent) => {
     e.stopPropagation();
+    onUnlock(); // Unlock first, then navigate
     navigate('/calendar');
   };
 
   const handleBiasClick = (e: React.MouseEvent, symbol: string) => {
     e.stopPropagation();
+    onUnlock(); // Unlock first, then navigate
     navigate(`/asset/${symbol}?from=Dashboard`);
   };
 
