@@ -2,16 +2,28 @@ import { useState, useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { TrendingUp, TrendingDown, Minus, Clock, ChevronRight, ExternalLink, Pencil, X, Check } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { useAssets } from "@/hooks/use-watchlist";
 import { type Asset } from "@/data/assets";
+
+// Safety cleanup: Remove any stray inert/aria-hidden from app root
+function cleanupInteractionBlockers() {
+  const appRoot = document.getElementById('root');
+  if (appRoot) {
+    appRoot.removeAttribute('inert');
+    appRoot.removeAttribute('aria-hidden');
+    appRoot.style.pointerEvents = '';
+  }
+  // Also clean any elements that might have been marked by Radix dialogs
+  document.querySelectorAll('[data-aria-hidden="true"]').forEach(el => {
+    el.removeAttribute('aria-hidden');
+    el.removeAttribute('data-aria-hidden');
+  });
+  document.querySelectorAll('[inert]').forEach(el => {
+    el.removeAttribute('inert');
+  });
+}
 
 // Trading sessions data
 const tradingSessions = [
@@ -80,6 +92,14 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   
   // Use shared assets data
   const { assets, getAssetBySymbol } = useAssets();
+
+  // Cleanup interaction blockers on unmount (when unlocking)
+  useEffect(() => {
+    return () => {
+      // When LockScreen unmounts, ensure the app is fully interactive
+      cleanupInteractionBlockers();
+    };
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -367,74 +387,88 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
         </div>
       </div>
 
-      {/* Manage Dashboard Focus Pairs Modal - Using shared assets data */}
-      <Dialog open={isManageModalOpen} onOpenChange={setIsManageModalOpen}>
-        <DialogContent className="sm:max-w-md bg-card border-border" onClick={(e) => e.stopPropagation()}>
-          <DialogHeader>
-            <DialogTitle className="text-foreground">Dashboard Focus Pairs</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Choose up to {MAX_FAVORITES} pairs to display on your dashboard lock screen.
-            </p>
-            
-            {tempSelection.length >= MAX_FAVORITES && (
-              <p className="text-xs text-warning bg-warning/10 px-3 py-2 rounded-md">
-                You can pin up to {MAX_FAVORITES} pairs on your dashboard.
-              </p>
-            )}
-
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {assets.map((asset) => {
-                const isSelected = tempSelection.includes(asset.symbol);
-                const isDisabled = !isSelected && tempSelection.length >= MAX_FAVORITES;
-                
-                return (
-                  <div
-                    key={asset.symbol}
-                    className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                      isSelected 
-                        ? 'bg-primary/10 border-primary/30' 
-                        : isDisabled
-                          ? 'bg-muted/30 border-border opacity-50'
-                          : 'bg-muted/50 border-border hover:border-primary/20'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Checkbox
-                        checked={isSelected}
-                        disabled={isDisabled}
-                        onCheckedChange={() => handleTogglePair(asset.symbol)}
-                      />
-                      <span className="font-medium text-foreground">{asset.symbol}</span>
-                    </div>
-                    <div className={`flex items-center gap-1 text-xs ${getBiasColor(asset.biasDirection)}`}>
-                      {asset.biasDirection === 'Bullish' ? (
-                        <TrendingUp className="h-3 w-3" />
-                      ) : asset.biasDirection === 'Bearish' ? (
-                        <TrendingDown className="h-3 w-3" />
-                      ) : (
-                        <Minus className="h-3 w-3" />
-                      )}
-                      <span>{asset.biasDirection}</span>
-                    </div>
-                  </div>
-                );
-              })}
+      {/* Manage Dashboard Focus Pairs Panel - Inline to avoid Radix Dialog inert issues */}
+      {isManageModalOpen && (
+        <div 
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
+          onClick={() => setIsManageModalOpen(false)}
+        >
+          <div 
+            className="w-full max-w-md mx-4 bg-card border border-border rounded-lg shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <h2 className="text-lg font-semibold text-foreground">Dashboard Focus Pairs</h2>
+              <button
+                onClick={() => setIsManageModalOpen(false)}
+                className="p-1 rounded-sm opacity-70 hover:opacity-100 transition-opacity"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
+            <div className="p-4 space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Choose up to {MAX_FAVORITES} pairs to display on your dashboard lock screen.
+              </p>
+              
+              {tempSelection.length >= MAX_FAVORITES && (
+                <p className="text-xs text-warning bg-warning/10 px-3 py-2 rounded-md">
+                  You can pin up to {MAX_FAVORITES} pairs on your dashboard.
+                </p>
+              )}
 
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setIsManageModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSaveFavorites}>
-                <Check className="h-4 w-4 mr-1" />
-                Save
-              </Button>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {assets.map((asset) => {
+                  const isSelected = tempSelection.includes(asset.symbol);
+                  const isDisabled = !isSelected && tempSelection.length >= MAX_FAVORITES;
+                  
+                  return (
+                    <div
+                      key={asset.symbol}
+                      className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                        isSelected 
+                          ? 'bg-primary/10 border-primary/30' 
+                          : isDisabled
+                            ? 'bg-muted/30 border-border opacity-50'
+                            : 'bg-muted/50 border-border hover:border-primary/20'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Checkbox
+                          checked={isSelected}
+                          disabled={isDisabled}
+                          onCheckedChange={() => handleTogglePair(asset.symbol)}
+                        />
+                        <span className="font-medium text-foreground">{asset.symbol}</span>
+                      </div>
+                      <div className={`flex items-center gap-1 text-xs ${getBiasColor(asset.biasDirection)}`}>
+                        {asset.biasDirection === 'Bullish' ? (
+                          <TrendingUp className="h-3 w-3" />
+                        ) : asset.biasDirection === 'Bearish' ? (
+                          <TrendingDown className="h-3 w-3" />
+                        ) : (
+                          <Minus className="h-3 w-3" />
+                        )}
+                        <span>{asset.biasDirection}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setIsManageModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveFavorites}>
+                  <Check className="h-4 w-4 mr-1" />
+                  Save
+                </Button>
+              </div>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
     </>
   );
 }

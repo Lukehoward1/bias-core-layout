@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppSidebarProvider, useAppSidebar } from "@/hooks/use-app-sidebar";
@@ -27,6 +28,24 @@ function MobileHeader() {
   );
 }
 
+// Safety cleanup function to remove any stray interaction blockers
+function cleanupInteractionBlockers() {
+  const appRoot = document.getElementById('root');
+  if (appRoot) {
+    appRoot.removeAttribute('inert');
+    appRoot.removeAttribute('aria-hidden');
+    appRoot.style.pointerEvents = '';
+  }
+  // Clean any elements marked by Radix dialogs
+  document.querySelectorAll('[data-aria-hidden="true"]').forEach(el => {
+    el.removeAttribute('aria-hidden');
+    el.removeAttribute('data-aria-hidden');
+  });
+  document.querySelectorAll('[inert]').forEach(el => {
+    el.removeAttribute('inert');
+  });
+}
+
 function AppLayoutContent() {
   const { collapsed } = useAppSidebar();
   const { isLocked, unlock } = useSessionLock();
@@ -34,6 +53,24 @@ function AppLayoutContent() {
   
   // Check if lock overlay is enabled (can be disabled via dev toggle)
   const showLockScreen = ENABLE_LOCK_OVERLAY && isLocked;
+  
+  // Run cleanup whenever we transition from locked to unlocked
+  useEffect(() => {
+    if (!showLockScreen) {
+      // Small delay to ensure any Radix cleanup has a chance to run first
+      const timer = setTimeout(() => {
+        cleanupInteractionBlockers();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [showLockScreen]);
+  
+  // Also run cleanup on mount in case we're in a broken state
+  useEffect(() => {
+    if (!showLockScreen) {
+      cleanupInteractionBlockers();
+    }
+  }, []);
   
   return (
     <>
