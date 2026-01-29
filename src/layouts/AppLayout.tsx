@@ -7,6 +7,9 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 
+// Dev flag to disable lock overlay during development if it causes issues
+const ENABLE_LOCK_OVERLAY = localStorage.getItem('dev-disable-lock-overlay') !== 'true';
+
 function MobileHeader() {
   const { setMobileOpen } = useAppSidebar();
   
@@ -29,13 +32,16 @@ function AppLayoutContent() {
   const { isLocked, unlock } = useSessionLock();
   const isMobile = useIsMobile();
   
+  // Check if lock overlay is enabled (can be disabled via dev toggle)
+  const showLockScreen = ENABLE_LOCK_OVERLAY && isLocked;
+  
   return (
     <>
-      {/* Lock screen overlay - renders ABOVE the app, fully unmounts when unlocked */}
-      {isLocked && <LockScreen onUnlock={unlock} />}
+      {/* Lock screen overlay - only renders when enabled AND locked, fully unmounts otherwise */}
+      {showLockScreen && <LockScreen onUnlock={unlock} />}
       
-      {/* Main app - remains mounted; lock overlay above blocks interaction while locked */}
-      <div className="flex min-h-screen w-full" aria-hidden={isLocked}>
+      {/* Main app - ALWAYS interactive when lock screen is not shown */}
+      <div className="flex min-h-screen w-full">
         <AppSidebar />
         
         {/* Spacer div to account for fixed sidebar - desktop only */}
