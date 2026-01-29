@@ -1,4 +1,5 @@
-import html2pdf from 'html2pdf.js';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import { format } from 'date-fns';
 
 interface CertificateData {
@@ -10,6 +11,16 @@ interface CertificateData {
 export async function generateCertificatePdf(data: CertificateData): Promise<void> {
   const { studentName, courseName, completedAt } = data;
   const formattedDate = format(new Date(completedAt), 'MMMM d, yyyy');
+
+  // Sanitize user inputs to prevent XSS
+  const escapeHtml = (str: string) => {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  };
+
+  const safeStudentName = escapeHtml(studentName);
+  const safeCourseName = escapeHtml(courseName);
 
   // Create certificate HTML
   const certificateHtml = `
@@ -91,13 +102,13 @@ export async function generateCertificatePdf(data: CertificateData): Promise<voi
         <!-- Recipient -->
         <div style="margin-bottom: 24px;">
           <p style="font-size: 12px; color: #94a3b8; margin: 0 0 8px 0;">This is to certify that</p>
-          <h2 style="font-size: 32px; font-weight: bold; margin: 0; color: #f1f5f9;">${studentName}</h2>
+          <h2 style="font-size: 32px; font-weight: bold; margin: 0; color: #f1f5f9;">${safeStudentName}</h2>
         </div>
         
         <!-- Course -->
         <div style="margin-bottom: 24px;">
           <p style="font-size: 12px; color: #94a3b8; margin: 0 0 8px 0;">has successfully completed the course</p>
-          <h3 style="font-size: 20px; font-weight: 600; margin: 0; color: #3b82f6;">${courseName}</h3>
+          <h3 style="font-size: 20px; font-weight: 600; margin: 0; color: #3b82f6;">${safeCourseName}</h3>
         </div>
         
         <!-- Date -->
@@ -137,24 +148,28 @@ export async function generateCertificatePdf(data: CertificateData): Promise<voi
 
   const element = container.firstElementChild as HTMLElement;
 
-  const options = {
-    margin: 0,
-    filename: `StreamBias-Certificate-${courseName.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { 
+  try {
+    // Use html2canvas to capture the element
+    const canvas = await html2canvas(element, {
       scale: 2,
       useCORS: true,
       backgroundColor: '#0f1318'
-    },
-    jsPDF: { 
-      unit: 'px', 
-      format: [800, 566], 
-      orientation: 'landscape' as const
-    }
-  };
+    });
 
-  try {
-    await html2pdf().set(options).from(element).save();
+    // Create PDF with jsPDF
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'px',
+      format: [800, 566]
+    });
+
+    // Add the canvas as an image
+    const imgData = canvas.toDataURL('image/jpeg', 0.98);
+    pdf.addImage(imgData, 'JPEG', 0, 0, 800, 566);
+
+    // Save the PDF
+    const filename = `StreamBias-Certificate-${courseName.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`;
+    pdf.save(filename);
   } finally {
     document.body.removeChild(container);
   }
