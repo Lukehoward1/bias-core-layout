@@ -1,20 +1,30 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Link2, ArrowRight, Sparkles, ShieldOff, RefreshCw } from "lucide-react";
+import { Link2, ArrowRight, Sparkles, ShieldOff, RefreshCw, Lock, KeyRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useSubscription } from "@/hooks/use-subscription";
+import { useSessionLock } from "@/hooks/use-session-lock";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { SubscriptionPlan } from "@/types/subscription";
 
 export default function Settings() {
   const { plan, setPlan } = useSubscription();
+  const { pinEnabled, setPinEnabled, pinSet, setPin, clearPin } = useSessionLock();
+  
   const [lockOverlayDisabled, setLockOverlayDisabled] = useState(() => {
     return localStorage.getItem('dev-disable-lock-overlay') === 'true';
   });
+
+  // PIN management state
+  const [showPinSetup, setShowPinSetup] = useState(false);
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [pinSetupError, setPinSetupError] = useState('');
 
   const handleToggleLockOverlay = (disabled: boolean) => {
     setLockOverlayDisabled(disabled);
@@ -29,6 +39,49 @@ export default function Settings() {
     window.location.reload();
   };
 
+  const handleTogglePinEnabled = (enabled: boolean) => {
+    setPinEnabled(enabled);
+    if (enabled && !pinSet) {
+      setShowPinSetup(true);
+    }
+  };
+
+  const handleSetPin = () => {
+    if (newPin.length !== 4) {
+      setPinSetupError('PIN must be 4 digits');
+      return;
+    }
+    if (!/^\d{4}$/.test(newPin)) {
+      setPinSetupError('PIN must contain only numbers');
+      return;
+    }
+    if (newPin !== confirmPin) {
+      setPinSetupError('PINs do not match');
+      return;
+    }
+    
+    setPin(newPin);
+    setShowPinSetup(false);
+    setNewPin('');
+    setConfirmPin('');
+    setPinSetupError('');
+  };
+
+  const handleRemovePin = () => {
+    clearPin();
+    setPinEnabled(false);
+  };
+
+  const handleCancelPinSetup = () => {
+    setShowPinSetup(false);
+    setNewPin('');
+    setConfirmPin('');
+    setPinSetupError('');
+    if (!pinSet) {
+      setPinEnabled(false);
+    }
+  };
+
   const planOptions: { value: SubscriptionPlan; label: string; color: string }[] = [
     { value: 'free', label: 'Free', color: 'bg-muted text-muted-foreground' },
     { value: 'standard', label: 'Standard', color: 'bg-primary/20 text-primary' },
@@ -40,6 +93,116 @@ export default function Settings() {
       <AppHeader title="Settings" />
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto space-y-6">
+          {/* Session Privacy Section */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <Lock className="h-5 w-5 text-primary" />
+                <CardTitle className="text-base">Session Privacy</CardTitle>
+              </div>
+              <CardDescription className="text-xs">
+                Protect your dashboard with a 4-digit PIN. When enabled, you'll need to enter your PIN to unlock after inactivity.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="pin-enabled"
+                    checked={pinEnabled}
+                    onCheckedChange={handleTogglePinEnabled}
+                  />
+                  <Label htmlFor="pin-enabled" className="text-sm">
+                    Enable PIN lock
+                  </Label>
+                </div>
+                {pinSet && (
+                  <Badge variant="outline" className="text-xs bg-success/10 text-success border-success/30">
+                    PIN Set
+                  </Badge>
+                )}
+              </div>
+
+              {pinEnabled && pinSet && !showPinSetup && (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowPinSetup(true)}
+                    className="gap-1"
+                  >
+                    <KeyRound className="h-3.5 w-3.5" />
+                    Change PIN
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRemovePin}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    Remove PIN
+                  </Button>
+                </div>
+              )}
+
+              {showPinSetup && (
+                <div className="space-y-3 p-4 bg-muted/50 rounded-lg border border-border">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-pin" className="text-xs text-muted-foreground">
+                      {pinSet ? 'New PIN' : 'Enter PIN'}
+                    </Label>
+                    <Input
+                      id="new-pin"
+                      type="password"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={4}
+                      value={newPin}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                        setNewPin(val);
+                        setPinSetupError('');
+                      }}
+                      className="max-w-32 text-center tracking-[0.3em]"
+                      placeholder="••••"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-pin" className="text-xs text-muted-foreground">
+                      Confirm PIN
+                    </Label>
+                    <Input
+                      id="confirm-pin"
+                      type="password"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={4}
+                      value={confirmPin}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                        setConfirmPin(val);
+                        setPinSetupError('');
+                      }}
+                      className="max-w-32 text-center tracking-[0.3em]"
+                      placeholder="••••"
+                    />
+                  </div>
+                  {pinSetupError && (
+                    <p className="text-xs text-destructive">{pinSetupError}</p>
+                  )}
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" onClick={handleSetPin}>
+                      {pinSet ? 'Update PIN' : 'Set PIN'}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleCancelPinSetup}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Dev Safety: Disable Lock Overlay */}
           <Card className="border-dashed border-warning/30">
             <CardHeader className="pb-3">
