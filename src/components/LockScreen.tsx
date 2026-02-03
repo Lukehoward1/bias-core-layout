@@ -7,24 +7,6 @@ import { Button } from "@/components/ui/button";
 import { useAssets } from "@/hooks/use-watchlist";
 import { type Asset } from "@/data/assets";
 
-// Safety cleanup: Remove any stray inert/aria-hidden from app root
-function cleanupInteractionBlockers() {
-  const appRoot = document.getElementById('root');
-  if (appRoot) {
-    appRoot.removeAttribute('inert');
-    appRoot.removeAttribute('aria-hidden');
-    appRoot.style.pointerEvents = '';
-  }
-  // Also clean any elements that might have been marked by Radix dialogs
-  document.querySelectorAll('[data-aria-hidden="true"]').forEach(el => {
-    el.removeAttribute('aria-hidden');
-    el.removeAttribute('data-aria-hidden');
-  });
-  document.querySelectorAll('[inert]').forEach(el => {
-    el.removeAttribute('inert');
-  });
-}
-
 // Trading sessions data
 const tradingSessions = [
   { name: 'Sydney', openHour: 22, closeHour: 7, accent: '#2EC4B6' },
@@ -92,14 +74,6 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
   
   // Use shared assets data
   const { assets, getAssetBySymbol } = useAssets();
-
-  // Cleanup interaction blockers on unmount (when unlocking)
-  useEffect(() => {
-    return () => {
-      // When LockScreen unmounts, ensure the app is fully interactive
-      cleanupInteractionBlockers();
-    };
-  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
