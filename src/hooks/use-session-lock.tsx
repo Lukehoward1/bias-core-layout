@@ -14,10 +14,12 @@ interface SessionLockContextValue {
 const SessionLockContext = createContext<SessionLockContextValue | null>(null);
 
 export function SessionLockProvider({ children }: { children: ReactNode }) {
-  // Check if this is a fresh session (no sessionStorage marker)
-  const [isLocked, setIsLocked] = useState(() => {
+  // Initialize: locked only if sessionStorage key is absent (first load of session)
+  const [isLocked, setIsLocked] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
-    return sessionStorage.getItem(SESSION_KEY) !== 'true';
+    const stored = sessionStorage.getItem(SESSION_KEY);
+    // If SESSION_KEY === 'true', user already unlocked this session -> not locked
+    return stored !== 'true';
   });
   
   const [lastActivityTime, setLastActivityTime] = useState(Date.now());
@@ -27,10 +29,10 @@ export function SessionLockProvider({ children }: { children: ReactNode }) {
     setLastActivityTime(Date.now());
   }, []);
 
-  // Unlock the session
+  // Unlock the session - synchronous, no delays
   const unlock = useCallback(() => {
-    setIsLocked(false);
     sessionStorage.setItem(SESSION_KEY, 'true');
+    setIsLocked(false);
     setLastActivityTime(Date.now());
     
     // Synchronously reset interaction state
