@@ -8,6 +8,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import { resetInteractionState } from "@/lib/resetInteractionState";
+import { InteractionDebugPanel } from "@/components/dev/InteractionDebugPanel";
 
 function MobileHeader() {
   const { setMobileOpen } = useAppSidebar();
@@ -65,6 +66,9 @@ function AppLayoutContent() {
           </main>
         </div>
       </div>
+      
+      {/* DEV-only interaction debug panel */}
+      <InteractionDebugPanel />
     </>
   );
 }
