@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppSidebarProvider, useAppSidebar } from "@/hooks/use-app-sidebar";
@@ -7,7 +6,6 @@ import { LockScreen } from "@/components/LockScreen";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
-import { resetInteractionState } from "@/lib/resetInteractionState";
 import { InteractionDebugPanel } from "@/components/dev/InteractionDebugPanel";
 
 function MobileHeader() {
@@ -29,26 +27,15 @@ function MobileHeader() {
 
 function AppLayoutContent() {
   const { collapsed } = useAppSidebar();
-  const { isLocked, unlock } = useSessionLock();
+  const { isLocked } = useSessionLock();
   const isMobile = useIsMobile();
-  
-  // Secondary safety net: ensure interaction is restored when lock state changes
-  useEffect(() => {
-    if (!isLocked) {
-      // Run cleanup after React has finished updating the DOM
-      const timer = setTimeout(() => {
-        resetInteractionState();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isLocked]);
   
   return (
     <>
-      {/* Lock screen - pure visual overlay, no interaction-disabling */}
-      {isLocked && <LockScreen onUnlock={unlock} />}
+      {/* Lock screen - rendered via portal, only when locked */}
+      {isLocked && <LockScreen />}
       
-      {/* Main app - always interactive */}
+      {/* Main app - always rendered */}
       <div className="flex min-h-screen w-full">
         <AppSidebar />
         

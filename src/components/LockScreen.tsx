@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-import { TrendingUp, TrendingDown, Minus, Clock, ChevronRight, ExternalLink, Pencil, X, Check } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Clock, ChevronRight, ExternalLink, Pencil, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAssets } from "@/hooks/use-watchlist";
 import { type Asset } from "@/data/assets";
+import { useSessionLock } from "@/hooks/use-session-lock";
 
 // Trading sessions data
 const tradingSessions = [
@@ -18,7 +21,6 @@ const tradingSessions = [
 function getSessionStatus(session: typeof tradingSessions[0], currentHour: number) {
   const { openHour, closeHour } = session;
   
-  // Handle sessions that cross midnight
   if (openHour > closeHour) {
     if (currentHour >= openHour || currentHour < closeHour) {
       return { isLive: true, timeUntilOpen: 0 };
@@ -29,7 +31,6 @@ function getSessionStatus(session: typeof tradingSessions[0], currentHour: numbe
     }
   }
   
-  // Calculate time until open
   let hoursUntil = openHour - currentHour;
   if (hoursUntil <= 0) hoursUntil += 24;
   
@@ -44,46 +45,40 @@ function formatTimeUntil(hours: number, minutes: number) {
   return `${hours}h ${minutes}m`;
 }
 
-// Mock news data with identifiers for navigation
 const redNews = [
   { id: 'nfp-1', time: '08:30', currency: 'USD', event: 'Non-Farm Payrolls', impact: 'High' as const },
   { id: 'cpi-eur-1', time: '10:00', currency: 'EUR', event: 'CPI Flash Estimate', impact: 'High' as const },
   { id: 'rate-gbp-1', time: '14:00', currency: 'GBP', event: 'Interest Rate Decision', impact: 'High' as const },
 ];
 
-// Mock session data
-const currentSession = {
-  name: 'London',
-  status: 'live' as const,
-  nextSession: 'New York',
-  nextSessionIn: '2h 15m'
-};
-
 const STORAGE_KEY = 'streambias-dashboard-favorites';
 const MAX_FAVORITES = 5;
 
-export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
+export function LockScreen() {
+  const { unlock, pinEnabled, pinSet } = useSessionLock();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [favoritePairs, setFavoritePairs] = useState<string[]>([]);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [tempSelection, setTempSelection] = useState<string[]>([]);
   const [showSessionDropdown, setShowSessionDropdown] = useState(false);
+  const [showPinEntry, setShowPinEntry] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
   const sessionIconRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const pinInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   
-  // Use shared assets data
   const { assets, getAssetBySymbol } = useAssets();
 
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
-
     return () => clearInterval(timer);
   }, []);
 
-  // Handle click outside for session dropdown
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -102,7 +97,6 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showSessionDropdown]);
 
-  // Load favorite pairs from localStorage
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -127,6 +121,12 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     }
   }, []);
 
+  useEffect(() => {
+    if (showPinEntry && pinInputRef.current) {
+      pinInputRef.current.focus();
+    }
+  }, [showPinEntry]);
+
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', { 
       hour: '2-digit', 
@@ -144,27 +144,64 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     });
   };
 
+  const attemptUnlock = (navigationPath?: string) => {
+    if (pinEnabled && pinSet) {
+      setPendingNavigation(navigationPath || null);
+      setShowPinEntry(true);
+      setPinInput('');
+      setPinError(false);
+    } else {
+      const success = unlock();
+      if (success && navigationPath) {
+        navigate(navigationPath);
+      }
+    }
+  };
+
+  const handlePinSubmit = () => {
+    const success = unlock(pinInput);
+    if (success) {
+      setShowPinEntry(false);
+      setPinInput('');
+      if (pendingNavigation) {
+        navigate(pendingNavigation);
+        setPendingNavigation(null);
+      }
+    } else {
+      setPinError(true);
+      setPinInput('');
+    }
+  };
+
+  const handlePinKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && pinInput.length === 4) {
+      handlePinSubmit();
+    }
+    if (e.key === 'Escape') {
+      setShowPinEntry(false);
+      setPinInput('');
+      setPinError(false);
+    }
+  };
+
   const handleNewsClick = (e: React.MouseEvent, eventId: string, eventName: string) => {
     e.stopPropagation();
-    onUnlock(); // Unlock first, then navigate
-    navigate(`/calendar?event=${encodeURIComponent(eventName)}`);
+    attemptUnlock(`/calendar?event=${encodeURIComponent(eventName)}`);
   };
 
   const handleViewAllNews = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onUnlock(); // Unlock first, then navigate
-    navigate('/calendar');
+    attemptUnlock('/calendar');
   };
 
   const handleBiasClick = (e: React.MouseEvent, symbol: string) => {
     e.stopPropagation();
-    onUnlock(); // Unlock first, then navigate
-    navigate(`/asset/${symbol}?from=Dashboard`);
+    attemptUnlock(`/asset/${symbol}?from=Dashboard`);
   };
 
   const handleBackgroundClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onUnlock();
+    if (e.target === e.currentTarget && !isManageModalOpen && !showPinEntry) {
+      attemptUnlock();
     }
   };
 
@@ -188,7 +225,6 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     setIsManageModalOpen(false);
   };
 
-  // Get displayed pairs from shared assets data
   const displayedPairs: Asset[] = favoritePairs
     .map(symbol => getAssetBySymbol(symbol))
     .filter((asset): asset is Asset => asset !== undefined);
@@ -205,163 +241,220 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
     return 'text-muted-foreground';
   };
 
-  return (
-    <>
-      <div 
-        className="fixed inset-0 z-50 bg-background dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-950 dark:to-black flex items-center justify-center"
-        onClick={handleBackgroundClick}
-      >
-        <div className="text-center space-y-6 px-6 max-w-2xl w-full" onClick={handleBackgroundClick}>
-          {/* Time */}
-          <div className="cursor-pointer" onClick={onUnlock}>
-            <div className="text-7xl sm:text-8xl font-light text-foreground tracking-tight mb-2">
-              {formatTime(currentTime)}
-            </div>
-            <div className="text-base sm:text-lg text-muted-foreground">
-              {formatDate(currentTime)}
-            </div>
+  const lockScreenContent = (
+    <div 
+      className="fixed inset-0 z-50 bg-background dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-950 dark:to-black flex items-center justify-center"
+      onClick={handleBackgroundClick}
+    >
+      <div className="text-center space-y-6 px-6 max-w-2xl w-full" onClick={handleBackgroundClick}>
+        {/* Time */}
+        <div className="cursor-pointer" onClick={() => attemptUnlock()}>
+          <div className="text-7xl sm:text-8xl font-light text-foreground tracking-tight mb-2">
+            {formatTime(currentTime)}
+          </div>
+          <div className="text-base sm:text-lg text-muted-foreground">
+            {formatDate(currentTime)}
+          </div>
+        </div>
+
+        {/* Session Info with Interactive Timer Dropdown */}
+        <div className="relative inline-block">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-muted/50 dark:bg-white/5 border border-border dark:border-white/10">
+            {(() => {
+              const currentHour = currentTime.getHours();
+              const liveSession = tradingSessions.find(s => getSessionStatus(s, currentHour).isLive);
+              return (
+                <>
+                  <div className={`w-2 h-2 rounded-full ${liveSession ? 'bg-success animate-pulse' : 'bg-warning'}`} />
+                  <span className="text-sm text-foreground dark:text-gray-300">
+                    {liveSession ? `${liveSession.name} Session Live` : 'Market Closed'}
+                  </span>
+                </>
+              );
+            })()}
+            <button
+              ref={sessionIconRef}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowSessionDropdown(!showSessionDropdown);
+              }}
+              onMouseEnter={() => setShowSessionDropdown(true)}
+              className="p-1 -m-1 rounded-full hover:bg-muted dark:hover:bg-white/10 transition-colors cursor-pointer"
+              aria-label="View session times"
+            >
+              <Clock className="h-3.5 w-3.5 text-muted-foreground dark:text-gray-400 hover:text-foreground transition-colors" />
+            </button>
           </div>
 
-          {/* Session Info with Interactive Timer Dropdown */}
-          <div className="relative inline-block">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-muted/50 dark:bg-white/5 border border-border dark:border-white/10">
-              {(() => {
-                const currentHour = currentTime.getHours();
-                const liveSession = tradingSessions.find(s => getSessionStatus(s, currentHour).isLive);
-                return (
-                  <>
-                    <div className={`w-2 h-2 rounded-full ${liveSession ? 'bg-success animate-pulse' : 'bg-warning'}`} />
-                    <span className="text-sm text-foreground dark:text-gray-300">
-                      {liveSession ? `${liveSession.name} Session Live` : 'Market Closed'}
-                    </span>
-                  </>
-                );
-              })()}
-              <button
-                ref={sessionIconRef}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowSessionDropdown(!showSessionDropdown);
-                }}
-                onMouseEnter={() => setShowSessionDropdown(true)}
-                className="p-1 -m-1 rounded-full hover:bg-muted dark:hover:bg-white/10 transition-colors cursor-pointer"
-                aria-label="View session times"
-              >
-                <Clock className="h-3.5 w-3.5 text-muted-foreground dark:text-gray-400 hover:text-foreground transition-colors" />
-              </button>
-            </div>
-
-            {/* Session Timer Dropdown */}
-            {showSessionDropdown && (
-              <div 
-                ref={dropdownRef}
-                onMouseLeave={() => setShowSessionDropdown(false)}
-                className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-56 bg-popover border border-border rounded-lg shadow-lg z-[60]"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="p-3 space-y-2">
-                  {tradingSessions.map(session => {
-                    const status = getSessionStatus(session, currentTime.getHours());
-                    return (
-                      <div 
-                        key={session.name}
-                        className={`flex items-center justify-between p-2 rounded-md transition-colors ${
-                          status.isLive ? 'bg-success/10 border border-success/20' : 'hover:bg-muted/50'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div 
-                            className={`w-2 h-2 rounded-full ${status.isLive ? 'animate-pulse' : ''}`}
-                            style={{ backgroundColor: session.accent }}
-                          />
-                          <span className={`text-sm ${status.isLive ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
-                            {session.name}
-                          </span>
-                        </div>
-                        <span className={`text-xs ${status.isLive ? 'text-success font-medium' : 'text-muted-foreground'}`}>
-                          {status.isLive ? 'Live' : `opens in ${formatTimeUntil(status.hours!, status.minutes!)}`}
+          {/* Session Timer Dropdown */}
+          {showSessionDropdown && (
+            <div 
+              ref={dropdownRef}
+              onMouseLeave={() => setShowSessionDropdown(false)}
+              className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-56 bg-popover border border-border rounded-lg shadow-lg z-[60]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-3 space-y-2">
+                {tradingSessions.map(session => {
+                  const status = getSessionStatus(session, currentTime.getHours());
+                  return (
+                    <div 
+                      key={session.name}
+                      className={`flex items-center justify-between p-2 rounded-md transition-colors ${
+                        status.isLive ? 'bg-success/10 border border-success/20' : 'hover:bg-muted/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className={`w-2 h-2 rounded-full ${status.isLive ? 'animate-pulse' : ''}`}
+                          style={{ backgroundColor: session.accent }}
+                        />
+                        <span className={`text-sm ${status.isLive ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
+                          {session.name}
                         </span>
                       </div>
-                    );
-                  })}
-                </div>
+                      <span className={`text-xs ${status.isLive ? 'text-success font-medium' : 'text-muted-foreground'}`}>
+                        {status.isLive ? 'Live' : `opens in ${formatTimeUntil(status.hours!, status.minutes!)}`}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
-            )}
-          </div>
-
-          {/* Dashboard Focus Pairs - Using shared data */}
-          <div className="space-y-2">
-            <button
-              onClick={handleOpenManageModal}
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Pencil className="h-3 w-3" />
-              <span>Edit pairs</span>
-            </button>
-            <div className="flex justify-center gap-2 sm:gap-3 flex-wrap">
-              {displayedPairs.map((asset) => (
-                <button
-                  key={asset.symbol}
-                  onClick={(e) => handleBiasClick(e, asset.symbol)}
-                  className="group flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg bg-muted/50 dark:bg-white/5 border border-border dark:border-white/10 hover:bg-muted dark:hover:bg-white/10 hover:border-primary/30 transition-all duration-200"
-                >
-                  <span className="text-xs sm:text-sm font-medium text-foreground">{asset.symbol}</span>
-                  <div className={`flex items-center gap-1 ${getBiasColor(asset.biasDirection)}`}>
-                    {getBiasIcon(asset.biasDirection)}
-                    <span className="text-[10px] sm:text-xs">{asset.biasDirection}</span>
-                  </div>
-                  <ChevronRight className="h-3 w-3 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
-                </button>
-              ))}
             </div>
-          </div>
-
-          {/* Today's Red News */}
-          <div className="space-y-3 mt-6 sm:mt-8">
-            <button 
-              onClick={handleViewAllNews}
-              className="group flex items-center justify-center gap-2 mx-auto hover:opacity-80 transition-opacity"
-            >
-              <h3 className="text-xs sm:text-sm font-medium text-muted-foreground uppercase tracking-wider group-hover:text-foreground transition-colors">
-                Today's Red News
-              </h3>
-              <ExternalLink className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
-            </button>
-            <div className="space-y-2">
-              {redNews.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={(e) => handleNewsClick(e, item.id, item.event)}
-                  className="w-full bg-muted/50 dark:bg-white/5 backdrop-blur-sm rounded-lg p-3 sm:p-4 border border-border dark:border-white/10 hover:bg-muted dark:hover:bg-white/10 hover:border-destructive/30 transition-all duration-200 group"
-                >
-                  <div className="flex items-center justify-between gap-2 sm:gap-4">
-                    <span className="text-xs sm:text-sm font-medium text-muted-foreground min-w-[45px] sm:min-w-[60px] group-hover:text-foreground transition-colors">
-                      {item.time}
-                    </span>
-                    <Badge variant="outline" className="border-destructive/30 text-destructive text-[10px] sm:text-xs group-hover:bg-destructive/10 transition-colors">
-                      {item.currency}
-                    </Badge>
-                    <span className="text-xs sm:text-sm text-foreground flex-1 text-left group-hover:text-primary transition-colors truncate">
-                      {item.event}
-                    </span>
-                    <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all flex-shrink-0" />
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Unlock prompt */}
-          <button 
-            onClick={onUnlock}
-            className="mt-8 sm:mt-10 text-xs sm:text-sm text-muted-foreground hover:text-foreground animate-pulse transition-colors"
-          >
-            Tap anywhere to unlock your dashboard
-          </button>
+          )}
         </div>
+
+        {/* Dashboard Focus Pairs */}
+        <div className="space-y-2">
+          <button
+            onClick={handleOpenManageModal}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Pencil className="h-3 w-3" />
+            <span>Edit pairs</span>
+          </button>
+          <div className="flex justify-center gap-2 sm:gap-3 flex-wrap">
+            {displayedPairs.map((asset) => (
+              <button
+                key={asset.symbol}
+                onClick={(e) => handleBiasClick(e, asset.symbol)}
+                className="group flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg bg-muted/50 dark:bg-white/5 border border-border dark:border-white/10 hover:bg-muted dark:hover:bg-white/10 hover:border-primary/30 transition-all duration-200"
+              >
+                <span className="text-xs sm:text-sm font-medium text-foreground">{asset.symbol}</span>
+                <div className={`flex items-center gap-1 ${getBiasColor(asset.biasDirection)}`}>
+                  {getBiasIcon(asset.biasDirection)}
+                  <span className="text-[10px] sm:text-xs">{asset.biasDirection}</span>
+                </div>
+                <ChevronRight className="h-3 w-3 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Today's Red News */}
+        <div className="space-y-3 mt-6 sm:mt-8">
+          <button 
+            onClick={handleViewAllNews}
+            className="group flex items-center justify-center gap-2 mx-auto hover:opacity-80 transition-opacity"
+          >
+            <h3 className="text-xs sm:text-sm font-medium text-muted-foreground uppercase tracking-wider group-hover:text-foreground transition-colors">
+              Today's Red News
+            </h3>
+            <ExternalLink className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
+          </button>
+          <div className="space-y-2">
+            {redNews.map((item) => (
+              <button
+                key={item.id}
+                onClick={(e) => handleNewsClick(e, item.id, item.event)}
+                className="w-full bg-muted/50 dark:bg-white/5 backdrop-blur-sm rounded-lg p-3 sm:p-4 border border-border dark:border-white/10 hover:bg-muted dark:hover:bg-white/10 hover:border-destructive/30 transition-all duration-200 group"
+              >
+                <div className="flex items-center justify-between gap-2 sm:gap-4">
+                  <span className="text-xs sm:text-sm font-medium text-muted-foreground min-w-[45px] sm:min-w-[60px] group-hover:text-foreground transition-colors">
+                    {item.time}
+                  </span>
+                  <Badge variant="outline" className="border-destructive/30 text-destructive text-[10px] sm:text-xs group-hover:bg-destructive/10 transition-colors">
+                    {item.currency}
+                  </Badge>
+                  <span className="text-xs sm:text-sm text-foreground flex-1 text-left group-hover:text-primary transition-colors truncate">
+                    {item.event}
+                  </span>
+                  <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Unlock prompt */}
+        <button 
+          onClick={() => attemptUnlock()}
+          className="mt-8 sm:mt-10 text-xs sm:text-sm text-muted-foreground hover:text-foreground animate-pulse transition-colors"
+        >
+          {pinEnabled && pinSet ? 'Tap anywhere to enter PIN' : 'Tap anywhere to unlock your dashboard'}
+        </button>
       </div>
 
-      {/* Manage Dashboard Focus Pairs Panel - Inline to avoid Radix Dialog inert issues */}
+      {/* PIN Entry Panel */}
+      {showPinEntry && (
+        <div 
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowPinEntry(false);
+            setPinInput('');
+            setPinError(false);
+          }}
+        >
+          <div 
+            className="w-full max-w-xs mx-4 bg-card border border-border rounded-lg shadow-xl p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-foreground text-center mb-4">Enter PIN</h2>
+            <Input
+              ref={pinInputRef}
+              type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={4}
+              value={pinInput}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                setPinInput(val);
+                setPinError(false);
+              }}
+              onKeyDown={handlePinKeyDown}
+              className={`text-center text-2xl tracking-[0.5em] ${pinError ? 'border-destructive' : ''}`}
+              placeholder="••••"
+            />
+            {pinError && (
+              <p className="text-xs text-destructive text-center mt-2">Incorrect PIN</p>
+            )}
+            <div className="flex gap-2 mt-4">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setShowPinEntry(false);
+                  setPinInput('');
+                  setPinError(false);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                disabled={pinInput.length !== 4}
+                onClick={handlePinSubmit}
+              >
+                Unlock
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Dashboard Focus Pairs Panel */}
       {isManageModalOpen && (
         <div 
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
@@ -435,14 +528,16 @@ export function LockScreen({ onUnlock }: { onUnlock: () => void }) {
                   Cancel
                 </Button>
                 <Button onClick={handleSaveFavorites}>
-                  <Check className="h-4 w-4 mr-1" />
-                  Save
+                  Save Changes
                 </Button>
               </div>
             </div>
           </div>
         </div>
       )}
-    </>
+    </div>
   );
+
+  // Use createPortal to render directly to document.body
+  return createPortal(lockScreenContent, document.body);
 }

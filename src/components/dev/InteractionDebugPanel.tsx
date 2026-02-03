@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useSessionLock } from "@/hooks/use-session-lock";
-import { resetInteractionState } from "@/lib/resetInteractionState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -68,13 +67,6 @@ export function InteractionDebugPanel() {
     return () => clearInterval(interval);
   }, [enabled]);
 
-  const handleReset = () => {
-    resetInteractionState();
-    requestAnimationFrame(() => {
-      resetInteractionState();
-    });
-  };
-
   const handleLogBlockers = () => {
     const inertElements = Array.from(document.querySelectorAll("[inert]"));
     const ariaHiddenElements = Array.from(document.querySelectorAll('[aria-hidden="true"]'));
@@ -140,9 +132,6 @@ export function InteractionDebugPanel() {
         </div>
 
         <div className="flex gap-2 pt-2 border-t">
-          <Button size="sm" variant="outline" onClick={handleReset} className="flex-1 text-xs h-7">
-            Run Reset
-          </Button>
           <Button size="sm" variant="outline" onClick={handleLogBlockers} className="flex-1 text-xs h-7">
             Log Blockers
           </Button>
