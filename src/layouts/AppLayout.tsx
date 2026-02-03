@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppSidebarProvider, useAppSidebar } from "@/hooks/use-app-sidebar";
@@ -6,6 +7,7 @@ import { LockScreen } from "@/components/LockScreen";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
+import { resetInteractionState } from "@/lib/resetInteractionState";
 
 function MobileHeader() {
   const { setMobileOpen } = useAppSidebar();
@@ -28,6 +30,17 @@ function AppLayoutContent() {
   const { collapsed } = useAppSidebar();
   const { isLocked, unlock } = useSessionLock();
   const isMobile = useIsMobile();
+  
+  // Secondary safety net: ensure interaction is restored when lock state changes
+  useEffect(() => {
+    if (!isLocked) {
+      // Run cleanup after React has finished updating the DOM
+      const timer = setTimeout(() => {
+        resetInteractionState();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isLocked]);
   
   return (
     <>
