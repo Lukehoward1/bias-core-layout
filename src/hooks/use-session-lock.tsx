@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react';
+import { resetInteractionState } from '@/lib/resetInteractionState';
 
 const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 const SESSION_KEY = 'streambias-session-active';
@@ -31,6 +32,14 @@ export function SessionLockProvider({ children }: { children: ReactNode }) {
     setIsLocked(false);
     sessionStorage.setItem(SESSION_KEY, 'true');
     setLastActivityTime(Date.now());
+    
+    // Synchronously reset interaction state
+    resetInteractionState();
+    
+    // Schedule a second pass on next frame to catch any delayed DOM updates
+    requestAnimationFrame(() => {
+      resetInteractionState();
+    });
   }, []);
 
   // Lock the session (manual lock)
