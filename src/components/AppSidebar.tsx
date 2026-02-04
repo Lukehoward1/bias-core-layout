@@ -19,7 +19,7 @@ import {
   Zap,
   X,
 } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAppSidebar } from "@/hooks/use-app-sidebar";
 import { useTheme } from "@/hooks/use-theme";
@@ -52,13 +52,17 @@ const accountItems = [
 export function AppSidebar() {
   const { collapsed, toggleCollapsed, mobileOpen, setMobileOpen } = useAppSidebar();
   const { theme, toggleTheme } = useTheme();
+  const location = useLocation();
+  const currentPath = location.pathname;
   const isMobile = useIsMobile();
 
   const handleNavClick = () => {
+    // diagnostic: you should see this log when you click any nav item
+    console.log("NAV CLICK");
     if (isMobile) setMobileOpen(false);
   };
 
-  const NavSection = ({ title, items }: { title: string; items: { title: string; url: string; icon: any }[] }) => (
+  const NavSection = ({ title, items }: { title: string; items: typeof mainItems }) => (
     <div>
       {!collapsed && (
         <div className="px-3 mb-2">
@@ -68,33 +72,25 @@ export function AppSidebar() {
 
       <div className="space-y-0.5">
         {items.map((item) => {
+          const isActive = currentPath === item.url || (item.url !== "/" && currentPath.startsWith(item.url));
           const Icon = item.icon;
 
           return (
             <NavLink
               key={item.url}
               to={item.url}
-              end={item.url === "/"}
               onClick={handleNavClick}
-              className={({ isActive }) =>
-                [
-                  "flex items-center px-3 py-2 rounded-lg transition-all relative",
-                  collapsed && !isMobile ? "justify-center mx-1" : "justify-start",
-                  isActive
-                    ? "bg-sidebar-accent text-sidebar-primary"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/50",
-                ].join(" ")
-              }
+              className={`
+                flex items-center px-3 py-2 rounded-lg transition-all relative
+                ${collapsed && !isMobile ? "justify-center mx-1" : "justify-start"}
+                ${isActive ? "bg-sidebar-accent text-sidebar-primary" : "text-sidebar-foreground hover:bg-sidebar-accent/50"}
+              `}
             >
-              {({ isActive }) => (
-                <>
-                  {isActive && !collapsed && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary rounded-r-full" />
-                  )}
-                  <Icon className={`${collapsed && !isMobile ? "" : "mr-3"} h-[18px] w-[18px] flex-shrink-0`} />
-                  {(!collapsed || isMobile) && <span className="text-sm font-medium">{item.title}</span>}
-                </>
+              {isActive && !collapsed && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary rounded-r-full" />
               )}
+              <Icon className={`${collapsed && !isMobile ? "" : "mr-3"} h-[18px] w-[18px] flex-shrink-0`} />
+              {(!collapsed || isMobile) && <span className="text-sm font-medium">{item.title}</span>}
             </NavLink>
           );
         })}
@@ -107,9 +103,7 @@ export function AppSidebar() {
       {/* TOP: Logo */}
       <div className="flex-shrink-0">
         <div
-          className={`h-14 ${
-            collapsed && !isMobile ? "px-3" : "px-4"
-          } flex items-center justify-between border-b border-border`}
+          className={`h-14 ${collapsed && !isMobile ? "px-3" : "px-4"} flex items-center justify-between border-b border-border`}
         >
           <div className={`flex items-center ${collapsed && !isMobile ? "justify-center" : "gap-3"}`}>
             <img
@@ -142,23 +136,21 @@ export function AppSidebar() {
         )}
       </div>
 
-      {/* MIDDLE: Navigation */}
+      {/* MIDDLE */}
       <div className="flex-1 flex flex-col overflow-y-auto px-3 py-2 space-y-5">
         <NavSection title="MAIN" items={mainItems} />
-        <NavSection title="LEARNING" items={learningItems} />
-        <NavSection title="BROKERAGE" items={brokerageItems} />
-        <NavSection title="ACCOUNT" items={accountItems} />
+        <NavSection title="LEARNING" items={learningItems as any} />
+        <NavSection title="BROKERAGE" items={brokerageItems as any} />
+        <NavSection title="ACCOUNT" items={accountItems as any} />
       </div>
 
-      {/* BOTTOM: Theme + Upgrade */}
+      {/* BOTTOM */}
       <div className="flex-shrink-0 px-3 py-3 border-t border-sidebar-border space-y-2">
         <Button
           variant="ghost"
           size="sm"
           onClick={toggleTheme}
-          className={`w-full h-8 ${
-            collapsed && !isMobile ? "justify-center px-0" : "justify-start px-3"
-          } hover:bg-sidebar-accent`}
+          className={`w-full h-8 ${collapsed && !isMobile ? "justify-center px-0" : "justify-start px-3"} hover:bg-sidebar-accent`}
         >
           {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           {(!collapsed || isMobile) && <span className="ml-3 text-sm">Theme</span>}
@@ -174,7 +166,7 @@ export function AppSidebar() {
     </>
   );
 
-  // Mobile: Overlay drawer
+  // Mobile drawer
   if (isMobile) {
     return (
       <>
@@ -194,7 +186,7 @@ export function AppSidebar() {
     );
   }
 
-  // Desktop: Fixed sidebar
+  // Desktop fixed sidebar
   return (
     <aside
       className={`
