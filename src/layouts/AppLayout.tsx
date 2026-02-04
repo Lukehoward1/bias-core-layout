@@ -1,5 +1,5 @@
-import { useEffect } from "react";
 import { Outlet } from "react-router-dom";
+import { useEffect } from "react";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppSidebarProvider, useAppSidebar } from "@/hooks/use-app-sidebar";
 import { useSessionLock } from "@/hooks/use-session-lock";
@@ -21,88 +21,67 @@ function MobileHeader() {
   );
 }
 
-/**
- * Neutralise Lovable injected overlays / badge wrappers that can end up leaving
- * aria-hidden/inert behind and interfere with interaction inside the embedded preview.
- * This is intentionally conservative: it only runs when UNLOCKED.
- */
-function patchLovableOverlays() {
-  // Known Lovable elements seen in your blocker logs
-  const selectors = [
-    "#lovable-badge-divider",
-    "aside#lovable-badge",
-    "[aria-label='Edit with Lovable']",
-    "[id*='lovable-badge']",
-  ];
-
-  const nodes = document.querySelectorAll<HTMLElement>(selectors.join(","));
-  nodes.forEach((el) => {
-    // Remove attributes that can participate in focus/interaction traps
-    el.removeAttribute("aria-hidden");
-    el.removeAttribute("inert");
-    el.removeAttribute("data-aria-hidden");
-
-    // Make sure these overlays can never steal clicks
-    el.style.pointerEvents = "none";
-    el.style.userSelect = "none";
-
-    // Avoid them sitting “above” the app if styles go odd
-    // (doesn't break their rendering, just prevents covering UI)
-    if (el.style.position === "fixed" || el.style.position === "absolute") {
-      el.style.zIndex = "0";
-    }
-  });
-}
-
-/**
- * General cleanup: remove stray aria-hidden/inert that can be left behind by overlays/modals.
- */
-function clearInteractionTraps() {
-  document.querySelectorAll<HTMLElement>('[aria-hidden="true"]').forEach((el) => el.removeAttribute("aria-hidden"));
-
-  document.querySelectorAll<HTMLElement>("[data-aria-hidden]").forEach((el) => el.removeAttribute("data-aria-hidden"));
-
-  document.querySelectorAll<HTMLElement>("[inert]").forEach((el) => el.removeAttribute("inert"));
-}
-
 function AppLayoutContent() {
   const { collapsed } = useAppSidebar();
   const { isLocked } = useSessionLock();
   const isMobile = useIsMobile();
 
+  // LOVABLE PREVIEW FIX:
+  // Lovable injects a divider/badge element that intermittently breaks hit-testing in the preview iframe.
+  // We neutralise it ONLY in Lovable preview so you can keep working visually.
   useEffect(() => {
-    if (isLocked) return;
+    const host = typeof window !== "undefined" ? window.location.hostname : "";
+    const isLovablePreview = host.includes("lovable.app") || host.includes("lovableproject.com");
 
-    // Run twice across frames to catch post-render mutations
-    const run = () => {
-      clearInteractionTraps();
-      patchLovableOverlays();
+    if (!isLovablePreview) return;
+
+    const kill = () => {
+      const el = document.getElementById("lovable-badge-divider");
+      if (el) {
+        // Make it harmless (and remove if possible)
+        (el as HTMLElement).style.pointerEvents = "none";
+        el.removeAttribute("aria-hidden");
+        try {
+          el.remove();
+        } catch {
+          // ignore
+        }
+      }
     };
 
-    requestAnimationFrame(() => {
-      requestAnimationFrame(run);
-    });
+    // Run now + keep re-running because Lovable reinjects it
+    kill();
+    const interval = window.setInterval(kill, 250);
 
-    // If Lovable re-applies aria-hidden later, keep removing it (UNLOCKED only)
-    const obs = new MutationObserver(() => {
-      run();
-    });
+    // Also watch DOM changes (more reliable than interval alone)
+    const mo = new MutationObserver(() => kill());
+    mo.observe(document.documentElement, { childList: true, subtree: true });
 
-    obs.observe(document.documentElement, {
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["aria-hidden", "data-aria-hidden", "inert", "style", "class"],
-    });
+    return () => {
+      window.clearInterval(interval);
+      mo.disconnect();
+    };
+  }, []);
 
-    return () => obs.disconnect();
+  // SAFETY CLEANUP: ensure nothing is left aria-hidden/inert after unlock (your existing safety net)
+  useEffect(() => {
+    if (!isLocked) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          document.querySelectorAll('[aria-hidden="true"]').forEach((el) => el.removeAttribute("aria-hidden"));
+
+          document.querySelectorAll("[inert]").forEach((el) => el.removeAttribute("inert"));
+        });
+      });
+    }
   }, [isLocked]);
 
   return (
     <>
-      {/* Lock screen - rendered via portal, only when locked */}
+      {/* Lock screen - only when locked */}
       {isLocked && <LockScreen />}
 
-      {/* Main app - always rendered */}
+      {/* Main app */}
       <div className="flex min-h-screen w-full">
         <AppSidebar />
 
@@ -110,7 +89,6 @@ function AppLayoutContent() {
         {!isMobile && <div className={`${collapsed ? "w-16" : "w-60"} flex-shrink-0 transition-all duration-300`} />}
 
         <div className="flex-1 flex flex-col h-screen overflow-hidden">
-          {/* Mobile header with hamburger */}
           {isMobile && <MobileHeader />}
 
           <main className="flex-1 overflow-y-auto">
