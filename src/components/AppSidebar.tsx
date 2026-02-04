@@ -57,7 +57,6 @@ export function AppSidebar() {
   const isMobile = useIsMobile();
 
   const handleNavClick = () => {
-    // diagnostic: you should see this log when you click any nav item
     console.log("NAV CLICK");
     if (isMobile) setMobileOpen(false);
   };
@@ -83,7 +82,11 @@ export function AppSidebar() {
               className={`
                 flex items-center px-3 py-2 rounded-lg transition-all relative
                 ${collapsed && !isMobile ? "justify-center mx-1" : "justify-start"}
-                ${isActive ? "bg-sidebar-accent text-sidebar-primary" : "text-sidebar-foreground hover:bg-sidebar-accent/50"}
+                ${
+                  isActive
+                    ? "bg-sidebar-accent text-sidebar-primary"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                }
               `}
             >
               {isActive && !collapsed && (
@@ -100,43 +103,35 @@ export function AppSidebar() {
 
   const sidebarContent = (
     <>
-      {/* TOP: Logo */}
+      {/* TOP */}
       <div className="flex-shrink-0">
         <div
-          className={`h-14 ${collapsed && !isMobile ? "px-3" : "px-4"} flex items-center justify-between border-b border-border`}
+          className={`h-14 ${
+            collapsed && !isMobile ? "px-3" : "px-4"
+          } flex items-center justify-between border-b border-border`}
         >
           <div className={`flex items-center ${collapsed && !isMobile ? "justify-center" : "gap-3"}`}>
-            <img
-              src={sbLogo}
-              alt="StreamBias"
-              className={`${collapsed && !isMobile ? "h-7" : "h-8"} w-auto flex-shrink-0`}
-            />
-            {(!collapsed || isMobile) && <span className="text-lg font-bold text-foreground">StreamBias</span>}
+            <img src={sbLogo} alt="StreamBias" className={`${collapsed && !isMobile ? "h-7" : "h-8"} w-auto`} />
+            {(!collapsed || isMobile) && <span className="text-lg font-bold">StreamBias</span>}
           </div>
 
           {isMobile && (
-            <Button variant="ghost" size="icon" onClick={() => setMobileOpen(false)} className="h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={() => setMobileOpen(false)}>
               <X className="h-4 w-4" />
             </Button>
           )}
         </div>
 
-        {/* Collapse Button - Desktop only */}
         {!isMobile && (
           <div className="px-3 py-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleCollapsed}
-              className={`w-full justify-center hover:bg-sidebar-accent h-8 ${collapsed ? "px-0" : ""}`}
-            >
-              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            <Button variant="ghost" size="sm" onClick={toggleCollapsed} className="w-full h-8 justify-center">
+              {collapsed ? <ChevronRight /> : <ChevronLeft />}
             </Button>
           </div>
         )}
       </div>
 
-      {/* MIDDLE */}
+      {/* NAV */}
       <div className="flex-1 flex flex-col overflow-y-auto px-3 py-2 space-y-5">
         <NavSection title="MAIN" items={mainItems} />
         <NavSection title="LEARNING" items={learningItems as any} />
@@ -144,21 +139,16 @@ export function AppSidebar() {
         <NavSection title="ACCOUNT" items={accountItems as any} />
       </div>
 
-      {/* BOTTOM */}
-      <div className="flex-shrink-0 px-3 py-3 border-t border-sidebar-border space-y-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={toggleTheme}
-          className={`w-full h-8 ${collapsed && !isMobile ? "justify-center px-0" : "justify-start px-3"} hover:bg-sidebar-accent`}
-        >
-          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          {(!collapsed || isMobile) && <span className="ml-3 text-sm">Theme</span>}
+      {/* FOOTER */}
+      <div className="flex-shrink-0 px-3 py-3 border-t space-y-2">
+        <Button variant="ghost" size="sm" onClick={toggleTheme} className="w-full h-8">
+          {theme === "dark" ? <Sun /> : <Moon />}
+          {(!collapsed || isMobile) && <span className="ml-3">Theme</span>}
         </Button>
 
         {(!collapsed || isMobile) && (
-          <Button size="sm" className="w-full h-8 bg-gradient-to-r from-primary to-accent hover:opacity-90">
-            <Zap className="h-4 w-4 mr-2" />
+          <Button size="sm" className="w-full h-8">
+            <Zap className="mr-2" />
             Upgrade
           </Button>
         )}
@@ -166,34 +156,25 @@ export function AppSidebar() {
     </>
   );
 
-  // Mobile drawer
+  // MOBILE
   if (isMobile) {
     return (
       <>
         {mobileOpen && <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setMobileOpen(false)} />}
 
-        <aside
-          className={`
-            fixed left-0 top-0 z-50 h-screen w-72
-            bg-sidebar flex flex-col
-            transform transition-transform duration-300 ease-in-out
-            ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
-          `}
-        >
-          {sidebarContent}
-        </aside>
+        <aside className="fixed left-0 top-0 z-50 h-screen w-72 bg-sidebar">{sidebarContent}</aside>
       </>
     );
   }
 
-  // Desktop fixed sidebar
+  // DESKTOP (✅ FIXED)
   return (
     <aside
       className={`
         ${collapsed ? "w-16" : "w-60"}
         bg-sidebar
         flex flex-col h-screen
-        fixed left-0 top-0 z-40
+        relative
         transition-all duration-300
       `}
     >
