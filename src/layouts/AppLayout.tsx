@@ -1,5 +1,4 @@
-import { useEffect } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppSidebarProvider, useAppSidebar } from "@/hooks/use-app-sidebar";
 import { SessionLockProvider, useSessionLock } from "@/hooks/use-session-lock";
@@ -8,6 +7,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import { InteractionDebugPanel } from "@/components/dev/InteractionDebugPanel";
+import { useEffect } from "react";
 
 function MobileHeader() {
   const { setMobileOpen } = useAppSidebar();
@@ -25,33 +25,23 @@ function AppLayoutContent() {
   const { collapsed } = useAppSidebar();
   const { isLocked } = useSessionLock();
   const isMobile = useIsMobile();
-  const location = useLocation();
 
   /**
-   * SAFETY CLEANUP (runs after unlock + on route changes):
-   * Removes any stray aria-hidden/inert that can “freeze” the app.
-   * Also removes any stale lockscreen portal hosts if they were left behind.
+   * 🔥 CRITICAL CLEANUP
+   * When unlocked, nuke ANY global click/pointer traps
    */
   useEffect(() => {
-    if (isLocked) return;
+    if (!isLocked) {
+      // remove inert / aria-hidden leftovers
+      document.querySelectorAll("[aria-hidden='true']").forEach((el) => el.removeAttribute("aria-hidden"));
 
-    const cleanup = () => {
-      // 1) Remove aria-hidden flags that can block focus/click routing in some setups
-      document.querySelectorAll('[aria-hidden="true"]').forEach((el) => el.removeAttribute("aria-hidden"));
-
-      // 2) Remove inert attributes that can block pointer/keyboard interaction
       document.querySelectorAll("[inert]").forEach((el) => el.removeAttribute("inert"));
 
-      // 3) Remove any stale lockscreen portal hosts (should not exist when unlocked)
-      document.querySelectorAll('[data-lockscreen-host="true"]').forEach((el) => el.parentElement?.removeChild(el));
-    };
-
-    // Run twice across frames to catch cases where another component sets flags during the same paint.
-    requestAnimationFrame(() => {
-      cleanup();
-      requestAnimationFrame(cleanup);
-    });
-  }, [isLocked, location.pathname]);
+      // hard reset pointer-events just in case
+      document.body.style.pointerEvents = "auto";
+      document.documentElement.style.pointerEvents = "auto";
+    }
+  }, [isLocked]);
 
   return (
     <>
