@@ -19,7 +19,8 @@ import {
   Zap,
   X,
 } from "lucide-react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink } from "@/components/NavLink";
+import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAppSidebar } from "@/hooks/use-app-sidebar";
 import { useTheme } from "@/hooks/use-theme";
