@@ -1,4 +1,5 @@
-import { Outlet } from "react-router-dom";
+import { useEffect } from "react";
+import { Outlet, useLocation } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppSidebarProvider, useAppSidebar } from "@/hooks/use-app-sidebar";
 import { SessionLockProvider, useSessionLock } from "@/hooks/use-session-lock";
@@ -24,6 +25,33 @@ function AppLayoutContent() {
   const { collapsed } = useAppSidebar();
   const { isLocked } = useSessionLock();
   const isMobile = useIsMobile();
+  const location = useLocation();
+
+  /**
+   * SAFETY CLEANUP (runs after unlock + on route changes):
+   * Removes any stray aria-hidden/inert that can “freeze” the app.
+   * Also removes any stale lockscreen portal hosts if they were left behind.
+   */
+  useEffect(() => {
+    if (isLocked) return;
+
+    const cleanup = () => {
+      // 1) Remove aria-hidden flags that can block focus/click routing in some setups
+      document.querySelectorAll('[aria-hidden="true"]').forEach((el) => el.removeAttribute("aria-hidden"));
+
+      // 2) Remove inert attributes that can block pointer/keyboard interaction
+      document.querySelectorAll("[inert]").forEach((el) => el.removeAttribute("inert"));
+
+      // 3) Remove any stale lockscreen portal hosts (should not exist when unlocked)
+      document.querySelectorAll('[data-lockscreen-host="true"]').forEach((el) => el.parentElement?.removeChild(el));
+    };
+
+    // Run twice across frames to catch cases where another component sets flags during the same paint.
+    requestAnimationFrame(() => {
+      cleanup();
+      requestAnimationFrame(cleanup);
+    });
+  }, [isLocked, location.pathname]);
 
   return (
     <>
