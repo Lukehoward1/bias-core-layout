@@ -1,77 +1,52 @@
-import { useEffect } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
-import { AppSidebarProvider, useAppSidebar } from "@/hooks/use-app-sidebar";
+import { AppSidebarProvider } from "@/hooks/use-app-sidebar";
 import { useSessionLock } from "@/hooks/use-session-lock";
 import { LockScreen } from "@/components/LockScreen";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { Button } from "@/components/ui/button";
-import { Menu } from "lucide-react";
-import { InteractionDebugPanel } from "@/components/dev/InteractionDebugPanel";
+import { useEffect } from "react";
 
-function MobileHeader() {
-  const { setMobileOpen } = useAppSidebar();
-
-  return (
-    <div className="h-14 bg-sidebar border-b border-border flex items-center px-4 lg:hidden">
-      <Button variant="ghost" size="icon" onClick={() => setMobileOpen(true)} className="h-9 w-9">
-        <Menu className="h-5 w-5" />
-      </Button>
-    </div>
-  );
-}
-
-function AppLayoutContent() {
-  const { collapsed } = useAppSidebar();
+function AppLayoutInner() {
   const { isLocked } = useSessionLock();
-  const isMobile = useIsMobile();
+  const location = useLocation();
 
-  // Safety cleanup: ensure nothing is left aria-hidden/inert after unlock
+  // HARD reset on every route change
   useEffect(() => {
-    if (!isLocked) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          document.querySelectorAll('[aria-hidden="true"]').forEach((el) => el.removeAttribute("aria-hidden"));
-          document.querySelectorAll("[inert]").forEach((el) => el.removeAttribute("inert"));
-        });
-      });
-    }
-  }, [isLocked]);
+    document.documentElement.style.pointerEvents = "auto";
+    document.body.style.pointerEvents = "auto";
+    document.querySelectorAll("[inert]").forEach((el) => el.removeAttribute("inert"));
+    document.querySelectorAll('[aria-hidden="true"]').forEach((el) => el.removeAttribute("aria-hidden"));
 
-  // Desktop sidebar widths (AppSidebar is fixed; we pad the app content)
-  const desktopPad = collapsed ? "lg:pl-16" : "lg:pl-60";
+    // Force scroll to top of main content
+    const main = document.querySelector("main");
+    if (main) main.scrollTop = 0;
+  }, [location.pathname, isLocked]);
 
   return (
-    <>
-      {isLocked && <LockScreen />}
+    <div className="flex w-full h-screen overflow-hidden">
+      {/* Sidebar stays in normal flow */}
+      <AppSidebar />
 
-      {/* Fixed sidebar + padded app content. App content handles scrolling. */}
-      <div className="min-h-screen w-full">
-        <AppSidebar />
-
-        <div className={`min-h-screen w-full ${desktopPad}`}>
-          <div className="flex min-h-screen w-full">
-            <div className="flex-1 flex flex-col h-screen overflow-hidden">
-              {isMobile && <MobileHeader />}
-
-              {/* IMPORTANT: this is the scroll container for pages */}
-              <main className="flex-1 overflow-y-auto">
-                <Outlet />
-              </main>
-            </div>
-          </div>
-        </div>
+      {/* Content column */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        <main className="flex-1 overflow-y-auto min-w-0">
+          <Outlet />
+        </main>
       </div>
 
-      <InteractionDebugPanel />
-    </>
+      {/* Lock screen ALWAYS on top */}
+      {isLocked && (
+        <div className="fixed inset-0 z-[9999] pointer-events-auto">
+          <LockScreen />
+        </div>
+      )}
+    </div>
   );
 }
 
 export function AppLayout() {
   return (
     <AppSidebarProvider>
-      <AppLayoutContent />
+      <AppLayoutInner />
     </AppSidebarProvider>
   );
 }
