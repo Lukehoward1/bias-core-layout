@@ -32,25 +32,28 @@ function AppLayoutContent() {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           document.querySelectorAll('[aria-hidden="true"]').forEach((el) => el.removeAttribute("aria-hidden"));
+
           document.querySelectorAll("[inert]").forEach((el) => el.removeAttribute("inert"));
         });
       });
     }
   }, [isLocked]);
 
-  const leftPad = isMobile ? "" : collapsed ? "pl-16" : "pl-60";
+  // Desktop sidebar widths
+  const desktopSidebarPad = collapsed ? "lg:pl-16" : "lg:pl-60";
 
   return (
     <>
       {isLocked && <LockScreen />}
 
-      <div className={`min-h-screen w-full ${leftPad}`}>
+      {/* Sidebar is fixed on desktop. Main content is padded-left to match it. */}
+      <div className="min-h-screen w-full">
         <AppSidebar />
 
-        <div className="flex flex-col min-h-screen overflow-hidden">
+        <div className={`min-h-screen w-full ${desktopSidebarPad}`}>
           {isMobile && <MobileHeader />}
 
-          <main className="flex-1 overflow-y-auto">
+          <main className="min-h-[calc(100vh)] overflow-y-auto">
             <Outlet />
           </main>
         </div>
