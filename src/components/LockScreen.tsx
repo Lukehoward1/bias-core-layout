@@ -20,20 +20,17 @@ function formatDate(d: Date) {
 export function LockScreen() {
   const { isLocked, unlock, pinEnabled, pinSet } = useSessionLock();
 
-  // If not locked, render nothing at all.
   if (!isLocked) return null;
 
   const [now, setNow] = useState(() => new Date());
   const [pin, setPinState] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  // Tick the clock
   useEffect(() => {
     const id = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(id);
   }, []);
 
-  // Create a dedicated portal host and ALWAYS remove it on unmount.
   const host = useMemo(() => {
     const el = document.createElement("div");
     el.setAttribute("data-lockscreen-host", "true");
@@ -62,57 +59,50 @@ export function LockScreen() {
   };
 
   const onBackgroundClick = () => {
-    // If PIN protection is enabled+set, you must enter it
-    if (pinEnabled && pinSet) return;
+    if (pinEnabled && pinSet) return; // require PIN if enabled
     attemptUnlock();
   };
 
-  // ---- Mock data (safe placeholders) ----
-  // Replace these later with your real session + events data sources.
+  // Placeholders for now (we can wire these later)
   const sessionLabel = "London Session Live";
+  const sessionTimer = "2h 15m"; // placeholder timer next to session
+
   const redNews = [
     { time: "08:30", ccy: "USD", title: "Non-Farm Payrolls" },
     { time: "10:00", ccy: "EUR", title: "CPI Flash Estimate" },
     { time: "14:00", ccy: "GBP", title: "Interest Rate Decision" },
   ];
-  // --------------------------------------
 
   const overlay = (
     <div
       className="fixed inset-0 z-[9999] bg-gradient-to-br from-gray-900 via-gray-950 to-black"
-      // IMPORTANT: do NOT preventDefault here (it can kill click routing elsewhere)
-      // We only stop propagation so clicks don't leak into the app when locked.
-      onPointerDown={(e) => e.stopPropagation()}
+      // IMPORTANT: do NOT preventDefault here.
+      // We want normal click behavior within the lock screen.
       onClick={onBackgroundClick}
     >
-      {/* Center content */}
-      <div
-        className="min-h-screen w-full flex items-center justify-center px-6 py-10"
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="w-full max-w-3xl text-center">
+      {/* Full-screen positioning wrapper (NO stopPropagation here) */}
+      <div className="min-h-screen w-full flex items-center justify-center px-6 py-10">
+        {/* Center “card” area (THIS is what should not unlock when clicked) */}
+        <div className="w-full max-w-3xl text-center" onClick={(e) => e.stopPropagation()}>
           {/* Clock */}
           <div className="text-[72px] sm:text-[92px] leading-none font-light tracking-tight text-foreground">
             {formatTime(now)}
           </div>
           <div className="mt-3 text-sm sm:text-base text-muted-foreground">{formatDate(now)}</div>
 
-          {/* Session pill */}
+          {/* Session pill + timer */}
           <div className="mt-6 flex items-center justify-center gap-3 flex-wrap">
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/40 px-4 py-2 text-sm text-foreground">
               <span className="h-2 w-2 rounded-full bg-green-500" />
-              {sessionLabel}
+              <span>{sessionLabel}</span>
+              <span className="text-muted-foreground">•</span>
+              <span className="text-muted-foreground">{sessionTimer}</span>
             </div>
 
             <button
               type="button"
               className="text-xs sm:text-sm text-muted-foreground hover:text-foreground underline underline-offset-4"
-              // keep this click local (no unlock)
-              onClick={() => {
-                // placeholder for “Edit pairs” action
-                console.log("Edit pairs clicked");
-              }}
+              onClick={() => console.log("Edit pairs clicked")}
             >
               Edit pairs
             </button>
@@ -126,9 +116,11 @@ export function LockScreen() {
 
             <div className="mt-4 space-y-3 text-left">
               {redNews.map((e) => (
-                <div
+                <button
                   key={`${e.time}-${e.ccy}-${e.title}`}
-                  className="flex items-center justify-between rounded-xl border border-border bg-card/30 px-4 py-3"
+                  type="button"
+                  className="w-full text-left flex items-center justify-between rounded-xl border border-border bg-card/30 px-4 py-3 hover:bg-card/40 transition"
+                  onClick={() => console.log("News clicked:", e)}
                 >
                   <div className="flex items-center gap-3">
                     <div className="text-sm text-muted-foreground w-[56px]">{e.time}</div>
@@ -139,15 +131,22 @@ export function LockScreen() {
                   </div>
 
                   <div className="text-muted-foreground">›</div>
-                </div>
+                </button>
               ))}
             </div>
 
-            <div className="mt-6 text-xs text-muted-foreground">Tap anywhere to unlock your dashboard</div>
+            {/* Only show this hint when tap-to-unlock is valid */}
+            {!pinEnabled || !pinSet ? (
+              <div className="mt-6 text-xs text-muted-foreground">
+                Tap anywhere outside this panel to unlock your dashboard
+              </div>
+            ) : (
+              <div className="mt-6 text-xs text-muted-foreground">Enter your PIN to unlock</div>
+            )}
           </div>
 
           {/* PIN unlock (only when enabled) */}
-          {pinEnabled && pinSet && (
+          {pinEnabled && pinSet ? (
             <div className="mt-8 mx-auto max-w-xs space-y-3">
               <Input
                 value={pin}
@@ -165,6 +164,11 @@ export function LockScreen() {
               <Button className="w-full" onClick={attemptUnlock} disabled={pin.length !== 4}>
                 Unlock
               </Button>
+            </div>
+          ) : (
+            // Optional explicit button (so you’re not forced to tap background)
+            <div className="mt-8 flex justify-center">
+              <Button onClick={attemptUnlock}>Unlock</Button>
             </div>
           )}
         </div>
