@@ -38,16 +38,16 @@ function AppLayoutContent() {
     }
   }, [isLocked]);
 
-  const leftOffset = isMobile ? "ml-0" : collapsed ? "ml-16" : "ml-60";
+  const leftPad = isMobile ? "" : collapsed ? "pl-16" : "pl-60";
 
   return (
     <>
       {isLocked && <LockScreen />}
 
-      <div className="min-h-screen w-full">
+      <div className={`min-h-screen w-full ${leftPad}`}>
         <AppSidebar />
 
-        <div className={`flex flex-col min-h-screen ${leftOffset}`}>
+        <div className="flex flex-col min-h-screen overflow-hidden">
           {isMobile && <MobileHeader />}
 
           <main className="flex-1 overflow-y-auto">
