@@ -8,74 +8,64 @@ import { DailyRiskLimitTracker } from "@/components/risk/DailyRiskLimitTracker";
 import { MaxDrawdownGuard } from "@/components/risk/MaxDrawdownGuard";
 
 export default function RiskTools() {
-  // Dashboard integration - single hook at page level
   const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
-  
-  // Card IDs matching the registry
-  const quickCalcCardId = 'quick-calculator';
-  const positionSizeCardId = 'position-size-calculator';
-  const rrCalcCardId = 'rr-calculator';
-  const dailyLimitCardId = 'daily-risk-limit';
-  const maxDrawdownCardId = 'max-drawdown-guard';
-  
-  // Check if cards are on dashboard
+
+  const quickCalcCardId = "quick-calculator";
+  const positionSizeCardId = "position-size-calculator";
+  const rrCalcCardId = "rr-calculator";
+  const dailyLimitCardId = "daily-risk-limit";
+  const maxDrawdownCardId = "max-drawdown-guard";
+
   const isQuickCalcAdded = isCardOnDashboard(quickCalcCardId);
   const isPositionSizeAdded = isCardOnDashboard(positionSizeCardId);
   const isRRCalcAdded = isCardOnDashboard(rrCalcCardId);
   const isDailyLimitAdded = isCardOnDashboard(dailyLimitCardId);
   const isMaxDrawdownAdded = isCardOnDashboard(maxDrawdownCardId);
-  
+
   const handleAddCard = (cardId: string) => {
     addCard(cardId);
-    toast.success('Added to Dashboard');
+    toast.success("Added to Dashboard");
   };
-  
+
   const handleRemoveCard = (cardId: string) => {
     removeCard(cardId);
-    toast.success('Removed from Dashboard');
+    toast.success("Removed from Dashboard");
   };
 
   return (
-    <div className="flex flex-col min-h-full bg-background">
+    <div className="p-6 space-y-6">
       <AppHeader title="Risk Tools" />
-      
-      <div className="flex-1 p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          {/* Quick Risk Calculator */}
-          <QuickRiskCalculator
-            isAdded={isQuickCalcAdded}
-            onAdd={() => handleAddCard(quickCalcCardId)}
-            onRemove={() => handleRemoveCard(quickCalcCardId)}
-          />
 
-          {/* Position Size Calculator */}
-          <PositionSizeCalculator
-            isAdded={isPositionSizeAdded}
-            onAdd={() => handleAddCard(positionSizeCardId)}
-            onRemove={() => handleRemoveCard(positionSizeCardId)}
-          />
+      <div className="max-w-7xl mx-auto space-y-6">
+        <QuickRiskCalculator
+          isAdded={isQuickCalcAdded}
+          onAdd={() => handleAddCard(quickCalcCardId)}
+          onRemove={() => handleRemoveCard(quickCalcCardId)}
+        />
 
-          {/* Risk-to-Reward Calculator */}
-          <RiskRewardCalculator
-            isAdded={isRRCalcAdded}
-            onAdd={() => handleAddCard(rrCalcCardId)}
-            onRemove={() => handleRemoveCard(rrCalcCardId)}
-          />
+        <PositionSizeCalculator
+          isAdded={isPositionSizeAdded}
+          onAdd={() => handleAddCard(positionSizeCardId)}
+          onRemove={() => handleRemoveCard(positionSizeCardId)}
+        />
 
-          {/* Daily Risk Limit Tracker */}
-          <DailyRiskLimitTracker
-            isAdded={isDailyLimitAdded}
-            onAdd={() => handleAddCard(dailyLimitCardId)}
-            onRemove={() => handleRemoveCard(dailyLimitCardId)}
-          />
+        <RiskRewardCalculator
+          isAdded={isRRCalcAdded}
+          onAdd={() => handleAddCard(rrCalcCardId)}
+          onRemove={() => handleRemoveCard(rrCalcCardId)}
+        />
 
-          {/* Max Drawdown Guard */}
-          <MaxDrawdownGuard
-            isAdded={isMaxDrawdownAdded}
-            onAdd={() => handleAddCard(maxDrawdownCardId)}
-            onRemove={() => handleRemoveCard(maxDrawdownCardId)}
-          />
-        </div>
+        <DailyRiskLimitTracker
+          isAdded={isDailyLimitAdded}
+          onAdd={() => handleAddCard(dailyLimitCardId)}
+          onRemove={() => handleRemoveCard(dailyLimitCardId)}
+        />
+
+        <MaxDrawdownGuard
+          isAdded={isMaxDrawdownAdded}
+          onAdd={() => handleAddCard(maxDrawdownCardId)}
+          onRemove={() => handleRemoveCard(maxDrawdownCardId)}
+        />
       </div>
     </div>
   );
