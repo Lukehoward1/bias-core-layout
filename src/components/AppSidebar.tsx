@@ -19,7 +19,7 @@ import {
   Zap,
   X,
 } from "lucide-react";
-import { NavLink, useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAppSidebar } from "@/hooks/use-app-sidebar";
 import { useTheme } from "@/hooks/use-theme";
@@ -49,18 +49,22 @@ const accountItems = [
   { title: "Subscriptions", url: "/billing", icon: CreditCard },
 ];
 
+type Item = { title: string; url: string; icon: any };
+
 export function AppSidebar() {
   const { collapsed, toggleCollapsed, mobileOpen, setMobileOpen } = useAppSidebar();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   const currentPath = location.pathname;
   const isMobile = useIsMobile();
 
-  const handleNavClick = () => {
+  const go = (url: string) => {
+    navigate(url);
     if (isMobile) setMobileOpen(false);
   };
 
-  const NavSection = ({ title, items }: { title: string; items: typeof mainItems }) => (
+  const NavSection = ({ title, items }: { title: string; items: Item[] }) => (
     <div>
       {!collapsed && (
         <div className="px-3 mb-2">
@@ -74,11 +78,23 @@ export function AppSidebar() {
           const Icon = item.icon;
 
           return (
-            <NavLink
+            <button
               key={item.url}
-              to={item.url}
-              onClick={handleNavClick}
+              type="button"
+              onPointerDown={(e) => {
+                // IMPORTANT: we navigate on pointerdown (since click is being blocked in your env)
+                e.preventDefault();
+                e.stopPropagation();
+                go(item.url);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  go(item.url);
+                }
+              }}
               className={`
+                w-full text-left
                 flex items-center px-3 py-2 rounded-lg transition-all relative
                 ${collapsed && !isMobile ? "justify-center mx-1" : "justify-start"}
                 ${isActive ? "bg-sidebar-accent text-sidebar-primary" : "text-sidebar-foreground hover:bg-sidebar-accent/50"}
@@ -89,7 +105,7 @@ export function AppSidebar() {
               )}
               <Icon className={`${collapsed && !isMobile ? "" : "mr-3"} h-[18px] w-[18px] flex-shrink-0`} />
               {(!collapsed || isMobile) && <span className="text-sm font-medium">{item.title}</span>}
-            </NavLink>
+            </button>
           );
         })}
       </div>
@@ -98,7 +114,7 @@ export function AppSidebar() {
 
   const sidebarContent = (
     <>
-      {/* TOP */}
+      {/* TOP: Logo */}
       <div className="flex-shrink-0">
         <div
           className={`h-14 ${collapsed && !isMobile ? "px-3" : "px-4"} flex items-center justify-between border-b border-border`}
@@ -119,6 +135,7 @@ export function AppSidebar() {
           )}
         </div>
 
+        {/* Collapse Button - Desktop only */}
         {!isMobile && (
           <div className="px-3 py-2">
             <Button
@@ -133,12 +150,12 @@ export function AppSidebar() {
         )}
       </div>
 
-      {/* NAV */}
+      {/* MIDDLE */}
       <div className="flex-1 flex flex-col overflow-y-auto px-3 py-2 space-y-5">
         <NavSection title="MAIN" items={mainItems} />
-        <NavSection title="LEARNING" items={learningItems as any} />
-        <NavSection title="BROKERAGE" items={brokerageItems as any} />
-        <NavSection title="ACCOUNT" items={accountItems as any} />
+        <NavSection title="LEARNING" items={learningItems} />
+        <NavSection title="BROKERAGE" items={brokerageItems} />
+        <NavSection title="ACCOUNT" items={accountItems} />
       </div>
 
       {/* BOTTOM */}
@@ -163,11 +180,11 @@ export function AppSidebar() {
     </>
   );
 
-  // Mobile overlay drawer stays fixed
+  // Mobile drawer
   if (isMobile) {
     return (
       <>
-        {mobileOpen && <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setMobileOpen(false)} />}
+        {mobileOpen && <div className="fixed inset-0 bg-black/50 z-40" onPointerDown={() => setMobileOpen(false)} />}
 
         <aside
           className={`
@@ -183,14 +200,14 @@ export function AppSidebar() {
     );
   }
 
-  // ✅ Desktop sidebar in normal layout flow (NOT fixed) to avoid double-spacing/gaps
+  // Desktop fixed sidebar
   return (
     <aside
       className={`
         ${collapsed ? "w-16" : "w-60"}
-        bg-sidebar flex flex-col h-screen
-        flex-shrink-0
-        border-r border-border
+        bg-sidebar
+        flex flex-col h-screen
+        fixed left-0 top-0 z-40
         transition-all duration-300
       `}
     >
