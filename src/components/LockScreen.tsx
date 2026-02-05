@@ -2,18 +2,31 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSessionLock } from "@/hooks/use-session-lock";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+
+type NewsItem = {
+  time: string;
+  currency: string;
+  title: string;
+};
+
+function formatDate(d: Date) {
+  return d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+}
+
+function formatTime(d: Date) {
+  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
 
 export function LockScreen() {
   const { isLocked, unlock, pinEnabled, pinSet } = useSessionLock();
 
-  // If not locked, render nothing at all.
+  // If not locked, render nothing at all (cannot block the app)
   if (!isLocked) return null;
 
-  const [pin, setPinState] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
+  const [modal, setModal] = useState<null | { title: string; body: string }>(null);
 
-  // Create a dedicated portal host and remove it on unmount.
   const host = useMemo(() => {
     const el = document.createElement("div");
     el.setAttribute("data-lockscreen-host", "true");
@@ -31,62 +44,144 @@ export function LockScreen() {
     };
   }, [host]);
 
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Demo UI data (wire later)
+  const sessionName = "London Session Live";
+  const sessionTPlus = "2h 15m";
+
+  const news: NewsItem[] = [
+    { time: "08:30", currency: "USD", title: "Non-Farm Payrolls" },
+    { time: "10:00", currency: "EUR", title: "CPI Flash Estimate" },
+    { time: "14:00", currency: "GBP", title: "Interest Rate Decision" },
+  ];
+
   const attemptUnlock = () => {
-    setError(null);
-
-    const ok = unlock(pinEnabled && pinSet ? pin : undefined);
-
+    // If PIN is enabled+set, this should be a PIN flow later.
+    // For now, keep button unlock behaviour.
+    const ok = unlock(undefined);
     if (!ok) {
-      setError("Incorrect PIN");
-      setPinState("");
+      setModal({
+        title: "Locked",
+        body: "Unlock failed (PIN may be enabled). We can wire the PIN entry UI next.",
+      });
     }
   };
 
-  // ✅ Outside click should unlock when no PIN is set.
-  const onBackgroundClick = () => {
-    if (pinEnabled && pinSet) return; // must use PIN / button
-    attemptUnlock();
-  };
-
   const overlay = (
-    <div
-      className="fixed inset-0 z-[9999] bg-gradient-to-br from-gray-900 via-gray-950 to-black flex items-center justify-center"
-      onClick={onBackgroundClick}
-    >
-      <div className="text-center space-y-6 px-6 max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
-        {/* Replace these bits with your existing time/date UI if you want */}
-        <div className="text-6xl font-light tracking-tight text-foreground">Locked</div>
+    <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-gray-900 via-gray-950 to-black">
+      {/* IMPORTANT: do NOT preventDefault on pointer events.
+          That was killing click/press interactions. */}
+      <div className="min-h-screen w-full flex items-center justify-center px-4">
+        <div className="w-full max-w-3xl text-center space-y-6" onClick={(e) => e.stopPropagation()}>
+          {/* Time + date */}
+          <div className="space-y-2">
+            <div className="text-6xl sm:text-7xl font-light tracking-tight text-foreground">{formatTime(now)}</div>
+            <div className="text-sm sm:text-base text-muted-foreground">{formatDate(now)}</div>
+          </div>
 
-        {/* ❌ Removed the “tap anywhere…” text (since it was misleading) */}
+          {/* Session pill row */}
+          <div className="flex items-center justify-center gap-3 flex-wrap">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/50 px-4 py-2 text-sm">
+              <span className="h-2 w-2 rounded-full bg-green-500" />
+              <span className="text-foreground">{sessionName}</span>
+              <span className="text-muted-foreground">•</span>
+              <span className="text-muted-foreground">{sessionTPlus}</span>
+            </div>
 
-        {/* PIN block (only if enabled+set) */}
-        {pinEnabled && pinSet && (
-          <div className="mx-auto max-w-xs space-y-3">
-            <Input
-              value={pin}
-              onChange={(e) => {
-                const v = e.target.value.replace(/\D/g, "").slice(0, 4);
-                setPinState(v);
-              }}
-              inputMode="numeric"
-              placeholder="Enter 4-digit PIN"
-              className="text-center text-lg tracking-widest"
-            />
+            <button
+              className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-4"
+              onClick={() =>
+                setModal({
+                  title: "Edit pairs",
+                  body: "Placeholder: next step is to wire this to your real pairs state (watchlist / selected pairs).",
+                })
+              }
+              type="button"
+            >
+              Edit pairs
+            </button>
+          </div>
 
-            {error && <div className="text-sm text-destructive">{error}</div>}
+          {/* News list */}
+          <div className="space-y-3">
+            <div className="text-xs tracking-wider uppercase text-muted-foreground">Today’s red news</div>
+
+            <div className="rounded-xl border border-border bg-card/40 overflow-hidden">
+              {news.map((n, idx) => (
+                <button
+                  key={`${n.time}-${n.currency}-${idx}`}
+                  type="button"
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-card/70 transition text-left"
+                  onClick={() =>
+                    setModal({
+                      title: `${n.currency} • ${n.title}`,
+                      body: `Time: ${n.time}\n\nNext step: open the Calendar event detail drawer / route (once we decide where these live).`,
+                    })
+                  }
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-14 text-sm text-muted-foreground">{n.time}</div>
+                    <Badge variant="secondary" className="text-xs">
+                      {n.currency}
+                    </Badge>
+                    <div className="text-sm text-foreground">{n.title}</div>
+                  </div>
+                  <div className="text-muted-foreground">›</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Unlock */}
+          <div className="pt-2 space-y-2">
+            {/* We intentionally removed the “tap anywhere…” text because we’re button-only now */}
+            <Button
+              onClick={attemptUnlock}
+              className="px-10"
+              disabled={pinEnabled && pinSet}
+              title={pinEnabled && pinSet ? "PIN is enabled — we’ll add PIN entry next." : "Unlock"}
+            >
+              Unlock
+            </Button>
+
+            {pinEnabled && pinSet && (
+              <div className="text-xs text-muted-foreground">PIN is enabled. Next step: add PIN entry UI here.</div>
+            )}
+          </div>
+        </div>
+
+        {/* Simple modal */}
+        {modal && (
+          <div
+            className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center px-4"
+            onClick={() => setModal(null)}
+          >
+            <div
+              className="w-full max-w-lg rounded-xl border border-border bg-card p-5 text-left"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="font-semibold text-foreground">{modal.title}</div>
+                <button
+                  type="button"
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                  onClick={() => setModal(null)}
+                >
+                  Close
+                </button>
+              </div>
+              <div className="text-sm text-muted-foreground whitespace-pre-line">{modal.body}</div>
+
+              <div className="mt-4 flex justify-end">
+                <Button onClick={() => setModal(null)}>Close</Button>
+              </div>
+            </div>
           </div>
         )}
-
-        {/* ✅ Always show an Unlock button */}
-        <div className="flex justify-center">
-          <Button
-            className="min-w-[140px]"
-            onClick={attemptUnlock}
-            disabled={pinEnabled && pinSet ? pin.length !== 4 : false}
-          >
-            Unlock
-          </Button>
-        </div>
       </div>
     </div>
   );
