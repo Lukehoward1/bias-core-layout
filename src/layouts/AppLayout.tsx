@@ -32,30 +32,34 @@ function AppLayoutContent() {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           document.querySelectorAll('[aria-hidden="true"]').forEach((el) => el.removeAttribute("aria-hidden"));
-
           document.querySelectorAll("[inert]").forEach((el) => el.removeAttribute("inert"));
         });
       });
     }
   }, [isLocked]);
 
-  // Desktop sidebar widths
-  const desktopSidebarPad = collapsed ? "lg:pl-16" : "lg:pl-60";
+  // Desktop sidebar widths (AppSidebar is fixed; we pad the app content)
+  const desktopPad = collapsed ? "lg:pl-16" : "lg:pl-60";
 
   return (
     <>
       {isLocked && <LockScreen />}
 
-      {/* Sidebar is fixed on desktop. Main content is padded-left to match it. */}
+      {/* Fixed sidebar + padded app content. App content handles scrolling. */}
       <div className="min-h-screen w-full">
         <AppSidebar />
 
-        <div className={`min-h-screen w-full ${desktopSidebarPad}`}>
-          {isMobile && <MobileHeader />}
+        <div className={`min-h-screen w-full ${desktopPad}`}>
+          <div className="flex min-h-screen w-full">
+            <div className="flex-1 flex flex-col h-screen overflow-hidden">
+              {isMobile && <MobileHeader />}
 
-          <main className="min-h-[calc(100vh)] overflow-y-auto">
-            <Outlet />
-          </main>
+              {/* IMPORTANT: this is the scroll container for pages */}
+              <main className="flex-1 overflow-y-auto">
+                <Outlet />
+              </main>
+            </div>
+          </div>
         </div>
       </div>
 
