@@ -4,32 +4,17 @@ import { useSessionLock } from "@/hooks/use-session-lock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-function cleanupInteractionLocks() {
-  try {
-    // remove any stale aria-hidden/inert left behind by overlays/modals
-    document.querySelectorAll('[aria-hidden="true"]').forEach((el) => el.removeAttribute("aria-hidden"));
-
-    document.querySelectorAll("[inert]").forEach((el) => el.removeAttribute("inert"));
-  } catch {
-    // ignore
-  }
-}
-
 export function LockScreen() {
   const { isLocked, unlock, pinEnabled, pinSet } = useSessionLock();
+
+  // If not locked, render nothing at all.
+  if (!isLocked) return null;
+
   const [pin, setPinState] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  // Create a dedicated portal host.
-  // Also aggressively remove any stale previous hosts (common after preview crashes / hot reload).
+  // Create a dedicated portal host and ALWAYS remove it on unmount.
   const host = useMemo(() => {
-    // remove any previous leftover lockscreen hosts
-    try {
-      document.querySelectorAll('[data-lockscreen-host="true"]').forEach((n) => n.parentElement?.removeChild(n));
-    } catch {
-      // ignore
-    }
-
     const el = document.createElement("div");
     el.setAttribute("data-lockscreen-host", "true");
     return el;
@@ -37,31 +22,19 @@ export function LockScreen() {
 
   useEffect(() => {
     document.body.appendChild(host);
-
     return () => {
       try {
         host.remove();
       } catch {
         // ignore
       }
-      // extra safety: make sure nothing is left locking interactions
-      cleanupInteractionLocks();
     };
   }, [host]);
-
-  // If we become unlocked while mounted (or during transitions), hard-cleanup.
-  useEffect(() => {
-    if (!isLocked) {
-      cleanupInteractionLocks();
-    }
-  }, [isLocked]);
-
-  // IMPORTANT: when not locked, render nothing at all.
-  if (!isLocked) return null;
 
   const attemptUnlock = () => {
     setError(null);
 
+    // If PIN is enabled+set, enforce it; otherwise allow tap to unlock
     const ok = unlock(pinEnabled && pinSet ? pin : undefined);
 
     if (!ok) {
@@ -79,14 +52,15 @@ export function LockScreen() {
   const overlay = (
     <div
       className="fixed inset-0 z-[9999] bg-gradient-to-br from-gray-900 via-gray-950 to-black flex items-center justify-center"
-      // Do NOT preventDefault pointer events; that can interfere with click routing
+      // IMPORTANT: do NOT preventDefault here (it can kill click routing elsewhere)
+      // We only stop propagation so clicks don't "leak" into the app when locked.
+      onPointerDown={(e) => e.stopPropagation()}
       onClick={onBackgroundClick}
-      role="dialog"
-      aria-modal="true"
     >
       <div
         className="text-center space-y-6 px-6 max-w-2xl w-full"
         // stop inner panel clicks from triggering background unlock
+        onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="text-6xl font-light tracking-tight text-foreground">Locked</div>
