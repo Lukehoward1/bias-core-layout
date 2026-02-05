@@ -26,7 +26,9 @@ import { useTheme } from "@/hooks/use-theme";
 import { useIsMobile } from "@/hooks/use-mobile";
 import sbLogo from "@/assets/sb-logo.svg";
 
-const mainItems = [
+type Item = { title: string; url: string; icon: any };
+
+const mainItems: Item[] = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Markets", url: "/markets", icon: TrendingUp },
   { title: "Calendar", url: "/calendar", icon: Calendar },
@@ -37,27 +39,26 @@ const mainItems = [
   { title: "Community", url: "/community", icon: Users },
 ];
 
-const learningItems = [
+const learningItems: Item[] = [
   { title: "Education", url: "/education", icon: GraduationCap },
   { title: "Webinars", url: "/webinars", icon: Video },
 ];
 
-const brokerageItems = [{ title: "Brokerage", url: "/brokerage", icon: Link2 }];
+const brokerageItems: Item[] = [{ title: "Brokerage", url: "/brokerage", icon: Link2 }];
 
-const accountItems = [
+const accountItems: Item[] = [
   { title: "Settings", url: "/settings", icon: Settings },
   { title: "Subscriptions", url: "/billing", icon: CreditCard },
 ];
-
-type Item = { title: string; url: string; icon: any };
 
 export function AppSidebar() {
   const { collapsed, toggleCollapsed, mobileOpen, setMobileOpen } = useAppSidebar();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
-  const currentPath = location.pathname;
   const isMobile = useIsMobile();
+
+  const currentPath = location.pathname;
 
   const go = (url: string) => {
     navigate(url);
@@ -82,7 +83,7 @@ export function AppSidebar() {
               key={item.url}
               type="button"
               onPointerDown={(e) => {
-                // IMPORTANT: we navigate on pointerdown (since click is being blocked in your env)
+                // IMPORTANT: navigate on pointerdown to avoid environments where click gets suppressed
                 e.preventDefault();
                 e.stopPropagation();
                 go(item.url);
@@ -200,14 +201,14 @@ export function AppSidebar() {
     );
   }
 
-  // Desktop fixed sidebar
+  // Desktop: IN NORMAL FLOW (NOT fixed) to avoid gap/double-spacing and click weirdness
   return (
     <aside
       className={`
         ${collapsed ? "w-16" : "w-60"}
-        bg-sidebar
-        flex flex-col h-screen
-        fixed left-0 top-0 z-40
+        bg-sidebar flex flex-col h-screen
+        flex-shrink-0
+        border-r border-border
         transition-all duration-300
       `}
     >
