@@ -2,13 +2,22 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, Clock, Calendar as CalendarIcon, Activity, ChevronDown, AlertTriangle, BookOpen, Shield, Plus } from "lucide-react";
-import { useDashboardLayout, type DashboardCardEntry, type RowType } from "@/hooks/use-dashboard-layout";
+import {
+  TrendingUp,
+  Clock,
+  Calendar as CalendarIcon,
+  Activity,
+  ChevronDown,
+  AlertTriangle,
+  BookOpen,
+  Shield,
+  Plus,
+} from "lucide-react";
+import { useDashboardLayout, type DashboardCardEntry } from "@/hooks/use-dashboard-layout";
 import { DashboardEditToolbar } from "@/components/dashboard/DashboardEditToolbar";
 import { DashboardRow } from "@/components/dashboard/DashboardRow";
 import { AddCardsModal } from "@/components/dashboard/AddCardsModal";
 import { WatchlistOverviewCard } from "@/components/dashboard/WatchlistOverviewCard";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { getCardRenderer, warnMissingRenderers } from "@/data/dashboardCardRenderers";
@@ -23,21 +32,21 @@ interface SessionData {
 }
 
 const sessionsData: SessionData[] = [
-  { name: 'Sydney', time: 'Opens in 8:30:00', status: 'closed', accent: '#2EC4B6', region: 'Asia-Pacific' },
-  { name: 'Asia', time: 'Closes in 1:23:45', status: 'active', accent: '#4361EE', region: 'Asia-Pacific Markets' },
-  { name: 'London', time: 'Opens in 2:15:30', status: 'closed', accent: '#F4D35E', region: 'European' },
-  { name: 'New York', time: 'Opens in 5:45:12', status: 'closed', accent: '#F77F00', region: 'US Markets' },
+  { name: "Sydney", time: "Opens in 8:30:00", status: "closed", accent: "#2EC4B6", region: "Asia-Pacific" },
+  { name: "Asia", time: "Closes in 1:23:45", status: "active", accent: "#4361EE", region: "Asia-Pacific Markets" },
+  { name: "London", time: "Opens in 2:15:30", status: "closed", accent: "#F4D35E", region: "European" },
+  { name: "New York", time: "Opens in 5:45:12", status: "closed", accent: "#F77F00", region: "US Markets" },
 ];
 
 // Local Session Timer Dropdown Component
-function SessionTimerDropdown({ 
-  isOpen, 
-  onClose, 
-  sessions, 
-  anchorRef 
-}: { 
-  isOpen: boolean; 
-  onClose: () => void; 
+function SessionTimerDropdown({
+  isOpen,
+  onClose,
+  sessions,
+  anchorRef,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
   sessions: SessionData[];
   anchorRef: React.RefObject<HTMLDivElement>;
 }) {
@@ -56,25 +65,27 @@ function SessionTimerDropdown({
 
   useEffect(() => {
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
     } else {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     }
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isOpen, onClose, anchorRef]);
 
   if (!isOpen) return null;
 
-  const activeSession = sessions.find(s => s.status === 'active');
-  const upcomingSessions = sessions.filter(s => s.status !== 'active').sort((a, b) => {
-    return a.time.localeCompare(b.time);
-  });
+  const activeSession = sessions.find((s) => s.status === "active");
+  const upcomingSessions = sessions
+    .filter((s) => s.status !== "active")
+    .sort((a, b) => {
+      return a.time.localeCompare(b.time);
+    });
 
   return (
-    <div 
+    <div
       ref={dropdownRef}
       className="absolute top-full left-0 mt-2 w-72 bg-popover border border-border rounded-lg shadow-lg z-50"
     >
@@ -82,10 +93,7 @@ function SessionTimerDropdown({
         <p className="text-xs font-medium text-muted-foreground mb-1">Current Session</p>
         {activeSession ? (
           <div className="flex items-center gap-2">
-            <div 
-              className="w-2 h-2 rounded-full animate-pulse" 
-              style={{ backgroundColor: activeSession.accent }}
-            />
+            <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: activeSession.accent }} />
             <span className="font-medium text-foreground">{activeSession.name}</span>
             <span className="text-xs text-muted-foreground ml-auto">{activeSession.time}</span>
           </div>
@@ -96,15 +104,12 @@ function SessionTimerDropdown({
       <div className="p-3">
         <p className="text-xs font-medium text-muted-foreground mb-2">Upcoming Sessions</p>
         <div className="space-y-2">
-          {upcomingSessions.map(session => (
-            <div 
+          {upcomingSessions.map((session) => (
+            <div
               key={session.name}
               className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors"
             >
-              <div 
-                className="w-2 h-2 rounded-full" 
-                style={{ backgroundColor: session.accent }}
-              />
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: session.accent }} />
               <span className="text-sm text-foreground">{session.name}</span>
               <span className="text-xs text-muted-foreground ml-auto">{session.time}</span>
             </div>
@@ -123,7 +128,7 @@ export default function Dashboard() {
   const [dragOverRowId, setDragOverRowId] = useState<string | null>(null);
   const sessionCardRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  
+
   // Row-based dashboard layout
   const {
     layout,
@@ -139,13 +144,12 @@ export default function Dashboard() {
     moveCardToRow,
     resetToDefault,
     getMaxSlots,
-    isCardOnDashboard,
   } = useDashboardLayout();
 
   // Compute set of card IDs on dashboard for modal
   const cardsOnDashboardSet = useMemo(() => {
     const ids = new Set<string>();
-    layout.rows.forEach(row => row.cards.forEach(card => ids.add(card.id)));
+    layout.rows.forEach((row) => row.cards.forEach((card) => ids.add(card.id)));
     return ids;
   }, [layout]);
 
@@ -177,38 +181,41 @@ export default function Dashboard() {
   };
 
   // Sample equity data for pinned journal equity card - must be before early return
-  const journalEquityData = useMemo(() => {
+  useMemo(() => {
     const sampleTrades = [
-      { date: '2025-01-03', pnl: 450 },
-      { date: '2025-01-06', pnl: 300 },
-      { date: '2025-01-08', pnl: -400 },
-      { date: '2025-01-10', pnl: 480 },
-      { date: '2025-01-12', pnl: -400 },
-      { date: '2025-01-13', pnl: -73 },
-      { date: '2025-01-14', pnl: 1350 },
-      { date: '2025-01-15', pnl: 600 },
+      { date: "2025-01-03", pnl: 450 },
+      { date: "2025-01-06", pnl: 300 },
+      { date: "2025-01-08", pnl: -400 },
+      { date: "2025-01-10", pnl: 480 },
+      { date: "2025-01-12", pnl: -400 },
+      { date: "2025-01-13", pnl: -73 },
+      { date: "2025-01-14", pnl: 1350 },
+      { date: "2025-01-15", pnl: 600 },
     ];
     let cumulative = 0;
-    return sampleTrades.map(t => {
+    return sampleTrades.map((t) => {
       cumulative += t.pnl;
-      return { 
-        date: t.date, 
+      return {
+        date: t.date,
         equity: cumulative,
-        formattedDate: format(new Date(t.date), 'MMM d')
+        formattedDate: format(new Date(t.date), "MMM d"),
       };
     });
   }, []);
 
   // Developer check: warn about missing renderers at mount
   useEffect(() => {
-    const registryCardIds = DASHBOARD_CARD_REGISTRY.map(c => c.id);
+    const registryCardIds = DASHBOARD_CARD_REGISTRY.map((c) => c.id);
     warnMissingRenderers(registryCardIds);
   }, []);
 
   // Render card content based on card ID and slot type
-  const renderCardContent = (cardEntry: DashboardCardEntry, slotType: 'wide' | 'narrow' | 'equal' | 'hero' | 'kpi'): React.ReactNode => {
+  const renderCardContent = (
+    cardEntry: DashboardCardEntry,
+    slotType: "wide" | "narrow" | "equal" | "hero" | "kpi",
+  ): React.ReactNode => {
     const cardId = cardEntry.id;
-    
+
     // First, try the centralized renderer (covers pinned and registry cards)
     const renderer = getCardRenderer(cardId);
     if (renderer) {
@@ -217,7 +224,7 @@ export default function Dashboard() {
 
     // Handle default dashboard-native cards (legacy hardcoded)
     switch (cardEntry.id) {
-      case 'todays-bias':
+      case "todays-bias":
         return (
           <Card className="h-full flex flex-col">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 flex-shrink-0">
@@ -231,7 +238,7 @@ export default function Dashboard() {
           </Card>
         );
 
-      case 'active-trades':
+      case "active-trades":
         return (
           <Card className="h-full flex flex-col">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 flex-shrink-0">
@@ -245,10 +252,10 @@ export default function Dashboard() {
           </Card>
         );
 
-      case 'next-session':
+      case "next-session":
         return (
           <div className="relative h-full" ref={sessionCardRef}>
-            <Card 
+            <Card
               className="cursor-pointer hover:bg-muted/30 transition-colors h-full flex flex-col"
               onClick={() => !isEditMode && setShowSessionDropdown(!showSessionDropdown)}
             >
@@ -256,7 +263,9 @@ export default function Dashboard() {
                 <CardTitle className="text-sm font-medium text-muted-foreground">Next Session</CardTitle>
                 <div className="flex items-center gap-1">
                   <Clock className="h-4 w-4 text-accent" />
-                  <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${showSessionDropdown ? 'rotate-180' : ''}`} />
+                  <ChevronDown
+                    className={`h-3 w-3 text-muted-foreground transition-transform ${showSessionDropdown ? "rotate-180" : ""}`}
+                  />
                 </div>
               </CardHeader>
               <CardContent className="flex-1 flex flex-col justify-center">
@@ -273,7 +282,7 @@ export default function Dashboard() {
           </div>
         );
 
-      case 'high-impact-events':
+      case "high-impact-events":
         return (
           <Card className="h-full flex flex-col">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 flex-shrink-0">
@@ -287,10 +296,10 @@ export default function Dashboard() {
           </Card>
         );
 
-      case 'watchlist-overview':
+      case "watchlist-overview":
         return <WatchlistOverviewCard isEditMode={isEditMode} slotType={slotType} />;
 
-      case 'session-timers':
+      case "session-timers":
         return (
           <Card className="h-full">
             <CardHeader>
@@ -299,9 +308,12 @@ export default function Dashboard() {
             <CardContent>
               <div className="space-y-3">
                 {sessionsData.map((session) => (
-                  <div key={session.name} className="relative p-3 bg-muted/50 rounded-lg border border-border overflow-hidden">
-                    <div 
-                      className="absolute left-0 top-0 bottom-0 w-[3px]" 
+                  <div
+                    key={session.name}
+                    className="relative p-3 bg-muted/50 rounded-lg border border-border overflow-hidden"
+                  >
+                    <div
+                      className="absolute left-0 top-0 bottom-0 w-[3px]"
                       style={{ backgroundColor: session.accent }}
                     />
                     <div className="flex items-center justify-between">
@@ -309,7 +321,9 @@ export default function Dashboard() {
                         <div className="font-medium text-foreground text-sm">{session.name}</div>
                         <div className="text-xs text-muted-foreground">{session.region}</div>
                       </div>
-                      <div className={`text-xs ${session.status === 'active' ? 'text-success font-medium' : 'text-muted-foreground'}`}>
+                      <div
+                        className={`text-xs ${session.status === "active" ? "text-success font-medium" : "text-muted-foreground"}`}
+                      >
                         {session.time}
                       </div>
                     </div>
@@ -320,7 +334,7 @@ export default function Dashboard() {
           </Card>
         );
 
-      case 'upcoming-events':
+      case "upcoming-events":
         return (
           <Card className="h-full">
             <CardHeader>
@@ -329,15 +343,15 @@ export default function Dashboard() {
             <CardContent>
               <div className="space-y-3">
                 {[
-                  { time: '08:30', event: 'USD Non-Farm Payrolls', impact: 'high' },
-                  { time: '10:00', event: 'EUR CPI', impact: 'medium' },
-                  { time: '14:00', event: 'GBP Interest Rate', impact: 'high' },
+                  { time: "08:30", event: "USD Non-Farm Payrolls", impact: "high" },
+                  { time: "10:00", event: "EUR CPI", impact: "medium" },
+                  { time: "14:00", event: "GBP Interest Rate", impact: "high" },
                 ].map((event, i) => (
                   <div key={i} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
                     <div className="text-sm font-medium text-muted-foreground min-w-[48px]">{event.time}</div>
                     <div className="flex-1">
                       <div className="text-sm font-medium text-foreground">{event.event}</div>
-                      <div className={`text-xs mt-1 ${event.impact === 'high' ? 'text-destructive' : 'text-accent'}`}>
+                      <div className={`text-xs mt-1 ${event.impact === "high" ? "text-destructive" : "text-accent"}`}>
                         {event.impact.toUpperCase()} IMPACT
                       </div>
                     </div>
@@ -348,7 +362,7 @@ export default function Dashboard() {
           </Card>
         );
 
-      case 'performance-overview':
+      case "performance-overview":
         return (
           <Card className="h-full">
             <CardHeader>
@@ -377,7 +391,7 @@ export default function Dashboard() {
           </Card>
         );
 
-      case 'journal-summary':
+      case "journal-summary":
         return (
           <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -403,7 +417,7 @@ export default function Dashboard() {
           </Card>
         );
 
-      case 'risk-snapshot':
+      case "risk-snapshot":
         return (
           <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -429,7 +443,7 @@ export default function Dashboard() {
           </Card>
         );
 
-      case 'calendar-events':
+      case "calendar-events":
         return (
           <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -459,7 +473,6 @@ export default function Dashboard() {
         );
 
       default:
-        // Unknown card - render warning (this case should rarely happen now)
         return (
           <Card className="h-full border-warning/30 bg-warning/5">
             <CardHeader className="pb-2">
@@ -470,91 +483,82 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <p className="text-xs text-muted-foreground mb-2">Card ID: {cardEntry.id}</p>
-              <p className="text-xs text-muted-foreground">This card type is not recognized. Use Edit mode to remove it.</p>
+              <p className="text-xs text-muted-foreground">
+                This card type is not recognized. Use Edit mode to remove it.
+              </p>
             </CardContent>
           </Card>
         );
     }
   };
 
-  // Legacy function - kept for backwards compatibility but no longer needed
-  // as renderCardContent now handles all cards through centralized renderers
-
   const handleAddRow = (afterRowId?: string) => {
-    addRow('equal', afterRowId);
+    addRow("equal", afterRowId);
   };
 
   return (
-    <div className="flex flex-col min-h-full bg-background">
+    <div className="p-6 space-y-6">
       <AppHeader title="Dashboard" />
-      
-      <div className="flex-1 p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
-          {/* Welcome Header with Edit Controls */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h1 className="text-3xl font-bold text-foreground">Welcome, Trader</h1>
-              {isEditMode && (
-                <p className="text-sm text-muted-foreground">
-                  Drag cards to reorder • Click × to remove • Change row layouts
-                </p>
-              )}
-            </div>
-            <DashboardEditToolbar
-              isEditMode={isEditMode}
-              onToggleEdit={toggleEditMode}
-              onReset={resetToDefault}
-              onOpenAddCards={() => setShowAddCardsModal(true)}
-            />
-          </div>
-          
-          {/* Row-based layout */}
-          {layout.rows.map((row, index) => (
-            <DashboardRow
-              key={row.id}
-              row={row}
-              rowIndex={index}
-              totalRows={layout.rows.length}
-              isEditMode={isEditMode}
-              draggingCardId={draggingCardId}
-              dragOverCardId={dragOverCardId}
-              dragOverRowId={dragOverRowId}
-              renderCardContent={renderCardContent}
-              onDragStart={handleDragStart}
-              onDragOver={handleDragOver}
-              onDragEnd={handleDragEnd}
-              onDragOverRow={handleDragOverRow}
-              onRemoveCard={removeCard}
-              onChangeRowType={changeRowType}
-              onMoveRow={moveRow}
-              onRemoveRow={removeRow}
-              onAddRow={handleAddRow}
-              maxSlots={getMaxSlots(row.type)}
-            />
-          ))}
 
-          {/* Add row button in edit mode */}
-          {isEditMode && (
-            <Button
-              variant="outline"
-              className="w-full border-dashed gap-2"
-              onClick={() => handleAddRow()}
-            >
-              <Plus className="h-4 w-4" />
-              Add New Row
-            </Button>
-          )}
-
-          {/* Empty state when no cards */}
-          {layout.rows.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <p className="text-muted-foreground mb-4">No cards on your Dashboard.</p>
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Welcome Header with Edit Controls */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h1 className="text-3xl font-bold text-foreground">Welcome, Trader</h1>
+            {isEditMode && (
               <p className="text-sm text-muted-foreground">
-                Click "Edit Dashboard" and then "Add Cards" to customize.
+                Drag cards to reorder • Click × to remove • Change row layouts
               </p>
-            </div>
-          )}
+            )}
+          </div>
+          <DashboardEditToolbar
+            isEditMode={isEditMode}
+            onToggleEdit={toggleEditMode}
+            onReset={resetToDefault}
+            onOpenAddCards={() => setShowAddCardsModal(true)}
+          />
         </div>
+
+        {/* Row-based layout */}
+        {layout.rows.map((row, index) => (
+          <DashboardRow
+            key={row.id}
+            row={row}
+            rowIndex={index}
+            totalRows={layout.rows.length}
+            isEditMode={isEditMode}
+            draggingCardId={draggingCardId}
+            dragOverCardId={dragOverCardId}
+            dragOverRowId={dragOverRowId}
+            renderCardContent={renderCardContent}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+            onDragOverRow={handleDragOverRow}
+            onRemoveCard={removeCard}
+            onChangeRowType={changeRowType}
+            onMoveRow={moveRow}
+            onRemoveRow={removeRow}
+            onAddRow={handleAddRow}
+            maxSlots={getMaxSlots(row.type)}
+          />
+        ))}
+
+        {/* Add row button in edit mode */}
+        {isEditMode && (
+          <Button variant="outline" className="w-full border-dashed gap-2" onClick={() => handleAddRow()}>
+            <Plus className="h-4 w-4" />
+            Add New Row
+          </Button>
+        )}
+
+        {/* Empty state when no cards */}
+        {layout.rows.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <p className="text-muted-foreground mb-4">No cards on your Dashboard.</p>
+            <p className="text-sm text-muted-foreground">Click "Edit Dashboard" and then "Add Cards" to customize.</p>
+          </div>
+        )}
       </div>
 
       {/* Add Cards Modal */}
