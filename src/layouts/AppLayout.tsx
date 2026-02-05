@@ -22,10 +22,11 @@ function MobileHeader() {
 }
 
 function AppLayoutContent() {
+  const { collapsed } = useAppSidebar();
   const { isLocked } = useSessionLock();
   const isMobile = useIsMobile();
 
-  // Safety cleanup after unlock
+  // Safety cleanup: ensure nothing is left aria-hidden/inert after unlock
   useEffect(() => {
     if (!isLocked) {
       requestAnimationFrame(() => {
@@ -37,14 +38,16 @@ function AppLayoutContent() {
     }
   }, [isLocked]);
 
+  const leftOffset = isMobile ? "ml-0" : collapsed ? "ml-16" : "ml-60";
+
   return (
     <>
       {isLocked && <LockScreen />}
 
-      <div className="flex min-h-screen w-full">
+      <div className="min-h-screen w-full">
         <AppSidebar />
 
-        <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+        <div className={`flex flex-col min-h-screen ${leftOffset}`}>
           {isMobile && <MobileHeader />}
 
           <main className="flex-1 overflow-y-auto">
