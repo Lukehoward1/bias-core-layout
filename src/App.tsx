@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { AlertsProvider } from "@/contexts/AlertsContext";
-import { SessionLockProvider } from "@/hooks/use-session-lock";
 import { GlobalNotifications } from "@/components/alerts/GlobalNotifications";
 import { AppLayout } from "@/layouts/AppLayout";
 import Dashboard from "./pages/Dashboard";
@@ -56,7 +55,7 @@ const App = () => (
                   <Route path="/community" element={<Community />} />
                   <Route path="/education" element={<Education />} />
                   <Route path="/webinars" element={<Webinars />} />
-                  
+
                   <Route path="/brokerage" element={<Brokerage />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/billing" element={<Billing />} />
