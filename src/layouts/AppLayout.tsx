@@ -1,8 +1,6 @@
-import { useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppSidebarProvider, useAppSidebar } from "@/hooks/use-app-sidebar";
-import { useSessionLock } from "@/hooks/use-session-lock";
 import { LockScreen } from "@/components/LockScreen";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
@@ -23,32 +21,20 @@ function MobileHeader() {
 
 function AppLayoutContent() {
   const { collapsed } = useAppSidebar();
-  const { isLocked } = useSessionLock();
   const isMobile = useIsMobile();
-
-  // Safety cleanup: ensure nothing is left aria-hidden/inert after unlock
-  useEffect(() => {
-    if (!isLocked) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          document.querySelectorAll('[aria-hidden="true"]').forEach((el) => el.removeAttribute("aria-hidden"));
-
-          document.querySelectorAll("[inert]").forEach((el) => el.removeAttribute("inert"));
-        });
-      });
-    }
-  }, [isLocked]);
 
   return (
     <>
-      {isLocked && <LockScreen />}
+      {/* IMPORTANT: render LockScreen unconditionally; it returns null when unlocked */}
+      <LockScreen />
 
       <div className="flex min-h-screen w-full">
         <AppSidebar />
 
+        {/* spacer for fixed desktop sidebar */}
         {!isMobile && <div className={`${collapsed ? "w-16" : "w-60"} flex-shrink-0 transition-all duration-300`} />}
 
-        <div className="flex-1 flex flex-col h-screen overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
           {isMobile && <MobileHeader />}
 
           <main className="flex-1 overflow-y-auto">
