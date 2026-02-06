@@ -128,9 +128,19 @@ export default function Calendar() {
     else eventRefs.current.delete(eventId);
   }, []);
 
+  const openEvent = useCallback((ev: CalendarEvent | null) => {
+    if (!ev) return;
+    setSelectedEvent(ev);
+    setIsModalOpen(true);
+  }, []);
+
+  const closeModal = useCallback(() => {
+    setIsModalOpen(false);
+    setSelectedEvent(null);
+  }, []);
+
   useEffect(() => {
     const eventId = searchParams.get("eventId");
-
     if (!eventId) return;
 
     const match = events.find((e) => e.id === eventId);
@@ -140,13 +150,12 @@ export default function Calendar() {
 
     setTimeout(() => {
       eventRefs.current.get(match.id)?.scrollIntoView({ behavior: "smooth", block: "center" });
-      setSelectedEvent(match);
-      setIsModalOpen(true);
+      openEvent(match);
     }, 100);
 
     setTimeout(() => setHighlightedEventId(null), 3000);
     setSearchParams({}, { replace: true });
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, openEvent]);
 
   const getImpactVariant = (impact: string) =>
     impact === "high" ? "destructive" : impact === "medium" ? "default" : "secondary";
@@ -196,23 +205,27 @@ export default function Calendar() {
             <AddToDashboardButton isAdded={isUpcomingEventsAdded} onAdd={handleAddCard} onRemove={handleRemoveCard} />
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {keyEvents.map((event) => (
-              <div
-                key={event.id}
-                className={cn(
-                  "p-4 rounded-lg border bg-muted/50 cursor-pointer hover:bg-muted/70",
-                  highlightedEventId === event.id && "ring-2 ring-primary",
-                )}
-                onClick={() => setSelectedEvent(events.find((e) => e.id === event.id) ?? null)}
-              >
-                <div className="flex justify-between mb-2">
-                  <Badge variant={getImpactVariant(event.impact)}>{event.impact.toUpperCase()}</Badge>
-                  <span className="text-sm text-muted-foreground">{event.time}</span>
+            {keyEvents.map((event) => {
+              const fullEvent = events.find((e) => e.id === event.id) ?? null;
+
+              return (
+                <div
+                  key={event.id}
+                  className={cn(
+                    "p-4 rounded-lg border bg-muted/50 cursor-pointer hover:bg-muted/70",
+                    highlightedEventId === event.id && "ring-2 ring-primary",
+                  )}
+                  onClick={() => openEvent(fullEvent)}
+                >
+                  <div className="flex justify-between mb-2">
+                    <Badge variant={getImpactVariant(event.impact)}>{event.impact.toUpperCase()}</Badge>
+                    <span className="text-sm text-muted-foreground">{event.time}</span>
+                  </div>
+                  <div className="font-semibold text-sm">{event.currency}</div>
+                  <div className="text-xs text-muted-foreground">{event.event}</div>
                 </div>
-                <div className="font-semibold text-sm">{event.currency}</div>
-                <div className="text-xs text-muted-foreground">{event.event}</div>
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
 
@@ -237,7 +250,7 @@ export default function Calendar() {
                   <tr
                     key={event.id}
                     ref={(el) => setEventRef(event.id, el)}
-                    onClick={() => setSelectedEvent(event)}
+                    onClick={() => openEvent(event)}
                     className={cn(
                       "border-b cursor-pointer hover:bg-muted/50",
                       highlightedEventId === event.id && "bg-primary/10",
@@ -262,7 +275,7 @@ export default function Calendar() {
         </Card>
       </div>
 
-      <EventDetailsModal event={selectedEvent} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <EventDetailsModal event={selectedEvent} isOpen={isModalOpen} onClose={closeModal} />
     </div>
   );
 }
