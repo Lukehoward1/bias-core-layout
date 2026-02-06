@@ -2,12 +2,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { SessionLockProvider } from "@/hooks/use-session-lock";
 import { AlertsProvider } from "@/contexts/AlertsContext";
 import { GlobalNotifications } from "@/components/alerts/GlobalNotifications";
 import { AppLayout } from "@/layouts/AppLayout";
+
 import Dashboard from "./pages/Dashboard";
 import Markets from "./pages/Markets";
 import AssetDetail from "./pages/AssetDetail";
@@ -29,7 +30,96 @@ import Billing from "./pages/Billing";
 import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
 
+// ✅ Use your existing shadcn Dialog for the modal overlay
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+
 const queryClient = new QueryClient();
+
+/**
+ * Modal routing:
+ * - When navigating to /asset/:symbol from inside the app, we pass:
+ *   navigate(`/asset/${symbol}`, { state: { backgroundLocation: location } })
+ * - App then renders the "background" routes using backgroundLocation,
+ *   and renders the asset route again on top as a modal.
+ */
+function AppRoutes() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // location.state may carry the previous page location
+  const state = location.state as { backgroundLocation?: Location } | null;
+  const backgroundLocation = state?.backgroundLocation;
+
+  return (
+    <>
+      <GlobalNotifications />
+
+      {/* 1) Render the normal app using the background location if present */}
+      <Routes location={backgroundLocation || location}>
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/markets" element={<Markets />} />
+          <Route path="/calendar" element={<Calendar />} />
+          <Route path="/alerts" element={<Alerts />} />
+          <Route path="/risk-tools" element={<RiskTools />} />
+          <Route path="/journal" element={<Journal />} />
+          <Route path="/strategy-tester" element={<StrategyTester />} />
+          <Route path="/strategy/manual" element={<ManualBacktesting />} />
+          <Route path="/strategy/auto" element={<AutomatedStrategyLab />} />
+          <Route path="/strategy/funding" element={<FundingChallengeSim />} />
+          <Route path="/community" element={<Community />} />
+          <Route path="/education" element={<Education />} />
+          <Route path="/webinars" element={<Webinars />} />
+          <Route path="/brokerage" element={<Brokerage />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/billing" element={<Billing />} />
+        </Route>
+
+        {/* Direct visit to asset detail still works as a full page */}
+        <Route path="/asset/:symbol" element={<AssetDetail />} />
+
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+
+      {/* 2) If we have a backgroundLocation, render the asset page as a MODAL on top */}
+      {backgroundLocation && (
+        <Routes>
+          <Route
+            path="/asset/:symbol"
+            element={
+              <Dialog
+                open
+                onOpenChange={(open) => {
+                  if (!open) navigate(-1);
+                }}
+              >
+                {/* 
+                  Make the overlay feel like Calendar:
+                  - translucent + blur
+                  - not full-black
+                */}
+                <DialogContent
+                  className="
+                    max-w-6xl w-[96vw]
+                    max-h-[92vh]
+                    overflow-y-auto
+                    p-0
+                    bg-background
+                    border-border
+                    backdrop-blur
+                  "
+                >
+                  <AssetDetail />
+                </DialogContent>
+              </Dialog>
+            }
+          />
+        </Routes>
+      )}
+    </>
+  );
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -40,32 +130,7 @@ const App = () => (
             <Toaster />
             <Sonner />
             <BrowserRouter>
-              <GlobalNotifications />
-              <Routes>
-                <Route element={<AppLayout />}>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/markets" element={<Markets />} />
-                  <Route path="/calendar" element={<Calendar />} />
-                  <Route path="/alerts" element={<Alerts />} />
-                  <Route path="/risk-tools" element={<RiskTools />} />
-                  <Route path="/journal" element={<Journal />} />
-                  <Route path="/strategy-tester" element={<StrategyTester />} />
-                  <Route path="/strategy/manual" element={<ManualBacktesting />} />
-                  <Route path="/strategy/auto" element={<AutomatedStrategyLab />} />
-                  <Route path="/strategy/funding" element={<FundingChallengeSim />} />
-                  <Route path="/community" element={<Community />} />
-                  <Route path="/education" element={<Education />} />
-                  <Route path="/webinars" element={<Webinars />} />
-
-                  <Route path="/brokerage" element={<Brokerage />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/billing" element={<Billing />} />
-                </Route>
-                {/* Full-screen Asset Detail (no sidebar) */}
-                <Route path="/asset/:symbol" element={<AssetDetail />} />
-                <Route path="/pricing" element={<Pricing />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
+              <AppRoutes />
             </BrowserRouter>
           </SessionLockProvider>
         </AlertsProvider>
