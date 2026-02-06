@@ -19,7 +19,8 @@ import {
   Zap,
   X,
 } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import * as React from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAppSidebar } from "@/hooks/use-app-sidebar";
 import { useTheme } from "@/hooks/use-theme";
@@ -48,6 +49,7 @@ const brokerageItems: Item[] = [{ title: "Brokerage", url: "/brokerage", icon: L
 
 const accountItems: Item[] = [
   { title: "Settings", url: "/settings", icon: Settings },
+  // IMPORTANT: confirm your real route. If your app uses "/subscriptions", change this.
   { title: "Subscriptions", url: "/billing", icon: CreditCard },
 ];
 
@@ -55,15 +57,13 @@ export function AppSidebar() {
   const { collapsed, toggleCollapsed, mobileOpen, setMobileOpen } = useAppSidebar();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
-  const navigate = useNavigate();
   const isMobile = useIsMobile();
 
   const currentPath = location.pathname;
 
-  const go = (url: string) => {
-    navigate(url);
+  const closeMobile = React.useCallback(() => {
     if (isMobile) setMobileOpen(false);
-  };
+  }, [isMobile, setMobileOpen]);
 
   const NavSection = ({ title, items }: { title: string; items: Item[] }) => (
     <div>
@@ -75,25 +75,16 @@ export function AppSidebar() {
 
       <div className="space-y-0.5">
         {items.map((item) => {
-          const isActive = currentPath === item.url || (item.url !== "/" && currentPath.startsWith(item.url));
           const Icon = item.icon;
 
+          // “active” logic: exact match for "/", prefix match for all others
+          const isActive = item.url === "/" ? currentPath === "/" : currentPath.startsWith(item.url);
+
           return (
-            <button
+            <NavLink
               key={item.url}
-              type="button"
-              onPointerDown={(e) => {
-                // IMPORTANT: navigate on pointerdown to avoid environments where click gets suppressed
-                e.preventDefault();
-                e.stopPropagation();
-                go(item.url);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  go(item.url);
-                }
-              }}
+              to={item.url}
+              onClick={closeMobile}
               className={`
                 w-full text-left
                 flex items-center px-3 py-2 rounded-lg transition-all relative
@@ -104,9 +95,11 @@ export function AppSidebar() {
               {isActive && !collapsed && (
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary rounded-r-full" />
               )}
+
               <Icon className={`${collapsed && !isMobile ? "" : "mr-3"} h-[18px] w-[18px] flex-shrink-0`} />
+
               {(!collapsed || isMobile) && <span className="text-sm font-medium">{item.title}</span>}
-            </button>
+            </NavLink>
           );
         })}
       </div>
@@ -185,7 +178,7 @@ export function AppSidebar() {
   if (isMobile) {
     return (
       <>
-        {mobileOpen && <div className="fixed inset-0 bg-black/50 z-40" onPointerDown={() => setMobileOpen(false)} />}
+        {mobileOpen && <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setMobileOpen(false)} />}
 
         <aside
           className={`
@@ -201,7 +194,7 @@ export function AppSidebar() {
     );
   }
 
-  // Desktop: IN NORMAL FLOW (NOT fixed) to avoid gap/double-spacing and click weirdness
+  // Desktop: IN NORMAL FLOW (NOT fixed)
   return (
     <aside
       className={`
