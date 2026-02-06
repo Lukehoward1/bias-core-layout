@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TrendingUp, TrendingDown, Minus, Calendar, Star, ChevronRight, Activity, Search } from "lucide-react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
@@ -16,6 +16,7 @@ type MarketType = "Watchlist" | "All" | "FX" | "Crypto" | "Indices" | "Commoditi
 export default function Markets() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation(); // ✅ NEW (needed for modal background routing)
   const filterParam = searchParams.get("filter") as MarketType | null;
 
   const { assets } = useAssets();
@@ -94,8 +95,11 @@ export default function Markets() {
     return "text-muted-foreground";
   };
 
+  // ✅ UPDATED: pass backgroundLocation so /asset opens as a modal overlay (Calendar-style)
   const openAssetDetail = (symbol: string) => {
-    navigate(`/asset/${symbol}?from=${selectedType}`);
+    navigate(`/asset/${symbol}?from=${selectedType}`, {
+      state: { backgroundLocation: location },
+    });
   };
 
   return (
