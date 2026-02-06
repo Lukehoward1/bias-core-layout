@@ -1,22 +1,18 @@
-import {
-  Dialog,
-  DialogContent,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { 
-  TrendingUp, 
-  Clock, 
-  Star, 
+import {
+  TrendingUp,
+  Clock,
+  Star,
   Bell,
   BarChart3,
-  TrendingDown,
   ArrowUpRight,
   ArrowDownRight,
   Lightbulb,
   MessageSquare,
-  Minus
+  Minus,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -41,94 +37,108 @@ const getHistoricalData = (eventName: string) => {
   const baseValues = [185, 225, 165, 253, 281, 209, 187, 227];
   const seed = eventName.length;
   return [
-    { period: "May", actual: baseValues[0] + (seed * 5), forecast: baseValues[0] + (seed * 3) },
-    { period: "Jun", actual: baseValues[1] - (seed * 3), forecast: baseValues[1] - (seed * 5) },
-    { period: "Jul", actual: baseValues[2] + (seed * 7), forecast: baseValues[2] + (seed * 4) },
-    { period: "Aug", actual: baseValues[3] - (seed * 2), forecast: baseValues[3] + (seed * 1) },
-    { period: "Sep", actual: baseValues[4] + (seed * 4), forecast: baseValues[4] + (seed * 2) },
-    { period: "Oct", actual: baseValues[5] - (seed * 6), forecast: baseValues[5] - (seed * 3) },
-    { period: "Nov", actual: baseValues[6] + (seed * 3), forecast: baseValues[6] + (seed * 5) },
+    { period: "May", actual: baseValues[0] + seed * 5, forecast: baseValues[0] + seed * 3 },
+    { period: "Jun", actual: baseValues[1] - seed * 3, forecast: baseValues[1] - seed * 5 },
+    { period: "Jul", actual: baseValues[2] + seed * 7, forecast: baseValues[2] + seed * 4 },
+    { period: "Aug", actual: baseValues[3] - seed * 2, forecast: baseValues[3] + seed * 1 },
+    { period: "Sep", actual: baseValues[4] + seed * 4, forecast: baseValues[4] + seed * 2 },
+    { period: "Oct", actual: baseValues[5] - seed * 6, forecast: baseValues[5] - seed * 3 },
+    { period: "Nov", actual: baseValues[6] + seed * 3, forecast: baseValues[6] + seed * 5 },
     { period: "Dec", actual: null, forecast: baseValues[7] + seed },
   ];
 };
 
 // Market interpretation with bullish/bearish focus
-const getMarketInterpretation = (eventName: string, currency: string, isReleased: boolean) => {
-  const interpretations: Record<string, { description: string; impact: string; bias: 'bullish' | 'bearish' | 'neutral'; pairs: string[] }> = {
+const getMarketInterpretation = (eventName: string, currency: string, _isReleased: boolean) => {
+  const interpretations: Record<
+    string,
+    { description: string; impact: string; bias: "bullish" | "bearish" | "neutral"; pairs: string[] }
+  > = {
     "Non-Farm Payrolls": {
-      description: "Measures monthly change in employment excluding agricultural sector. A key indicator of US labor market health and economic activity.",
-      impact: "Higher-than-expected NFP is typically bullish for USD, signaling strong job creation and economic momentum. Lower readings are bearish for USD as they may prompt Fed rate cuts.",
-      bias: 'bullish',
-      pairs: ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF']
+      description:
+        "Measures monthly change in employment excluding agricultural sector. A key indicator of US labor market health and economic activity.",
+      impact:
+        "Higher-than-expected NFP is typically bullish for USD, signaling strong job creation and economic momentum. Lower readings are bearish for USD as they may prompt Fed rate cuts.",
+      bias: "bullish",
+      pairs: ["EURUSD", "GBPUSD", "USDJPY", "USDCHF"],
     },
     "Unemployment Rate": {
-      description: "Measures the percentage of the labor force actively seeking employment. A lagging indicator that confirms broader economic trends.",
-      impact: "Lower-than-expected unemployment is usually bullish for USD, especially against EUR, GBP and JPY. Higher unemployment is bearish as it suggests economic weakness and potential policy easing.",
-      bias: 'bullish',
-      pairs: ['EURUSD', 'GBPUSD', 'USDJPY']
+      description:
+        "Measures the percentage of the labor force actively seeking employment. A lagging indicator that confirms broader economic trends.",
+      impact:
+        "Lower-than-expected unemployment is usually bullish for USD, especially against EUR, GBP and JPY. Higher unemployment is bearish as it suggests economic weakness and potential policy easing.",
+      bias: "bullish",
+      pairs: ["EURUSD", "GBPUSD", "USDJPY"],
     },
     "German Factory Orders": {
-      description: "Measures the change in value of new orders placed with manufacturers. A leading indicator of production and economic health.",
-      impact: "Higher-than-expected orders are bullish for EUR, indicating robust manufacturing demand. Lower readings are bearish as they suggest weakening industrial activity.",
-      bias: 'neutral',
-      pairs: ['EURUSD', 'EURGBP', 'EURJPY']
+      description:
+        "Measures the change in value of new orders placed with manufacturers. A leading indicator of production and economic health.",
+      impact:
+        "Higher-than-expected orders are bullish for EUR, indicating robust manufacturing demand. Lower readings are bearish as they suggest weakening industrial activity.",
+      bias: "neutral",
+      pairs: ["EURUSD", "EURGBP", "EURJPY"],
     },
     "ECB Interest Rate Decision": {
-      description: "The European Central Bank's decision on benchmark interest rates. One of the most impactful events for EUR pairs.",
-      impact: "Rate hikes or hawkish guidance are bullish for EUR as higher rates attract foreign capital. Rate cuts or dovish signals are bearish. Surprises move price most.",
-      bias: 'neutral',
-      pairs: ['EURUSD', 'EURGBP', 'EURJPY', 'EURCHF']
+      description:
+        "The European Central Bank's decision on benchmark interest rates. One of the most impactful events for EUR pairs.",
+      impact:
+        "Rate hikes or hawkish guidance are bullish for EUR as higher rates attract foreign capital. Rate cuts or dovish signals are bearish. Surprises move price most.",
+      bias: "neutral",
+      pairs: ["EURUSD", "EURGBP", "EURJPY", "EURCHF"],
     },
     "Employment Change": {
-      description: "Measures the change in the number of employed people. A key labor market indicator for economic health.",
-      impact: "Stronger-than-expected job growth is bullish for CAD as it signals economic strength and supports BoC tightening. Weaker readings are bearish.",
-      bias: 'bullish',
-      pairs: ['USDCAD', 'CADJPY', 'EURCAD']
+      description:
+        "Measures the change in the number of employed people. A key labor market indicator for economic health.",
+      impact:
+        "Stronger-than-expected job growth is bullish for CAD as it signals economic strength and supports BoC tightening. Weaker readings are bearish.",
+      bias: "bullish",
+      pairs: ["USDCAD", "CADJPY", "EURCAD"],
     },
     "BOE Interest Rate Decision": {
-      description: "The Bank of England's decision on the UK base rate. The primary tool for monetary policy in the UK.",
-      impact: "Rate hikes or hawkish tone are bullish for GBP, attracting yield-seeking flows. Rate cuts or dovish guidance are bearish. Watch for voting split and MPC commentary.",
-      bias: 'neutral',
-      pairs: ['GBPUSD', 'EURGBP', 'GBPJPY']
+      description:
+        "The Bank of England's decision on the UK base rate. The primary tool for monetary policy in the UK.",
+      impact:
+        "Rate hikes or hawkish tone are bullish for GBP, attracting yield-seeking flows. Rate cuts or dovish guidance are bearish. Watch for voting split and MPC commentary.",
+      bias: "neutral",
+      pairs: ["GBPUSD", "EURGBP", "GBPJPY"],
     },
   };
 
   const defaultInterpretation = {
     description: `This economic indicator provides insight into ${currency} economic conditions and may influence central bank policy decisions.`,
     impact: `Better-than-forecast data is typically bullish for ${currency}, while weaker readings tend to be bearish. The magnitude of the surprise often determines market reaction strength.`,
-    bias: 'neutral' as const,
-    pairs: [`${currency}USD`, `EUR${currency}`, `${currency}JPY`]
+    bias: "neutral" as const,
+    pairs: [`${currency}USD`, `EUR${currency}`, `${currency}JPY`],
   };
 
-  const interpretation = interpretations[eventName] || defaultInterpretation;
-  
-  return interpretation;
+  return interpretations[eventName] || defaultInterpretation;
 };
 
 // How to interpret guidance
-const getInterpretationGuide = (eventName: string, currency: string) => {
+const getInterpretationGuide = (_eventName: string, currency: string) => {
   return [
     `Strong deviation (>2x consensus range) typically causes immediate price reaction in ${currency} pairs`,
     "Initial spike may reverse as traders digest the full context of the release",
     "Consider waiting 5-15 minutes after release for volatility to settle before entering positions",
     "Compare actual vs forecast AND vs previous reading for full context",
-    "Watch for revisions to prior data which can amplify or dampen the reaction"
+    "Watch for revisions to prior data which can amplify or dampen the reaction",
   ];
 };
 
 // Event narrative based on release status
 const getEventNarrative = (event: CalendarEvent) => {
-  if (event.actual === "—") {
-    return null;
-  }
-  
+  if (event.actual === "—") return null;
+
   const narratives: Record<string, string> = {
     "Non-Farm Payrolls": `The US economy added ${event.actual} jobs in the latest reporting period, compared to expectations of ${event.forecast}. This suggests continued resilience in the labor market, with implications for Federal Reserve policy decisions.`,
     "Unemployment Rate": `Unemployment came in at ${event.actual}, against forecasts of ${event.forecast}. This reading indicates the current state of the US labor market and will factor into Fed deliberations.`,
     "ECB Interest Rate Decision": `The ECB has set rates at ${event.actual}, in line with/diverging from market expectations of ${event.forecast}. This decision reflects the central bank's assessment of inflation and economic conditions.`,
   };
-  
-  return narratives[event.event] || `The ${event.event} data was released at ${event.actual}, compared to the forecast of ${event.forecast}. Market participants are now assessing the implications for monetary policy and economic outlook.`;
+
+  return (
+    narratives[event.event] ||
+    `The ${event.event} data was released at ${event.actual}, compared to the forecast of ${event.forecast}. Market participants are now assessing the implications for monetary policy and economic outlook.`
+  );
 };
 
 export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalProps) {
@@ -136,15 +146,15 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
 
   const isReleased = event.actual !== "—";
   const historicalData = getHistoricalData(event.event);
-  const maxValue = Math.max(...historicalData.map(d => d.actual || d.forecast || 0));
+  const maxValue = Math.max(...historicalData.map((d) => d.actual || d.forecast || 0));
   const interpretation = getMarketInterpretation(event.event, event.currency, isReleased);
   const narrative = getEventNarrative(event);
   const interpretationGuide = getInterpretationGuide(event.event, event.currency);
 
   const getImpactColor = (impact: string) => {
-    if (impact === 'high') return 'bg-destructive text-destructive-foreground';
-    if (impact === 'medium') return 'bg-warning text-warning-foreground';
-    return 'bg-muted text-muted-foreground';
+    if (impact === "high") return "bg-destructive text-destructive-foreground";
+    if (impact === "medium") return "bg-warning text-warning-foreground";
+    return "bg-muted text-muted-foreground";
   };
 
   const handleAddToWatchlist = () => {
@@ -160,25 +170,28 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
   };
 
   const getBiasIcon = (bias: string) => {
-    if (bias === 'bullish') return <ArrowUpRight className="h-4 w-4 text-success" />;
-    if (bias === 'bearish') return <ArrowDownRight className="h-4 w-4 text-destructive" />;
+    if (bias === "bullish") return <ArrowUpRight className="h-4 w-4 text-success" />;
+    if (bias === "bearish") return <ArrowDownRight className="h-4 w-4 text-destructive" />;
     return <Minus className="h-4 w-4 text-warning" />;
   };
 
   const getBiasLabel = (bias: string) => {
-    if (bias === 'bullish') return 'Typically Bullish';
-    if (bias === 'bearish') return 'Typically Bearish';
-    return 'Data-Dependent';
+    if (bias === "bullish") return "Typically Bullish";
+    if (bias === "bearish") return "Typically Bearish";
+    return "Data-Dependent";
   };
 
   const getBiasColor = (bias: string) => {
-    if (bias === 'bullish') return 'text-success';
-    if (bias === 'bearish') return 'text-destructive';
-    return 'text-warning';
+    if (bias === "bullish") return "text-success";
+    if (bias === "bearish") return "text-destructive";
+    return "text-warning";
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      {/* Explicit overlay click-to-close (reliable across Lovable preview shells) */}
+      <DialogOverlay onPointerDown={() => onClose()} />
+
       <DialogContent className="max-w-6xl w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border-border p-0">
         {/* Header Row */}
         <div className="sticky top-0 z-10 bg-background border-b border-border px-8 py-5">
@@ -190,9 +203,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
               <Badge className={`text-xs font-semibold ${getImpactColor(event.impact)}`}>
                 {event.impact.toUpperCase()} IMPACT
               </Badge>
-              <h2 className="text-2xl font-bold text-foreground">
-                {event.event}
-              </h2>
+              <h2 className="text-2xl font-bold text-foreground">{event.event}</h2>
             </div>
 
             <div className="flex items-center gap-4">
@@ -200,24 +211,14 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                 <Clock className="h-4 w-4" />
                 <span>Today at {event.time} GMT</span>
               </div>
-              
+
               {/* Action Buttons */}
               <div className="flex gap-2 shrink-0">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="gap-1.5"
-                  onClick={handleAddToWatchlist}
-                >
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={handleAddToWatchlist}>
                   <Star className="h-3.5 w-3.5" />
                   Watchlist
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="gap-1.5"
-                  onClick={handleSetAlert}
-                >
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={handleSetAlert}>
                   <Bell className="h-3.5 w-3.5" />
                   Set Alert
                 </Button>
@@ -227,27 +228,30 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
         </div>
 
         <div className="px-8 py-6 space-y-6">
-          {/* Two Column Layout: Market Interpretation + Current Figures */}
+          {/* Two Column Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Market Interpretation - Left Column */}
+            {/* Market Interpretation */}
             <Card className="bg-card border-border">
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <BarChart3 className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">Market Interpretation</h3>
+                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
+                    Market Interpretation
+                  </h3>
                 </div>
-                
-                {/* Description */}
-                <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                  {interpretation.description}
-                </p>
-                
-                {/* Bias Indicator */}
+
+                <p className="text-sm text-muted-foreground leading-relaxed mb-4">{interpretation.description}</p>
+
                 <div className="flex items-center gap-3 mb-4 p-4 rounded-lg bg-muted/30 border border-border/50">
-                  <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                    interpretation.bias === 'bullish' ? 'bg-success/20' :
-                    interpretation.bias === 'bearish' ? 'bg-destructive/20' : 'bg-warning/20'
-                  }`}>
+                  <div
+                    className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                      interpretation.bias === "bullish"
+                        ? "bg-success/20"
+                        : interpretation.bias === "bearish"
+                          ? "bg-destructive/20"
+                          : "bg-warning/20"
+                    }`}
+                  >
                     {getBiasIcon(interpretation.bias)}
                   </div>
                   <div className="flex-1">
@@ -258,19 +262,15 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                   </div>
                 </div>
 
-                {/* Impact Explanation */}
-                <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                  {interpretation.impact}
-                </p>
+                <p className="text-sm text-muted-foreground leading-relaxed mb-4">{interpretation.impact}</p>
 
-                {/* Relevant Pairs */}
                 <div className="pt-4 border-t border-border/50">
                   <div className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">Most Impacted Pairs</div>
                   <div className="flex flex-wrap gap-2">
                     {interpretation.pairs.map((pair) => (
-                      <Badge 
-                        key={pair} 
-                        variant="secondary" 
+                      <Badge
+                        key={pair}
+                        variant="secondary"
                         className="text-xs font-mono cursor-pointer hover:bg-primary/20 transition-colors"
                       >
                         {pair}
@@ -281,15 +281,16 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
               </CardContent>
             </Card>
 
-            {/* Current Release Figures - Right Column */}
+            {/* Current Release Figures */}
             <Card className="bg-card border-border">
               <CardContent className="p-6 h-full flex flex-col">
                 <div className="flex items-center gap-2 mb-4">
                   <TrendingUp className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">Current Release Figures</h3>
+                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
+                    Current Release Figures
+                  </h3>
                 </div>
-                
-                {/* 2x2 Grid */}
+
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
                     <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Previous</div>
@@ -301,28 +302,25 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                   </div>
                   <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
                     <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Actual</div>
-                    <div className={`text-2xl font-bold ${isReleased ? 'text-primary' : 'text-muted-foreground'}`}>
+                    <div className={`text-2xl font-bold ${isReleased ? "text-primary" : "text-muted-foreground"}`}>
                       {event.actual}
                     </div>
                   </div>
                   <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
                     <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Deviation</div>
-                    <div className="text-2xl font-bold text-muted-foreground">
-                      {isReleased ? "—" : "Pending"}
-                    </div>
+                    <div className="text-2xl font-bold text-muted-foreground">{isReleased ? "—" : "Pending"}</div>
                   </div>
                 </div>
 
-                {/* Release Commentary */}
                 <div className="flex-1 pt-4 border-t border-border/50">
                   <div className="flex items-center gap-2 mb-3">
                     <MessageSquare className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-semibold text-foreground uppercase tracking-wide">Release Commentary</span>
+                    <span className="text-sm font-semibold text-foreground uppercase tracking-wide">
+                      Release Commentary
+                    </span>
                   </div>
                   {narrative ? (
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      {narrative}
-                    </p>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{narrative}</p>
                   ) : (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-lg p-4 border border-border/50">
                       <Clock className="h-4 w-4 flex-shrink-0" />
@@ -334,7 +332,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
             </Card>
           </div>
 
-          {/* Historical Trend Chart - Full Width */}
+          {/* Historical Trend */}
           <Card className="bg-card border-border">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
@@ -342,7 +340,6 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                   <TrendingUp className="h-4 w-4 text-primary" />
                   <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">Historical Trend</h3>
                 </div>
-                {/* Legend */}
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-1.5">
                     <div className="w-3 h-3 rounded-sm bg-primary" />
@@ -354,14 +351,13 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                   </div>
                 </div>
               </div>
-              
-              {/* Simple Bar Chart */}
+
               <div className="h-48 flex items-end justify-between gap-3 px-2">
                 {historicalData.map((item, index) => {
                   const actualHeight = item.actual ? (item.actual / maxValue) * 100 : 0;
                   const forecastHeight = (item.forecast / maxValue) * 100;
                   const isForecastOnly = item.actual === null;
-                  
+
                   return (
                     <div key={index} className="flex-1 flex flex-col items-center gap-2">
                       <div className="w-full h-40 flex items-end justify-center gap-1">
@@ -374,9 +370,9 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                         )}
                         <div
                           className={`w-full max-w-[24px] rounded-t transition-all duration-300 ${
-                            isForecastOnly 
-                              ? 'border-2 border-dashed border-muted-foreground bg-muted/30' 
-                              : 'border-2 border-dashed border-muted-foreground/50 bg-transparent'
+                            isForecastOnly
+                              ? "border-2 border-dashed border-muted-foreground bg-muted/30"
+                              : "border-2 border-dashed border-muted-foreground/50 bg-transparent"
                           }`}
                           style={{ height: `${forecastHeight}%` }}
                           title={`Forecast: ${item.forecast}`}
@@ -390,17 +386,20 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
             </CardContent>
           </Card>
 
-          {/* How to Interpret Section */}
+          {/* How to Interpret */}
           <Card className="bg-card border-border">
             <CardContent className="p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Lightbulb className="h-4 w-4 text-primary" />
                 <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">How to Interpret</h3>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {interpretationGuide.map((tip, index) => (
-                  <div key={index} className="flex items-start gap-2 p-3 bg-muted/30 rounded-lg border border-border/50">
+                  <div
+                    key={index}
+                    className="flex items-start gap-2 p-3 bg-muted/30 rounded-lg border border-border/50"
+                  >
                     <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
                       <span className="text-xs font-semibold text-primary">{index + 1}</span>
                     </div>
