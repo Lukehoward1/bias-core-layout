@@ -9,20 +9,26 @@ function AppLayoutInner() {
   const { isLocked } = useSessionLock();
   const location = useLocation();
 
-  // HARD reset on every route change
   useEffect(() => {
-    document.documentElement.style.pointerEvents = "auto";
-    document.body.style.pointerEvents = "auto";
-    document.querySelectorAll("[inert]").forEach((el) => el.removeAttribute("inert"));
-    document.querySelectorAll('[aria-hidden="true"]').forEach((el) => el.removeAttribute("aria-hidden"));
+    // Only ever reset within the app shell, not the whole document
+    const shell = document.getElementById("app-shell");
+    if (!shell) return;
 
-    // Force scroll to top of main content
-    const main = document.querySelector("main");
-    if (main) main.scrollTop = 0;
+    // Ensure the app is interactable
+    (shell as HTMLElement).style.pointerEvents = "auto";
+    document.body.style.pointerEvents = "auto";
+
+    // Remove inert/aria-hidden ONLY inside the app shell
+    shell.querySelectorAll("[inert]").forEach((el) => el.removeAttribute("inert"));
+    shell.querySelectorAll('[aria-hidden="true"]').forEach((el) => el.removeAttribute("aria-hidden"));
+
+    // Scroll main content to top
+    const main = shell.querySelector("main");
+    if (main) (main as HTMLElement).scrollTop = 0;
   }, [location.pathname, isLocked]);
 
   return (
-    <div className="flex w-full h-screen overflow-hidden">
+    <div id="app-shell" className="flex w-full h-screen overflow-hidden bg-background">
       {/* Sidebar stays in normal flow */}
       <AppSidebar />
 
