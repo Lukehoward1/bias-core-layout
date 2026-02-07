@@ -10,15 +10,10 @@ import { Star, TrendingUp, TrendingDown, Minus, Activity, AlertTriangle, Clock, 
 
 import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
 
-// (Optional) If you later want clicking a news item to open the exact CPI/NFP card template,
-// we can wire this into Calendar's EventDetailsModal using real event IDs/data.
-// import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
-
 /* =======================
    DATA (demo placeholders)
 ======================= */
 
-// Asset-specific news events for today
 const assetNewsEvents: Record<string, { event: string; time: string; impact: "High" | "Medium" | "Low" }[]> = {
   EURUSD: [
     { event: "CPI (USD)", time: "13:30 GMT", impact: "High" },
@@ -46,7 +41,6 @@ const assetNewsEvents: Record<string, { event: string; time: string; impact: "Hi
   ETHUSD: [{ event: "ETH Network Update", time: "18:00 GMT", impact: "Medium" }],
 };
 
-// Quick insights per asset
 const quickInsights: Record<string, string[]> = {
   XAUUSD: [
     "Bias: Bullish → approaching resistance at 2035",
@@ -100,7 +94,6 @@ export default function AssetDetail() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Use shared data sources
   const { getAssetBySymbol } = useAssets();
   const { isInWatchlist, toggleWatchlist } = useWatchlist();
 
@@ -109,13 +102,18 @@ export default function AssetDetail() {
   const asset = symbol ? getAssetBySymbol(symbol) : undefined;
   const isWatchlisted = symbol ? isInWatchlist(symbol) : false;
 
-  // Modal is always open while on this route
   const [open, setOpen] = useState(true);
 
+  // ✅ CLOSE BEHAVIOR:
+  // If opened from Markets with backgroundLocation, go back to it (keeps scroll)
+  // Otherwise, fall back to /markets?filter=...
   const closeToMarkets = () => {
-    // Keep your existing behavior for now (returns to Markets with filter).
-    // If you want perfect "return to previous scroll position", we can switch this
-    // to navigate(-1) when opened from Markets via location.state.
+    const state = location.state as any;
+    const bg = state?.backgroundLocation;
+    if (bg) {
+      navigate(-1);
+      return;
+    }
     navigate(`/markets?filter=${returnFilter}`, { replace: true });
   };
 
@@ -174,9 +172,8 @@ export default function AssetDetail() {
         if (!next) closeToMarkets();
       }}
     >
-      {/* Click-off/outside closes automatically via Dialog */}
       <DialogContent className="max-w-6xl w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border-border p-0">
-        {/* Top bar (modal header) */}
+        {/* Modal header */}
         <div className="sticky top-0 z-10 bg-background border-b border-border px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-semibold text-foreground">{asset.symbol}</h2>
@@ -184,19 +181,15 @@ export default function AssetDetail() {
               Live Data
             </Badge>
           </div>
-
-          {/* Optional: keep close action implicit (click outside / ESC). */}
-          {/* If you want an explicit X button, tell me and I’ll add it. */}
         </div>
 
         <div className="p-6 space-y-6">
-          {/* UNIFIED HERO CARD */}
+          {/* HERO */}
           <Card className="overflow-hidden">
             <CardContent className="p-8">
               <div className="grid lg:grid-cols-2 gap-8">
-                {/* LEFT SIDE */}
+                {/* LEFT */}
                 <div className="flex flex-col">
-                  {/* Asset Name */}
                   <div className="flex items-center gap-3 mb-3">
                     <h1 className="text-4xl font-bold text-foreground">{asset.symbol}</h1>
                     <Button variant="ghost" size="icon" onClick={handleToggleWatchlist} className="h-10 w-10">
@@ -208,7 +201,6 @@ export default function AssetDetail() {
                     </Button>
                   </div>
 
-                  {/* Price + Change */}
                   <div className="flex items-baseline gap-3 mb-6">
                     <span className="text-3xl font-semibold text-foreground">{asset.latestPrice}</span>
                     <span
@@ -220,7 +212,6 @@ export default function AssetDetail() {
                     </span>
                   </div>
 
-                  {/* Quick Insights */}
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
                       Quick Insights
@@ -239,7 +230,6 @@ export default function AssetDetail() {
                       })}
                     </div>
 
-                    {/* News Impact Section */}
                     {symbol && assetNewsEvents[symbol] && assetNewsEvents[symbol].length > 0 && (
                       <div className="mt-5">
                         <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
@@ -258,12 +248,9 @@ export default function AssetDetail() {
                                 key={index}
                                 type="button"
                                 onPointerDown={(e) => {
-                                  // Keep modal context; don’t navigate away.
                                   e.preventDefault();
                                   e.stopPropagation();
-
-                                  // For now: do nothing (placeholder) — we’ll wire this to open the CPI/NFP overlay next.
-                                  // Next step will be: open EventDetailsModal with the exact template.
+                                  // placeholder for next step: open CPI/NFP overlay inside modal
                                 }}
                                 className="w-full flex items-center gap-2 text-left hover:bg-muted/30 rounded-md px-2 py-1.5 transition-colors group"
                               >
@@ -288,9 +275,8 @@ export default function AssetDetail() {
                   </div>
                 </div>
 
-                {/* RIGHT SIDE */}
+                {/* RIGHT */}
                 <div className="flex flex-col">
-                  {/* Stats Row */}
                   <div className="grid grid-cols-4 gap-3 mb-6">
                     <div className="p-3 bg-muted/30 rounded-lg text-center">
                       <span className="text-xs text-muted-foreground block mb-1">Volume</span>
@@ -321,7 +307,6 @@ export default function AssetDetail() {
                     </div>
                   </div>
 
-                  {/* Large Bias Gauge */}
                   <div className="flex-1 flex flex-col items-center justify-center pt-2">
                     <span className="text-sm text-muted-foreground uppercase tracking-wide mb-6">Current Bias</span>
                     <div className="relative w-72 h-36">
@@ -363,7 +348,7 @@ export default function AssetDetail() {
             </CardContent>
           </Card>
 
-          {/* AI MARKET OVERVIEW */}
+          {/* AI Market Overview */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -376,21 +361,19 @@ export default function AssetDetail() {
                 <p className="text-muted-foreground leading-relaxed">
                   <strong className="text-foreground">{asset.symbol}</strong> is currently showing a{" "}
                   <strong className={getBiasColor(asset.biasDirection)}>{asset.biasDirection.toLowerCase()}</strong>{" "}
-                  bias with {asset.biasConfidence}% confidence based on our multi-timeframe analysis. On the weekly
-                  timeframe, price remains above the key support zone, indicating underlying strength. The daily chart
-                  shows consolidation near recent highs with potential for continuation.
+                  bias with {asset.biasConfidence}% confidence based on our multi-timeframe analysis.
                 </p>
+
                 <p className="text-muted-foreground leading-relaxed mt-4">
                   H4 structure maintains a series of higher highs and higher lows, supporting the current bias
-                  direction. Key resistance overhead at the psychological level may act as a short-term ceiling. Current
-                  volatility is elevated due to upcoming high-impact economic data, suggesting wider stops may be
-                  appropriate.
+                  direction. Key resistance overhead at the psychological level may act as a short-term ceiling.
                 </p>
+
                 <p className="text-muted-foreground leading-relaxed mt-4">
                   <strong className="text-foreground">Session Preference:</strong> London session showing strongest
-                  directional moves historically for this pair. Consider reduced position sizing during Asian session
-                  consolidation. Watch for potential reversals during NY session if key levels are tested.
+                  directional moves historically for this pair. Consider reduced position sizing during Asian session.
                 </p>
+
                 <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
@@ -404,9 +387,8 @@ export default function AssetDetail() {
             </CardContent>
           </Card>
 
-          {/* Grid for Key Levels, Session Insights, Upcoming News */}
+          {/* 3-column grid */}
           <div className="grid lg:grid-cols-3 gap-6">
-            {/* Key Levels */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -429,7 +411,6 @@ export default function AssetDetail() {
               </CardContent>
             </Card>
 
-            {/* Session Insights */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -463,7 +444,6 @@ export default function AssetDetail() {
               </CardContent>
             </Card>
 
-            {/* Upcoming News */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
