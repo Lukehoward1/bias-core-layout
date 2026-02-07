@@ -25,6 +25,7 @@ import { useAppSidebar } from "@/hooks/use-app-sidebar";
 import { useTheme } from "@/hooks/use-theme";
 import { useIsMobile } from "@/hooks/use-mobile";
 import sbLogo from "@/assets/sb-logo.svg";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type Item = { title: string; url: string; icon: any };
 
@@ -65,17 +66,31 @@ export function AppSidebar() {
     if (isMobile) setMobileOpen(false);
   };
 
-  // Unified nav row styling (used by normal items + Theme + Upgrade)
-  const navRowBase = `
+  // Unified nav button styling (so Theme/Upgrade match the rest)
+  const navBtnBase = `
     w-full text-left
     flex items-center rounded-lg transition-all relative
     px-3 py-2
     hover:bg-sidebar-accent/50
     text-sidebar-foreground
+    select-none
   `;
 
+  // Wrapper to show tooltip ONLY when collapsed on desktop
+  const WithCollapsedTooltip = ({ label, children }: { label: string; children: React.ReactNode }) => {
+    if (!collapsed || isMobile) return <>{children}</>;
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{children}</TooltipTrigger>
+        <TooltipContent side="right" align="center">
+          {label}
+        </TooltipContent>
+      </Tooltip>
+    );
+  };
+
   const NavSection = ({ title, items }: { title: string; items: Item[] }) => (
-    <div>
+    <div className={collapsed && !isMobile ? "pt-1" : ""}>
       {!collapsed && (
         <div className="px-3 mb-2">
           <h2 className="text-[11px] font-semibold text-muted-foreground tracking-wider uppercase">{title}</h2>
@@ -87,7 +102,7 @@ export function AppSidebar() {
           const isActive = currentPath === item.url || (item.url !== "/" && currentPath.startsWith(item.url));
           const Icon = item.icon;
 
-          return (
+          const btn = (
             <button
               key={item.url}
               type="button"
@@ -104,17 +119,28 @@ export function AppSidebar() {
                 }
               }}
               className={[
-                navRowBase,
+                navBtnBase,
                 collapsed && !isMobile ? "justify-center mx-1 px-0" : "justify-start",
-                isActive ? "bg-sidebar-accent text-sidebar-primary" : "",
+                // Active state clarity (especially when collapsed)
+                isActive ? "bg-sidebar-accent text-sidebar-primary ring-1 ring-primary/20" : "",
               ].join(" ")}
+              aria-current={isActive ? "page" : undefined}
+              title={collapsed && !isMobile ? item.title : undefined}
             >
+              {/* Left indicator only when expanded (cleaner when collapsed) */}
               {isActive && !collapsed && (
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary rounded-r-full" />
               )}
+
               <Icon className={`${collapsed && !isMobile ? "" : "mr-3"} h-[18px] w-[18px] flex-shrink-0`} />
               {(!collapsed || isMobile) && <span className="text-sm font-medium">{item.title}</span>}
             </button>
+          );
+
+          return (
+            <WithCollapsedTooltip key={item.url} label={item.title}>
+              {btn}
+            </WithCollapsedTooltip>
           );
         })}
       </div>
@@ -123,11 +149,16 @@ export function AppSidebar() {
 
   const sidebarContent = (
     <>
-      {/* TOP: Logo (no borders). SB stays one fixed (bigger) size; word shows only when expanded */}
+      {/* TOP: Logo (no border lines) */}
       <div className="flex-shrink-0">
         <div className={`h-14 ${collapsed && !isMobile ? "px-3" : "px-4"} flex items-center justify-between`}>
-          <div className={`flex items-center ${collapsed && !isMobile ? "justify-center w-full" : "gap-3"}`}>
-            <img src={sbLogo} alt="StreamBias" className="h-10 w-auto flex-shrink-0" />
+          <div className={`flex items-center ${collapsed && !isMobile ? "justify-center" : "gap-3"}`}>
+            <img
+              src={sbLogo}
+              alt="StreamBias"
+              // SB mark stays BIG even when collapsed; wordmark still hides
+              className={"h-10 w-auto flex-shrink-0"}
+            />
             {(!collapsed || isMobile) && <span className="text-lg font-bold text-foreground">StreamBias</span>}
           </div>
 
@@ -138,7 +169,7 @@ export function AppSidebar() {
           )}
         </div>
 
-        {/* Collapse Button - Desktop only (no divider lines) */}
+        {/* Collapse Button - Desktop only (no border divider) */}
         {!isMobile && (
           <div className="px-3 py-2">
             <Button
@@ -154,44 +185,58 @@ export function AppSidebar() {
       </div>
 
       {/* MIDDLE */}
-      <div className="flex-1 flex flex-col overflow-y-auto px-3 py-2 space-y-5">
+      <div
+        className={[
+          "flex-1 flex flex-col overflow-y-auto px-3 py-2",
+          // collapsed rhythm: more separation between groups without labels/dividers
+          collapsed && !isMobile ? "space-y-4" : "space-y-5",
+        ].join(" ")}
+      >
         <NavSection title="MAIN" items={mainItems} />
         <NavSection title="LEARNING" items={learningItems} />
         <NavSection title="BROKERAGE" items={brokerageItems} />
         <NavSection title="ACCOUNT" items={accountItems} />
       </div>
 
-      {/* BOTTOM (Theme + Upgrade aligned with nav rows; no border-t) */}
+      {/* BOTTOM (aligned to same nav styling) */}
       <div className="flex-shrink-0 px-3 py-3 space-y-2">
-        <button
-          type="button"
-          onPointerDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleTheme();
-          }}
-          className={[navRowBase, collapsed && !isMobile ? "justify-center mx-1 px-0" : "justify-start"].join(" ")}
-        >
-          {theme === "dark" ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
-          {(!collapsed || isMobile) && <span className="text-sm font-medium ml-3">Theme</span>}
-        </button>
+        {/* Theme row - same padding/font/hover as nav items */}
+        <WithCollapsedTooltip label="Theme">
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              toggleTheme();
+            }}
+            className={[navBtnBase, collapsed && !isMobile ? "justify-center mx-1 px-0" : "justify-start"].join(" ")}
+            title={collapsed && !isMobile ? "Theme" : undefined}
+          >
+            {theme === "dark" ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+            {(!collapsed || isMobile) && <span className="text-sm font-medium ml-3">Theme</span>}
+          </button>
+        </WithCollapsedTooltip>
 
-        <button
-          type="button"
-          onPointerDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            go("/pricing");
-          }}
-          className={[
-            navRowBase,
-            "bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground hover:text-primary-foreground",
-            collapsed && !isMobile ? "justify-center mx-1 px-0" : "justify-start",
-          ].join(" ")}
-        >
-          <Zap className="h-[18px] w-[18px]" />
-          {(!collapsed || isMobile) && <span className="text-sm font-semibold ml-3">Upgrade</span>}
-        </button>
+        {/* Upgrade row - aligned like nav item, but styled as CTA */}
+        <WithCollapsedTooltip label="Upgrade">
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              go("/pricing");
+            }}
+            className={[
+              navBtnBase,
+              "bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground hover:text-primary-foreground",
+              collapsed && !isMobile ? "justify-center mx-1 px-0" : "justify-start",
+            ].join(" ")}
+            title={collapsed && !isMobile ? "Upgrade" : undefined}
+          >
+            <Zap className="h-[18px] w-[18px]" />
+            {(!collapsed || isMobile) && <span className="text-sm font-semibold ml-3">Upgrade</span>}
+          </button>
+        </WithCollapsedTooltip>
       </div>
     </>
   );
@@ -216,7 +261,7 @@ export function AppSidebar() {
     );
   }
 
-  // Desktop: in normal flow (no border lines)
+  // Desktop: in normal flow (no border lines on sidebar)
   return (
     <aside
       className={`
