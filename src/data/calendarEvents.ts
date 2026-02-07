@@ -9,6 +9,20 @@ export type CalendarEvent = {
   impact: "high" | "medium" | "low";
 };
 
+/**
+ * Key Events (cards at the top of Calendar)
+ * Keep this as a lightweight subset of calendarEvents by ID.
+ */
+export const keyEvents: Array<Pick<CalendarEvent, "id" | "time" | "currency" | "event" | "impact">> = [
+  { id: "nfp-2025-01", time: "08:30", currency: "USD", event: "Non-Farm Payrolls", impact: "high" },
+  { id: "ecb-rate-2025-01", time: "10:00", currency: "EUR", event: "ECB Interest Rate Decision", impact: "high" },
+  { id: "boe-rate-2025-01", time: "14:00", currency: "GBP", event: "BOE Interest Rate Decision", impact: "high" },
+  { id: "us-cpi-2025-01", time: "14:30", currency: "USD", event: "US CPI", impact: "high" },
+];
+
+/**
+ * Full Calendar Events (table + modal)
+ */
 export const calendarEvents: CalendarEvent[] = [
   {
     id: "nfp-2025-01",
@@ -50,6 +64,22 @@ export const calendarEvents: CalendarEvent[] = [
     actual: "—",
     impact: "high",
   },
+
+  /**
+   * Optional (used by AssetDetail mapping for "Core CPI (USD)")
+   * If you don’t want this yet, we can remove the mapping instead — but this keeps it working.
+   */
+  {
+    id: "us-core-cpi-2025-01",
+    time: "15:00",
+    currency: "USD",
+    event: "Core CPI (USD)",
+    previous: "3.9%",
+    forecast: "3.8%",
+    actual: "—",
+    impact: "high",
+  },
+
   {
     id: "boe-rate-2025-01",
     time: "14:00",
