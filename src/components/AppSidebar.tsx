@@ -131,8 +131,7 @@ export function AppSidebar() {
             <img
               src={sbLogo}
               alt="StreamBias"
-              // Fix: keep logo readable when collapsed
-              className={`${collapsed && !isMobile ? "h-8" : "h-8"} w-auto flex-shrink-0`}
+              className={`${collapsed && !isMobile ? "h-10" : "h-8"} w-auto flex-shrink-0`}
             />
             {(!collapsed || isMobile) && <span className="text-lg font-bold text-foreground">StreamBias</span>}
           </div>
