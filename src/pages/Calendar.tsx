@@ -1,4 +1,4 @@
-import { calendarEvents, keyEvents } from "@/data/calendarEvents";
+import { calendarEvents, type CalendarEvent } from "@/data/calendarEvents";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
@@ -13,90 +13,8 @@ import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButto
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-/* =======================
-   DATA
-======================= */
-
-const keyEvents = [
-  { id: "nfp-2025-01", time: "08:30", currency: "USD", event: "Non-Farm Payrolls", impact: "high" },
-  { id: "ecb-rate-2025-01", time: "10:00", currency: "EUR", event: "ECB Interest Rate Decision", impact: "high" },
-  { id: "boe-rate-2025-01", time: "14:00", currency: "GBP", event: "BOE Interest Rate Decision", impact: "high" },
-];
-
-const events = [
-  {
-    id: "nfp-2025-01",
-    time: "08:30",
-    currency: "USD",
-    event: "Non-Farm Payrolls",
-    previous: "180K",
-    forecast: "190K",
-    actual: "—",
-    impact: "high",
-  },
-  {
-    id: "unemployment-2025-01",
-    time: "08:30",
-    currency: "USD",
-    event: "Unemployment Rate",
-    previous: "3.9%",
-    forecast: "3.9%",
-    actual: "—",
-    impact: "high",
-  },
-  {
-    id: "german-factory-2025-01",
-    time: "09:00",
-    currency: "EUR",
-    event: "German Factory Orders",
-    previous: "-0.2%",
-    forecast: "0.5%",
-    actual: "—",
-    impact: "medium",
-  },
-  {
-    id: "ecb-rate-2025-01",
-    time: "10:00",
-    currency: "EUR",
-    event: "ECB Interest Rate Decision",
-    previous: "4.50%",
-    forecast: "4.50%",
-    actual: "—",
-    impact: "high",
-  },
-  {
-    id: "cad-employment-2025-01",
-    time: "12:30",
-    currency: "CAD",
-    event: "Employment Change",
-    previous: "42.0K",
-    forecast: "25.0K",
-    actual: "—",
-    impact: "medium",
-  },
-  {
-    id: "boe-rate-2025-01",
-    time: "14:00",
-    currency: "GBP",
-    event: "BOE Interest Rate Decision",
-    previous: "5.25%",
-    forecast: "5.25%",
-    actual: "—",
-    impact: "high",
-  },
-  {
-    id: "us-cpi-2025-01",
-    time: "14:30",
-    currency: "USD",
-    event: "US CPI",
-    previous: "3.1%",
-    forecast: "3.0%",
-    actual: "—",
-    impact: "high",
-  },
-];
-
-type CalendarEvent = (typeof events)[0];
+/* Derive key (high-impact) events from the shared data source */
+const keyEvents = calendarEvents.filter((e) => e.impact === "high").slice(0, 3);
 
 /* =======================
    PAGE
@@ -144,7 +62,7 @@ export default function Calendar() {
     const eventId = searchParams.get("eventId");
     if (!eventId) return;
 
-    const match = events.find((e) => e.id === eventId);
+    const match = calendarEvents.find((e) => e.id === eventId);
     if (!match) return;
 
     setHighlightedEventId(match.id);
@@ -206,27 +124,23 @@ export default function Calendar() {
             <AddToDashboardButton isAdded={isUpcomingEventsAdded} onAdd={handleAddCard} onRemove={handleRemoveCard} />
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {keyEvents.map((event) => {
-              const fullEvent = events.find((e) => e.id === event.id) ?? null;
-
-              return (
-                <div
-                  key={event.id}
-                  className={cn(
-                    "p-4 rounded-lg border bg-muted/50 cursor-pointer hover:bg-muted/70",
-                    highlightedEventId === event.id && "ring-2 ring-primary",
-                  )}
-                  onClick={() => openEvent(fullEvent)}
-                >
-                  <div className="flex justify-between mb-2">
-                    <Badge variant={getImpactVariant(event.impact)}>{event.impact.toUpperCase()}</Badge>
-                    <span className="text-sm text-muted-foreground">{event.time}</span>
-                  </div>
-                  <div className="font-semibold text-sm">{event.currency}</div>
-                  <div className="text-xs text-muted-foreground">{event.event}</div>
+            {keyEvents.map((event) => (
+              <div
+                key={event.id}
+                className={cn(
+                  "p-4 rounded-lg border bg-muted/50 cursor-pointer hover:bg-muted/70",
+                  highlightedEventId === event.id && "ring-2 ring-primary",
+                )}
+                onClick={() => openEvent(event)}
+              >
+                <div className="flex justify-between mb-2">
+                  <Badge variant={getImpactVariant(event.impact)}>{event.impact.toUpperCase()}</Badge>
+                  <span className="text-sm text-muted-foreground">{event.time}</span>
                 </div>
-              );
-            })}
+                <div className="font-semibold text-sm">{event.currency}</div>
+                <div className="text-xs text-muted-foreground">{event.event}</div>
+              </div>
+            ))}
           </CardContent>
         </Card>
 
@@ -247,7 +161,7 @@ export default function Calendar() {
                 </tr>
               </thead>
               <tbody>
-                {events.map((event) => (
+                {calendarEvents.map((event) => (
                   <tr
                     key={event.id}
                     ref={(el) => setEventRef(event.id, el)}
