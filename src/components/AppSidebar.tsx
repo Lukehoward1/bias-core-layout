@@ -18,7 +18,6 @@ import {
   ChevronRight,
   Zap,
   X,
-  Star,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -66,8 +65,8 @@ export function AppSidebar() {
     if (isMobile) setMobileOpen(false);
   };
 
-  // Unified nav button styling (so Theme/Upgrade match the rest)
-  const navBtnBase = `
+  // Unified nav row styling (used by normal items + Theme + Upgrade)
+  const navRowBase = `
     w-full text-left
     flex items-center rounded-lg transition-all relative
     px-3 py-2
@@ -105,7 +104,7 @@ export function AppSidebar() {
                 }
               }}
               className={[
-                navBtnBase,
+                navRowBase,
                 collapsed && !isMobile ? "justify-center mx-1 px-0" : "justify-start",
                 isActive ? "bg-sidebar-accent text-sidebar-primary" : "",
               ].join(" ")}
@@ -124,19 +123,13 @@ export function AppSidebar() {
 
   const sidebarContent = (
     <>
-    <div className="flex items-center gap-3">
-  {/* Static SB logo (never resizes) */}
-  <div className="h-10 w-10 rounded-lg bg-primary/15 text-primary flex items-center justify-center font-bold text-lg tracking-tight select-none">
-    SB
-  </div>
-
-  {/* Text label disappears when collapsed */}
-  {!collapsed && !isMobile && (
-    <span className="text-lg font-bold text-foreground whitespace-nowrap">
-      StreamBias
-    </span>
-  )}
-</div>
+      {/* TOP: Logo (no borders). SB stays one fixed (bigger) size; word shows only when expanded */}
+      <div className="flex-shrink-0">
+        <div className={`h-14 ${collapsed && !isMobile ? "px-3" : "px-4"} flex items-center justify-between`}>
+          <div className={`flex items-center ${collapsed && !isMobile ? "justify-center w-full" : "gap-3"}`}>
+            <img src={sbLogo} alt="StreamBias" className="h-10 w-auto flex-shrink-0" />
+            {(!collapsed || isMobile) && <span className="text-lg font-bold text-foreground">StreamBias</span>}
+          </div>
 
           {isMobile && (
             <Button variant="ghost" size="icon" onClick={() => setMobileOpen(false)} className="h-8 w-8">
@@ -145,7 +138,7 @@ export function AppSidebar() {
           )}
         </div>
 
-        {/* Collapse Button - Desktop only (no border divider) */}
+        {/* Collapse Button - Desktop only (no divider lines) */}
         {!isMobile && (
           <div className="px-3 py-2">
             <Button
@@ -168,9 +161,8 @@ export function AppSidebar() {
         <NavSection title="ACCOUNT" items={accountItems} />
       </div>
 
-      {/* BOTTOM (aligned to same nav styling) */}
+      {/* BOTTOM (Theme + Upgrade aligned with nav rows; no border-t) */}
       <div className="flex-shrink-0 px-3 py-3 space-y-2">
-        {/* Theme row - same padding/font/hover as nav items */}
         <button
           type="button"
           onPointerDown={(e) => {
@@ -178,13 +170,12 @@ export function AppSidebar() {
             e.stopPropagation();
             toggleTheme();
           }}
-          className={[navBtnBase, collapsed && !isMobile ? "justify-center mx-1 px-0" : "justify-start"].join(" ")}
+          className={[navRowBase, collapsed && !isMobile ? "justify-center mx-1 px-0" : "justify-start"].join(" ")}
         >
           {theme === "dark" ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
           {(!collapsed || isMobile) && <span className="text-sm font-medium ml-3">Theme</span>}
         </button>
 
-        {/* Upgrade row - aligned like nav item, but styled as CTA */}
         <button
           type="button"
           onPointerDown={(e) => {
@@ -193,7 +184,7 @@ export function AppSidebar() {
             go("/pricing");
           }}
           className={[
-            navBtnBase,
+            navRowBase,
             "bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground hover:text-primary-foreground",
             collapsed && !isMobile ? "justify-center mx-1 px-0" : "justify-start",
           ].join(" ")}
@@ -225,7 +216,7 @@ export function AppSidebar() {
     );
   }
 
-  // Desktop: in normal flow (no border lines on sidebar)
+  // Desktop: in normal flow (no border lines)
   return (
     <aside
       className={`
