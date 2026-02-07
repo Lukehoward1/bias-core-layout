@@ -1,3 +1,4 @@
+import { calendarEvents, keyEvents } from "@/data/calendarEvents";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
