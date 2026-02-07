@@ -1,4 +1,3 @@
-import { calendarEvents, type CalendarEvent } from "@/data/calendarEvents";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
@@ -13,12 +12,9 @@ import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButto
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-/* Derive key (high-impact) events from the shared data source */
-const keyEvents = calendarEvents.filter((e) => e.impact === "high").slice(0, 3);
+import { calendarEvents, keyEvents } from "@/data/calendarEvents";
 
-/* =======================
-   PAGE
-======================= */
+type CalendarEvent = (typeof calendarEvents)[0];
 
 export default function Calendar() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -58,11 +54,12 @@ export default function Calendar() {
     setSelectedEvent(null);
   }, []);
 
+  // Open from deep-link: /calendar?eventId=xxxx
   useEffect(() => {
     const eventId = searchParams.get("eventId");
     if (!eventId) return;
 
-    const match = calendarEvents.find((e) => e.id === eventId);
+    const match = calendarEvents.find((e) => e.id === eventId) ?? null;
     if (!match) return;
 
     setHighlightedEventId(match.id);
@@ -123,24 +120,29 @@ export default function Calendar() {
             <CardTitle>Key Events Today</CardTitle>
             <AddToDashboardButton isAdded={isUpcomingEventsAdded} onAdd={handleAddCard} onRemove={handleRemoveCard} />
           </CardHeader>
+
           <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {keyEvents.map((event) => (
-              <div
-                key={event.id}
-                className={cn(
-                  "p-4 rounded-lg border bg-muted/50 cursor-pointer hover:bg-muted/70",
-                  highlightedEventId === event.id && "ring-2 ring-primary",
-                )}
-                onClick={() => openEvent(event)}
-              >
-                <div className="flex justify-between mb-2">
-                  <Badge variant={getImpactVariant(event.impact)}>{event.impact.toUpperCase()}</Badge>
-                  <span className="text-sm text-muted-foreground">{event.time}</span>
+            {keyEvents.map((event) => {
+              const fullEvent = calendarEvents.find((e) => e.id === event.id) ?? null;
+
+              return (
+                <div
+                  key={event.id}
+                  className={cn(
+                    "p-4 rounded-lg border bg-muted/50 cursor-pointer hover:bg-muted/70",
+                    highlightedEventId === event.id && "ring-2 ring-primary",
+                  )}
+                  onClick={() => openEvent(fullEvent)}
+                >
+                  <div className="flex justify-between mb-2">
+                    <Badge variant={getImpactVariant(event.impact)}>{event.impact.toUpperCase()}</Badge>
+                    <span className="text-sm text-muted-foreground">{event.time}</span>
+                  </div>
+                  <div className="font-semibold text-sm">{event.currency}</div>
+                  <div className="text-xs text-muted-foreground">{event.event}</div>
                 </div>
-                <div className="font-semibold text-sm">{event.currency}</div>
-                <div className="text-xs text-muted-foreground">{event.event}</div>
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
 
@@ -149,6 +151,7 @@ export default function Calendar() {
           <CardHeader>
             <CardTitle>All Events</CardTitle>
           </CardHeader>
+
           <CardContent className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -160,6 +163,7 @@ export default function Calendar() {
                   ))}
                 </tr>
               </thead>
+
               <tbody>
                 {calendarEvents.map((event) => (
                   <tr
