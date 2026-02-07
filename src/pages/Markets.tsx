@@ -16,16 +16,14 @@ type MarketType = "Watchlist" | "All" | "FX" | "Crypto" | "Indices" | "Commoditi
 export default function Markets() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const location = useLocation(); // ✅ NEW (needed for modal background routing)
+  const location = useLocation(); // ✅ backgroundLocation for modal routing
   const filterParam = searchParams.get("filter") as MarketType | null;
 
   const { assets } = useAssets();
   const { watchlist, toggleWatchlist, isInWatchlist, watchlistAssets } = useWatchlist();
 
-  // Dashboard integration - single hook at page level
   const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
 
-  // Dashboard card state
   const watchlistOverviewCardId = "watchlist-overview";
   const isWatchlistOverviewAdded = isCardOnDashboard(watchlistOverviewCardId);
 
@@ -39,7 +37,6 @@ export default function Markets() {
     toast.success("Removed from Dashboard");
   };
 
-  // Set default filter based on URL param or watchlist
   const [selectedType, setSelectedType] = useState<MarketType>(() => {
     if (
       filterParam &&
@@ -51,6 +48,7 @@ export default function Markets() {
     const parsed = saved ? JSON.parse(saved) : [];
     return parsed.length > 0 ? "Watchlist" : "All";
   });
+
   const [searchQuery, setSearchQuery] = useState("");
 
   const marketTypes: MarketType[] = ["Watchlist", "All", "FX", "Crypto", "Indices", "Commodities", "ETFs", "Futures"];
@@ -60,7 +58,6 @@ export default function Markets() {
     toggleWatchlist(symbol);
   };
 
-  // Filter by type and search query using shared assets data
   const filteredPairs = useMemo(() => {
     let filtered =
       selectedType === "Watchlist"
@@ -95,7 +92,7 @@ export default function Markets() {
     return "text-muted-foreground";
   };
 
-  // ✅ UPDATED: pass backgroundLocation so /asset opens as a modal overlay (Calendar-style)
+  // ✅ open /asset as modal overlay
   const openAssetDetail = (symbol: string) => {
     navigate(`/asset/${symbol}?from=${selectedType}`, {
       state: { backgroundLocation: location },
@@ -108,7 +105,6 @@ export default function Markets() {
 
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          {/* Search Bar */}
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -123,7 +119,6 @@ export default function Markets() {
           </Badge>
         </div>
 
-        {/* Market Type Filters */}
         <div className="flex flex-wrap gap-2">
           {marketTypes.map((type) => (
             <Button
@@ -144,7 +139,6 @@ export default function Markets() {
           ))}
         </div>
 
-        {/* Watchlist Overview Bar */}
         {(selectedType === "Watchlist" || selectedType === "All") && watchlistAssets.length > 0 && (
           <Card className="bg-muted/30">
             <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
@@ -191,7 +185,6 @@ export default function Markets() {
           </Card>
         )}
 
-        {/* Empty Watchlist State */}
         {selectedType === "Watchlist" && watchlistAssets.length === 0 && (
           <Card className="bg-muted/30">
             <CardContent className="py-12 text-center">
@@ -207,7 +200,6 @@ export default function Markets() {
           </Card>
         )}
 
-        {/* No Search Results */}
         {searchQuery && filteredPairs.length === 0 && (
           <Card className="bg-muted/30">
             <CardContent className="py-12 text-center">
@@ -218,7 +210,6 @@ export default function Markets() {
           </Card>
         )}
 
-        {/* Asset Cards Grid */}
         {(selectedType !== "Watchlist" || watchlistAssets.length > 0) && filteredPairs.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {filteredPairs.map((asset) => (
@@ -227,7 +218,6 @@ export default function Markets() {
                 onClick={() => openAssetDetail(asset.symbol)}
                 className="hover:shadow-lg transition-shadow cursor-pointer group relative"
               >
-                {/* Watchlist Star */}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -262,6 +252,7 @@ export default function Markets() {
                     </span>
                   </div>
                 </CardHeader>
+
                 <CardContent className="space-y-3">
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
@@ -274,7 +265,6 @@ export default function Markets() {
                     </div>
                   </div>
 
-                  {/* Mini Sentiment Gauge */}
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-xs text-muted-foreground">Sentiment</span>
@@ -303,7 +293,6 @@ export default function Markets() {
                     </div>
                   </div>
 
-                  {/* High Impact News Badge */}
                   <div className="pt-3 border-t border-border">
                     <div className="flex items-start gap-2">
                       <Calendar className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
