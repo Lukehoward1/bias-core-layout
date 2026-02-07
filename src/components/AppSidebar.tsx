@@ -124,17 +124,19 @@ export function AppSidebar() {
 
   const sidebarContent = (
     <>
-      {/* TOP: Logo (no border lines) */}
-      <div className="flex-shrink-0">
-        <div className={`h-14 ${collapsed && !isMobile ? "px-3" : "px-4"} flex items-center justify-between`}>
-          <div className={`flex items-center ${collapsed && !isMobile ? "justify-center" : "gap-3"}`}>
-            <img
-              src={sbLogo}
-              alt="StreamBias"
-              className={`${collapsed && !isMobile ? "h-10" : "h-8"} w-auto flex-shrink-0`}
-            />
-            {(!collapsed || isMobile) && <span className="text-lg font-bold text-foreground">StreamBias</span>}
-          </div>
+    <div className="flex items-center gap-3">
+  {/* Static SB logo (never resizes) */}
+  <div className="h-10 w-10 rounded-lg bg-primary/15 text-primary flex items-center justify-center font-bold text-lg tracking-tight select-none">
+    SB
+  </div>
+
+  {/* Text label disappears when collapsed */}
+  {!collapsed && !isMobile && (
+    <span className="text-lg font-bold text-foreground whitespace-nowrap">
+      StreamBias
+    </span>
+  )}
+</div>
 
           {isMobile && (
             <Button variant="ghost" size="icon" onClick={() => setMobileOpen(false)} className="h-8 w-8">
