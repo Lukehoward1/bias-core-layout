@@ -10,7 +10,7 @@ import { Star, TrendingUp, TrendingDown, Minus, Activity, AlertTriangle, Clock, 
 
 import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
-import { calendarEvents } from "@/data/calendarEvents";
+import { calendarEvents, type CalendarEvent } from "@/data/calendarEvents";
 
 /* =======================
    DATA (demo placeholders)
@@ -94,18 +94,18 @@ const sessionInsights = [
 
 /* =======================
    NEWS → CALENDAR EVENT MAPPING
+   (Only map to IDs that exist in calendarEvents.ts)
 ======================= */
 
 const newsToCalendarEventId: Record<string, string> = {
   "CPI (USD)": "us-cpi-2025-01",
-  "Core CPI (USD)": "us-core-cpi-2025-01", // if you don’t have this yet, see note below
-  "Non-Farm Payrolls": "nfp-2025-01",
   "US CPI": "us-cpi-2025-01",
+  "Non-Farm Payrolls": "nfp-2025-01",
   "ECB Interest Rate Decision": "ecb-rate-2025-01",
   "BOE Interest Rate Decision": "boe-rate-2025-01",
+  // NOTE: "Core CPI (USD)" is NOT in your calendarEvents list right now.
+  // If you add it later, map it here to its ID.
 };
-
-type CalendarEvent = (typeof calendarEvents)[0];
 
 export default function AssetDetail() {
   const { symbol } = useParams<{ symbol: string }>();
@@ -123,7 +123,7 @@ export default function AssetDetail() {
   // Asset modal open
   const [open, setOpen] = useState(true);
 
-  // Calendar Event overlay open (nested)
+  // Calendar event overlay (nested)
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
@@ -175,6 +175,12 @@ export default function AssetDetail() {
     );
   }, [symbol, asset]);
 
+  const impactPillClasses = (impact: "High" | "Medium" | "Low") => {
+    if (impact === "High") return "bg-destructive/20 text-destructive border-destructive/30";
+    if (impact === "Medium") return "bg-warning/20 text-warning border-warning/30";
+    return "bg-success/15 text-success border-success/25";
+  };
+
   if (!asset) {
     return (
       <Dialog
@@ -215,7 +221,7 @@ export default function AssetDetail() {
           </div>
 
           <div className="p-6 space-y-6">
-            {/* UNIFIED HERO CARD */}
+            {/* HERO */}
             <Card className="overflow-hidden">
               <CardContent className="p-8">
                 <div className="grid lg:grid-cols-2 gap-8">
@@ -225,9 +231,7 @@ export default function AssetDetail() {
                       <h1 className="text-4xl font-bold text-foreground">{asset.symbol}</h1>
                       <Button variant="ghost" size="icon" onClick={handleToggleWatchlist} className="h-10 w-10">
                         <Star
-                          className={`h-6 w-6 ${
-                            isWatchlisted ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
-                          }`}
+                          className={`h-6 w-6 ${isWatchlisted ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`}
                         />
                       </Button>
                     </div>
@@ -235,14 +239,13 @@ export default function AssetDetail() {
                     <div className="flex items-baseline gap-3 mb-6">
                       <span className="text-3xl font-semibold text-foreground">{asset.latestPrice}</span>
                       <span
-                        className={`text-lg font-medium ${
-                          asset.priceChange.startsWith("+") ? "text-success" : "text-destructive"
-                        }`}
+                        className={`text-lg font-medium ${asset.priceChange.startsWith("+") ? "text-success" : "text-destructive"}`}
                       >
                         {asset.priceChange}
                       </span>
                     </div>
 
+                    {/* Quick Insights */}
                     <div>
                       <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
                         Quick Insights
@@ -261,19 +264,16 @@ export default function AssetDetail() {
                         })}
                       </div>
 
-                      {/* News Impact */}
-                      {symbol && assetNewsEvents[symbol] && assetNewsEvents[symbol].length > 0 && (
+                      {/* News Impact (PILLS) */}
+                      {symbol && assetNewsEvents[symbol]?.length > 0 && (
                         <div className="mt-5">
                           <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
                             News Impact
                           </h3>
-                          <div className="space-y-2">
+
+                          <div className="flex flex-wrap gap-2">
                             {assetNewsEvents[symbol].map((newsItem, index) => {
-                              const impactColors = {
-                                High: "bg-destructive text-destructive-foreground",
-                                Medium: "bg-warning text-warning-foreground",
-                                Low: "bg-success text-success-foreground",
-                              };
+                              const hasMapping = Boolean(newsToCalendarEventId[newsItem.event]);
 
                               return (
                                 <button
@@ -282,30 +282,34 @@ export default function AssetDetail() {
                                   onPointerDown={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
+
+                                    // ✅ THIS is the fix (no more /alerts navigation)
                                     openCalendarOverlayByNewsLabel(newsItem.event);
                                   }}
-                                  className="w-full flex items-center gap-2 text-left hover:bg-muted/30 rounded-md px-2 py-1.5 transition-colors group"
+                                  className={[
+                                    "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors",
+                                    impactPillClasses(newsItem.impact),
+                                    hasMapping ? "hover:bg-muted/40" : "opacity-60 cursor-not-allowed",
+                                  ].join(" ")}
+                                  title={
+                                    hasMapping
+                                      ? "Open event details"
+                                      : "No matching calendar event ID yet (add it to calendarEvents.ts and map it)"
+                                  }
+                                  disabled={!hasMapping}
                                 >
-                                  <span
-                                    className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                                      impactColors[newsItem.impact]
-                                    }`}
-                                  >
-                                    {newsItem.impact}
-                                  </span>
-                                  <span className="text-sm text-foreground group-hover:text-primary transition-colors">
-                                    {newsItem.event}
-                                  </span>
-                                  <span className="text-sm text-muted-foreground">—</span>
-                                  <span className="text-sm text-muted-foreground">{newsItem.time}</span>
+                                  <span className="font-semibold">{newsItem.time}</span>
+                                  <span className="text-muted-foreground">—</span>
+                                  <span className="font-medium">{newsItem.event}</span>
+                                  <span className="text-muted-foreground">({newsItem.impact} Impact)</span>
                                 </button>
                               );
                             })}
                           </div>
 
-                          {/* Tiny helper if mapping missing */}
                           <p className="text-xs text-muted-foreground mt-2">
-                            Tip: If a news item doesn’t open, it just means its event ID hasn’t been mapped yet.
+                            If a pill is disabled, it just means we haven’t mapped that news label to a calendar event
+                            ID yet.
                           </p>
                         </div>
                       )}
@@ -385,7 +389,7 @@ export default function AssetDetail() {
               </CardContent>
             </Card>
 
-            {/* AI MARKET OVERVIEW */}
+            {/* AI Market Overview */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -503,12 +507,8 @@ export default function AssetDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* Nested Calendar overlay (same template as Calendar page) */}
-      <EventDetailsModal
-        event={selectedCalendarEvent as any}
-        isOpen={isEventModalOpen}
-        onClose={closeCalendarOverlay}
-      />
+      {/* Nested Calendar overlay */}
+      <EventDetailsModal event={selectedCalendarEvent} isOpen={isEventModalOpen} onClose={closeCalendarOverlay} />
     </>
   );
 }
