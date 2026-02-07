@@ -23,13 +23,11 @@ export function AppHeader({ title, rightContent }: AppHeaderProps) {
   return (
     <header
       className="
-        h-14
-        border-b border-border
-        flex items-center justify-between
-        px-6 gap-6
-        shrink-0
-        sticky top-0 z-30
-      "
+    h-14 sticky top-0 z-30
+    border-b border-border
+    bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/60
+    flex items-center justify-between px-6 gap-6 shrink-0
+  "
     >
       <h1 className="text-xl font-semibold text-foreground shrink-0">{title}</h1>
 
@@ -40,18 +38,12 @@ export function AppHeader({ title, rightContent }: AppHeaderProps) {
           type="text"
           placeholder="Smart Search (Coming Soon)"
           disabled
-          className="
-            pl-10 h-9
-            bg-transparent
-            border-muted
-            text-sm
-          "
+          className="pl-10 h-9 bg-muted/50 border-muted text-sm"
         />
       </div>
 
       <div className="flex items-center gap-4 shrink-0">
         {rightContent}
-
         <Badge variant="secondary" className="text-xs font-medium h-6 px-2.5">
           Pro
         </Badge>
@@ -63,7 +55,6 @@ export function AppHeader({ title, rightContent }: AppHeaderProps) {
             </Avatar>
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           </DropdownMenuTrigger>
-
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel className="py-2">
               <div className="flex flex-col space-y-1">
@@ -71,21 +62,16 @@ export function AppHeader({ title, rightContent }: AppHeaderProps) {
                 <p className="text-xs text-muted-foreground">john@example.com</p>
               </div>
             </DropdownMenuLabel>
-
             <DropdownMenuSeparator />
-
             <DropdownMenuItem className="py-2">
               <User className="mr-2.5 h-4 w-4" />
               Profile
             </DropdownMenuItem>
-
             <DropdownMenuItem className="py-2" onClick={lock}>
               <Lock className="mr-2.5 h-4 w-4" />
               Lock now
             </DropdownMenuItem>
-
             <DropdownMenuSeparator />
-
             <DropdownMenuItem className="py-2">
               <LogOut className="mr-2.5 h-4 w-4" />
               Sign out
