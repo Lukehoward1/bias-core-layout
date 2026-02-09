@@ -1,4 +1,7 @@
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+
+import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +18,6 @@ import {
   Minus,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useNavigate, useLocation } from "react-router-dom";
 
 interface CalendarEvent {
   time: string;
@@ -103,6 +105,22 @@ const getMarketInterpretation = (eventName: string, currency: string, _isRelease
       bias: "neutral",
       pairs: ["GBPUSD", "EURGBP", "GBPJPY"],
     },
+    "US CPI": {
+      description:
+        "Measures inflation at the consumer level. One of the most market-moving releases for USD and risk assets.",
+      impact:
+        "Higher-than-expected CPI is typically bullish for USD (higher rates for longer). Lower-than-expected CPI is usually bearish for USD and supportive for risk assets.",
+      bias: "neutral",
+      pairs: ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD"],
+    },
+    "US Core CPI": {
+      description:
+        "Measures inflation excluding food and energy. Often watched more closely than headline CPI for policy expectations.",
+      impact:
+        "A higher core print usually supports USD (hawkish Fed expectations). A weaker core print tends to weigh on USD and support risk sentiment.",
+      bias: "neutral",
+      pairs: ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD"],
+    },
   };
 
   const defaultInterpretation = {
@@ -134,6 +152,8 @@ const getEventNarrative = (event: CalendarEvent) => {
     "Non-Farm Payrolls": `The US economy added ${event.actual} jobs in the latest reporting period, compared to expectations of ${event.forecast}. This suggests continued resilience in the labor market, with implications for Federal Reserve policy decisions.`,
     "Unemployment Rate": `Unemployment came in at ${event.actual}, against forecasts of ${event.forecast}. This reading indicates the current state of the US labor market and will factor into Fed deliberations.`,
     "ECB Interest Rate Decision": `The ECB has set rates at ${event.actual}, in line with/diverging from market expectations of ${event.forecast}. This decision reflects the central bank's assessment of inflation and economic conditions.`,
+    "US CPI": `US CPI printed at ${event.actual} versus ${event.forecast} forecast. Traders will reassess rate expectations and USD strength based on the inflation surprise.`,
+    "US Core CPI": `US Core CPI printed at ${event.actual} versus ${event.forecast} forecast. Core inflation is closely watched for policy direction and USD repricing.`,
   };
 
   return (
@@ -149,11 +169,20 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
   if (!event) return null;
 
   const isReleased = event.actual !== "—";
-  const historicalData = getHistoricalData(event.event);
+
+  const historicalData = useMemo(() => getHistoricalData(event.event), [event.event]);
   const maxValue = Math.max(...historicalData.map((d) => d.actual || d.forecast || 0));
-  const interpretation = getMarketInterpretation(event.event, event.currency, isReleased);
-  const narrative = getEventNarrative(event);
-  const interpretationGuide = getInterpretationGuide(event.event, event.currency);
+
+  const interpretation = useMemo(
+    () => getMarketInterpretation(event.event, event.currency, isReleased),
+    [event.event, event.currency, isReleased],
+  );
+
+  const narrative = useMemo(() => getEventNarrative(event), [event]);
+  const interpretationGuide = useMemo(
+    () => getInterpretationGuide(event.event, event.currency),
+    [event.event, event.currency],
+  );
 
   const getImpactColor = (impact: string) => {
     if (impact === "high") return "bg-destructive text-destructive-foreground";
@@ -191,11 +220,31 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     return "text-warning";
   };
 
+  /**
+   * ✅ KEY FIX:
+   * Close this event modal first, then navigate to the clicked pair.
+   * This prevents the new pair modal from appearing "behind" the event modal.
+   */
+  const openPairFromEvent = (pair: string) => {
+    // Close event card first
+    onClose();
+
+    // Keep whatever "from" filter is already in the URL if present
+    const from = new URLSearchParams(location.search).get("from") ?? "All";
+
+    // Navigate on next tick so the modal has actually unmounted
+    setTimeout(() => {
+      navigate(`/asset/${pair}?from=${encodeURIComponent(from)}`, {
+        state: { backgroundLocation: location.state?.backgroundLocation ?? location },
+      });
+    }, 0);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      {/* ✅ IMPORTANT: No DialogOverlay here.
-          This prevents the nested modal from applying the black bg overlay.
-          The parent AssetDetail overlay remains visible (blurred). */}
+      {/* Explicit overlay click-to-close */}
+      <DialogOverlay onPointerDown={() => onClose()} />
+
       <DialogContent className="max-w-6xl w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border-border p-0">
         {/* Header Row */}
         <div className="sticky top-0 z-10 bg-background border-b border-border px-8 py-5">
@@ -216,7 +265,6 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                 <span>Today at {event.time} GMT</span>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex gap-2 shrink-0">
                 <Button variant="outline" size="sm" className="gap-1.5" onClick={handleAddToWatchlist}>
                   <Star className="h-3.5 w-3.5" />
@@ -232,7 +280,6 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
         </div>
 
         <div className="px-8 py-6 space-y-6">
-          {/* Two Column Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Market Interpretation */}
             <Card className="bg-card border-border">
@@ -270,25 +317,28 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
 
                 <div className="pt-4 border-t border-border/50">
                   <div className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">Most Impacted Pairs</div>
+
+                  {/* ✅ NOW CLICKABLE and opens on top (closes modal first) */}
                   <div className="flex flex-wrap gap-2">
-                    {interpretation.pairs.map((pair) => {
-                      const symbol = pair.replace("/", "");
-                      return (
+                    {interpretation.pairs.map((pair) => (
+                      <button
+                        key={pair}
+                        type="button"
+                        onPointerDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          openPairFromEvent(pair);
+                        }}
+                        className="focus:outline-none"
+                      >
                         <Badge
-                          key={pair}
                           variant="secondary"
                           className="text-xs font-mono cursor-pointer hover:bg-primary/20 transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/asset/${symbol}`, {
-                              state: { backgroundLocation: location.state?.backgroundLocation ?? location },
-                            });
-                          }}
                         >
                           {pair}
                         </Badge>
-                      );
-                    })}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </CardContent>
