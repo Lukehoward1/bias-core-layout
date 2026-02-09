@@ -1,11 +1,10 @@
 import React from "react";
 import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useAssets } from "@/hooks/use-watchlist";
-import { useWatchlist } from "@/hooks/use-watchlist";
-import { TrendingUp, TrendingDown, Minus, Star, StarOff, BarChart3, Activity, Shield, X } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { useAssets, useWatchlist } from "@/hooks/use-watchlist";
+import { Star, TrendingUp, TrendingDown, Minus, BarChart3, Activity, Shield, X } from "lucide-react";
 
 interface AssetQuickViewModalProps {
   symbol: string;
@@ -18,10 +17,23 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
   const { isInWatchlist, toggleWatchlist } = useWatchlist();
 
   const asset = getAssetBySymbol(symbol);
+  const isWatchlisted = isInWatchlist(symbol);
+
+  const getBiasColor = (bias: string) => {
+    if (bias === "Bullish") return "text-success";
+    if (bias === "Bearish") return "text-destructive";
+    return "text-muted-foreground";
+  };
+
+  const getBiasIcon = (bias: string) => {
+    if (bias === "Bullish") return <TrendingUp className="h-5 w-5" />;
+    if (bias === "Bearish") return <TrendingDown className="h-5 w-5" />;
+    return <Minus className="h-5 w-5" />;
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      {/* Overlay: clicking it closes THIS top modal (and prevents click-through) */}
+      {/* Overlay: closes THIS modal and prevents click-through */}
       <DialogOverlay
         className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200]"
         onPointerDown={(e) => {
@@ -31,12 +43,9 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
         }}
       />
 
-      {/* Content: block pointer events from leaking to modal behind */}
       <DialogContent
         className="max-w-6xl w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border-border p-0 z-[201]"
-        onPointerDown={(e) => {
-          e.stopPropagation();
-        }}
+        onPointerDown={(e) => e.stopPropagation()}
       >
         {!asset ? (
           <div className="px-8 py-12 text-center space-y-4">
@@ -47,128 +56,117 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
           </div>
         ) : (
           <>
-            {/* Sticky header */}
-            <div className="sticky top-0 z-10 bg-background border-b border-border px-8 py-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-2xl font-bold text-foreground">{asset.displayName}</h2>
-                  <Badge variant="outline" className="text-xs">
-                    {asset.category}
-                  </Badge>
-                </div>
+            {/* Top bar (same feel as other modals) */}
+            <div className="sticky top-0 z-10 bg-background border-b border-border px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-semibold text-foreground">{asset.symbol}</h2>
+                <Badge variant="outline" className="text-xs">
+                  {asset.category}
+                </Badge>
+              </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => toggleWatchlist(symbol)}
-                    className="p-1.5 rounded hover:bg-accent transition-colors"
-                    title={isInWatchlist(symbol) ? "Remove from watchlist" : "Add to watchlist"}
-                  >
-                    {isInWatchlist(symbol) ? (
-                      <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                    ) : (
-                      <StarOff className="h-5 w-5 text-muted-foreground" />
-                    )}
-                  </button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => toggleWatchlist(symbol)}
+                  className="h-9 w-9"
+                  title={isWatchlisted ? "Remove from watchlist" : "Add to watchlist"}
+                >
+                  <Star
+                    className={`h-5 w-5 ${isWatchlisted ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`}
+                  />
+                </Button>
 
-                  <button
-                    onClick={onClose}
-                    className="p-1.5 rounded-sm opacity-70 hover:opacity-100 transition-opacity ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                  >
-                    <X className="h-4 w-4" />
-                    <span className="sr-only">Close</span>
-                  </button>
-                </div>
+                <Button variant="ghost" size="icon" onClick={onClose} className="h-9 w-9">
+                  <X className="h-5 w-5" />
+                </Button>
               </div>
             </div>
 
-            {/* Body */}
-            <div className="px-8 py-6 space-y-6">
-              {/* Price row */}
-              <div className="flex items-baseline gap-3">
-                <span className="text-3xl font-bold tracking-tight">{asset.latestPrice}</span>
-                <span
-                  className={`text-sm font-medium ${
-                    asset.priceChange.startsWith("+")
-                      ? "text-emerald-400"
-                      : asset.priceChange.startsWith("-")
-                        ? "text-red-400"
-                        : "text-muted-foreground"
-                  }`}
-                >
-                  {asset.priceChange}
-                </span>
-              </div>
+            <div className="p-6">
+              {/* Hero card (matches AssetDetail “unified hero” spacing/feel) */}
+              <Card className="overflow-hidden">
+                <CardContent className="p-8">
+                  <div className="grid lg:grid-cols-2 gap-8">
+                    {/* LEFT */}
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-3 mb-3">
+                        <h1 className="text-4xl font-bold text-foreground">{asset.symbol}</h1>
+                        <Badge variant="outline" className="text-xs">
+                          {asset.category}
+                        </Badge>
+                      </div>
 
-              {/* Bias */}
-              <div className="flex items-center gap-2">
-                {asset.biasDirection === "Bullish" ? (
-                  <TrendingUp className="h-4 w-4 text-emerald-400" />
-                ) : asset.biasDirection === "Bearish" ? (
-                  <TrendingDown className="h-4 w-4 text-red-400" />
-                ) : (
-                  <Minus className="h-4 w-4 text-yellow-400" />
-                )}
+                      <div className="flex items-baseline gap-3 mb-5">
+                        <span className="text-3xl font-semibold text-foreground">{asset.latestPrice}</span>
+                        <span
+                          className={`text-lg font-medium ${
+                            asset.priceChange.startsWith("+") ? "text-success" : "text-destructive"
+                          }`}
+                        >
+                          {asset.priceChange}
+                        </span>
+                      </div>
 
-                <span
-                  className={`font-semibold ${
-                    asset.biasDirection === "Bullish"
-                      ? "text-emerald-400"
-                      : asset.biasDirection === "Bearish"
-                        ? "text-red-400"
-                        : "text-yellow-400"
-                  }`}
-                >
-                  {asset.biasDirection}
-                </span>
+                      <div className={`flex items-center gap-2 ${getBiasColor(asset.biasDirection)}`}>
+                        {getBiasIcon(asset.biasDirection)}
+                        <span className="text-xl font-bold">{asset.biasDirection}</span>
+                        <span className="text-sm text-muted-foreground">({asset.biasConfidence}% confidence)</span>
+                      </div>
 
-                <span className="text-xs text-muted-foreground">({asset.biasConfidence}% confidence)</span>
-              </div>
-
-              {/* Stats grid */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <Card className="bg-muted/40 border-border/50">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Volume</p>
-                      <p className="text-sm font-semibold">{asset.volume}</p>
+                      {asset.insight && (
+                        <p className="text-sm text-muted-foreground mt-4">
+                          <span className="mr-2">💡</span>
+                          {asset.insight}
+                        </p>
+                      )}
                     </div>
-                  </CardContent>
-                </Card>
 
-                <Card className="bg-muted/40 border-border/50">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <Activity className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Spread</p>
-                      <p className="text-sm font-semibold">{asset.spread}</p>
+                    {/* RIGHT */}
+                    <div className="flex flex-col">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-4 bg-muted/30 rounded-lg">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                            <BarChart3 className="h-4 w-4" />
+                            Volume
+                          </div>
+                          <div className="text-lg font-semibold text-foreground">{asset.volume}</div>
+                        </div>
+
+                        <div className="p-4 bg-muted/30 rounded-lg">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                            <Activity className="h-4 w-4" />
+                            Spread
+                          </div>
+                          <div className="text-lg font-semibold text-foreground">{asset.spread}</div>
+                        </div>
+
+                        <div className="p-4 bg-muted/30 rounded-lg">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                            <Shield className="h-4 w-4" />
+                            Confidence
+                          </div>
+                          <div className="text-lg font-semibold text-foreground">{asset.biasConfidence}%</div>
+                        </div>
+
+                        <div className="p-4 bg-muted/30 rounded-lg">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                            <TrendingUp className="h-4 w-4" />
+                            Sentiment
+                          </div>
+                          <div className="text-lg font-semibold text-foreground">{asset.sentiment}</div>
+                        </div>
+                      </div>
+
+                      {/* Optional: keeps the modal feeling “full” even when content is short */}
+                      <div className="mt-5 text-xs text-muted-foreground">
+                        Quick view — open the full asset card for deeper analysis.
+                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-muted/40 border-border/50">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <Shield className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Confidence</p>
-                      <p className="text-sm font-semibold">{asset.biasConfidence}%</p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-muted/40 border-border/50">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Sentiment</p>
-                      <p className="text-sm font-semibold">{asset.sentiment}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Insight */}
-              {asset.insight && <p className="text-xs text-muted-foreground italic">💡 {asset.insight}</p>}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </>
         )}
