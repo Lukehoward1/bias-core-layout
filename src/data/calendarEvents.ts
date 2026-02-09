@@ -19,7 +19,7 @@ export const keyEvents: Array<Pick<CalendarEvent, "id" | "time" | "currency" | "
   { id: "boe-rate-2025-01", time: "14:00", currency: "GBP", event: "BOE Interest Rate Decision", impact: "high" },
   { id: "us-cpi-2025-01", time: "14:30", currency: "USD", event: "US CPI", impact: "high" },
 
-  // ✅ Optional but recommended since you’re linking to it from AssetDetail
+  // Optional but recommended – used by AssetDetail → Calendar matching
   { id: "us-core-cpi-2025-01", time: "15:00", currency: "USD", event: "US Core CPI", impact: "high" },
 ];
 
@@ -89,8 +89,8 @@ export const calendarEvents: CalendarEvent[] = [
   },
 
   /**
-   * ✅ Used by AssetDetail matching for "Core CPI (USD)"
-   * NOTE: event label is now consistent with the calendar style (currency is in its own column).
+   * Used by AssetDetail matching for "Core CPI (USD)"
+   * Event label intentionally excludes currency — currency lives in its own column
    */
   {
     id: "us-core-cpi-2025-01",
