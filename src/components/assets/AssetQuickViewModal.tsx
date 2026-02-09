@@ -7,7 +7,7 @@ import { useAssets } from "@/hooks/use-watchlist";
 import { useWatchlist } from "@/hooks/use-watchlist";
 import { TrendingUp, TrendingDown, Minus, Star, StarOff, BarChart3, Activity, Shield, X } from "lucide-react";
 
-export interface AssetQuickViewModalProps {
+interface AssetQuickViewModalProps {
   symbol: string;
   isOpen: boolean;
   onClose: () => void;
@@ -21,23 +21,20 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      {/* IMPORTANT: Higher z-index than EventDetailsModal so it ALWAYS sits on top */}
+      {/* Overlay */}
       <DialogOverlay
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[300]"
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200]"
         onPointerDown={(e) => {
-          // prevent click-through to modal behind
           e.preventDefault();
           e.stopPropagation();
           onClose();
         }}
       />
 
+      {/* CONTENT — forced wide layout */}
       <DialogContent
-        className="max-w-6xl w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border-border p-0 z-[301]"
-        onPointerDown={(e) => {
-          // prevent click-through to modal behind
-          e.stopPropagation();
-        }}
+        className="!max-w-6xl !w-[96vw] !max-h-[92vh] !p-0 overflow-y-auto scrollbar-hidden bg-background border-border z-[201]"
+        onPointerDown={(e) => e.stopPropagation()}
       >
         {!asset ? (
           <div className="px-8 py-12 text-center space-y-4">
@@ -48,7 +45,7 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
           </div>
         ) : (
           <>
-            {/* Sticky header */}
+            {/* Header */}
             <div className="sticky top-0 z-10 bg-background border-b border-border px-8 py-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -73,10 +70,9 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
 
                   <button
                     onClick={onClose}
-                    className="p-1.5 rounded-sm opacity-70 hover:opacity-100 transition-opacity ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    className="p-1.5 rounded-sm opacity-70 hover:opacity-100 transition-opacity"
                   >
                     <X className="h-4 w-4" />
-                    <span className="sr-only">Close</span>
                   </button>
                 </div>
               </div>
@@ -84,7 +80,7 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
 
             {/* Body */}
             <div className="px-8 py-6 space-y-6">
-              {/* Price row */}
+              {/* Price */}
               <div className="flex items-baseline gap-3">
                 <span className="text-3xl font-bold tracking-tight">{asset.latestPrice}</span>
                 <span
@@ -125,7 +121,7 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
                 <span className="text-xs text-muted-foreground">({asset.biasConfidence}% confidence)</span>
               </div>
 
-              {/* Stats grid */}
+              {/* Stats */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <Card className="bg-muted/40 border-border/50">
                   <CardContent className="p-4 flex items-center gap-3">
