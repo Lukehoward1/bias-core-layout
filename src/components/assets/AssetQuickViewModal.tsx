@@ -29,9 +29,9 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
         }}
       />
 
+      {/* ✅ Force XL sizing here (no data-variant reliance) */}
       <DialogContent
-        data-size="xl"
-        className="z-[301] w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden"
+        className="z-[301] w-[96vw] max-w-6xl max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border-border p-0"
         onPointerDown={(e) => e.stopPropagation()}
       >
         {!asset ? (
@@ -43,18 +43,22 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
           </div>
         ) : (
           <>
-            {/* Header */}
+            {/* Sticky header */}
             <div className="sticky top-0 z-10 bg-background border-b border-border px-8 py-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <h2 className="text-2xl font-bold">{asset.displayName}</h2>
+                  <h2 className="text-2xl font-bold text-foreground">{asset.displayName}</h2>
                   <Badge variant="outline" className="text-xs">
                     {asset.category}
                   </Badge>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button onClick={() => toggleWatchlist(symbol)} className="p-1.5 rounded hover:bg-accent">
+                  <button
+                    onClick={() => toggleWatchlist(symbol)}
+                    className="p-1.5 rounded hover:bg-accent transition-colors"
+                    title={isInWatchlist(symbol) ? "Remove from watchlist" : "Add to watchlist"}
+                  >
                     {isInWatchlist(symbol) ? (
                       <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
                     ) : (
@@ -62,8 +66,12 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
                     )}
                   </button>
 
-                  <button onClick={onClose} className="p-1.5 rounded-sm opacity-70 hover:opacity-100">
+                  <button
+                    onClick={onClose}
+                    className="p-1.5 rounded-sm opacity-70 hover:opacity-100 transition-opacity ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  >
                     <X className="h-4 w-4" />
+                    <span className="sr-only">Close</span>
                   </button>
                 </div>
               </div>
@@ -72,7 +80,7 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
             {/* Body */}
             <div className="px-8 py-6 space-y-6">
               <div className="flex items-baseline gap-3">
-                <span className="text-3xl font-bold">{asset.latestPrice}</span>
+                <span className="text-3xl font-bold tracking-tight">{asset.latestPrice}</span>
                 <span
                   className={`text-sm font-medium ${
                     asset.priceChange.startsWith("+")
@@ -95,15 +103,60 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
                   <Minus className="h-4 w-4 text-yellow-400" />
                 )}
 
-                <span className="font-semibold">{asset.biasDirection}</span>
+                <span
+                  className={`font-semibold ${
+                    asset.biasDirection === "Bullish"
+                      ? "text-emerald-400"
+                      : asset.biasDirection === "Bearish"
+                        ? "text-red-400"
+                        : "text-yellow-400"
+                  }`}
+                >
+                  {asset.biasDirection}
+                </span>
                 <span className="text-xs text-muted-foreground">({asset.biasConfidence}% confidence)</span>
               </div>
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <StatCard icon={<BarChart3 />} label="Volume" value={asset.volume} />
-                <StatCard icon={<Activity />} label="Spread" value={asset.spread} />
-                <StatCard icon={<Shield />} label="Confidence" value={`${asset.biasConfidence}%`} />
-                <StatCard icon={<TrendingUp />} label="Sentiment" value={asset.sentiment} />
+                <Card className="bg-muted/40 border-border/50">
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Volume</p>
+                      <p className="text-sm font-semibold">{asset.volume}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-muted/40 border-border/50">
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <Activity className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Spread</p>
+                      <p className="text-sm font-semibold">{asset.spread}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-muted/40 border-border/50">
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <Shield className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Confidence</p>
+                      <p className="text-sm font-semibold">{asset.biasConfidence}%</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-muted/40 border-border/50">
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Sentiment</p>
+                      <p className="text-sm font-semibold">{asset.sentiment}</p>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
 
               {asset.insight && <p className="text-xs text-muted-foreground italic">💡 {asset.insight}</p>}
@@ -112,19 +165,5 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
         )}
       </DialogContent>
     </Dialog>
-  );
-}
-
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
-  return (
-    <Card className="bg-muted/40 border-border/50">
-      <CardContent className="p-4 flex items-center gap-3">
-        {icon}
-        <div>
-          <p className="text-xs text-muted-foreground">{label}</p>
-          <p className="text-sm font-semibold">{value}</p>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
