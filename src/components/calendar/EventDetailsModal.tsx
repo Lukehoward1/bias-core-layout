@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAssets } from "@/hooks/use-watchlist";
 import {
   TrendingUp,
   Clock,
@@ -177,6 +178,8 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     setQuickViewSymbol(null);
   };
 
+  const { getAssetBySymbol } = useAssets();
+
   if (!event) return null;
 
   const isReleased = event.actual !== "—";
@@ -299,25 +302,37 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                 <div className="pt-4 border-t border-border/50">
                   <div className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">Most Impacted Pairs</div>
                   <div className="flex flex-wrap gap-2">
-                    {interpretation.pairs.map((pair) => (
-                      <button
-                        key={pair}
-                        type="button"
-                        onPointerDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          openQuickView(pair);
-                        }}
-                        className="focus:outline-none"
-                      >
-                        <Badge
-                          variant="secondary"
-                          className="text-xs font-mono cursor-pointer hover:bg-primary/20 transition-colors"
+                    {interpretation.pairs.map((pair) => {
+                      const exists = !!getAssetBySymbol(pair);
+                      return exists ? (
+                        <button
+                          key={pair}
+                          type="button"
+                          onPointerDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openQuickView(pair);
+                          }}
+                          className="focus:outline-none"
                         >
-                          {pair}
-                        </Badge>
-                      </button>
-                    ))}
+                          <Badge
+                            variant="secondary"
+                            className="text-xs font-mono cursor-pointer hover:bg-primary/20 transition-colors"
+                          >
+                            {pair}
+                          </Badge>
+                        </button>
+                      ) : (
+                        <span key={pair} title="Coming soon">
+                          <Badge
+                            variant="secondary"
+                            className="text-xs font-mono opacity-50 cursor-not-allowed"
+                          >
+                            {pair}
+                          </Badge>
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               </CardContent>
