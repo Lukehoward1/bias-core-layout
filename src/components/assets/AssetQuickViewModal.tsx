@@ -3,7 +3,8 @@ import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useAssets, useWatchlist } from "@/hooks/use-watchlist";
+import { useAssets } from "@/hooks/use-watchlist";
+import { useWatchlist } from "@/hooks/use-watchlist";
 import { TrendingUp, TrendingDown, Minus, Star, StarOff, BarChart3, Activity, Shield, X } from "lucide-react";
 
 interface AssetQuickViewModalProps {
@@ -20,8 +21,9 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      {/* Overlay: clicking it closes THIS top modal (and prevents click-through) */}
       <DialogOverlay
-        className="z-[300]"
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[300]"
         onPointerDown={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -29,12 +31,13 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
         }}
       />
 
-      {/* ✅ Force XL sizing here (no data-variant reliance) */}
+      {/* Content: force wide size + block pointer events leaking to modal behind */}
       <DialogContent
-  className="z-[301] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border-border p-0"
-  style={{ width: "96vw", maxWidth: "72rem" }} // ✅ 72rem = Tailwind max-w-6xl
-  onPointerDown={(e) => e.stopPropagation()}
->
+        className="z-[301] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border-border p-0"
+        style={{ width: "96vw", maxWidth: "72rem" }} // 72rem = Tailwind max-w-6xl
+        onPointerDown={(e) => {
+          e.stopPropagation();
+        }}
       >
         {!asset ? (
           <div className="px-8 py-12 text-center space-y-4">
@@ -81,6 +84,7 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
 
             {/* Body */}
             <div className="px-8 py-6 space-y-6">
+              {/* Price row */}
               <div className="flex items-baseline gap-3">
                 <span className="text-3xl font-bold tracking-tight">{asset.latestPrice}</span>
                 <span
@@ -96,6 +100,7 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
                 </span>
               </div>
 
+              {/* Bias */}
               <div className="flex items-center gap-2">
                 {asset.biasDirection === "Bullish" ? (
                   <TrendingUp className="h-4 w-4 text-emerald-400" />
@@ -116,9 +121,11 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
                 >
                   {asset.biasDirection}
                 </span>
+
                 <span className="text-xs text-muted-foreground">({asset.biasConfidence}% confidence)</span>
               </div>
 
+              {/* Stats grid */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <Card className="bg-muted/40 border-border/50">
                   <CardContent className="p-4 flex items-center gap-3">
@@ -161,6 +168,7 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
                 </Card>
               </div>
 
+              {/* Insight */}
               {asset.insight && <p className="text-xs text-muted-foreground italic">💡 {asset.insight}</p>}
             </div>
           </>
