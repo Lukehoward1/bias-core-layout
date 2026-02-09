@@ -1,8 +1,8 @@
+import { useState } from "react";
 import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useLocation, useNavigate } from "react-router-dom";
 import {
   TrendingUp,
   Clock,
@@ -16,6 +16,11 @@ import {
   Minus,
 } from "lucide-react";
 import { toast } from "sonner";
+import * as AssetQuickViewModalModule from "@/components/assets/AssetQuickViewModal";
+
+const AssetQuickViewModalAny =
+  (AssetQuickViewModalModule as any).default ??
+  (AssetQuickViewModalModule as any).AssetQuickViewModal;
 
 interface CalendarEvent {
   time: string;
@@ -159,8 +164,18 @@ const getEventNarrative = (event: CalendarEvent) => {
 };
 
 export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalProps) {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const [quickViewSymbol, setQuickViewSymbol] = useState<string | null>(null);
+  const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
+
+  const openQuickView = (symbol: string) => {
+    setQuickViewSymbol(symbol);
+    setIsQuickViewOpen(true);
+  };
+
+  const closeQuickView = () => {
+    setIsQuickViewOpen(false);
+    setQuickViewSymbol(null);
+  };
 
   if (!event) return null;
 
@@ -208,18 +223,6 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     return "text-warning";
   };
 
-  // ✅ Close event modal first, then navigate to the clicked pair so it appears on top
-  const openPairFromEvent = (pair: string) => {
-    onClose();
-
-    const from = new URLSearchParams(location.search).get("from") ?? "All";
-
-    setTimeout(() => {
-      navigate(`/asset/${pair}?from=${encodeURIComponent(from)}`, {
-        state: { backgroundLocation: (location.state as any)?.backgroundLocation ?? location },
-      });
-    }, 0);
-  };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -303,7 +306,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                         onPointerDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          openPairFromEvent(pair);
+                          openQuickView(pair);
                         }}
                         className="focus:outline-none"
                       >
@@ -435,6 +438,14 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
           </Card>
         </div>
       </DialogContent>
+
+      {AssetQuickViewModalAny && quickViewSymbol && (
+        <AssetQuickViewModalAny
+          symbol={quickViewSymbol}
+          isOpen={isQuickViewOpen}
+          onClose={closeQuickView}
+        />
+      )}
     </Dialog>
   );
 }
