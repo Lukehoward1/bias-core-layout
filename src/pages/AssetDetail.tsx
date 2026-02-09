@@ -232,6 +232,9 @@ export default function AssetDetail() {
   // ✅ default High-only, toggle to show all relevant
   const [showAllRelevantNews, setShowAllRelevantNews] = useState(false);
 
+  // Cap visible news pills to 3 by default
+  const [newsExpanded, setNewsExpanded] = useState(false);
+
   const closeToMarkets = () => {
     navigate(`/markets?filter=${returnFilter}`, { replace: true });
   };
@@ -444,7 +447,7 @@ export default function AssetDetail() {
                           </div>
 
                           <div className="space-y-2">
-                            {newsImpactPills.map((pill) => {
+                            {(newsExpanded ? newsImpactPills : newsImpactPills.slice(0, 3)).map((pill) => {
                               const impactColors = {
                                 High: "bg-destructive text-destructive-foreground",
                                 Medium: "bg-warning text-warning-foreground",
@@ -478,6 +481,18 @@ export default function AssetDetail() {
                               );
                             })}
                           </div>
+
+                          {newsImpactPills.length > 3 && (
+                            <button
+                              type="button"
+                              onClick={() => setNewsExpanded((v) => !v)}
+                              className="text-xs text-primary hover:underline mt-1"
+                            >
+                              {newsExpanded
+                                ? "Show less"
+                                : `+${newsImpactPills.length - 3} more · Show more`}
+                            </button>
+                          )}
 
                           <p className="text-xs text-muted-foreground mt-2">
                             If something doesn’t open, it means the event doesn’t exist in <code>calendarEvents</code>{" "}
