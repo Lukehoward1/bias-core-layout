@@ -10,7 +10,8 @@ import { Star, TrendingUp, TrendingDown, Minus, Activity, AlertTriangle, Clock, 
 
 import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
-import { calendarEvents, type CalendarEvent } from "@/data/calendarEvents";
+import { calendarEvents } from "@/data/calendarEvents";
+import { toast } from "sonner";
 
 /* =======================
    DATA (demo placeholders)
@@ -93,18 +94,82 @@ const sessionInsights = [
 ];
 
 /* =======================
-   NEWS → CALENDAR EVENT MAPPING
-   (Only map to IDs that exist in calendarEvents.ts)
+   NEWS → CALENDAR MATCHING (AUTO)
 ======================= */
 
-const newsToCalendarEventId: Record<string, string> = {
-  "CPI (USD)": "us-cpi-2025-01",
-  "US CPI": "us-cpi-2025-01",
-  "Non-Farm Payrolls": "nfp-2025-01",
-  "ECB Interest Rate Decision": "ecb-rate-2025-01",
-  "BOE Interest Rate Decision": "boe-rate-2025-01",
-  // NOTE: "Core CPI (USD)" is NOT in your calendarEvents list right now.
-  // If you add it later, map it here to its ID.
+type CalendarEvent = (typeof calendarEvents)[0];
+
+const normalize = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/\(.*?\)/g, " ") // remove bracketed currency like (USD)
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const extractCurrencyFromLabel = (label: string) => {
+  const m = label.match(/\(([A-Z]{3})\)/);
+  return m?.[1] ?? null;
+};
+
+const extractTimeHHMM = (timeStr: string) => {
+  const m = timeStr.match(/(\d{1,2}:\d{2})/);
+  if (!m) return null;
+  // normalize to 2-digit hour
+  const [hh, mm] = m[1].split(":");
+  return `${hh.padStart(2, "0")}:${mm}`;
+};
+
+// Small alias layer so common variations match nicely
+const normalizeEventAlias = (label: string) => {
+  const raw = normalize(label);
+
+  // Examples:
+  // "cpi" pills should match "us cpi"
+  if (raw === "cpi") return "us cpi";
+  if (raw.includes("core cpi")) return "core cpi";
+  if (raw.includes("interest rate decision")) return "interest rate decision";
+  if (raw.includes("non farm payroll")) return "non farm payrolls";
+
+  return raw;
+};
+
+const scoreCalendarMatch = (args: {
+  pillLabel: string;
+  pillCurrency: string | null;
+  pillTime: string | null;
+  candidate: CalendarEvent;
+}) => {
+  const { pillLabel, pillCurrency, pillTime, candidate } = args;
+
+  const pillNorm = normalizeEventAlias(pillLabel);
+  const candNorm = normalize(candidate.event);
+
+  let score = 0;
+
+  // Text similarity
+  if (candNorm === pillNorm) score += 6;
+  if (candNorm.includes(pillNorm) || pillNorm.includes(candNorm)) score += 4;
+
+  // Token overlap
+  const pillTokens = new Set(pillNorm.split(" ").filter(Boolean));
+  const candTokens = new Set(candNorm.split(" ").filter(Boolean));
+  let overlap = 0;
+  pillTokens.forEach((t) => {
+    if (candTokens.has(t)) overlap += 1;
+  });
+  score += overlap; // +1 per shared token
+
+  // Currency match
+  if (pillCurrency && candidate.currency?.toUpperCase() === pillCurrency.toUpperCase()) score += 3;
+
+  // Time match
+  if (pillTime && candidate.time === pillTime) score += 2;
+
+  // Prefer higher impact if close
+  if (candidate.impact === "high") score += 0.5;
+
+  return score;
 };
 
 export default function AssetDetail() {
@@ -123,7 +188,7 @@ export default function AssetDetail() {
   // Asset modal open
   const [open, setOpen] = useState(true);
 
-  // Calendar event overlay (nested)
+  // Calendar Event overlay open (nested)
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
@@ -135,14 +200,30 @@ export default function AssetDetail() {
     if (symbol) toggleWatchlist(symbol);
   };
 
-  const openCalendarOverlayByNewsLabel = useCallback((newsLabel: string) => {
-    const eventId = newsToCalendarEventId[newsLabel];
-    if (!eventId) return;
+  const openCalendarOverlayFromNewsPill = useCallback((newsLabel: string, newsTime: string) => {
+    const pillCurrency = extractCurrencyFromLabel(newsLabel);
+    const pillTime = extractTimeHHMM(newsTime);
 
-    const match = calendarEvents.find((e) => e.id === eventId) ?? null;
-    if (!match) return;
+    let best: { ev: CalendarEvent; score: number } | null = null;
 
-    setSelectedCalendarEvent(match);
+    for (const ev of calendarEvents) {
+      const s = scoreCalendarMatch({
+        pillLabel: newsLabel,
+        pillCurrency,
+        pillTime,
+        candidate: ev,
+      });
+
+      if (!best || s > best.score) best = { ev, score: s };
+    }
+
+    // Threshold so we don't open completely unrelated things
+    if (!best || best.score < 4) {
+      toast.error("No matching calendar event found for this news item yet.");
+      return;
+    }
+
+    setSelectedCalendarEvent(best.ev);
     setIsEventModalOpen(true);
   }, []);
 
@@ -174,12 +255,6 @@ export default function AssetDetail() {
       ]
     );
   }, [symbol, asset]);
-
-  const impactPillClasses = (impact: "High" | "Medium" | "Low") => {
-    if (impact === "High") return "bg-destructive/20 text-destructive border-destructive/30";
-    if (impact === "Medium") return "bg-warning/20 text-warning border-warning/30";
-    return "bg-success/15 text-success border-success/25";
-  };
 
   if (!asset) {
     return (
@@ -221,7 +296,7 @@ export default function AssetDetail() {
           </div>
 
           <div className="p-6 space-y-6">
-            {/* HERO */}
+            {/* UNIFIED HERO CARD */}
             <Card className="overflow-hidden">
               <CardContent className="p-8">
                 <div className="grid lg:grid-cols-2 gap-8">
@@ -231,7 +306,9 @@ export default function AssetDetail() {
                       <h1 className="text-4xl font-bold text-foreground">{asset.symbol}</h1>
                       <Button variant="ghost" size="icon" onClick={handleToggleWatchlist} className="h-10 w-10">
                         <Star
-                          className={`h-6 w-6 ${isWatchlisted ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`}
+                          className={`h-6 w-6 ${
+                            isWatchlisted ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
+                          }`}
                         />
                       </Button>
                     </div>
@@ -239,13 +316,14 @@ export default function AssetDetail() {
                     <div className="flex items-baseline gap-3 mb-6">
                       <span className="text-3xl font-semibold text-foreground">{asset.latestPrice}</span>
                       <span
-                        className={`text-lg font-medium ${asset.priceChange.startsWith("+") ? "text-success" : "text-destructive"}`}
+                        className={`text-lg font-medium ${
+                          asset.priceChange.startsWith("+") ? "text-success" : "text-destructive"
+                        }`}
                       >
                         {asset.priceChange}
                       </span>
                     </div>
 
-                    {/* Quick Insights */}
                     <div>
                       <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
                         Quick Insights
@@ -264,16 +342,20 @@ export default function AssetDetail() {
                         })}
                       </div>
 
-                      {/* News Impact (PILLS) */}
-                      {symbol && assetNewsEvents[symbol]?.length > 0 && (
+                      {/* News Impact */}
+                      {symbol && assetNewsEvents[symbol] && assetNewsEvents[symbol].length > 0 && (
                         <div className="mt-5">
                           <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
                             News Impact
                           </h3>
 
-                          <div className="flex flex-wrap gap-2">
+                          <div className="space-y-2">
                             {assetNewsEvents[symbol].map((newsItem, index) => {
-                              const hasMapping = Boolean(newsToCalendarEventId[newsItem.event]);
+                              const impactColors = {
+                                High: "bg-destructive text-destructive-foreground",
+                                Medium: "bg-warning text-warning-foreground",
+                                Low: "bg-success text-success-foreground",
+                              };
 
                               return (
                                 <button
@@ -282,34 +364,30 @@ export default function AssetDetail() {
                                   onPointerDown={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-
-                                    // ✅ THIS is the fix (no more /alerts navigation)
-                                    openCalendarOverlayByNewsLabel(newsItem.event);
+                                    openCalendarOverlayFromNewsPill(newsItem.event, newsItem.time);
                                   }}
-                                  className={[
-                                    "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition-colors",
-                                    impactPillClasses(newsItem.impact),
-                                    hasMapping ? "hover:bg-muted/40" : "opacity-60 cursor-not-allowed",
-                                  ].join(" ")}
-                                  title={
-                                    hasMapping
-                                      ? "Open event details"
-                                      : "No matching calendar event ID yet (add it to calendarEvents.ts and map it)"
-                                  }
-                                  disabled={!hasMapping}
+                                  className="w-full flex items-center gap-2 text-left hover:bg-muted/30 rounded-md px-2 py-1.5 transition-colors group"
                                 >
-                                  <span className="font-semibold">{newsItem.time}</span>
-                                  <span className="text-muted-foreground">—</span>
-                                  <span className="font-medium">{newsItem.event}</span>
-                                  <span className="text-muted-foreground">({newsItem.impact} Impact)</span>
+                                  <span
+                                    className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                                      impactColors[newsItem.impact]
+                                    }`}
+                                  >
+                                    {newsItem.impact}
+                                  </span>
+                                  <span className="text-sm text-foreground group-hover:text-primary transition-colors">
+                                    {newsItem.event}
+                                  </span>
+                                  <span className="text-sm text-muted-foreground">—</span>
+                                  <span className="text-sm text-muted-foreground">{newsItem.time}</span>
                                 </button>
                               );
                             })}
                           </div>
 
                           <p className="text-xs text-muted-foreground mt-2">
-                            If a pill is disabled, it just means we haven’t mapped that news label to a calendar event
-                            ID yet.
+                            If something doesn’t open, it means the event doesn’t exist in <code>calendarEvents</code>{" "}
+                            yet (or needs a closer name match).
                           </p>
                         </div>
                       )}
@@ -389,7 +467,7 @@ export default function AssetDetail() {
               </CardContent>
             </Card>
 
-            {/* AI Market Overview */}
+            {/* AI MARKET OVERVIEW */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -507,8 +585,12 @@ export default function AssetDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* Nested Calendar overlay */}
-      <EventDetailsModal event={selectedCalendarEvent} isOpen={isEventModalOpen} onClose={closeCalendarOverlay} />
+      {/* Nested Calendar overlay (same template as Calendar page) */}
+      <EventDetailsModal
+        event={selectedCalendarEvent as any}
+        isOpen={isEventModalOpen}
+        onClose={closeCalendarOverlay}
+      />
     </>
   );
 }
