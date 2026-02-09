@@ -17,7 +17,7 @@ import { toast } from "sonner";
    DATA (demo placeholders)
 ======================= */
 
-// Asset-specific news events for today
+// Asset-specific news events for today (extras / non-calendar items)
 const assetNewsEvents: Record<string, { event: string; time: string; impact: "High" | "Medium" | "Low" }[]> = {
   EURUSD: [
     { event: "CPI (USD)", time: "13:30 GMT", impact: "High" },
@@ -30,19 +30,19 @@ const assetNewsEvents: Record<string, { event: string; time: string; impact: "Hi
   USDJPY: [],
   XAUUSD: [
     { event: "CPI (USD)", time: "13:30 GMT", impact: "High" },
-    { event: "Gold Futures Report", time: "15:30 GMT", impact: "Medium" },
+    { event: "Gold Futures Report", time: "15:30 GMT", impact: "Medium" }, // not in calendarEvents (example)
   ],
-  BTCUSD: [{ event: "BTC ETF Decision", time: "12:00 GMT", impact: "High" }],
+  BTCUSD: [{ event: "BTC ETF Decision", time: "12:00 GMT", impact: "High" }], // not in calendarEvents (example)
   AUDUSD: [],
   USDCAD: [
     { event: "CAD Inflation", time: "16:00 GMT", impact: "High" },
     { event: "CPI (USD)", time: "13:30 GMT", impact: "High" },
   ],
   SPX500: [
-    { event: "US Market Open", time: "14:30 GMT", impact: "Low" },
+    { event: "US Market Open", time: "14:30 GMT", impact: "Low" }, // not in calendarEvents (example)
     { event: "CPI (USD)", time: "13:30 GMT", impact: "High" },
   ],
-  ETHUSD: [{ event: "ETH Network Update", time: "18:00 GMT", impact: "Medium" }],
+  ETHUSD: [{ event: "ETH Network Update", time: "18:00 GMT", impact: "Medium" }], // not in calendarEvents (example)
 };
 
 // Quick insights per asset
@@ -102,7 +102,7 @@ type CalendarEvent = (typeof calendarEvents)[0];
 const normalize = (s: string) =>
   s
     .toLowerCase()
-    .replace(/\(.*?\)/g, " ") // remove bracketed currency like (USD)
+    .replace(/\(.*?\)/g, " ")
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -115,17 +115,13 @@ const extractCurrencyFromLabel = (label: string) => {
 const extractTimeHHMM = (timeStr: string) => {
   const m = timeStr.match(/(\d{1,2}:\d{2})/);
   if (!m) return null;
-  // normalize to 2-digit hour
   const [hh, mm] = m[1].split(":");
   return `${hh.padStart(2, "0")}:${mm}`;
 };
 
-// Small alias layer so common variations match nicely
 const normalizeEventAlias = (label: string) => {
   const raw = normalize(label);
 
-  // Examples:
-  // "cpi" pills should match "us cpi"
   if (raw === "cpi") return "us cpi";
   if (raw.includes("core cpi")) return "core cpi";
   if (raw.includes("interest rate decision")) return "interest rate decision";
@@ -147,29 +143,54 @@ const scoreCalendarMatch = (args: {
 
   let score = 0;
 
-  // Text similarity
   if (candNorm === pillNorm) score += 6;
   if (candNorm.includes(pillNorm) || pillNorm.includes(candNorm)) score += 4;
 
-  // Token overlap
   const pillTokens = new Set(pillNorm.split(" ").filter(Boolean));
   const candTokens = new Set(candNorm.split(" ").filter(Boolean));
   let overlap = 0;
   pillTokens.forEach((t) => {
     if (candTokens.has(t)) overlap += 1;
   });
-  score += overlap; // +1 per shared token
+  score += overlap;
 
-  // Currency match
   if (pillCurrency && candidate.currency?.toUpperCase() === pillCurrency.toUpperCase()) score += 3;
-
-  // Time match
   if (pillTime && candidate.time === pillTime) score += 2;
-
-  // Prefer higher impact if close
   if (candidate.impact === "high") score += 0.5;
 
   return score;
+};
+
+/* =======================
+   CALENDAR-FIRST NEWS BUILD
+======================= */
+
+type NewsPill = {
+  key: string;
+  event: string;
+  time: string; // display
+  impact: "High" | "Medium" | "Low";
+  calendarEvent?: CalendarEvent; // if present, open directly (no matching)
+};
+
+const toPillImpact = (impact: CalendarEvent["impact"]): "High" | "Medium" | "Low" =>
+  impact === "high" ? "High" : impact === "medium" ? "Medium" : "Low";
+
+const getRelevantCurrenciesForAsset = (symbol: string) => {
+  const s = (symbol || "").toUpperCase();
+
+  // FX pairs like EURUSD, GBPUSD, USDCAD
+  if (/^[A-Z]{6}$/.test(s)) {
+    return [s.slice(0, 3), s.slice(3, 6)];
+  }
+
+  // Metals/crypto vs USD (use USD news)
+  if (s.endsWith("USD")) return ["USD"];
+
+  // Indices (SPX500 etc) (use USD news by default)
+  if (s.includes("SPX") || s.includes("NAS") || s.includes("US")) return ["USD"];
+
+  return ["USD"];
 };
 
 export default function AssetDetail() {
@@ -185,10 +206,8 @@ export default function AssetDetail() {
   const asset = symbol ? getAssetBySymbol(symbol) : undefined;
   const isWatchlisted = symbol ? isInWatchlist(symbol) : false;
 
-  // Asset modal open
   const [open, setOpen] = useState(true);
 
-  // Calendar Event overlay open (nested)
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
@@ -199,6 +218,11 @@ export default function AssetDetail() {
   const handleToggleWatchlist = () => {
     if (symbol) toggleWatchlist(symbol);
   };
+
+  const openCalendarOverlayDirect = useCallback((ev: CalendarEvent) => {
+    setSelectedCalendarEvent(ev);
+    setIsEventModalOpen(true);
+  }, []);
 
   const openCalendarOverlayFromNewsPill = useCallback((newsLabel: string, newsTime: string) => {
     const pillCurrency = extractCurrencyFromLabel(newsLabel);
@@ -217,7 +241,6 @@ export default function AssetDetail() {
       if (!best || s > best.score) best = { ev, score: s };
     }
 
-    // Threshold so we don't open completely unrelated things
     if (!best || best.score < 4) {
       toast.error("No matching calendar event found for this news item yet.");
       return;
@@ -255,6 +278,37 @@ export default function AssetDetail() {
       ]
     );
   }, [symbol, asset]);
+
+  // ✅ Build News Impact pills: calendar-first + extras
+  const newsImpactPills: NewsPill[] = useMemo(() => {
+    if (!symbol) return [];
+
+    const relevantCurrencies = new Set(getRelevantCurrenciesForAsset(symbol));
+
+    const fromCalendar: NewsPill[] = calendarEvents
+      .filter((ev) => relevantCurrencies.has((ev.currency || "").toUpperCase()))
+      .map((ev) => ({
+        key: `cal-${ev.id}`,
+        event: ev.event,
+        time: `${ev.time} GMT`,
+        impact: toPillImpact(ev.impact),
+        calendarEvent: ev,
+      }));
+
+    const extras = (assetNewsEvents[symbol] || []).map((n, idx) => ({
+      key: `extra-${symbol}-${idx}-${n.event}`,
+      event: n.event,
+      time: n.time,
+      impact: n.impact,
+    }));
+
+    // Avoid duplicates where the extra is basically the same as a calendar event
+    const calNormSet = new Set(fromCalendar.map((p) => normalize(p.event)));
+    const filteredExtras = extras.filter((x) => !calNormSet.has(normalize(x.event)));
+
+    // Calendar events first, then extras
+    return [...fromCalendar, ...filteredExtras];
+  }, [symbol]);
 
   if (!asset) {
     return (
@@ -296,7 +350,6 @@ export default function AssetDetail() {
           </div>
 
           <div className="p-6 space-y-6">
-            {/* UNIFIED HERO CARD */}
             <Card className="overflow-hidden">
               <CardContent className="p-8">
                 <div className="grid lg:grid-cols-2 gap-8">
@@ -342,28 +395,36 @@ export default function AssetDetail() {
                         })}
                       </div>
 
-                      {/* News Impact */}
-                      {symbol && assetNewsEvents[symbol] && assetNewsEvents[symbol].length > 0 && (
+                      {/* ✅ NEWS IMPACT (calendar-first) */}
+                      {newsImpactPills.length > 0 && (
                         <div className="mt-5">
                           <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
                             News Impact
                           </h3>
 
                           <div className="space-y-2">
-                            {assetNewsEvents[symbol].map((newsItem, index) => {
+                            {newsImpactPills.map((newsItem) => {
                               const impactColors = {
                                 High: "bg-destructive text-destructive-foreground",
                                 Medium: "bg-warning text-warning-foreground",
                                 Low: "bg-success text-success-foreground",
-                              };
+                              } as const;
 
                               return (
                                 <button
-                                  key={index}
+                                  key={newsItem.key}
                                   type="button"
                                   onPointerDown={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
+
+                                    // Calendar-first: open exact event
+                                    if (newsItem.calendarEvent) {
+                                      openCalendarOverlayDirect(newsItem.calendarEvent);
+                                      return;
+                                    }
+
+                                    // Fallback: try to match
                                     openCalendarOverlayFromNewsPill(newsItem.event, newsItem.time);
                                   }}
                                   className="w-full flex items-center gap-2 text-left hover:bg-muted/30 rounded-md px-2 py-1.5 transition-colors group"
@@ -386,8 +447,8 @@ export default function AssetDetail() {
                           </div>
 
                           <p className="text-xs text-muted-foreground mt-2">
-                            If something doesn’t open, it means the event doesn’t exist in <code>calendarEvents</code>{" "}
-                            yet (or needs a closer name match).
+                            Calendar events open directly. “Extra” items use best-match until they exist in{" "}
+                            <code>calendarEvents</code>.
                           </p>
                         </div>
                       )}
@@ -585,7 +646,6 @@ export default function AssetDetail() {
         </DialogContent>
       </Dialog>
 
-      {/* Nested Calendar overlay (same template as Calendar page) */}
       <EventDetailsModal
         event={selectedCalendarEvent as any}
         isOpen={isEventModalOpen}
