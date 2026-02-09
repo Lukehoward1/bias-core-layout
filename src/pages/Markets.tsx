@@ -478,7 +478,8 @@ export default function Markets() {
                         <p className="text-xs text-muted-foreground">No relevant events found.</p>
                       ) : (
                         <div className="space-y-2">
-                          {eventsToShow.slice(0, 3).map((ev) => (
+                          {/* CHANGED: show 2 items instead of 3 */}
+                          {eventsToShow.slice(0, 2).map((ev) => (
                             <button
                               key={ev.id}
                               type="button"
@@ -504,9 +505,10 @@ export default function Markets() {
                             </button>
                           ))}
 
-                          {eventsToShow.length > 3 && (
+                          {/* CHANGED: reflect 2-item limit */}
+                          {eventsToShow.length > 2 && (
                             <div className="text-[11px] text-muted-foreground">
-                              +{eventsToShow.length - 3} more (tap “See all”)
+                              +{eventsToShow.length - 2} more (tap “See all”)
                             </div>
                           )}
                         </div>
