@@ -17,7 +17,10 @@ import {
   Minus,
 } from "lucide-react";
 import { toast } from "sonner";
-import AssetQuickViewModal from "@/components/assets/AssetQuickViewModal";
+import * as AssetQuickViewModalModule from "@/components/assets/AssetQuickViewModal";
+
+const AssetQuickViewModalAny =
+  (AssetQuickViewModalModule as any).default ?? (AssetQuickViewModalModule as any).AssetQuickViewModal;
 
 interface CalendarEvent {
   time: string;
@@ -446,8 +449,8 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
         </div>
       </DialogContent>
 
-      {AssetQuickViewModalAny && quickViewSymbol && (
-        <AssetQuickViewModalAny symbol={quickViewSymbol} isOpen={isQuickViewOpen} onClose={closeQuickView} />
+      {quickViewSymbol && (
+        <AssetQuickViewModal symbol={quickViewSymbol} isOpen={isQuickViewOpen} onClose={closeQuickView} />
       )}
     </Dialog>
   );
