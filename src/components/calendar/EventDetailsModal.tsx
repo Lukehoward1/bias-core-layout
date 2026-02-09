@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -189,9 +189,9 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      {/* Explicit overlay click-to-close (reliable across Lovable preview shells) */}
-      <DialogOverlay onPointerDown={() => onClose()} />
-
+      {/* ✅ IMPORTANT: No DialogOverlay here.
+          This prevents the nested modal from applying the black bg overlay.
+          The parent AssetDetail overlay remains visible (blurred). */}
       <DialogContent className="max-w-6xl w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border-border p-0">
         {/* Header Row */}
         <div className="sticky top-0 z-10 bg-background border-b border-border px-8 py-5">
