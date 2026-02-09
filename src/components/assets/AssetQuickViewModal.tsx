@@ -7,7 +7,7 @@ import { useAssets } from "@/hooks/use-watchlist";
 import { useWatchlist } from "@/hooks/use-watchlist";
 import { TrendingUp, TrendingDown, Minus, Star, StarOff, BarChart3, Activity, Shield, X } from "lucide-react";
 
-interface AssetQuickViewModalProps {
+export interface AssetQuickViewModalProps {
   symbol: string;
   isOpen: boolean;
   onClose: () => void;
@@ -21,20 +21,21 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      {/* Overlay: clicking it closes THIS top modal (and prevents click-through) */}
+      {/* IMPORTANT: Higher z-index than EventDetailsModal so it ALWAYS sits on top */}
       <DialogOverlay
         className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[300]"
         onPointerDown={(e) => {
+          // prevent click-through to modal behind
           e.preventDefault();
           e.stopPropagation();
           onClose();
         }}
       />
 
-      {/* Content: block pointer events from leaking to modal behind */}
       <DialogContent
         className="max-w-6xl w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border-border p-0 z-[301]"
         onPointerDown={(e) => {
+          // prevent click-through to modal behind
           e.stopPropagation();
         }}
       >
