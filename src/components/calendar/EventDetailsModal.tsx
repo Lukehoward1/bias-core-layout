@@ -1,10 +1,8 @@
-import { useMemo } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-
 import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   TrendingUp,
   Clock,
@@ -133,7 +131,6 @@ const getMarketInterpretation = (eventName: string, currency: string, _isRelease
   return interpretations[eventName] || defaultInterpretation;
 };
 
-// How to interpret guidance
 const getInterpretationGuide = (_eventName: string, currency: string) => {
   return [
     `Strong deviation (>2x consensus range) typically causes immediate price reaction in ${currency} pairs`,
@@ -144,21 +141,20 @@ const getInterpretationGuide = (_eventName: string, currency: string) => {
   ];
 };
 
-// Event narrative based on release status
 const getEventNarrative = (event: CalendarEvent) => {
   if (event.actual === "—") return null;
 
   const narratives: Record<string, string> = {
-    "Non-Farm Payrolls": `The US economy added ${event.actual} jobs in the latest reporting period, compared to expectations of ${event.forecast}. This suggests continued resilience in the labor market, with implications for Federal Reserve policy decisions.`,
-    "Unemployment Rate": `Unemployment came in at ${event.actual}, against forecasts of ${event.forecast}. This reading indicates the current state of the US labor market and will factor into Fed deliberations.`,
-    "ECB Interest Rate Decision": `The ECB has set rates at ${event.actual}, in line with/diverging from market expectations of ${event.forecast}. This decision reflects the central bank's assessment of inflation and economic conditions.`,
-    "US CPI": `US CPI printed at ${event.actual} versus ${event.forecast} forecast. Traders will reassess rate expectations and USD strength based on the inflation surprise.`,
-    "US Core CPI": `US Core CPI printed at ${event.actual} versus ${event.forecast} forecast. Core inflation is closely watched for policy direction and USD repricing.`,
+    "Non-Farm Payrolls": `The US economy added ${event.actual} jobs in the latest reporting period, compared to expectations of ${event.forecast}.`,
+    "Unemployment Rate": `Unemployment came in at ${event.actual}, against forecasts of ${event.forecast}.`,
+    "ECB Interest Rate Decision": `The ECB has set rates at ${event.actual}, compared to expectations of ${event.forecast}.`,
+    "US CPI": `US CPI printed at ${event.actual} versus ${event.forecast} forecast.`,
+    "US Core CPI": `US Core CPI printed at ${event.actual} versus ${event.forecast} forecast.`,
   };
 
   return (
     narratives[event.event] ||
-    `The ${event.event} data was released at ${event.actual}, compared to the forecast of ${event.forecast}. Market participants are now assessing the implications for monetary policy and economic outlook.`
+    `The ${event.event} data was released at ${event.actual}, compared to the forecast of ${event.forecast}.`
   );
 };
 
@@ -169,20 +165,12 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
   if (!event) return null;
 
   const isReleased = event.actual !== "—";
-
-  const historicalData = useMemo(() => getHistoricalData(event.event), [event.event]);
+  const historicalData = getHistoricalData(event.event);
   const maxValue = Math.max(...historicalData.map((d) => d.actual || d.forecast || 0));
 
-  const interpretation = useMemo(
-    () => getMarketInterpretation(event.event, event.currency, isReleased),
-    [event.event, event.currency, isReleased],
-  );
-
-  const narrative = useMemo(() => getEventNarrative(event), [event]);
-  const interpretationGuide = useMemo(
-    () => getInterpretationGuide(event.event, event.currency),
-    [event.event, event.currency],
-  );
+  const interpretation = getMarketInterpretation(event.event, event.currency, isReleased);
+  const narrative = getEventNarrative(event);
+  const interpretationGuide = getInterpretationGuide(event.event, event.currency);
 
   const getImpactColor = (impact: string) => {
     if (impact === "high") return "bg-destructive text-destructive-foreground";
@@ -220,33 +208,24 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     return "text-warning";
   };
 
-  /**
-   * ✅ KEY FIX:
-   * Close this event modal first, then navigate to the clicked pair.
-   * This prevents the new pair modal from appearing "behind" the event modal.
-   */
+  // ✅ Close event modal first, then navigate to the clicked pair so it appears on top
   const openPairFromEvent = (pair: string) => {
-    // Close event card first
     onClose();
 
-    // Keep whatever "from" filter is already in the URL if present
     const from = new URLSearchParams(location.search).get("from") ?? "All";
 
-    // Navigate on next tick so the modal has actually unmounted
     setTimeout(() => {
       navigate(`/asset/${pair}?from=${encodeURIComponent(from)}`, {
-        state: { backgroundLocation: location.state?.backgroundLocation ?? location },
+        state: { backgroundLocation: (location.state as any)?.backgroundLocation ?? location },
       });
     }, 0);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      {/* Explicit overlay click-to-close */}
       <DialogOverlay onPointerDown={() => onClose()} />
 
       <DialogContent className="max-w-6xl w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border-border p-0">
-        {/* Header Row */}
         <div className="sticky top-0 z-10 bg-background border-b border-border px-8 py-5">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3 flex-wrap">
@@ -281,7 +260,6 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
 
         <div className="px-8 py-6 space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Market Interpretation */}
             <Card className="bg-card border-border">
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-4">
@@ -317,8 +295,6 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
 
                 <div className="pt-4 border-t border-border/50">
                   <div className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">Most Impacted Pairs</div>
-
-                  {/* ✅ NOW CLICKABLE and opens on top (closes modal first) */}
                   <div className="flex flex-wrap gap-2">
                     {interpretation.pairs.map((pair) => (
                       <button
@@ -344,7 +320,6 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
               </CardContent>
             </Card>
 
-            {/* Current Release Figures */}
             <Card className="bg-card border-border">
               <CardContent className="p-6 h-full flex flex-col">
                 <div className="flex items-center gap-2 mb-4">
@@ -395,24 +370,11 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
             </Card>
           </div>
 
-          {/* Historical Trend */}
           <Card className="bg-card border-border">
             <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">Historical Trend</h3>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-sm bg-primary" />
-                    <span className="text-xs text-muted-foreground">Actual</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-sm border-2 border-dashed border-muted-foreground bg-muted/30" />
-                    <span className="text-xs text-muted-foreground">Forecast</span>
-                  </div>
-                </div>
+              <div className="flex items-center gap-2 mb-4">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">Historical Trend</h3>
               </div>
 
               <div className="h-48 flex items-end justify-between gap-3 px-2">
@@ -449,7 +411,6 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
             </CardContent>
           </Card>
 
-          {/* How to Interpret */}
           <Card className="bg-card border-border">
             <CardContent className="p-6">
               <div className="flex items-center gap-2 mb-4">
