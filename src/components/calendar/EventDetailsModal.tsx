@@ -15,6 +15,7 @@ import {
   Minus,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate, useLocation } from "react-router-dom";
 
 interface CalendarEvent {
   time: string;
@@ -142,6 +143,9 @@ const getEventNarrative = (event: CalendarEvent) => {
 };
 
 export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   if (!event) return null;
 
   const isReleased = event.actual !== "—";
@@ -267,15 +271,24 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                 <div className="pt-4 border-t border-border/50">
                   <div className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">Most Impacted Pairs</div>
                   <div className="flex flex-wrap gap-2">
-                    {interpretation.pairs.map((pair) => (
-                      <Badge
-                        key={pair}
-                        variant="secondary"
-                        className="text-xs font-mono cursor-pointer hover:bg-primary/20 transition-colors"
-                      >
-                        {pair}
-                      </Badge>
-                    ))}
+                    {interpretation.pairs.map((pair) => {
+                      const symbol = pair.replace("/", "");
+                      return (
+                        <Badge
+                          key={pair}
+                          variant="secondary"
+                          className="text-xs font-mono cursor-pointer hover:bg-primary/20 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/asset/${symbol}`, {
+                              state: { backgroundLocation: location.state?.backgroundLocation ?? location },
+                            });
+                          }}
+                        >
+                          {pair}
+                        </Badge>
+                      );
+                    })}
                   </div>
                 </div>
               </CardContent>
