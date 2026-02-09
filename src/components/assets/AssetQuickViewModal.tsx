@@ -3,8 +3,7 @@ import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useAssets } from "@/hooks/use-watchlist";
-import { useWatchlist } from "@/hooks/use-watchlist";
+import { useAssets, useWatchlist } from "@/hooks/use-watchlist";
 import { TrendingUp, TrendingDown, Minus, Star, StarOff, BarChart3, Activity, Shield, X } from "lucide-react";
 
 interface AssetQuickViewModalProps {
@@ -21,9 +20,8 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      {/* Overlay */}
       <DialogOverlay
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200]"
+        className="z-[300]"
         onPointerDown={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -31,9 +29,9 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
         }}
       />
 
-      {/* CONTENT — forced wide layout */}
       <DialogContent
-        className="!max-w-6xl !w-[96vw] !max-h-[92vh] !p-0 overflow-y-auto scrollbar-hidden bg-background border-border z-[201]"
+        data-size="xl"
+        className="z-[301] w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden"
         onPointerDown={(e) => e.stopPropagation()}
       >
         {!asset ? (
@@ -49,18 +47,14 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
             <div className="sticky top-0 z-10 bg-background border-b border-border px-8 py-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <h2 className="text-2xl font-bold text-foreground">{asset.displayName}</h2>
+                  <h2 className="text-2xl font-bold">{asset.displayName}</h2>
                   <Badge variant="outline" className="text-xs">
                     {asset.category}
                   </Badge>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => toggleWatchlist(symbol)}
-                    className="p-1.5 rounded hover:bg-accent transition-colors"
-                    title={isInWatchlist(symbol) ? "Remove from watchlist" : "Add to watchlist"}
-                  >
+                  <button onClick={() => toggleWatchlist(symbol)} className="p-1.5 rounded hover:bg-accent">
                     {isInWatchlist(symbol) ? (
                       <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
                     ) : (
@@ -68,10 +62,7 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
                     )}
                   </button>
 
-                  <button
-                    onClick={onClose}
-                    className="p-1.5 rounded-sm opacity-70 hover:opacity-100 transition-opacity"
-                  >
+                  <button onClick={onClose} className="p-1.5 rounded-sm opacity-70 hover:opacity-100">
                     <X className="h-4 w-4" />
                   </button>
                 </div>
@@ -80,9 +71,8 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
 
             {/* Body */}
             <div className="px-8 py-6 space-y-6">
-              {/* Price */}
               <div className="flex items-baseline gap-3">
-                <span className="text-3xl font-bold tracking-tight">{asset.latestPrice}</span>
+                <span className="text-3xl font-bold">{asset.latestPrice}</span>
                 <span
                   className={`text-sm font-medium ${
                     asset.priceChange.startsWith("+")
@@ -96,7 +86,6 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
                 </span>
               </div>
 
-              {/* Bias */}
               <div className="flex items-center gap-2">
                 {asset.biasDirection === "Bullish" ? (
                   <TrendingUp className="h-4 w-4 text-emerald-400" />
@@ -106,70 +95,36 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
                   <Minus className="h-4 w-4 text-yellow-400" />
                 )}
 
-                <span
-                  className={`font-semibold ${
-                    asset.biasDirection === "Bullish"
-                      ? "text-emerald-400"
-                      : asset.biasDirection === "Bearish"
-                        ? "text-red-400"
-                        : "text-yellow-400"
-                  }`}
-                >
-                  {asset.biasDirection}
-                </span>
-
+                <span className="font-semibold">{asset.biasDirection}</span>
                 <span className="text-xs text-muted-foreground">({asset.biasConfidence}% confidence)</span>
               </div>
 
-              {/* Stats */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <Card className="bg-muted/40 border-border/50">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Volume</p>
-                      <p className="text-sm font-semibold">{asset.volume}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-muted/40 border-border/50">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <Activity className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Spread</p>
-                      <p className="text-sm font-semibold">{asset.spread}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-muted/40 border-border/50">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <Shield className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Confidence</p>
-                      <p className="text-sm font-semibold">{asset.biasConfidence}%</p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-muted/40 border-border/50">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Sentiment</p>
-                      <p className="text-sm font-semibold">{asset.sentiment}</p>
-                    </div>
-                  </CardContent>
-                </Card>
+                <StatCard icon={<BarChart3 />} label="Volume" value={asset.volume} />
+                <StatCard icon={<Activity />} label="Spread" value={asset.spread} />
+                <StatCard icon={<Shield />} label="Confidence" value={`${asset.biasConfidence}%`} />
+                <StatCard icon={<TrendingUp />} label="Sentiment" value={asset.sentiment} />
               </div>
 
-              {/* Insight */}
               {asset.insight && <p className="text-xs text-muted-foreground italic">💡 {asset.insight}</p>}
             </div>
           </>
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
+  return (
+    <Card className="bg-muted/40 border-border/50">
+      <CardContent className="p-4 flex items-center gap-3">
+        {icon}
+        <div>
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="text-sm font-semibold">{value}</p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
