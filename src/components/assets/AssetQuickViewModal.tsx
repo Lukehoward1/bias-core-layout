@@ -31,8 +31,10 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
 
       {/* ✅ Force XL sizing here (no data-variant reliance) */}
       <DialogContent
-        className="z-[301] w-[96vw] max-w-6xl max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border-border p-0"
-        onPointerDown={(e) => e.stopPropagation()}
+  className="z-[301] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border-border p-0"
+  style={{ width: "96vw", maxWidth: "72rem" }} // ✅ 72rem = Tailwind max-w-6xl
+  onPointerDown={(e) => e.stopPropagation()}
+>
       >
         {!asset ? (
           <div className="px-8 py-12 text-center space-y-4">
