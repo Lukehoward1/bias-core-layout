@@ -1,5 +1,5 @@
 import React from "react";
-import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { AssetDetailContent } from "@/pages/AssetDetail";
 
 interface AssetQuickViewModalProps {
@@ -11,18 +11,8 @@ interface AssetQuickViewModalProps {
 export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQuickViewModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogOverlay
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[220]"
-        onPointerDown={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          onClose();
-        }}
-      />
-
       <DialogContent
-        // keep this large + above overlay
-        className="max-w-6xl w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border-border p-0 z-[221]"
+        className="max-w-6xl w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border-border p-0"
         onPointerDown={(e) => e.stopPropagation()}
       >
         <AssetDetailContent symbol={symbol} onRequestClose={onClose} />
