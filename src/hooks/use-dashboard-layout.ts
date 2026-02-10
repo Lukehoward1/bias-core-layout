@@ -54,7 +54,7 @@ const getDefaultLayout = (): DashboardLayout => ({
         { id: 'todays-bias', isPinned: false },
         { id: 'active-trades', isPinned: false },
         { id: 'next-session', isPinned: false },
-        { id: 'high-impact-events', isPinned: false },
+        { id: 'rr-calculator', isPinned: false },
       ],
     },
     {
