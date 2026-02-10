@@ -1,10 +1,9 @@
 import { useMemo, useState, useCallback } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 import { Star, TrendingUp, TrendingDown, Minus, Activity, AlertTriangle, Clock, Target, Zap } from "lucide-react";
 
@@ -192,7 +191,6 @@ const getRelevantCurrenciesForAsset = (symbol: string): string[] => {
 
 /* =======================
    ✅ REUSABLE CONTENT (NO DIALOG)
-   This is what the QuickView modal will render.
 ======================= */
 
 export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string; onRequestClose?: () => void }) {
@@ -216,36 +214,53 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
     toggleWatchlist(symbol);
   };
 
-  const openCalendarOverlayFromNewsPill = useCallback((newsLabel: string, newsTime: string) => {
-    const pillCurrency = extractCurrencyFromLabel(newsLabel);
-    const pillTime = extractTimeHHMM(newsTime);
+  /**
+   * ✅ IMPORTANT FIX (same pattern as Calendar)
+   * Close current event modal first, then open the next event.
+   * Prevents “event changes behind another modal” behaviour.
+   */
+  const openCalendarEvent = useCallback((ev: CalendarEvent) => {
+    setIsEventModalOpen(false);
+    setSelectedCalendarEvent(null);
 
-    let best: { ev: CalendarEvent; score: number } | null = null;
-
-    for (const ev of calendarEvents) {
-      const s = scoreCalendarMatch({
-        pillLabel: newsLabel,
-        pillCurrency,
-        pillTime,
-        candidate: ev,
-      });
-
-      if (!best || s > best.score) best = { ev, score: s };
-    }
-
-    if (!best || best.score < 4) {
-      toast.error("No matching calendar event found for this news item yet.");
-      return;
-    }
-
-    setSelectedCalendarEvent(best.ev);
-    setIsEventModalOpen(true);
+    requestAnimationFrame(() => {
+      setSelectedCalendarEvent(ev);
+      setIsEventModalOpen(true);
+    });
   }, []);
 
   const closeCalendarOverlay = useCallback(() => {
     setIsEventModalOpen(false);
     setSelectedCalendarEvent(null);
   }, []);
+
+  const openCalendarOverlayFromNewsPill = useCallback(
+    (newsLabel: string, newsTime: string) => {
+      const pillCurrency = extractCurrencyFromLabel(newsLabel);
+      const pillTime = extractTimeHHMM(newsTime);
+
+      let best: { ev: CalendarEvent; score: number } | null = null;
+
+      for (const ev of calendarEvents) {
+        const s = scoreCalendarMatch({
+          pillLabel: newsLabel,
+          pillCurrency,
+          pillTime,
+          candidate: ev,
+        });
+
+        if (!best || s > best.score) best = { ev, score: s };
+      }
+
+      if (!best || best.score < 4) {
+        toast.error("No matching calendar event found for this news item yet.");
+        return;
+      }
+
+      openCalendarEvent(best.ev);
+    },
+    [openCalendarEvent],
+  );
 
   const getBiasColor = (bias: string) => {
     if (bias === "Bullish") return "text-success";
@@ -416,9 +431,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                               className="w-full flex items-center gap-2 text-left hover:bg-muted/30 rounded-md px-2 py-1.5 transition-colors group"
                             >
                               <span
-                                className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                                  impactColors[pill.impact]
-                                }`}
+                                className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${impactColors[pill.impact]}`}
                               >
                                 {pill.impact}
                               </span>
@@ -609,6 +622,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
             </CardContent>
           </Card>
 
+          {/* ✅ Now clickable → opens EventDetailsModal via matching */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
@@ -619,7 +633,19 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
             <CardContent>
               <div className="space-y-3">
                 {upcomingNews.map((news, index) => (
-                  <div key={index} className="p-2 bg-muted/30 rounded-lg">
+                  <button
+                    key={index}
+                    type="button"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      // Use the same matcher:
+                      // Convert "USD CPI m/m" into a label that can match calendar where possible.
+                      // (If it doesn't exist in calendarEvents, it will toast.)
+                      openCalendarOverlayFromNewsPill(news.event, `${news.time} GMT`);
+                    }}
+                    className="w-full text-left p-2 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
+                  >
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs text-muted-foreground">{news.time}</span>
                       <Badge variant={news.impact === "High" ? "destructive" : "default"} className="text-[10px]">
@@ -632,7 +658,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                       <span>P: {news.previous}</span>
                       <span>A: {news.actual}</span>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </CardContent>
@@ -651,37 +677,14 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 }
 
 /* =======================
-   ✅ PAGE WRAPPER (HAS DIALOG + NAV)
+   ✅ PAGE ROUTE (NO DIALOG)
+   App.tsx already handles modal-routing dialog for /asset/:symbol.
 ======================= */
 
 export default function AssetDetail() {
   const { symbol } = useParams<{ symbol: string }>();
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
 
-  const returnFilter = searchParams.get("from") || "All";
+  if (!symbol) return null;
 
-  const [open, setOpen] = useState(true);
-
-  const closeToMarkets = () => {
-    navigate(`/markets?filter=${returnFilter}`, { replace: true });
-  };
-
-  if (!symbol) {
-    return null;
-  }
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) closeToMarkets();
-      }}
-    >
-      <DialogContent className="max-w-6xl w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border-border p-0">
-        <AssetDetailContent symbol={symbol} />
-      </DialogContent>
-    </Dialog>
-  );
+  return <AssetDetailContent symbol={symbol} />;
 }
