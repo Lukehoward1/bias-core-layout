@@ -1,11 +1,11 @@
 import React from "react";
-import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAssets } from "@/hooks/use-watchlist";
 import { useWatchlist } from "@/hooks/use-watchlist";
-import { TrendingUp, TrendingDown, Minus, Star, StarOff, BarChart3, Activity, Shield, X } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Star, StarOff, BarChart3, Activity, Shield } from "lucide-react";
 
 interface AssetQuickViewModalProps {
   symbol: string;
@@ -21,23 +21,20 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      {/* Overlay: clicking it closes THIS top modal (and prevents click-through) */}
-      <DialogOverlay
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[300]"
-        onPointerDown={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          onClose();
-        }}
-      />
-
-      {/* Content: force wide size + block pointer events leaking to modal behind */}
       <DialogContent
-        className="z-[301] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border-border p-0"
-        style={{ width: "96vw", maxWidth: "72rem" }} // 72rem = Tailwind max-w-6xl
-        onPointerDown={(e) => {
-          e.stopPropagation();
+        // ✅ Force the “wide card” sizing (overrides dialog default max-w-lg)
+        className="z-[201] w-[96vw] max-w-6xl max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border-border p-0"
+        // ✅ Custom overlay for THIS modal so it stacks above EventDetailsModal
+        overlayClassName="z-[200] bg-black/40 backdrop-blur-sm"
+        overlayProps={{
+          onPointerDown: (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose();
+          },
         }}
+        // ✅ Prevent clicks inside this modal from affecting anything underneath
+        onPointerDown={(e) => e.stopPropagation()}
       >
         {!asset ? (
           <div className="px-8 py-12 text-center space-y-4">
@@ -69,14 +66,6 @@ export default function AssetQuickViewModal({ symbol, isOpen, onClose }: AssetQu
                     ) : (
                       <StarOff className="h-5 w-5 text-muted-foreground" />
                     )}
-                  </button>
-
-                  <button
-                    onClick={onClose}
-                    className="p-1.5 rounded-sm opacity-70 hover:opacity-100 transition-opacity ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                  >
-                    <X className="h-4 w-4" />
-                    <span className="sr-only">Close</span>
                   </button>
                 </div>
               </div>
