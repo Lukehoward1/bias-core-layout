@@ -104,13 +104,13 @@ type NewsPill = {
   event: string;
   time: string;
   impact: "High" | "Medium" | "Low";
-  calendarEvent?: CalendarEvent; // present when sourced from calendar
+  calendarEvent?: CalendarEvent;
 };
 
 const normalize = (s: string) =>
   s
     .toLowerCase()
-    .replace(/\(.*?\)/g, " ") // remove bracketed currency like (USD)
+    .replace(/\(.*?\)/g, " ")
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -127,16 +127,12 @@ const extractTimeHHMM = (timeStr: string) => {
   return `${hh.padStart(2, "0")}:${mm}`;
 };
 
-// Small alias layer so common variations match nicely
 const normalizeEventAlias = (label: string) => {
   const raw = normalize(label);
-
-  // "CPI (USD)" -> try to match "US CPI"
   if (raw === "cpi") return "us cpi";
   if (raw.includes("core cpi")) return "core cpi";
   if (raw.includes("interest rate decision")) return "interest rate decision";
   if (raw.includes("non farm payroll")) return "non farm payrolls";
-
   return raw;
 };
 
@@ -153,11 +149,9 @@ const scoreCalendarMatch = (args: {
 
   let score = 0;
 
-  // Text similarity
   if (candNorm === pillNorm) score += 6;
   if (candNorm.includes(pillNorm) || pillNorm.includes(candNorm)) score += 4;
 
-  // Token overlap
   const pillTokens = new Set(pillNorm.split(" ").filter(Boolean));
   const candTokens = new Set(candNorm.split(" ").filter(Boolean));
   let overlap = 0;
@@ -166,13 +160,9 @@ const scoreCalendarMatch = (args: {
   });
   score += overlap;
 
-  // Currency match
   if (pillCurrency && candidate.currency?.toUpperCase() === pillCurrency.toUpperCase()) score += 3;
-
-  // Time match
   if (pillTime && candidate.time === pillTime) score += 2;
 
-  // Prefer higher impact if close
   if (candidate.impact === "high") score += 0.5;
 
   return score;
@@ -184,46 +174,33 @@ const toPillImpact = (impact: CalendarEvent["impact"]): "High" | "Medium" | "Low
   return "Low";
 };
 
-/**
- * Define which currencies are "relevant" per asset symbol.
- * - FX pairs: base + quote (e.g., EURUSD -> EUR + USD)
- * - Common aliases: XAUUSD -> USD, SPX500 -> USD, BTCUSD -> USD, ETHUSD -> USD
- * Adjust as your asset universe expands.
- */
 const getRelevantCurrenciesForAsset = (symbol: string): string[] => {
   const s = (symbol || "").toUpperCase();
 
-  // crypto/indices/commodities typically USD-driven in this demo
   if (s.includes("USD") && (s.startsWith("BTC") || s.startsWith("ETH") || s.startsWith("XAU") || s.startsWith("SPX")))
     return ["USD"];
 
-  // standard FX pattern (6 letters) like EURUSD, GBPJPY, etc.
   if (s.length === 6) {
     const base = s.slice(0, 3);
     const quote = s.slice(3, 6);
     return [base, quote];
   }
 
-  // fallback: try to detect any known 3-letter currencies in the string
   const known = ["USD", "EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF"];
   return known.filter((c) => s.includes(c));
 };
 
-export default function AssetDetail() {
-  const { symbol } = useParams<{ symbol: string }>();
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
+/* =======================
+   ✅ REUSABLE CONTENT (NO DIALOG)
+   This is what the QuickView modal will render.
+======================= */
 
+export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string; onRequestClose?: () => void }) {
   const { getAssetBySymbol } = useAssets();
   const { isInWatchlist, toggleWatchlist } = useWatchlist();
 
-  const returnFilter = searchParams.get("from") || "All";
-
   const asset = symbol ? getAssetBySymbol(symbol) : undefined;
   const isWatchlisted = symbol ? isInWatchlist(symbol) : false;
-
-  // Asset modal open
-  const [open, setOpen] = useState(true);
 
   // Nested calendar overlay
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
@@ -235,12 +212,8 @@ export default function AssetDetail() {
   // Cap visible news pills to 3 by default
   const [newsExpanded, setNewsExpanded] = useState(false);
 
-  const closeToMarkets = () => {
-    navigate(`/markets?filter=${returnFilter}`, { replace: true });
-  };
-
   const handleToggleWatchlist = () => {
-    if (symbol) toggleWatchlist(symbol);
+    toggleWatchlist(symbol);
   };
 
   const openCalendarOverlayFromNewsPill = useCallback((newsLabel: string, newsTime: string) => {
@@ -260,7 +233,6 @@ export default function AssetDetail() {
       if (!best || s > best.score) best = { ev, score: s };
     }
 
-    // Threshold so we don't open unrelated things
     if (!best || best.score < 4) {
       toast.error("No matching calendar event found for this news item yet.");
       return;
@@ -299,13 +271,6 @@ export default function AssetDetail() {
     );
   }, [symbol, asset]);
 
-  /**
-   * ✅ News Impact pills:
-   * - "Relevant" = calendar events for currencies in this asset + asset-specific extras
-   * - Default: High impact only
-   * - Toggle: show all relevant
-   * - Prevent empty state: if no high exists, show all relevant instead
-   */
   const newsImpactPills: NewsPill[] = useMemo(() => {
     if (!symbol) return [];
 
@@ -328,16 +293,13 @@ export default function AssetDetail() {
       impact: n.impact,
     }));
 
-    // Avoid duplicates where extra is basically same as a calendar event
     const calNormSet = new Set(fromCalendar.map((p) => normalize(p.event)));
     const filteredExtras = extras.filter((x) => !calNormSet.has(normalize(x.event)));
 
     const combined = [...fromCalendar, ...filteredExtras];
 
-    // Default: HIGH only (unless toggled)
     const filtered = showAllRelevantNews ? combined : combined.filter((p) => p.impact === "High");
 
-    // If zero High but we have some relevant items, show all (prevents empty state)
     if (!showAllRelevantNews && filtered.length === 0 && combined.length > 0) return combined;
 
     return filtered;
@@ -345,361 +307,381 @@ export default function AssetDetail() {
 
   if (!asset) {
     return (
-      <Dialog
-        open={open}
-        onOpenChange={(next) => {
-          setOpen(next);
-          if (!next) closeToMarkets();
-        }}
-      >
-        <DialogContent className="max-w-xl w-[96vw] bg-background border-border">
-          <div className="text-center py-8">
-            <h1 className="text-2xl font-bold text-foreground mb-2">Asset not found</h1>
-            <Button onClick={() => navigate("/markets")}>Back to Markets</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <div className="text-center py-10 px-6">
+        <h1 className="text-2xl font-bold text-foreground mb-2">Asset not found</h1>
+        <Button onClick={() => onRequestClose?.()}>Close</Button>
+      </div>
     );
   }
 
   return (
     <>
-      <Dialog
-        open={open}
-        onOpenChange={(next) => {
-          setOpen(next);
-          if (!next) closeToMarkets();
-        }}
-      >
-        <DialogContent className="max-w-6xl w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border-border p-0">
-          {/* Top bar */}
-          <div className="sticky top-0 z-10 bg-background border-b border-border px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <h2 className="text-lg font-semibold text-foreground">{asset.symbol}</h2>
-              <Badge variant="outline" className="text-xs">
-                Live Data
-              </Badge>
-            </div>
-          </div>
+      {/* Top bar */}
+      <div className="sticky top-0 z-10 bg-background border-b border-border px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-foreground">{asset.symbol}</h2>
+          <Badge variant="outline" className="text-xs">
+            Live Data
+          </Badge>
+        </div>
 
-          <div className="p-6 space-y-6">
-            {/* UNIFIED HERO CARD */}
-            <Card className="overflow-hidden">
-              <CardContent className="p-8">
-                <div className="grid lg:grid-cols-2 gap-8">
-                  {/* LEFT */}
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-3 mb-3">
-                      <h1 className="text-4xl font-bold text-foreground">{asset.symbol}</h1>
-                      <Button variant="ghost" size="icon" onClick={handleToggleWatchlist} className="h-10 w-10">
-                        <Star
-                          className={`h-6 w-6 ${
-                            isWatchlisted ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
-                          }`}
-                        />
-                      </Button>
-                    </div>
+        {onRequestClose && (
+          <Button variant="outline" size="sm" onClick={onRequestClose}>
+            Close
+          </Button>
+        )}
+      </div>
 
-                    <div className="flex items-baseline gap-3 mb-6">
-                      <span className="text-3xl font-semibold text-foreground">{asset.latestPrice}</span>
-                      <span
-                        className={`text-lg font-medium ${
-                          asset.priceChange.startsWith("+") ? "text-success" : "text-destructive"
-                        }`}
-                      >
-                        {asset.priceChange}
-                      </span>
-                    </div>
+      <div className="p-6 space-y-6">
+        {/* UNIFIED HERO CARD */}
+        <Card className="overflow-hidden">
+          <CardContent className="p-8">
+            <div className="grid lg:grid-cols-2 gap-8">
+              {/* LEFT */}
+              <div className="flex flex-col">
+                <div className="flex items-center gap-3 mb-3">
+                  <h1 className="text-4xl font-bold text-foreground">{asset.symbol}</h1>
+                  <Button variant="ghost" size="icon" onClick={handleToggleWatchlist} className="h-10 w-10">
+                    <Star
+                      className={`h-6 w-6 ${
+                        isWatchlisted ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
+                      }`}
+                    />
+                  </Button>
+                </div>
 
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
-                        Quick Insights
-                      </h3>
+                <div className="flex items-baseline gap-3 mb-6">
+                  <span className="text-3xl font-semibold text-foreground">{asset.latestPrice}</span>
+                  <span
+                    className={`text-lg font-medium ${
+                      asset.priceChange.startsWith("+") ? "text-success" : "text-destructive"
+                    }`}
+                  >
+                    {asset.priceChange}
+                  </span>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                    Quick Insights
+                  </h3>
+                  <div className="space-y-2">
+                    {insights.map((insight, index) => {
+                      const colors = ["bg-primary", "bg-success", "bg-warning", "bg-destructive"];
+                      return (
+                        <div key={index} className="flex items-start gap-2">
+                          <div
+                            className={`h-1.5 w-1.5 rounded-full ${colors[index % colors.length]} mt-1.5 flex-shrink-0`}
+                          />
+                          <p className="text-sm text-muted-foreground">{insight}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* ✅ News Impact */}
+                  {newsImpactPills.length > 0 && (
+                    <div className="mt-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                          News Impact
+                        </h3>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowAllRelevantNews((v) => !v)}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          {showAllRelevantNews ? "Show high impact only" : "Show all relevant"}
+                        </button>
+                      </div>
+
                       <div className="space-y-2">
-                        {insights.map((insight, index) => {
-                          const colors = ["bg-primary", "bg-success", "bg-warning", "bg-destructive"];
+                        {(newsExpanded ? newsImpactPills : newsImpactPills.slice(0, 3)).map((pill) => {
+                          const impactColors = {
+                            High: "bg-destructive text-destructive-foreground",
+                            Medium: "bg-warning text-warning-foreground",
+                            Low: "bg-success text-success-foreground",
+                          } as const;
+
                           return (
-                            <div key={index} className="flex items-start gap-2">
-                              <div
-                                className={`h-1.5 w-1.5 rounded-full ${colors[index % colors.length]} mt-1.5 flex-shrink-0`}
-                              />
-                              <p className="text-sm text-muted-foreground">{insight}</p>
-                            </div>
+                            <button
+                              key={pill.key}
+                              type="button"
+                              onPointerDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                openCalendarOverlayFromNewsPill(pill.event, pill.time);
+                              }}
+                              className="w-full flex items-center gap-2 text-left hover:bg-muted/30 rounded-md px-2 py-1.5 transition-colors group"
+                            >
+                              <span
+                                className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                                  impactColors[pill.impact]
+                                }`}
+                              >
+                                {pill.impact}
+                              </span>
+                              <span className="text-sm text-foreground group-hover:text-primary transition-colors">
+                                {pill.event}
+                              </span>
+                              <span className="text-sm text-muted-foreground">—</span>
+                              <span className="text-sm text-muted-foreground">{pill.time}</span>
+                            </button>
                           );
                         })}
                       </div>
 
-                      {/* ✅ News Impact (High only by default, toggle to show all relevant) */}
-                      {newsImpactPills.length > 0 && (
-                        <div className="mt-5">
-                          <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                              News Impact
-                            </h3>
-
-                            <button
-                              type="button"
-                              onClick={() => setShowAllRelevantNews((v) => !v)}
-                              className="text-xs text-primary hover:underline"
-                            >
-                              {showAllRelevantNews ? "Show high impact only" : "Show all relevant"}
-                            </button>
-                          </div>
-
-                          <div className="space-y-2">
-                            {(newsExpanded ? newsImpactPills : newsImpactPills.slice(0, 3)).map((pill) => {
-                              const impactColors = {
-                                High: "bg-destructive text-destructive-foreground",
-                                Medium: "bg-warning text-warning-foreground",
-                                Low: "bg-success text-success-foreground",
-                              } as const;
-
-                              return (
-                                <button
-                                  key={pill.key}
-                                  type="button"
-                                  onPointerDown={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    openCalendarOverlayFromNewsPill(pill.event, pill.time);
-                                  }}
-                                  className="w-full flex items-center gap-2 text-left hover:bg-muted/30 rounded-md px-2 py-1.5 transition-colors group"
-                                >
-                                  <span
-                                    className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                                      impactColors[pill.impact]
-                                    }`}
-                                  >
-                                    {pill.impact}
-                                  </span>
-                                  <span className="text-sm text-foreground group-hover:text-primary transition-colors">
-                                    {pill.event}
-                                  </span>
-                                  <span className="text-sm text-muted-foreground">—</span>
-                                  <span className="text-sm text-muted-foreground">{pill.time}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-
-                          {newsImpactPills.length > 3 && (
-                            <button
-                              type="button"
-                              onClick={() => setNewsExpanded((v) => !v)}
-                              className="text-xs text-primary hover:underline mt-1"
-                            >
-                              {newsExpanded
-                                ? "Show less"
-                                : `+${newsImpactPills.length - 3} more · Show more`}
-                            </button>
-                          )}
-
-                          <p className="text-xs text-muted-foreground mt-2">
-                            If something doesn’t open, it means the event doesn’t exist in <code>calendarEvents</code>{" "}
-                            yet (or needs a closer name match).
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* RIGHT */}
-                  <div className="flex flex-col">
-                    <div className="grid grid-cols-4 gap-3 mb-6">
-                      <div className="p-3 bg-muted/30 rounded-lg text-center">
-                        <span className="text-xs text-muted-foreground block mb-1">Volume</span>
-                        <span className="text-sm font-semibold text-foreground">{asset.volume}</span>
-                      </div>
-                      <div className="p-3 bg-muted/30 rounded-lg text-center">
-                        <span className="text-xs text-muted-foreground block mb-1">Spread</span>
-                        <span className="text-sm font-semibold text-foreground">{asset.spread}</span>
-                      </div>
-                      <div className="p-3 bg-muted/30 rounded-lg text-center">
-                        <span className="text-xs text-muted-foreground block mb-1">Confidence</span>
-                        <span className="text-sm font-semibold text-foreground">{asset.biasConfidence}%</span>
-                      </div>
-                      <div className="p-3 bg-muted/30 rounded-lg text-center">
-                        <span className="text-xs text-muted-foreground block mb-1">Sentiment</span>
-                        <span
-                          className={`text-sm font-semibold ${
-                            asset.sentiment > 0
-                              ? "text-success"
-                              : asset.sentiment < 0
-                                ? "text-destructive"
-                                : "text-muted-foreground"
-                          }`}
+                      {newsImpactPills.length > 3 && (
+                        <button
+                          type="button"
+                          onClick={() => setNewsExpanded((v) => !v)}
+                          className="text-xs text-primary hover:underline mt-1"
                         >
-                          {asset.sentiment > 0 ? "+" : ""}
-                          {asset.sentiment}
-                        </span>
-                      </div>
-                    </div>
+                          {newsExpanded ? "Show less" : `+${newsImpactPills.length - 3} more · Show more`}
+                        </button>
+                      )}
 
-                    <div className="flex-1 flex flex-col items-center justify-center pt-2">
-                      <span className="text-sm text-muted-foreground uppercase tracking-wide mb-6">Current Bias</span>
-                      <div className="relative w-72 h-36">
-                        <svg viewBox="0 0 100 50" className="w-full h-full">
-                          <path
-                            d="M 10 45 A 40 40 0 0 1 90 45"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="8"
-                            className="text-muted"
-                          />
-                          <path
-                            d="M 10 45 A 40 40 0 0 1 90 45"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="8"
-                            strokeDasharray={`${(asset.biasConfidence / 100) * 126} 126`}
-                            className={getBiasColor(asset.biasDirection)}
-                          />
-                          <line
-                            x1="50"
-                            y1="45"
-                            x2={50 + 35 * Math.cos((Math.PI * (180 - asset.biasConfidence * 1.8)) / 180)}
-                            y2={45 - 35 * Math.sin((Math.PI * (180 - asset.biasConfidence * 1.8)) / 180)}
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            className="text-foreground"
-                          />
-                          <circle cx="50" cy="45" r="5" fill="currentColor" className="text-foreground" />
-                        </svg>
-                      </div>
-                      <div className={`flex items-center gap-2 mt-6 ${getBiasColor(asset.biasDirection)}`}>
-                        {getBiasIcon(asset.biasDirection)}
-                        <span className="text-3xl font-bold">{asset.biasDirection}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* AI MARKET OVERVIEW */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-primary" />
-                  AI Market Overview
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <p className="text-muted-foreground leading-relaxed">
-                    <strong className="text-foreground">{asset.symbol}</strong> is currently showing a{" "}
-                    <strong className={getBiasColor(asset.biasDirection)}>{asset.biasDirection.toLowerCase()}</strong>{" "}
-                    bias with {asset.biasConfidence}% confidence based on our multi-timeframe analysis.
-                  </p>
-
-                  <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
-                      <p className="text-sm text-destructive">
-                        <strong>Warning:</strong> High-impact news events scheduled within the next 4 hours.
+                      <p className="text-xs text-muted-foreground mt-2">
+                        If something doesn’t open, it means the event doesn’t exist in <code>calendarEvents</code> yet
+                        (or needs a closer name match).
                       </p>
                     </div>
+                  )}
+                </div>
+              </div>
+
+              {/* RIGHT */}
+              <div className="flex flex-col">
+                <div className="grid grid-cols-4 gap-3 mb-6">
+                  <div className="p-3 bg-muted/30 rounded-lg text-center">
+                    <span className="text-xs text-muted-foreground block mb-1">Volume</span>
+                    <span className="text-sm font-semibold text-foreground">{asset.volume}</span>
+                  </div>
+                  <div className="p-3 bg-muted/30 rounded-lg text-center">
+                    <span className="text-xs text-muted-foreground block mb-1">Spread</span>
+                    <span className="text-sm font-semibold text-foreground">{asset.spread}</span>
+                  </div>
+                  <div className="p-3 bg-muted/30 rounded-lg text-center">
+                    <span className="text-xs text-muted-foreground block mb-1">Confidence</span>
+                    <span className="text-sm font-semibold text-foreground">{asset.biasConfidence}%</span>
+                  </div>
+                  <div className="p-3 bg-muted/30 rounded-lg text-center">
+                    <span className="text-xs text-muted-foreground block mb-1">Sentiment</span>
+                    <span
+                      className={`text-sm font-semibold ${
+                        asset.sentiment > 0
+                          ? "text-success"
+                          : asset.sentiment < 0
+                            ? "text-destructive"
+                            : "text-muted-foreground"
+                      }`}
+                    >
+                      {asset.sentiment > 0 ? "+" : ""}
+                      {asset.sentiment}
+                    </span>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* Grid */}
-            <div className="grid lg:grid-cols-3 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Target className="h-4 w-4 text-primary" />
-                    Key Levels
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {keyLevels.map((level, index) => (
-                      <div key={index} className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
-                        <div>
-                          <span className="text-sm font-medium text-foreground">{level.type}</span>
-                          <p className="text-xs text-muted-foreground">{level.notes}</p>
-                        </div>
-                        <span className="text-sm font-semibold text-foreground">{level.price}</span>
-                      </div>
-                    ))}
+                <div className="flex-1 flex flex-col items-center justify-center pt-2">
+                  <span className="text-sm text-muted-foreground uppercase tracking-wide mb-6">Current Bias</span>
+                  <div className="relative w-72 h-36">
+                    <svg viewBox="0 0 100 50" className="w-full h-full">
+                      <path
+                        d="M 10 45 A 40 40 0 0 1 90 45"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="8"
+                        className="text-muted"
+                      />
+                      <path
+                        d="M 10 45 A 40 40 0 0 1 90 45"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="8"
+                        strokeDasharray={`${(asset.biasConfidence / 100) * 126} 126`}
+                        className={getBiasColor(asset.biasDirection)}
+                      />
+                      <line
+                        x1="50"
+                        y1="45"
+                        x2={50 + 35 * Math.cos((Math.PI * (180 - asset.biasConfidence * 1.8)) / 180)}
+                        y2={45 - 35 * Math.sin((Math.PI * (180 - asset.biasConfidence * 1.8)) / 180)}
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        className="text-foreground"
+                      />
+                      <circle cx="50" cy="45" r="5" fill="currentColor" className="text-foreground" />
+                    </svg>
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Clock className="h-4 w-4 text-primary" />
-                    Session Insights
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {sessionInsights.map((session, index) => (
-                      <div key={index} className="p-2 bg-muted/30 rounded-lg">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm font-medium text-foreground">{session.session}</span>
-                          <Badge
-                            variant={
-                              session.volatility === "High"
-                                ? "destructive"
-                                : session.volatility === "Medium"
-                                  ? "default"
-                                  : "secondary"
-                            }
-                            className="text-[10px]"
-                          >
-                            {session.volatility}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground">{session.description}</p>
-                      </div>
-                    ))}
+                  <div className={`flex items-center gap-2 mt-6 ${getBiasColor(asset.biasDirection)}`}>
+                    {getBiasIcon(asset.biasDirection)}
+                    <span className="text-3xl font-bold">{asset.biasDirection}</span>
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Zap className="h-4 w-4 text-primary" />
-                    Upcoming News
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {upcomingNews.map((news, index) => (
-                      <div key={index} className="p-2 bg-muted/30 rounded-lg">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-muted-foreground">{news.time}</span>
-                          <Badge variant={news.impact === "High" ? "destructive" : "default"} className="text-[10px]">
-                            {news.impact}
-                          </Badge>
-                        </div>
-                        <p className="text-sm font-medium text-foreground mb-1">{news.event}</p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>F: {news.forecast}</span>
-                          <span>P: {news.previous}</span>
-                          <span>A: {news.actual}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </CardContent>
+        </Card>
 
-      {/* Nested Calendar overlay (same template as Calendar page) */}
+        {/* AI MARKET OVERVIEW */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" />
+              AI Market Overview
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <p className="text-muted-foreground leading-relaxed">
+                <strong className="text-foreground">{asset.symbol}</strong> is currently showing a{" "}
+                <strong className={getBiasColor(asset.biasDirection)}>{asset.biasDirection.toLowerCase()}</strong> bias
+                with {asset.biasConfidence}% confidence based on our multi-timeframe analysis.
+              </p>
+
+              <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-destructive">
+                    <strong>Warning:</strong> High-impact news events scheduled within the next 4 hours.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Grid */}
+        <div className="grid lg:grid-cols-3 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Target className="h-4 w-4 text-primary" />
+                Key Levels
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {keyLevels.map((level, index) => (
+                  <div key={index} className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
+                    <div>
+                      <span className="text-sm font-medium text-foreground">{level.type}</span>
+                      <p className="text-xs text-muted-foreground">{level.notes}</p>
+                    </div>
+                    <span className="text-sm font-semibold text-foreground">{level.price}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Clock className="h-4 w-4 text-primary" />
+                Session Insights
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {sessionInsights.map((session, index) => (
+                  <div key={index} className="p-2 bg-muted/30 rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-foreground">{session.session}</span>
+                      <Badge
+                        variant={
+                          session.volatility === "High"
+                            ? "destructive"
+                            : session.volatility === "Medium"
+                              ? "default"
+                              : "secondary"
+                        }
+                        className="text-[10px]"
+                      >
+                        {session.volatility}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{session.description}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Zap className="h-4 w-4 text-primary" />
+                Upcoming News
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {upcomingNews.map((news, index) => (
+                  <div key={index} className="p-2 bg-muted/30 rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-muted-foreground">{news.time}</span>
+                      <Badge variant={news.impact === "High" ? "destructive" : "default"} className="text-[10px]">
+                        {news.impact}
+                      </Badge>
+                    </div>
+                    <p className="text-sm font-medium text-foreground mb-1">{news.event}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>F: {news.forecast}</span>
+                      <span>P: {news.previous}</span>
+                      <span>A: {news.actual}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Nested Calendar overlay */}
       <EventDetailsModal
         event={selectedCalendarEvent as any}
         isOpen={isEventModalOpen}
         onClose={closeCalendarOverlay}
       />
     </>
+  );
+}
+
+/* =======================
+   ✅ PAGE WRAPPER (HAS DIALOG + NAV)
+======================= */
+
+export default function AssetDetail() {
+  const { symbol } = useParams<{ symbol: string }>();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  const returnFilter = searchParams.get("from") || "All";
+
+  const [open, setOpen] = useState(true);
+
+  const closeToMarkets = () => {
+    navigate(`/markets?filter=${returnFilter}`, { replace: true });
+  };
+
+  if (!symbol) {
+    return null;
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) closeToMarkets();
+      }}
+    >
+      <DialogContent className="max-w-6xl w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border-border p-0">
+        <AssetDetailContent symbol={symbol} />
+      </DialogContent>
+    </Dialog>
   );
 }
