@@ -1,19 +1,24 @@
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
-
 import { cn } from "@/lib/utils";
 
 const Dialog = DialogPrimitive.Root;
 const DialogTrigger = DialogPrimitive.Trigger;
-const DialogPortal = DialogPrimitive.Portal;
 const DialogClose = DialogPrimitive.Close;
 
 /**
- * IMPORTANT:
- * We standardize z-index here so ALL dialogs (AssetDetail route modal, quick view, calendar event modal, etc.)
- * always dim + blur the background consistently across the entire app shell.
+ * Force portal into <body> so we always escape app-shell stacking contexts.
  */
+function DialogPortal({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+
+  return <DialogPrimitive.Portal container={document.body}>{children}</DialogPrimitive.Portal>;
+}
+
 const DialogOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
@@ -21,11 +26,10 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      // Consistent overlay: dim + blur + HIGH z-index
-      "fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm",
-      // Animations
+      // VERY high z-index so it always sits above the entire app shell
+      "fixed inset-0 z-[9998] bg-black/40 backdrop-blur-sm",
       "data-[state=open]:animate-in data-[state=closed]:animate-out",
-      "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
       className,
     )}
     {...props}
@@ -35,25 +39,22 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { size?: "default" | "xl" }
->(({ className, children, size = "default", ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
+>(({ className, children, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
-      data-size={size === "xl" ? "xl" : "default"}
       className={cn(
-        // Base positioning + HIGH z-index (above overlay)
-        "fixed left-[50%] top-[50%] z-[201] grid w-full translate-x-[-50%] translate-y-[-50%] gap-4",
+        // VERY high z-index (above overlay)
+        "fixed left-[50%] top-[50%] z-[9999] grid w-full translate-x-[-50%] translate-y-[-50%] gap-4",
         "border bg-background shadow-lg duration-200 sm:rounded-lg",
-        // Default sizing (your existing behavior)
+        // default modal sizing
         "max-w-lg p-6",
-        // XL sizing option (used by your large modals)
-        "data-[size=xl]:max-w-6xl data-[size=xl]:w-[96vw] data-[size=xl]:p-0 data-[size=xl]:max-h-[92vh] data-[size=xl]:overflow-y-auto",
-        // Animations
+        // animations
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
-        "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-        "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+        "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
+        "data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
         "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]",
         "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
         className,
@@ -61,8 +62,6 @@ const DialogContent = React.forwardRef<
       {...props}
     >
       {children}
-
-      {/* Default close button (fine for normal dialogs; big pages often render their own close in header) */}
       <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
