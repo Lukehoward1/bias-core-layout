@@ -23,7 +23,7 @@ export const AVAILABLE_CARDS: DashboardCardConfig[] = DASHBOARD_CARD_REGISTRY.ma
   allowedRowTypes: card.allowedRowTypes,
 }));
 
-const STORAGE_KEY = 'streambias-dashboard-layout-v3';
+const STORAGE_KEY = 'streambias-dashboard-layout-v4';
 
 export interface DashboardCardEntry {
   id: string;
