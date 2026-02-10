@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
+import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { SessionLockProvider } from "@/hooks/use-session-lock";
 import { AlertsProvider } from "@/contexts/AlertsContext";
@@ -30,7 +30,6 @@ import Billing from "./pages/Billing";
 import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
 
-// ✅ Use your existing shadcn Dialog for the modal overlay
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 const queryClient = new QueryClient();
@@ -46,7 +45,6 @@ function AppRoutes() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // location.state may carry the previous page location
   const state = location.state as { backgroundLocation?: Location } | null;
   const backgroundLocation = state?.backgroundLocation;
 
@@ -94,11 +92,6 @@ function AppRoutes() {
                   if (!open) navigate(-1);
                 }}
               >
-                {/* 
-                  Make the overlay feel like Calendar:
-                  - translucent + blur
-                  - not full-black
-                */}
                 <DialogContent
                   className="
                     max-w-6xl w-[96vw]
@@ -129,9 +122,7 @@ const App = () => (
           <SessionLockProvider>
             <Toaster />
             <Sonner />
-            <BrowserRouter>
-              <AppRoutes />
-            </BrowserRouter>
+            <AppRoutes />
           </SessionLockProvider>
         </AlertsProvider>
       </TooltipProvider>
