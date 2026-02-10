@@ -23,9 +23,9 @@ import { Button } from "@/components/ui/button";
 import { getCardRenderer, warnMissingRenderers } from "@/data/dashboardCardRenderers";
 import { DASHBOARD_CARD_REGISTRY } from "@/data/dashboardCardRegistry";
 
-// ✅ NEW: calendar event modal wiring (dashboard → event details)
+// ✅ Calendar event modal wiring (dashboard → event details)
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
-import { calendarEvents } from "@/data/calendarEvents";
+import { calendarEvents, type CalendarEvent } from "@/data/calendarEvents";
 
 interface SessionData {
   name: string;
@@ -82,11 +82,7 @@ function SessionTimerDropdown({
   if (!isOpen) return null;
 
   const activeSession = sessions.find((s) => s.status === "active");
-  const upcomingSessions = sessions
-    .filter((s) => s.status !== "active")
-    .sort((a, b) => {
-      return a.time.localeCompare(b.time);
-    });
+  const upcomingSessions = sessions.filter((s) => s.status !== "active").sort((a, b) => a.time.localeCompare(b.time));
 
   return (
     <div
@@ -105,6 +101,7 @@ function SessionTimerDropdown({
           <p className="text-sm text-muted-foreground">No active session</p>
         )}
       </div>
+
       <div className="p-3">
         <p className="text-xs font-medium text-muted-foreground mb-2">Upcoming Sessions</p>
         <div className="space-y-2">
@@ -133,8 +130,7 @@ export default function Dashboard() {
   const sessionCardRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  // ✅ NEW: event modal state (Dashboard → EventDetailsModal)
-  type CalendarEvent = (typeof calendarEvents)[0];
+  // ✅ Event modal state (Dashboard → EventDetailsModal)
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
@@ -341,7 +337,9 @@ export default function Dashboard() {
                         <div className="text-xs text-muted-foreground">{session.region}</div>
                       </div>
                       <div
-                        className={`text-xs ${session.status === "active" ? "text-success font-medium" : "text-muted-foreground"}`}
+                        className={`text-xs ${
+                          session.status === "active" ? "text-success font-medium" : "text-muted-foreground"
+                        }`}
                       >
                         {session.time}
                       </div>
@@ -353,7 +351,7 @@ export default function Dashboard() {
           </Card>
         );
 
-      // ✅ UPDATED: Upcoming events now clickable and opens EventDetailsModal
+      // ✅ Upcoming events now clickable and opens EventDetailsModal
       case "upcoming-events": {
         const upcoming = calendarEvents
           .slice()
@@ -362,9 +360,20 @@ export default function Dashboard() {
 
         return (
           <Card className="h-full">
-            <CardHeader>
+            <CardHeader className="flex items-center justify-between">
               <CardTitle>Upcoming Events</CardTitle>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => navigate("/calendar")}
+                disabled={isEditMode}
+              >
+                View all
+              </Button>
             </CardHeader>
+
             <CardContent>
               <div className="space-y-3">
                 {upcoming.map((ev) => (
@@ -610,8 +619,8 @@ export default function Dashboard() {
         onRemoveCard={removeCard}
       />
 
-      {/* ✅ NEW: Event modal mount (so Dashboard can open event details) */}
-      <EventDetailsModal event={selectedCalendarEvent as any} isOpen={isEventModalOpen} onClose={closeCalendarEvent} />
+      {/* ✅ Event modal mount (Dashboard can open event details) */}
+      <EventDetailsModal event={selectedCalendarEvent} isOpen={isEventModalOpen} onClose={closeCalendarEvent} />
     </div>
   );
 }
