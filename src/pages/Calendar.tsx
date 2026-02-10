@@ -18,6 +18,7 @@ type CalendarEvent = (typeof calendarEvents)[0];
 
 export default function Calendar() {
   const [searchParams, setSearchParams] = useSearchParams();
+
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
@@ -43,10 +44,23 @@ export default function Calendar() {
     else eventRefs.current.delete(eventId);
   }, []);
 
+  /**
+   * ✅ IMPORTANT FIX
+   * Always close the current modal before opening a new event.
+   * This prevents "event behind modal" behaviour.
+   */
   const openEvent = useCallback((ev: CalendarEvent | null) => {
     if (!ev) return;
-    setSelectedEvent(ev);
-    setIsModalOpen(true);
+
+    // Close first (even if already closed)
+    setIsModalOpen(false);
+    setSelectedEvent(null);
+
+    // Open on next tick so state fully resets
+    requestAnimationFrame(() => {
+      setSelectedEvent(ev);
+      setIsModalOpen(true);
+    });
   }, []);
 
   const closeModal = useCallback(() => {
@@ -54,7 +68,7 @@ export default function Calendar() {
     setSelectedEvent(null);
   }, []);
 
-  // Open from deep-link: /calendar?eventId=xxxx
+  // Deep-link support: /calendar?eventId=xxx
   useEffect(() => {
     const eventId = searchParams.get("eventId");
     if (!eventId) return;
@@ -126,13 +140,14 @@ export default function Calendar() {
               const fullEvent = calendarEvents.find((e) => e.id === event.id) ?? null;
 
               return (
-                <div
+                <button
                   key={event.id}
+                  type="button"
+                  onClick={() => openEvent(fullEvent)}
                   className={cn(
-                    "p-4 rounded-lg border bg-muted/50 cursor-pointer hover:bg-muted/70",
+                    "text-left p-4 rounded-lg border bg-muted/50 hover:bg-muted/70 transition-colors",
                     highlightedEventId === event.id && "ring-2 ring-primary",
                   )}
-                  onClick={() => openEvent(fullEvent)}
                 >
                   <div className="flex justify-between mb-2">
                     <Badge variant={getImpactVariant(event.impact)}>{event.impact.toUpperCase()}</Badge>
@@ -140,7 +155,7 @@ export default function Calendar() {
                   </div>
                   <div className="font-semibold text-sm">{event.currency}</div>
                   <div className="text-xs text-muted-foreground">{event.event}</div>
-                </div>
+                </button>
               );
             })}
           </CardContent>
@@ -194,6 +209,7 @@ export default function Calendar() {
         </Card>
       </div>
 
+      {/* Single authoritative event modal */}
       <EventDetailsModal event={selectedEvent} isOpen={isModalOpen} onClose={closeModal} />
     </div>
   );
