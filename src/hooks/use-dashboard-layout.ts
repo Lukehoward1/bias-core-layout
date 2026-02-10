@@ -1,21 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
-import { DASHBOARD_CARD_REGISTRY, type DashboardCardDefinition, isCardEligible } from '@/data/dashboardCardRegistry';
+import { useState, useEffect, useCallback } from "react";
+import { DASHBOARD_CARD_REGISTRY, isCardEligible } from "@/data/dashboardCardRegistry";
 
-export type RowType = 'kpi' | 'wide-narrow' | 'equal' | 'hero' | 'three-equal' | 'four-equal';
-
-// Re-export for backwards compatibility
-export type { DashboardCardDefinition };
-
-export interface DashboardCardConfig {
-  id: string;
-  title: string;
-  description: string;
-  category: 'metrics' | 'analysis' | 'overview';
-  allowedRowTypes?: RowType[];
-}
+export type RowType = "kpi" | "wide-narrow" | "equal" | "hero" | "three-equal" | "four-equal";
 
 // Derive AVAILABLE_CARDS from registry for backwards compatibility
-export const AVAILABLE_CARDS: DashboardCardConfig[] = DASHBOARD_CARD_REGISTRY.map(card => ({
+export const AVAILABLE_CARDS = DASHBOARD_CARD_REGISTRY.map((card) => ({
   id: card.id,
   title: card.title,
   description: card.description,
@@ -23,7 +12,8 @@ export const AVAILABLE_CARDS: DashboardCardConfig[] = DASHBOARD_CARD_REGISTRY.ma
   allowedRowTypes: card.allowedRowTypes,
 }));
 
-const STORAGE_KEY = 'streambias-dashboard-layout-v4';
+// ✅ Bump this any time defaults change, to invalidate old saved layouts
+const STORAGE_KEY = "streambias-dashboard-layout-v5";
 
 export interface DashboardCardEntry {
   id: string;
@@ -47,30 +37,31 @@ const generateRowId = () => `row-${Date.now()}-${Math.random().toString(36).subs
 const getDefaultLayout = (): DashboardLayout => ({
   rows: [
     {
-      id: 'kpi-row',
-      type: 'kpi',
+      id: "kpi-row",
+      type: "kpi",
       isFixed: true,
       cards: [
-        { id: 'todays-bias', isPinned: false },
-        { id: 'active-trades', isPinned: false },
-        { id: 'next-session', isPinned: false },
-        { id: 'rr-calculator', isPinned: false },
+        { id: "todays-bias", isPinned: false },
+        { id: "active-trades", isPinned: false },
+        { id: "next-session", isPinned: false },
+        // ✅ RR is the default KPI #4 now
+        { id: "rr-calculator", isPinned: false },
       ],
     },
     {
-      id: 'analysis-row',
-      type: 'wide-narrow',
+      id: "analysis-row",
+      type: "wide-narrow",
       cards: [
-        { id: 'watchlist-overview', isPinned: false },
-        { id: 'session-timers', isPinned: false },
+        { id: "watchlist-overview", isPinned: false },
+        { id: "session-timers", isPinned: false },
       ],
     },
     {
-      id: 'overview-row',
-      type: 'equal',
+      id: "overview-row",
+      type: "equal",
       cards: [
-        { id: 'upcoming-events', isPinned: false },
-        { id: 'performance-overview', isPinned: false },
+        { id: "upcoming-events", isPinned: false },
+        { id: "performance-overview", isPinned: false },
       ],
     },
   ],
@@ -78,28 +69,28 @@ const getDefaultLayout = (): DashboardLayout => ({
 
 const isRowType = (value: unknown): value is RowType => {
   return (
-    value === 'kpi' ||
-    value === 'wide-narrow' ||
-    value === 'equal' ||
-    value === 'hero' ||
-    value === 'three-equal' ||
-    value === 'four-equal'
+    value === "kpi" ||
+    value === "wide-narrow" ||
+    value === "equal" ||
+    value === "hero" ||
+    value === "three-equal" ||
+    value === "four-equal"
   );
 };
 
 const getMaxSlotsForRowType = (rowType: RowType): number => {
   switch (rowType) {
-    case 'kpi':
+    case "kpi":
       return 4;
-    case 'wide-narrow':
+    case "wide-narrow":
       return 2;
-    case 'equal':
+    case "equal":
       return 2;
-    case 'three-equal':
+    case "three-equal":
       return 3;
-    case 'four-equal':
+    case "four-equal":
       return 4;
-    case 'hero':
+    case "hero":
       return 1;
     default:
       return 2;
@@ -113,7 +104,7 @@ const getMaxSlotsForRowType = (rowType: RowType): number => {
 const normalizeLayout = (raw: unknown): DashboardLayout => {
   const fallback = getDefaultLayout();
 
-  if (!raw || typeof raw !== 'object') return fallback;
+  if (!raw || typeof raw !== "object") return fallback;
 
   const rowsRaw = (raw as { rows?: unknown }).rows;
   if (!Array.isArray(rowsRaw)) return fallback;
@@ -121,31 +112,32 @@ const normalizeLayout = (raw: unknown): DashboardLayout => {
   const normalizedRows: DashboardRow[] = rowsRaw
     .filter(Boolean)
     .map((row): DashboardRow | null => {
-      if (!row || typeof row !== 'object') return null;
+      if (!row || typeof row !== "object") return null;
 
       const r = row as Partial<DashboardRow> & { cards?: unknown };
 
-      const id = typeof r.id === 'string' ? r.id : generateRowId();
-      const type: RowType = isRowType(r.type) ? r.type : 'equal';
+      const id = typeof r.id === "string" ? r.id : generateRowId();
+      const type: RowType = isRowType(r.type) ? r.type : "equal";
       const isFixed = Boolean(r.isFixed);
 
       const cardsRaw = Array.isArray(r.cards) ? r.cards : [];
       const cards: DashboardCardEntry[] = cardsRaw
         .filter(Boolean)
         .map((c): DashboardCardEntry | null => {
-          if (!c || typeof c !== 'object') return null;
+          if (!c || typeof c !== "object") return null;
           const ce = c as Partial<DashboardCardEntry>;
-          if (typeof ce.id !== 'string' || !ce.id) return null;
+          if (typeof ce.id !== "string" || !ce.id) return null;
+
           // Safety filter: only keep cards that exist in the registry
-          // isCardEligible checks the full registry, no need for a hardcoded built-in list
           if (!isCardEligible(ce.id)) {
             console.warn(`Filtered unknown card from layout: ${ce.id}`);
             return null;
           }
+
           return {
             id: ce.id,
             isPinned: Boolean(ce.isPinned),
-            sourceType: typeof ce.sourceType === 'string' ? ce.sourceType : undefined,
+            sourceType: typeof ce.sourceType === "string" ? ce.sourceType : undefined,
           };
         })
         .filter((c): c is DashboardCardEntry => Boolean(c));
@@ -168,90 +160,84 @@ const normalizeLayout = (raw: unknown): DashboardLayout => {
     })
     .filter((r): r is DashboardRow => Boolean(r));
 
-  // Ensure KPI row always exists as the first row and is fixed.
-  const requiredKpiIds = ['todays-bias', 'active-trades', 'next-session', 'high-impact-events'];
-  const existingKpi = normalizedRows.find((r) => r.id === 'kpi-row' || r.type === 'kpi' || r.isFixed);
+  // ✅ KPI row must exist and always match DEFAULT KPI IDs (not hardcoded High Impact)
+  const defaultKpiIds = getDefaultLayout().rows[0].cards.map((c) => c.id);
+  const existingKpi = normalizedRows.find((r) => r.id === "kpi-row" || r.type === "kpi" || r.isFixed);
 
-  const existingKpiIds = (existingKpi?.cards ?? [])
-    .map((c) => c.id)
-    .filter((id) => requiredKpiIds.includes(id));
+  const existingKpiIds = (existingKpi?.cards ?? []).map((c) => c.id).filter((id) => defaultKpiIds.includes(id));
 
-  const finalKpiIds = [...existingKpiIds, ...requiredKpiIds.filter((id) => !existingKpiIds.includes(id))].slice(0, 4);
+  const finalKpiIds = [...existingKpiIds, ...defaultKpiIds.filter((id) => !existingKpiIds.includes(id))].slice(0, 4);
 
   const kpiRow: DashboardRow = {
-    id: 'kpi-row',
-    type: 'kpi',
+    id: "kpi-row",
+    type: "kpi",
     isFixed: true,
     cards: finalKpiIds.map((id) => ({ id, isPinned: false })),
   };
 
-  const nonKpiRows = normalizedRows.filter((r) => r !== existingKpi && !r.isFixed && r.type !== 'kpi');
+  const nonKpiRows = normalizedRows.filter((r) => r !== existingKpi && !r.isFixed && r.type !== "kpi");
 
   return {
     rows: [kpiRow, ...nonKpiRows],
   };
 };
 
-
 // Migrate from old v2 format
 const migrateOldLayout = (): DashboardLayout | null => {
   try {
-    const oldSaved = localStorage.getItem('streambias-dashboard-layout-v2');
+    const oldSaved = localStorage.getItem("streambias-dashboard-layout-v2");
     if (oldSaved) {
       const oldLayout = JSON.parse(oldSaved);
       if (oldLayout.cards && Array.isArray(oldLayout.cards)) {
-        // Build new row-based layout from flat card list
         const defaultLayout = getDefaultLayout();
-        
-        // Map old cards to rows based on categories
-        const kpiCards = ['todays-bias', 'active-trades', 'next-session', 'high-impact-events'];
-        const analysisCards = ['watchlist-overview', 'session-timers', 'risk-snapshot'];
-        const overviewCards = ['upcoming-events', 'performance-overview', 'journal-summary', 'calendar-events'];
-        
+
+        // ✅ Update KPI mapping to match new default KPI set
+        const kpiCards = ["todays-bias", "active-trades", "next-session", "rr-calculator"];
+        const analysisCards = ["watchlist-overview", "session-timers", "risk-snapshot"];
+        const overviewCards = ["upcoming-events", "performance-overview", "journal-summary", "calendar-events"];
+
         const oldCards: DashboardCardEntry[] = oldLayout.cards;
-        
+
         // KPI row
-        defaultLayout.rows[0].cards = oldCards.filter(c => kpiCards.includes(c.id));
-        
+        defaultLayout.rows[0].cards = oldCards.filter((c) => kpiCards.includes(c.id));
+
         // Analysis row (wide-narrow)
-        const analysisEntries = oldCards.filter(c => analysisCards.includes(c.id));
+        const analysisEntries = oldCards.filter((c) => analysisCards.includes(c.id));
         if (analysisEntries.length > 0) {
           defaultLayout.rows[1].cards = analysisEntries.slice(0, 2);
         }
-        
+
         // Overview row (equal)
-        const overviewEntries = oldCards.filter(c => overviewCards.includes(c.id));
+        const overviewEntries = oldCards.filter((c) => overviewCards.includes(c.id));
         if (overviewEntries.length > 0) {
           defaultLayout.rows[2].cards = overviewEntries.slice(0, 2);
         }
-        
+
         // Add remaining cards as new equal rows
         const assignedIds = [
-          ...defaultLayout.rows[0].cards.map(c => c.id),
-          ...defaultLayout.rows[1].cards.map(c => c.id),
-          ...defaultLayout.rows[2].cards.map(c => c.id),
+          ...defaultLayout.rows[0].cards.map((c) => c.id),
+          ...defaultLayout.rows[1].cards.map((c) => c.id),
+          ...defaultLayout.rows[2].cards.map((c) => c.id),
         ];
-        
-        const remainingCards = oldCards.filter(c => !assignedIds.includes(c.id));
+
+        const remainingCards = oldCards.filter((c) => !assignedIds.includes(c.id));
         for (let i = 0; i < remainingCards.length; i += 2) {
           const rowCards = remainingCards.slice(i, i + 2);
           if (rowCards.length > 0) {
             defaultLayout.rows.push({
               id: generateRowId(),
-              type: rowCards[0].isPinned ? 'hero' : 'equal',
+              type: rowCards[0].isPinned ? "hero" : "equal",
               cards: rowCards,
             });
           }
         }
-        
-        // Clean up old storage
-        localStorage.removeItem('streambias-dashboard-layout-v2');
-        
+
+        localStorage.removeItem("streambias-dashboard-layout-v2");
         return defaultLayout;
       }
     }
   } catch (e) {
-    console.warn('Failed to migrate old layout:', e);
+    console.warn("Failed to migrate old layout:", e);
   }
   return null;
 };
@@ -264,314 +250,304 @@ export function useDashboardLayout() {
         return normalizeLayout(JSON.parse(saved));
       }
 
-      // Try migrating from old format
       const migrated = migrateOldLayout();
       if (migrated) {
         return normalizeLayout(migrated);
       }
     } catch (e) {
-      console.warn('Failed to load dashboard layout:', e);
+      console.warn("Failed to load dashboard layout:", e);
     }
     return getDefaultLayout();
   });
 
   const [isEditMode, setIsEditMode] = useState(false);
 
-  // Persist layout changes
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(layout));
     } catch (e) {
-      console.warn('Failed to save dashboard layout:', e);
+      console.warn("Failed to save dashboard layout:", e);
     }
   }, [layout]);
 
   const toggleEditMode = useCallback(() => {
-    setIsEditMode(prev => !prev);
+    setIsEditMode((prev) => !prev);
   }, []);
 
-  // Get max slots for a row type
   const getMaxSlots = useCallback((rowType: RowType): number => {
     return getMaxSlotsForRowType(rowType);
   }, []);
 
-  // Add a card to a specific row
-  const addCardToRow = useCallback((rowId: string, cardId: string, isPinned = false, sourceType?: string) => {
-    setLayout(prev => {
-      const newRows = prev.rows.map(row => {
-        if (row.id === rowId) {
-          const maxSlots = getMaxSlots(row.type);
-          if (row.cards.length >= maxSlots) return row;
-          if (row.cards.some(c => c.id === cardId)) return row;
-          return {
-            ...row,
-            cards: [...row.cards, { id: cardId, isPinned, sourceType }],
-          };
-        }
-        return row;
+  const addCardToRow = useCallback(
+    (rowId: string, cardId: string, isPinned = false, sourceType?: string) => {
+      setLayout((prev) => {
+        const newRows = prev.rows.map((row) => {
+          if (row.id === rowId) {
+            const maxSlots = getMaxSlots(row.type);
+            if (row.cards.length >= maxSlots) return row;
+            if (row.cards.some((c) => c.id === cardId)) return row;
+            return {
+              ...row,
+              cards: [...row.cards, { id: cardId, isPinned, sourceType }],
+            };
+          }
+          return row;
+        });
+        return { rows: newRows };
       });
-      return { rows: newRows };
-    });
-  }, []);
+    },
+    [getMaxSlots],
+  );
 
-  // Add a new row
-  const addRow = useCallback((type: RowType = 'equal', afterRowId?: string) => {
-    setLayout(prev => {
+  const addRow = useCallback((type: RowType = "equal", afterRowId?: string) => {
+    setLayout((prev) => {
       const newRow: DashboardRow = {
         id: generateRowId(),
         type,
         cards: [],
       };
-      
+
       if (afterRowId) {
-        const index = prev.rows.findIndex(r => r.id === afterRowId);
+        const index = prev.rows.findIndex((r) => r.id === afterRowId);
         if (index !== -1) {
           const newRows = [...prev.rows];
           newRows.splice(index + 1, 0, newRow);
           return { rows: newRows };
         }
       }
-      
+
       return { rows: [...prev.rows, newRow] };
     });
   }, []);
 
-  // Change row type
-  const changeRowType = useCallback((rowId: string, newType: RowType) => {
-    setLayout(prev => {
-      const newRows = prev.rows.map(row => {
-        if (row.id === rowId && !row.isFixed) {
-          const maxSlots = getMaxSlots(newType);
-          return {
-            ...row,
-            type: newType,
-            cards: row.cards.slice(0, maxSlots), // Trim excess cards
-          };
-        }
-        return row;
+  const changeRowType = useCallback(
+    (rowId: string, newType: RowType) => {
+      setLayout((prev) => {
+        const newRows = prev.rows.map((row) => {
+          if (row.id === rowId && !row.isFixed) {
+            const maxSlots = getMaxSlots(newType);
+            return {
+              ...row,
+              type: newType,
+              cards: row.cards.slice(0, maxSlots),
+            };
+          }
+          return row;
+        });
+        return { rows: newRows };
       });
-      return { rows: newRows };
-    });
-  }, []);
+    },
+    [getMaxSlots],
+  );
 
-  // Remove a row
   const removeRow = useCallback((rowId: string) => {
-    setLayout(prev => ({
-      rows: prev.rows.filter(r => r.id !== rowId && !r.isFixed),
+    setLayout((prev) => ({
+      rows: prev.rows.filter((r) => r.id !== rowId && !r.isFixed),
     }));
   }, []);
 
-  // Move row up/down
-  const moveRow = useCallback((rowId: string, direction: 'up' | 'down') => {
-    setLayout(prev => {
-      const index = prev.rows.findIndex(r => r.id === rowId);
+  const moveRow = useCallback((rowId: string, direction: "up" | "down") => {
+    setLayout((prev) => {
+      const index = prev.rows.findIndex((r) => r.id === rowId);
       if (index === -1) return prev;
-      
-      // Can't move the KPI row
       if (prev.rows[index].isFixed) return prev;
-      
-      const newIndex = direction === 'up' ? index - 1 : index + 1;
-      
-      // Can't move before KPI row or beyond bounds
+
+      const newIndex = direction === "up" ? index - 1 : index + 1;
       if (newIndex < 1 || newIndex >= prev.rows.length) return prev;
       if (prev.rows[newIndex].isFixed) return prev;
-      
+
       const newRows = [...prev.rows];
       [newRows[index], newRows[newIndex]] = [newRows[newIndex], newRows[index]];
-      
       return { rows: newRows };
     });
   }, []);
 
-  // Remove card from any row
   const removeCard = useCallback((cardId: string) => {
-    setLayout(prev => ({
-      rows: prev.rows.map(row => ({
+    setLayout((prev) => ({
+      rows: prev.rows.map((row) => ({
         ...row,
-        cards: row.cards.filter(c => c.id !== cardId),
+        cards: row.cards.filter((c) => c.id !== cardId),
       })),
     }));
   }, []);
 
-  // Move card within or between rows
-  const moveCard = useCallback((draggedCardId: string, targetCardId: string) => {
-    setLayout(prev => {
-      // Find source and target rows
-      let sourceRowIndex = -1;
-      let sourceCardIndex = -1;
-      let targetRowIndex = -1;
-      let targetCardIndex = -1;
-      
-      prev.rows.forEach((row, ri) => {
-        row.cards.forEach((card, ci) => {
-          if (card.id === draggedCardId) {
-            sourceRowIndex = ri;
-            sourceCardIndex = ci;
-          }
-          if (card.id === targetCardId) {
-            targetRowIndex = ri;
-            targetCardIndex = ci;
-          }
+  const moveCard = useCallback(
+    (draggedCardId: string, targetCardId: string) => {
+      setLayout((prev) => {
+        let sourceRowIndex = -1;
+        let sourceCardIndex = -1;
+        let targetRowIndex = -1;
+        let targetCardIndex = -1;
+
+        prev.rows.forEach((row, ri) => {
+          row.cards.forEach((card, ci) => {
+            if (card.id === draggedCardId) {
+              sourceRowIndex = ri;
+              sourceCardIndex = ci;
+            }
+            if (card.id === targetCardId) {
+              targetRowIndex = ri;
+              targetCardIndex = ci;
+            }
+          });
         });
+
+        if (sourceRowIndex === -1 || targetRowIndex === -1) return prev;
+
+        const newRows = prev.rows.map((r) => ({ ...r, cards: [...r.cards] }));
+
+        if (sourceRowIndex === targetRowIndex) {
+          const row = newRows[sourceRowIndex];
+          const [removed] = row.cards.splice(sourceCardIndex, 1);
+          row.cards.splice(targetCardIndex, 0, removed);
+        } else {
+          const sourceRow = newRows[sourceRowIndex];
+          const targetRow = newRows[targetRowIndex];
+          const maxSlots = getMaxSlots(targetRow.type);
+
+          if (targetRow.cards.length < maxSlots) {
+            const [removed] = sourceRow.cards.splice(sourceCardIndex, 1);
+            targetRow.cards.splice(targetCardIndex, 0, removed);
+          }
+        }
+
+        return { rows: newRows };
       });
-      
-      if (sourceRowIndex === -1 || targetRowIndex === -1) return prev;
-      
-      const newRows = prev.rows.map(r => ({ ...r, cards: [...r.cards] }));
-      
-      if (sourceRowIndex === targetRowIndex) {
-        // Same row - just reorder
-        const row = newRows[sourceRowIndex];
-        const [removed] = row.cards.splice(sourceCardIndex, 1);
-        row.cards.splice(targetCardIndex, 0, removed);
-      } else {
-        // Different rows - move between
-        const sourceRow = newRows[sourceRowIndex];
+    },
+    [getMaxSlots],
+  );
+
+  const moveCardToRow = useCallback(
+    (cardId: string, targetRowId: string, position?: number) => {
+      setLayout((prev) => {
+        let sourceRowIndex = -1;
+        let sourceCardIndex = -1;
+        let cardEntry: DashboardCardEntry | null = null;
+
+        prev.rows.forEach((row, ri) => {
+          row.cards.forEach((card, ci) => {
+            if (card.id === cardId) {
+              sourceRowIndex = ri;
+              sourceCardIndex = ci;
+              cardEntry = card;
+            }
+          });
+        });
+
+        if (!cardEntry) return prev;
+
+        const targetRowIndex = prev.rows.findIndex((r) => r.id === targetRowId);
+        if (targetRowIndex === -1) return prev;
+
+        const newRows = prev.rows.map((r) => ({ ...r, cards: [...r.cards] }));
         const targetRow = newRows[targetRowIndex];
         const maxSlots = getMaxSlots(targetRow.type);
-        
-        // Only move if target row has space
-        if (targetRow.cards.length < maxSlots) {
-          const [removed] = sourceRow.cards.splice(sourceCardIndex, 1);
-          targetRow.cards.splice(targetCardIndex, 0, removed);
-        }
-      }
-      
-      return { rows: newRows };
-    });
-  }, []);
 
-  // Move card to a specific row (for dropping on empty row slots)
-  const moveCardToRow = useCallback((cardId: string, targetRowId: string, position?: number) => {
-    setLayout(prev => {
-      let sourceRowIndex = -1;
-      let sourceCardIndex = -1;
-      let cardEntry: DashboardCardEntry | null = null;
-      
-      prev.rows.forEach((row, ri) => {
-        row.cards.forEach((card, ci) => {
-          if (card.id === cardId) {
-            sourceRowIndex = ri;
-            sourceCardIndex = ci;
-            cardEntry = card;
-          }
-        });
+        if (targetRow.cards.length >= maxSlots && sourceRowIndex !== targetRowIndex) {
+          return prev;
+        }
+
+        if (sourceRowIndex !== -1) {
+          newRows[sourceRowIndex].cards.splice(sourceCardIndex, 1);
+        }
+
+        if (position !== undefined) {
+          targetRow.cards.splice(position, 0, cardEntry);
+        } else {
+          targetRow.cards.push(cardEntry);
+        }
+
+        return { rows: newRows };
       });
-      
-      if (!cardEntry) return prev;
-      
-      const targetRowIndex = prev.rows.findIndex(r => r.id === targetRowId);
-      if (targetRowIndex === -1) return prev;
-      
-      const newRows = prev.rows.map(r => ({ ...r, cards: [...r.cards] }));
-      const targetRow = newRows[targetRowIndex];
-      const maxSlots = getMaxSlots(targetRow.type);
-      
-      if (targetRow.cards.length >= maxSlots && sourceRowIndex !== targetRowIndex) {
-        return prev; // Target row is full
-      }
-      
-      // Remove from source
-      if (sourceRowIndex !== -1) {
-        newRows[sourceRowIndex].cards.splice(sourceCardIndex, 1);
-      }
-      
-      // Add to target
-      if (position !== undefined) {
-        targetRow.cards.splice(position, 0, cardEntry);
-      } else {
-        targetRow.cards.push(cardEntry);
-      }
-      
-      return { rows: newRows };
-    });
-  }, []);
+    },
+    [getMaxSlots],
+  );
 
   const resetToDefault = useCallback(() => {
     setLayout(getDefaultLayout());
   }, []);
 
-  // Get all cards currently in any row
   const getAllCards = useCallback((): DashboardCardEntry[] => {
-    return layout.rows.flatMap(r => r.cards);
-  }, [layout]);
+    return layout.rows.flatMap((r) => r.cards);
+  }, [layout.rows]);
 
-  // Get cards available to add (not currently in layout)
   const getAvailableToAdd = useCallback(() => {
-    const currentIds = getAllCards().map(c => c.id);
-    return AVAILABLE_CARDS.filter(card => !currentIds.includes(card.id));
+    const currentIds = getAllCards().map((c) => c.id);
+    return AVAILABLE_CARDS.filter((card) => !currentIds.includes(card.id));
   }, [getAllCards]);
 
-  // For pinned cards from external sources
   const pinCard = useCallback((cardId: string, sourceType: string) => {
-    // Add pinned card to a new hero row
-    setLayout(prev => {
-      // Check if already exists
-      if (prev.rows.some(r => r.cards.some(c => c.id === cardId))) {
+    setLayout((prev) => {
+      if (prev.rows.some((r) => r.cards.some((c) => c.id === cardId))) {
         return prev;
       }
-      
+
       const newRow: DashboardRow = {
         id: generateRowId(),
-        type: 'hero',
+        type: "hero",
         cards: [{ id: cardId, isPinned: true, sourceType }],
       };
-      
+
       return { rows: [...prev.rows, newRow] };
     });
   }, []);
 
-  const unpinCard = useCallback((cardId: string) => {
-    removeCard(cardId);
-  }, [removeCard]);
+  const unpinCard = useCallback(
+    (cardId: string) => {
+      removeCard(cardId);
+    },
+    [removeCard],
+  );
 
-  const isPinned = useCallback((cardId: string) => {
-    return layout.rows.some(r => r.cards.some(c => c.id === cardId && c.isPinned));
-  }, [layout.rows]);
+  const isPinned = useCallback(
+    (cardId: string) => {
+      return layout.rows.some((r) => r.cards.some((c) => c.id === cardId && c.isPinned));
+    },
+    [layout.rows],
+  );
 
-  // Add card to layout (finds appropriate row or creates new one)
-  const addCard = useCallback((cardId: string, isPinned = false, sourceType?: string) => {
-    setLayout(prev => {
-      // Check if already exists
-      if (prev.rows.some(r => r.cards.some(c => c.id === cardId))) {
-        return prev;
-      }
-      
-      const cardConfig = AVAILABLE_CARDS.find(c => c.id === cardId);
-      
-      // Find a row with space that matches allowed types
-      for (const row of prev.rows) {
-        if (row.isFixed) continue;
-        const maxSlots = getMaxSlots(row.type);
-        if (row.cards.length < maxSlots) {
-          const allowed = cardConfig?.allowedRowTypes || ['equal'];
-          if (allowed.includes(row.type)) {
-            return {
-              rows: prev.rows.map(r => 
-                r.id === row.id 
-                  ? { ...r, cards: [...r.cards, { id: cardId, isPinned, sourceType }] }
-                  : r
-              ),
-            };
+  const addCard = useCallback(
+    (cardId: string, isPinned = false, sourceType?: string) => {
+      setLayout((prev) => {
+        if (prev.rows.some((r) => r.cards.some((c) => c.id === cardId))) {
+          return prev;
+        }
+
+        const cardConfig = AVAILABLE_CARDS.find((c) => c.id === cardId);
+
+        for (const row of prev.rows) {
+          if (row.isFixed) continue;
+          const maxSlots = getMaxSlots(row.type);
+          if (row.cards.length < maxSlots) {
+            const allowed = cardConfig?.allowedRowTypes || ["equal"];
+            if (allowed.includes(row.type)) {
+              return {
+                rows: prev.rows.map((r) =>
+                  r.id === row.id ? { ...r, cards: [...r.cards, { id: cardId, isPinned, sourceType }] } : r,
+                ),
+              };
+            }
           }
         }
-      }
-      
-      // No space found - create new equal row
-      const newRow: DashboardRow = {
-        id: generateRowId(),
-        type: isPinned ? 'hero' : 'equal',
-        cards: [{ id: cardId, isPinned, sourceType }],
-      };
-      
-      return { rows: [...prev.rows, newRow] };
-    });
-  }, []);
 
-  // Check if a card is currently on the dashboard (by ID)
-  const isCardOnDashboard = useCallback((cardId: string): boolean => {
-    return layout.rows.some(r => r.cards.some(c => c.id === cardId));
-  }, [layout.rows]);
+        const newRow: DashboardRow = {
+          id: generateRowId(),
+          type: isPinned ? "hero" : "equal",
+          cards: [{ id: cardId, isPinned, sourceType }],
+        };
+
+        return { rows: [...prev.rows, newRow] };
+      });
+    },
+    [getMaxSlots],
+  );
+
+  const isCardOnDashboard = useCallback(
+    (cardId: string): boolean => {
+      return layout.rows.some((r) => r.cards.some((c) => c.id === cardId));
+    },
+    [layout.rows],
+  );
 
   return {
     layout,
@@ -590,11 +566,9 @@ export function useDashboardLayout() {
     getAllCards,
     getAvailableToAdd,
     getMaxSlots,
-    // Pinning API
     pinCard,
     unpinCard,
     isPinned,
-    // Check if card exists on dashboard
     isCardOnDashboard,
   };
 }
