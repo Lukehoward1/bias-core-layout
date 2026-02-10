@@ -3,13 +3,8 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./index.css";
 
-// ⬇️ import your AlertsProvider
-import { AlertsProvider } from "@/contexts/AlertsContext";
-
 createRoot(document.getElementById("root")!).render(
   <BrowserRouter>
-    <AlertsProvider>
-      <App />
-    </AlertsProvider>
+    <App />
   </BrowserRouter>,
 );
