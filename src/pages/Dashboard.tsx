@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +22,10 @@ import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { getCardRenderer, warnMissingRenderers } from "@/data/dashboardCardRenderers";
 import { DASHBOARD_CARD_REGISTRY } from "@/data/dashboardCardRegistry";
+
+import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
+import { calendarEvents } from "@/data/calendarEvents";
+import { toast } from "sonner";
 
 interface SessionData {
   name: string;
@@ -120,6 +124,23 @@ function SessionTimerDropdown({
   );
 }
 
+type CalendarEvent = (typeof calendarEvents)[0];
+
+const impactStyles = (impact: string) => {
+  const v = (impact || "").toLowerCase();
+  if (v === "high") return "text-destructive";
+  if (v === "medium") return "text-accent";
+  return "text-muted-foreground";
+};
+
+const normalize = (s: string) =>
+  (s || "")
+    .toLowerCase()
+    .replace(/\(.*?\)/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
 export default function Dashboard() {
   const [showSessionDropdown, setShowSessionDropdown] = useState(false);
   const [showAddCardsModal, setShowAddCardsModal] = useState(false);
@@ -128,6 +149,24 @@ export default function Dashboard() {
   const [dragOverRowId, setDragOverRowId] = useState<string | null>(null);
   const sessionCardRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  // ✅ Event overlay state (for Dashboard clickable events)
+  const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+
+  const openCalendarEvent = useCallback(
+    (ev: CalendarEvent) => {
+      if (!ev) return;
+      setSelectedCalendarEvent(ev);
+      setIsEventModalOpen(true);
+    },
+    [setSelectedCalendarEvent, setIsEventModalOpen],
+  );
+
+  const closeCalendarEvent = useCallback(() => {
+    setIsEventModalOpen(false);
+    setSelectedCalendarEvent(null);
+  }, []);
 
   // Row-based dashboard layout
   const {
@@ -207,6 +246,46 @@ export default function Dashboard() {
   useEffect(() => {
     const registryCardIds = DASHBOARD_CARD_REGISTRY.map((c) => c.id);
     warnMissingRenderers(registryCardIds);
+  }, []);
+
+  // ✅ Upcoming events list (real calendarEvents, next 4)
+  const upcomingCalendarItems = useMemo(() => {
+    const toMinutes = (hhmm: string) => {
+      const m = (hhmm || "").match(/^(\d{1,2}):(\d{2})$/);
+      if (!m) return Number.MAX_SAFE_INTEGER;
+      return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+    };
+
+    return [...calendarEvents]
+      .filter((ev) => !!ev?.time && !!ev?.event)
+      .sort((a, b) => toMinutes(a.time) - toMinutes(b.time))
+      .slice(0, 4);
+  }, []);
+
+  const findCalendarEventByLabel = useCallback((label: string, timeHHMM?: string) => {
+    const lbl = normalize(label);
+    const best = calendarEvents
+      .map((ev) => {
+        const evLabel = normalize(ev.event);
+        let score = 0;
+        if (evLabel === lbl) score += 6;
+        if (evLabel.includes(lbl) || lbl.includes(evLabel)) score += 3;
+
+        const lblTokens = new Set(lbl.split(" ").filter(Boolean));
+        const evTokens = new Set(evLabel.split(" ").filter(Boolean));
+        let overlap = 0;
+        lblTokens.forEach((t) => {
+          if (evTokens.has(t)) overlap += 1;
+        });
+        score += overlap;
+
+        if (timeHHMM && ev.time === timeHHMM) score += 2;
+        return { ev, score };
+      })
+      .sort((a, b) => b.score - a.score)[0];
+
+    if (!best || best.score < 3) return null;
+    return best.ev as CalendarEvent;
   }, []);
 
   // Render card content based on card ID and slot type
@@ -334,6 +413,7 @@ export default function Dashboard() {
           </Card>
         );
 
+      // ✅ CLICKABLE → opens EventDetailsModal
       case "upcoming-events":
         return (
           <Card className="h-full">
@@ -342,22 +422,40 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {[
-                  { time: "08:30", event: "USD Non-Farm Payrolls", impact: "high" },
-                  { time: "10:00", event: "EUR CPI", impact: "medium" },
-                  { time: "14:00", event: "GBP Interest Rate", impact: "high" },
-                ].map((event, i) => (
-                  <div key={i} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                    <div className="text-sm font-medium text-muted-foreground min-w-[48px]">{event.time}</div>
-                    <div className="flex-1">
-                      <div className="text-sm font-medium text-foreground">{event.event}</div>
-                      <div className={`text-xs mt-1 ${event.impact === "high" ? "text-destructive" : "text-accent"}`}>
-                        {event.impact.toUpperCase()} IMPACT
+                {upcomingCalendarItems.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">No upcoming events found.</div>
+                ) : (
+                  upcomingCalendarItems.map((ev) => (
+                    <button
+                      key={ev.id}
+                      type="button"
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (isEditMode) return;
+
+                        // This is already a real calendar event, so just open it
+                        openCalendarEvent(ev as any);
+                      }}
+                      className="w-full text-left flex items-start gap-3 p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
+                    >
+                      <div className="text-sm font-medium text-muted-foreground min-w-[56px]">{ev.time}</div>
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-foreground">
+                          {ev.currency ? `${ev.currency} ` : ""}
+                          {ev.event}
+                        </div>
+                        <div className={`text-xs mt-1 ${impactStyles(ev.impact)}`}>
+                          {String(ev.impact).toUpperCase()} IMPACT
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
+                    </button>
+                  ))
+                )}
               </div>
+              <p className="text-xs text-muted-foreground mt-3">
+                Tip: Click any event to open the full event post (same overlay as Calendar).
+              </p>
             </CardContent>
           </Card>
         );
@@ -443,6 +541,7 @@ export default function Dashboard() {
           </Card>
         );
 
+      // (Left as-is for now)
       case "calendar-events":
         return (
           <Card className="h-full">
@@ -497,78 +596,83 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <AppHeader title="Dashboard" />
+    <>
+      <div className="p-6 space-y-6">
+        <AppHeader title="Dashboard" />
 
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Welcome Header with Edit Controls */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-3xl font-bold text-foreground">Welcome, Trader</h1>
-            {isEditMode && (
-              <p className="text-sm text-muted-foreground">
-                Drag cards to reorder • Click × to remove • Change row layouts
-              </p>
-            )}
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Welcome Header with Edit Controls */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <h1 className="text-3xl font-bold text-foreground">Welcome, Trader</h1>
+              {isEditMode && (
+                <p className="text-sm text-muted-foreground">
+                  Drag cards to reorder • Click × to remove • Change row layouts
+                </p>
+              )}
+            </div>
+            <DashboardEditToolbar
+              isEditMode={isEditMode}
+              onToggleEdit={toggleEditMode}
+              onReset={resetToDefault}
+              onOpenAddCards={() => setShowAddCardsModal(true)}
+            />
           </div>
-          <DashboardEditToolbar
-            isEditMode={isEditMode}
-            onToggleEdit={toggleEditMode}
-            onReset={resetToDefault}
-            onOpenAddCards={() => setShowAddCardsModal(true)}
-          />
+
+          {/* Row-based layout */}
+          {layout.rows.map((row, index) => (
+            <DashboardRow
+              key={row.id}
+              row={row}
+              rowIndex={index}
+              totalRows={layout.rows.length}
+              isEditMode={isEditMode}
+              draggingCardId={draggingCardId}
+              dragOverCardId={dragOverCardId}
+              dragOverRowId={dragOverRowId}
+              renderCardContent={renderCardContent}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDragEnd={handleDragEnd}
+              onDragOverRow={handleDragOverRow}
+              onRemoveCard={removeCard}
+              onChangeRowType={changeRowType}
+              onMoveRow={moveRow}
+              onRemoveRow={removeRow}
+              onAddRow={handleAddRow}
+              maxSlots={getMaxSlots(row.type)}
+            />
+          ))}
+
+          {/* Add row button in edit mode */}
+          {isEditMode && (
+            <Button variant="outline" className="w-full border-dashed gap-2" onClick={() => handleAddRow()}>
+              <Plus className="h-4 w-4" />
+              Add New Row
+            </Button>
+          )}
+
+          {/* Empty state when no cards */}
+          {layout.rows.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <p className="text-muted-foreground mb-4">No cards on your Dashboard.</p>
+              <p className="text-sm text-muted-foreground">Click "Edit Dashboard" and then "Add Cards" to customize.</p>
+            </div>
+          )}
         </div>
 
-        {/* Row-based layout */}
-        {layout.rows.map((row, index) => (
-          <DashboardRow
-            key={row.id}
-            row={row}
-            rowIndex={index}
-            totalRows={layout.rows.length}
-            isEditMode={isEditMode}
-            draggingCardId={draggingCardId}
-            dragOverCardId={dragOverCardId}
-            dragOverRowId={dragOverRowId}
-            renderCardContent={renderCardContent}
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDragEnd={handleDragEnd}
-            onDragOverRow={handleDragOverRow}
-            onRemoveCard={removeCard}
-            onChangeRowType={changeRowType}
-            onMoveRow={moveRow}
-            onRemoveRow={removeRow}
-            onAddRow={handleAddRow}
-            maxSlots={getMaxSlots(row.type)}
-          />
-        ))}
-
-        {/* Add row button in edit mode */}
-        {isEditMode && (
-          <Button variant="outline" className="w-full border-dashed gap-2" onClick={() => handleAddRow()}>
-            <Plus className="h-4 w-4" />
-            Add New Row
-          </Button>
-        )}
-
-        {/* Empty state when no cards */}
-        {layout.rows.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <p className="text-muted-foreground mb-4">No cards on your Dashboard.</p>
-            <p className="text-sm text-muted-foreground">Click "Edit Dashboard" and then "Add Cards" to customize.</p>
-          </div>
-        )}
+        {/* Add Cards Modal */}
+        <AddCardsModal
+          open={showAddCardsModal}
+          onOpenChange={setShowAddCardsModal}
+          cardsOnDashboard={cardsOnDashboardSet}
+          onAddCard={addCard}
+          onRemoveCard={removeCard}
+        />
       </div>
 
-      {/* Add Cards Modal */}
-      <AddCardsModal
-        open={showAddCardsModal}
-        onOpenChange={setShowAddCardsModal}
-        cardsOnDashboard={cardsOnDashboardSet}
-        onAddCard={addCard}
-        onRemoveCard={removeCard}
-      />
-    </div>
+      {/* ✅ Nested Calendar overlay (same template as Calendar page) */}
+      <EventDetailsModal event={selectedCalendarEvent as any} isOpen={isEventModalOpen} onClose={closeCalendarEvent} />
+    </>
   );
 }
