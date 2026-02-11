@@ -5,6 +5,7 @@ import { useWatchlist } from "@/hooks/use-watchlist";
 
 interface WatchlistOverviewCardProps {
   isEditMode?: boolean;
+  slotType?: "wide" | "narrow" | "equal" | "hero" | "kpi";
 }
 
 export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps) {
