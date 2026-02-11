@@ -1,18 +1,24 @@
-import { useMemo } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Minus, ChevronRight, Star } from "lucide-react";
 import { useWatchlist } from "@/hooks/use-watchlist";
 
 interface WatchlistOverviewCardProps {
   isEditMode?: boolean;
-  slotType?: "wide" | "narrow" | "equal" | "hero" | "kpi";
 }
 
 export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps) {
   const { watchlistAssets } = useWatchlist();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const openAsset = (symbol: string) => {
+    if (isEditMode) return;
+
+    navigate(`/asset/${symbol}`, {
+      state: { backgroundLocation: location },
+    });
+  };
 
   const getBiasIcon = (bias: string) => {
     if (bias === "Bullish") return <TrendingUp className="h-4 w-4" />;
@@ -26,18 +32,7 @@ export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps
     return "text-muted-foreground";
   };
 
-  // Show up to 5 watchlist assets
-  const displayAssets = useMemo(() => watchlistAssets.slice(0, 5), [watchlistAssets]);
-
-  const openAssetModal = (symbol: string) => {
-    if (isEditMode) return;
-
-    // ✅ This is the correct modal-routing approach:
-    // App.tsx will see backgroundLocation and render /asset/:symbol on top.
-    navigate(`/asset/${symbol}`, {
-      state: { backgroundLocation: location },
-    });
-  };
+  const displayAssets = watchlistAssets.slice(0, 5);
 
   if (displayAssets.length === 0) {
     return (
@@ -74,8 +69,8 @@ export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps
             <button
               key={asset.symbol}
               type="button"
-              onClick={() => openAssetModal(asset.symbol)}
-              className="w-full text-left flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors group"
+              onClick={() => openAsset(asset.symbol)}
+              className="w-full text-left flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors group"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
