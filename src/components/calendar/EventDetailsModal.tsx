@@ -1,7 +1,7 @@
 import { useMemo, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import * as DialogPrimitive from "@radix-ui/react-dialog";
 
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -220,9 +220,8 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
   };
 
   /**
-   * ✅ THE IMPORTANT BIT:
-   * Close this event modal, then open Asset modal (global router modal) on next frame.
-   * Ensures “latest click is on top” and prevents “changes behind”.
+   * ✅ Close Event modal, then open router Asset modal next frame.
+   * Prevents “changing behind” and ensures top-most modal is the latest click.
    */
   const goToAsset = useCallback(
     (symbol: string) => {
@@ -241,245 +240,235 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
   );
 
   return (
-    <DialogPrimitive.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogPrimitive.Portal>
-        {/* Overlay */}
-        <DialogPrimitive.Overlay
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200]"
-          onPointerDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onClose();
-          }}
-        />
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        stack
+        className="max-w-6xl w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border border-border p-0"
+        onPointerDown={(e) => e.stopPropagation()}
+        onOpenAutoFocus={(e) => {
+          // Prevent focus jumps when nested
+          e.preventDefault();
+        }}
+      >
+        <div className="sticky top-0 z-10 bg-background border-b border-border px-8 py-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3 flex-wrap">
+              <Badge variant="outline" className="text-sm font-bold px-3 py-1.5 bg-muted/50">
+                {event.currency}
+              </Badge>
+              <Badge className={`text-xs font-semibold ${getImpactColor(event.impact)}`}>
+                {(event.impact || "").toUpperCase()} IMPACT
+              </Badge>
+              <h2 className="text-2xl font-bold text-foreground">{event.event}</h2>
+            </div>
 
-        {/* Content */}
-        <DialogPrimitive.Content
-          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 max-w-6xl w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border border-border p-0 rounded-lg z-[201]"
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <div className="sticky top-0 z-10 bg-background border-b border-border px-8 py-5">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-3 flex-wrap">
-                <Badge variant="outline" className="text-sm font-bold px-3 py-1.5 bg-muted/50">
-                  {event.currency}
-                </Badge>
-                <Badge className={`text-xs font-semibold ${getImpactColor(event.impact)}`}>
-                  {(event.impact || "").toUpperCase()} IMPACT
-                </Badge>
-                <h2 className="text-2xl font-bold text-foreground">{event.event}</h2>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                <span>Today at {event.time} GMT</span>
               </div>
 
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  <span>Today at {event.time} GMT</span>
-                </div>
-
-                <div className="flex gap-2 shrink-0">
-                  <Button variant="outline" size="sm" className="gap-1.5" onClick={handleAddToWatchlist}>
-                    <Star className="h-3.5 w-3.5" />
-                    Watchlist
-                  </Button>
-                  <Button variant="outline" size="sm" className="gap-1.5" onClick={handleSetAlert}>
-                    <Bell className="h-3.5 w-3.5" />
-                    Set Alert
-                  </Button>
-                </div>
+              <div className="flex gap-2 shrink-0">
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={handleAddToWatchlist}>
+                  <Star className="h-3.5 w-3.5" />
+                  Watchlist
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={handleSetAlert}>
+                  <Bell className="h-3.5 w-3.5" />
+                  Set Alert
+                </Button>
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="px-8 py-6 space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="bg-card border-border">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <BarChart3 className="h-4 w-4 text-primary" />
-                    <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
-                      Market Interpretation
-                    </h3>
-                  </div>
-
-                  <p className="text-sm text-muted-foreground leading-relaxed mb-4">{interpretation.description}</p>
-
-                  <div className="flex items-center gap-3 mb-4 p-4 rounded-lg bg-muted/30 border border-border/50">
-                    <div
-                      className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                        interpretation.bias === "bullish"
-                          ? "bg-success/20"
-                          : interpretation.bias === "bearish"
-                            ? "bg-destructive/20"
-                            : "bg-warning/20"
-                      }`}
-                    >
-                      {getBiasIcon(interpretation.bias)}
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-xs text-muted-foreground mb-0.5">Typical Market Reaction</div>
-                      <div className={`text-sm font-semibold ${getBiasColor(interpretation.bias)}`}>
-                        {getBiasLabel(interpretation.bias)} for {event.currency}
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="text-sm text-muted-foreground leading-relaxed mb-4">{interpretation.impact}</p>
-
-                  <div className="pt-4 border-t border-border/50">
-                    <div className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">
-                      Most Impacted Pairs
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {interpretation.pairs.map((pair) => {
-                        const exists = !!getAssetBySymbol(pair);
-
-                        return exists ? (
-                          <button
-                            key={pair}
-                            type="button"
-                            onPointerDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              goToAsset(pair);
-                            }}
-                            className="focus:outline-none"
-                          >
-                            <Badge
-                              variant="secondary"
-                              className="text-xs font-mono cursor-pointer hover:bg-primary/20 transition-colors"
-                            >
-                              {pair}
-                            </Badge>
-                          </button>
-                        ) : (
-                          <span key={pair} title="Coming soon">
-                            <Badge variant="secondary" className="text-xs font-mono opacity-50 cursor-not-allowed">
-                              {pair}
-                            </Badge>
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-card border-border">
-                <CardContent className="p-6 h-full flex flex-col">
-                  <div className="flex items-center gap-2 mb-4">
-                    <TrendingUp className="h-4 w-4 text-primary" />
-                    <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
-                      Current Release Figures
-                    </h3>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
-                      <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Previous</div>
-                      <div className="text-2xl font-bold text-foreground">{event.previous}</div>
-                    </div>
-                    <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
-                      <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Forecast</div>
-                      <div className="text-2xl font-bold text-foreground">{event.forecast}</div>
-                    </div>
-                    <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
-                      <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Actual</div>
-                      <div className={`text-2xl font-bold ${isReleased ? "text-primary" : "text-muted-foreground"}`}>
-                        {event.actual}
-                      </div>
-                    </div>
-                    <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
-                      <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Deviation</div>
-                      <div className="text-2xl font-bold text-muted-foreground">{isReleased ? "—" : "Pending"}</div>
-                    </div>
-                  </div>
-
-                  <div className="flex-1 pt-4 border-t border-border/50">
-                    <div className="flex items-center gap-2 mb-3">
-                      <MessageSquare className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-semibold text-foreground uppercase tracking-wide">
-                        Release Commentary
-                      </span>
-                    </div>
-                    {narrative ? (
-                      <p className="text-sm text-muted-foreground leading-relaxed">{narrative}</p>
-                    ) : (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-lg p-4 border border-border/50">
-                        <Clock className="h-4 w-4 flex-shrink-0" />
-                        <span>Awaiting release – commentary will appear after publication.</span>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
+        <div className="px-8 py-6 space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="bg-card border-border">
               <CardContent className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <BarChart3 className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
+                    Market Interpretation
+                  </h3>
+                </div>
+
+                <p className="text-sm text-muted-foreground leading-relaxed mb-4">{interpretation.description}</p>
+
+                <div className="flex items-center gap-3 mb-4 p-4 rounded-lg bg-muted/30 border border-border/50">
+                  <div
+                    className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                      interpretation.bias === "bullish"
+                        ? "bg-success/20"
+                        : interpretation.bias === "bearish"
+                          ? "bg-destructive/20"
+                          : "bg-warning/20"
+                    }`}
+                  >
+                    {getBiasIcon(interpretation.bias)}
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-xs text-muted-foreground mb-0.5">Typical Market Reaction</div>
+                    <div className={`text-sm font-semibold ${getBiasColor(interpretation.bias)}`}>
+                      {getBiasLabel(interpretation.bias)} for {event.currency}
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-sm text-muted-foreground leading-relaxed mb-4">{interpretation.impact}</p>
+
+                <div className="pt-4 border-t border-border/50">
+                  <div className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">Most Impacted Pairs</div>
+                  <div className="flex flex-wrap gap-2">
+                    {interpretation.pairs.map((pair) => {
+                      const exists = !!getAssetBySymbol(pair);
+
+                      return exists ? (
+                        <button
+                          key={pair}
+                          type="button"
+                          onPointerDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            goToAsset(pair);
+                          }}
+                          className="focus:outline-none"
+                        >
+                          <Badge
+                            variant="secondary"
+                            className="text-xs font-mono cursor-pointer hover:bg-primary/20 transition-colors"
+                          >
+                            {pair}
+                          </Badge>
+                        </button>
+                      ) : (
+                        <span key={pair} title="Coming soon">
+                          <Badge variant="secondary" className="text-xs font-mono opacity-50 cursor-not-allowed">
+                            {pair}
+                          </Badge>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card border-border">
+              <CardContent className="p-6 h-full flex flex-col">
                 <div className="flex items-center gap-2 mb-4">
                   <TrendingUp className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">Historical Trend</h3>
+                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
+                    Current Release Figures
+                  </h3>
                 </div>
 
-                <div className="h-48 flex items-end justify-between gap-3 px-2">
-                  {historicalData.map((item, index) => {
-                    const actualHeight = item.actual ? (item.actual / maxValue) * 100 : 0;
-                    const forecastHeight = (item.forecast / maxValue) * 100;
-                    const isForecastOnly = item.actual === null;
-
-                    return (
-                      <div key={index} className="flex-1 flex flex-col items-center gap-2">
-                        <div className="w-full h-40 flex items-end justify-center gap-1">
-                          {!isForecastOnly && (
-                            <div
-                              className="w-full max-w-[24px] bg-primary rounded-t transition-all duration-300 hover:bg-primary/80"
-                              style={{ height: `${actualHeight}%` }}
-                              title={`Actual: ${item.actual}`}
-                            />
-                          )}
-                          <div
-                            className={`w-full max-w-[24px] rounded-t transition-all duration-300 ${
-                              isForecastOnly
-                                ? "border-2 border-dashed border-muted-foreground bg-muted/30"
-                                : "border-2 border-dashed border-muted-foreground/50 bg-transparent"
-                            }`}
-                            style={{ height: `${forecastHeight}%` }}
-                            title={`Forecast: ${item.forecast}`}
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground">{item.period}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-card border-border">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Lightbulb className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">How to Interpret</h3>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {interpretationGuide.map((tip, index) => (
-                    <div
-                      key={index}
-                      className="flex items-start gap-2 p-3 bg-muted/30 rounded-lg border border-border/50"
-                    >
-                      <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <span className="text-xs font-semibold text-primary">{index + 1}</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground leading-relaxed">{tip}</p>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
+                    <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Previous</div>
+                    <div className="text-2xl font-bold text-foreground">{event.previous}</div>
+                  </div>
+                  <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
+                    <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Forecast</div>
+                    <div className="text-2xl font-bold text-foreground">{event.forecast}</div>
+                  </div>
+                  <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
+                    <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Actual</div>
+                    <div className={`text-2xl font-bold ${isReleased ? "text-primary" : "text-muted-foreground"}`}>
+                      {event.actual}
                     </div>
-                  ))}
+                  </div>
+                  <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
+                    <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Deviation</div>
+                    <div className="text-2xl font-bold text-muted-foreground">{isReleased ? "—" : "Pending"}</div>
+                  </div>
+                </div>
+
+                <div className="flex-1 pt-4 border-t border-border/50">
+                  <div className="flex items-center gap-2 mb-3">
+                    <MessageSquare className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-semibold text-foreground uppercase tracking-wide">
+                      Release Commentary
+                    </span>
+                  </div>
+                  {narrative ? (
+                    <p className="text-sm text-muted-foreground leading-relaxed">{narrative}</p>
+                  ) : (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-lg p-4 border border-border/50">
+                      <Clock className="h-4 w-4 flex-shrink-0" />
+                      <span>Awaiting release – commentary will appear after publication.</span>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
           </div>
-        </DialogPrimitive.Content>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
+
+          <Card className="bg-card border-border">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">Historical Trend</h3>
+              </div>
+
+              <div className="h-48 flex items-end justify-between gap-3 px-2">
+                {historicalData.map((item, index) => {
+                  const actualHeight = item.actual ? (item.actual / maxValue) * 100 : 0;
+                  const forecastHeight = (item.forecast / maxValue) * 100;
+                  const isForecastOnly = item.actual === null;
+
+                  return (
+                    <div key={index} className="flex-1 flex flex-col items-center gap-2">
+                      <div className="w-full h-40 flex items-end justify-center gap-1">
+                        {!isForecastOnly && (
+                          <div
+                            className="w-full max-w-[24px] bg-primary rounded-t transition-all duration-300 hover:bg-primary/80"
+                            style={{ height: `${actualHeight}%` }}
+                            title={`Actual: ${item.actual}`}
+                          />
+                        )}
+                        <div
+                          className={`w-full max-w-[24px] rounded-t transition-all duration-300 ${
+                            isForecastOnly
+                              ? "border-2 border-dashed border-muted-foreground bg-muted/30"
+                              : "border-2 border-dashed border-muted-foreground/50 bg-transparent"
+                          }`}
+                          style={{ height: `${forecastHeight}%` }}
+                          title={`Forecast: ${item.forecast}`}
+                        />
+                      </div>
+                      <span className="text-xs text-muted-foreground">{item.period}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border-border">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Lightbulb className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">How to Interpret</h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {interpretationGuide.map((tip, index) => (
+                  <div
+                    key={index}
+                    className="flex items-start gap-2 p-3 bg-muted/30 rounded-lg border border-border/50"
+                  >
+                    <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <span className="text-xs font-semibold text-primary">{index + 1}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{tip}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
