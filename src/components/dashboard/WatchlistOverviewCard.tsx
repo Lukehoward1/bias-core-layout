@@ -1,8 +1,7 @@
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Minus, ChevronRight, Star } from "lucide-react";
 import { useWatchlist } from "@/hooks/use-watchlist";
-import AssetQuickViewModal from "@/components/assets/AssetQuickViewModal";
+import { useNavigate, useLocation } from "react-router-dom";
 
 interface WatchlistOverviewCardProps {
   isEditMode?: boolean;
@@ -11,20 +10,14 @@ interface WatchlistOverviewCardProps {
 
 export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps) {
   const { watchlistAssets } = useWatchlist();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // Local quick-view modal state (keeps overlay consistent across the site)
-  const [quickViewSymbol, setQuickViewSymbol] = useState<string | null>(null);
-  const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
-
-  const openQuickView = (symbol: string) => {
+  const goToAsset = (symbol: string) => {
     if (isEditMode) return;
-    setQuickViewSymbol(symbol);
-    setIsQuickViewOpen(true);
-  };
-
-  const closeQuickView = () => {
-    setIsQuickViewOpen(false);
-    setQuickViewSymbol(null);
+    navigate(`/asset/${symbol}`, {
+      state: { backgroundLocation: location },
+    });
   };
 
   const getBiasIcon = (bias: string) => {
@@ -63,8 +56,7 @@ export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps
   }
 
   return (
-    <>
-      <Card className="h-full">
+    <Card className="h-full">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Star className="h-4 w-4 text-accent" />
@@ -78,7 +70,7 @@ export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps
               <button
                 key={asset.symbol}
                 type="button"
-                onClick={() => openQuickView(asset.symbol)}
+                onClick={() => goToAsset(asset.symbol)}
                 className="w-full text-left flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors group"
               >
                 <div className="flex-1 min-w-0">
@@ -124,12 +116,6 @@ export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps
             </p>
           )}
         </CardContent>
-      </Card>
-
-      {/* IMPORTANT: Render modal OUTSIDE the card so it stacks above cleanly */}
-      {quickViewSymbol && (
-        <AssetQuickViewModal symbol={quickViewSymbol} isOpen={isQuickViewOpen} onClose={closeQuickView} />
-      )}
-    </>
+    </Card>
   );
 }
