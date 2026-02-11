@@ -1,7 +1,8 @@
+import { useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Minus, ChevronRight, Star } from "lucide-react";
 import { useWatchlist } from "@/hooks/use-watchlist";
-import { useNavigate, useLocation } from "react-router-dom";
 
 interface WatchlistOverviewCardProps {
   isEditMode?: boolean;
@@ -12,13 +13,6 @@ export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps
   const { watchlistAssets } = useWatchlist();
   const navigate = useNavigate();
   const location = useLocation();
-
-  const goToAsset = (symbol: string) => {
-    if (isEditMode) return;
-    navigate(`/asset/${symbol}`, {
-      state: { backgroundLocation: location },
-    });
-  };
 
   const getBiasIcon = (bias: string) => {
     if (bias === "Bullish") return <TrendingUp className="h-4 w-4" />;
@@ -33,7 +27,17 @@ export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps
   };
 
   // Show up to 5 watchlist assets
-  const displayAssets = watchlistAssets.slice(0, 5);
+  const displayAssets = useMemo(() => watchlistAssets.slice(0, 5), [watchlistAssets]);
+
+  const openAssetModal = (symbol: string) => {
+    if (isEditMode) return;
+
+    // ✅ This is the correct modal-routing approach:
+    // App.tsx will see backgroundLocation and render /asset/:symbol on top.
+    navigate(`/asset/${symbol}`, {
+      state: { backgroundLocation: location },
+    });
+  };
 
   if (displayAssets.length === 0) {
     return (
@@ -57,65 +61,65 @@ export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps
 
   return (
     <Card className="h-full">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Star className="h-4 w-4 text-accent" />
-            Watchlist Overview
-          </CardTitle>
-        </CardHeader>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Star className="h-4 w-4 text-accent" />
+          Watchlist Overview
+        </CardTitle>
+      </CardHeader>
 
-        <CardContent>
-          <div className="space-y-3">
-            {displayAssets.map((asset) => (
-              <button
-                key={asset.symbol}
-                type="button"
-                onClick={() => goToAsset(asset.symbol)}
-                className="w-full text-left flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors group"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold text-foreground">{asset.symbol}</span>
-                    <div className={`flex items-center gap-1 text-xs font-medium ${getBiasColor(asset.biasDirection)}`}>
-                      {getBiasIcon(asset.biasDirection)}
-                      {asset.biasDirection}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span>Confidence: {asset.biasConfidence}%</span>
-                    <span>Spread: {asset.spread}</span>
+      <CardContent>
+        <div className="space-y-3">
+          {displayAssets.map((asset) => (
+            <button
+              key={asset.symbol}
+              type="button"
+              onClick={() => openAssetModal(asset.symbol)}
+              className="w-full text-left flex items-center justify-between p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors group"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-semibold text-foreground">{asset.symbol}</span>
+                  <div className={`flex items-center gap-1 text-xs font-medium ${getBiasColor(asset.biasDirection)}`}>
+                    {getBiasIcon(asset.biasDirection)}
+                    {asset.biasDirection}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <div className="text-right">
-                    <div className="text-sm font-medium text-foreground">{asset.latestPrice}</div>
-                    <div
-                      className={`text-xs ${
-                        asset.priceChange?.startsWith("+")
-                          ? "text-success"
-                          : asset.priceChange?.startsWith("-")
-                            ? "text-destructive"
-                            : "text-muted-foreground"
-                      }`}
-                    >
-                      {asset.priceChange || "0.00%"}
-                    </div>
-                  </div>
-
-                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span>Confidence: {asset.biasConfidence}%</span>
+                  <span>Spread: {asset.spread}</span>
                 </div>
-              </button>
-            ))}
-          </div>
+              </div>
 
-          {watchlistAssets.length > 5 && (
-            <p className="text-xs text-muted-foreground text-center mt-3">
-              +{watchlistAssets.length - 5} more in watchlist
-            </p>
-          )}
-        </CardContent>
+              <div className="flex items-center gap-2">
+                <div className="text-right">
+                  <div className="text-sm font-medium text-foreground">{asset.latestPrice}</div>
+                  <div
+                    className={`text-xs ${
+                      asset.priceChange?.startsWith("+")
+                        ? "text-success"
+                        : asset.priceChange?.startsWith("-")
+                          ? "text-destructive"
+                          : "text-muted-foreground"
+                    }`}
+                  >
+                    {asset.priceChange || "0.00%"}
+                  </div>
+                </div>
+
+                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {watchlistAssets.length > 5 && (
+          <p className="text-xs text-muted-foreground text-center mt-3">
+            +{watchlistAssets.length - 5} more in watchlist
+          </p>
+        )}
+      </CardContent>
     </Card>
   );
 }
