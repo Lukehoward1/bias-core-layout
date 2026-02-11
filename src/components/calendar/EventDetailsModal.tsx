@@ -27,7 +27,7 @@ interface CalendarEvent {
   previous: string;
   forecast: string;
   actual: string;
-  impact: string; // "high" | "medium" | "low" in your data, but keeping string for safety
+  impact: string; // "high" | "medium" | "low" (string for safety)
 }
 
 interface EventDetailsModalProps {
@@ -166,20 +166,34 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
   const location = useLocation();
   const { getAssetBySymbol } = useAssets();
 
-  if (!event) return null;
+  // ✅ ALWAYS define stable fallback values so hooks always run
+  const safeEvent: CalendarEvent = useMemo(
+    () =>
+      event ?? {
+        time: "",
+        currency: "",
+        event: "",
+        previous: "—",
+        forecast: "—",
+        actual: "—",
+        impact: "low",
+      },
+    [event],
+  );
 
-  const isReleased = event.actual !== "—";
-  const historicalData = useMemo(() => getHistoricalData(event.event), [event.event]);
+  const isReleased = safeEvent.actual !== "—";
+
+  const historicalData = useMemo(() => getHistoricalData(safeEvent.event || "Event"), [safeEvent.event]);
   const maxValue = useMemo(() => Math.max(...historicalData.map((d) => d.actual || d.forecast || 0)), [historicalData]);
 
   const interpretation = useMemo(
-    () => getMarketInterpretation(event.event, event.currency, isReleased),
-    [event.event, event.currency, isReleased],
+    () => getMarketInterpretation(safeEvent.event, safeEvent.currency, isReleased),
+    [safeEvent.event, safeEvent.currency, isReleased],
   );
-  const narrative = useMemo(() => getEventNarrative(event), [event]);
+  const narrative = useMemo(() => getEventNarrative(safeEvent), [safeEvent]);
   const interpretationGuide = useMemo(
-    () => getInterpretationGuide(event.event, event.currency),
-    [event.event, event.currency],
+    () => getInterpretationGuide(safeEvent.event, safeEvent.currency),
+    [safeEvent.event, safeEvent.currency],
   );
 
   const getImpactColor = (impact: string) => {
@@ -191,13 +205,13 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
 
   const handleAddToWatchlist = () => {
     toast.success("Added to Watchlist (demo)", {
-      description: `${event.event} has been added to your watchlist.`,
+      description: `${safeEvent.event} has been added to your watchlist.`,
     });
   };
 
   const handleSetAlert = () => {
     toast.success("Release Alert Scheduled (demo)", {
-      description: `You'll be notified when ${event.event} is released.`,
+      description: `You'll be notified when ${safeEvent.event} is released.`,
     });
   };
 
@@ -219,10 +233,6 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     return "text-warning";
   };
 
-  /**
-   * ✅ Close Event modal, then open router Asset modal next frame.
-   * Prevents “changing behind” and ensures top-most modal is the latest click.
-   */
   const goToAsset = useCallback(
     (symbol: string) => {
       onClose();
@@ -239,16 +249,15 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     [navigate, location, onClose],
   );
 
+  // ✅ NOW safe to return null AFTER hooks
+  if (!event) return null;
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        stack
         className="max-w-6xl w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border border-border p-0"
         onPointerDown={(e) => e.stopPropagation()}
-        onOpenAutoFocus={(e) => {
-          // Prevent focus jumps when nested
-          e.preventDefault();
-        }}
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <div className="sticky top-0 z-10 bg-background border-b border-border px-8 py-5">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
