@@ -176,8 +176,9 @@ const toPillImpact = (impact: CalendarEvent["impact"]): "High" | "Medium" | "Low
 const getRelevantCurrenciesForAsset = (symbol: string): string[] => {
   const s = (symbol || "").toUpperCase();
 
-  if (s.includes("USD") && (s.startsWith("BTC") || s.startsWith("ETH") || s.startsWith("XAU") || s.startsWith("SPX")))
+  if (s.includes("USD") && (s.startsWith("BTC") || s.startsWith("ETH") || s.startsWith("XAU") || s.startsWith("SPX"))) {
     return ["USD"];
+  }
 
   if (s.length === 6) {
     const base = s.slice(0, 3);
@@ -215,8 +216,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
   };
 
   /**
-   * ✅ IMPORTANT FIX (same pattern as Calendar)
-   * Close current event modal first, then open the next event.
+   * ✅ Close current event modal first, then open the next event.
    * Prevents “event changes behind another modal” behaviour.
    */
   const openCalendarEvent = useCallback((ev: CalendarEvent) => {
@@ -639,9 +639,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                     onPointerDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      // Use the same matcher:
-                      // Convert "USD CPI m/m" into a label that can match calendar where possible.
-                      // (If it doesn't exist in calendarEvents, it will toast.)
                       openCalendarOverlayFromNewsPill(news.event, `${news.time} GMT`);
                     }}
                     className="w-full text-left p-2 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
