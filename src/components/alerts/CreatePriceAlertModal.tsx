@@ -16,31 +16,23 @@ interface CreatePriceAlertModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 
-  /** Optional: when creating, pre-select an asset */
-  defaultAsset?: string;
-
-  /** Optional: when editing, pass the alert to edit */
-  editAlert?: PriceAlert | null;
+  /**
+   * Optional: if provided, modal becomes "Edit" mode and pre-fills fields
+   */
+  editingAlert?: PriceAlert | null;
 
   /**
-   * Optional: parent-controlled edit save.
-   * If provided and editAlert exists, we'll call this instead of addPriceAlert.
+   * Optional: convenience default when opening from elsewhere
    */
-  onSaveEdit?: (updates: Partial<PriceAlert>) => void;
+  defaultAsset?: string;
 }
 
 const timeframes: PriceAlertTimeframe[] = ["1m", "5m", "15m", "30m", "1h", "4h", "1D", "1W"];
 
-export function CreatePriceAlertModal({
-  open,
-  onOpenChange,
-  defaultAsset,
-  editAlert,
-  onSaveEdit,
-}: CreatePriceAlertModalProps) {
+export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editingAlert }: CreatePriceAlertModalProps) {
   const { addPriceAlert, updatePriceAlert } = useAlertsContext();
 
-  const isEditMode = !!editAlert;
+  const isEditMode = !!editingAlert;
 
   const [asset, setAsset] = useState(defaultAsset || "");
   const [direction, setDirection] = useState<PriceAlertDirection>("above");
@@ -48,28 +40,29 @@ export function CreatePriceAlertModal({
   const [price, setPrice] = useState("");
   const [timeframe, setTimeframe] = useState<PriceAlertTimeframe>("15m");
 
-  // Sync form when opening in edit mode
+  // Keep selected asset lookup stable
+  const selectedAsset = useMemo(() => assetsData.find((a) => a.symbol === asset), [asset]);
+
+  // ✅ When editingAlert changes (or modal opens), prefill form
   useEffect(() => {
     if (!open) return;
 
-    if (editAlert) {
-      setAsset(editAlert.asset);
-      setDirection(editAlert.direction);
-      setTriggerType(editAlert.triggerType);
-      setPrice(String(editAlert.price));
-      setTimeframe((editAlert.timeframe as PriceAlertTimeframe) || "15m");
+    if (editingAlert) {
+      setAsset(editingAlert.asset || "");
+      setDirection(editingAlert.direction || "above");
+      setTriggerType(editingAlert.triggerType || "wick");
+      setPrice(String(editingAlert.price ?? ""));
+      setTimeframe((editingAlert.timeframe as PriceAlertTimeframe) || "15m");
       return;
     }
 
-    // Create mode reset
+    // Create mode defaults
     setAsset(defaultAsset || "");
     setDirection("above");
     setTriggerType("wick");
     setPrice("");
     setTimeframe("15m");
-  }, [open, editAlert, defaultAsset]);
-
-  const selectedAsset = useMemo(() => assetsData.find((a) => a.symbol === asset), [asset]);
+  }, [open, editingAlert, defaultAsset]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,32 +83,28 @@ export function CreatePriceAlertModal({
       return;
     }
 
-    const payload: Partial<PriceAlert> = {
-      asset,
-      assetDisplayName: selectedAsset?.displayName || asset,
-      direction,
-      triggerType,
-      price: priceNum,
-      timeframe: triggerType === "close" ? timeframe : undefined,
-    };
+    const assetDisplayName = selectedAsset?.displayName || asset;
 
-    // ✅ Edit mode: update existing
-    if (editAlert) {
-      if (onSaveEdit) {
-        onSaveEdit(payload);
-      } else {
-        updatePriceAlert(editAlert.id, payload);
-        toast.success("Price alert updated");
-      }
+    if (editingAlert) {
+      // ✅ Edit mode: update only the editable fields
+      updatePriceAlert(editingAlert.id, {
+        asset,
+        assetDisplayName,
+        direction,
+        triggerType,
+        price: priceNum,
+        timeframe: triggerType === "close" ? timeframe : undefined,
+      });
 
+      toast.success("Price alert updated");
       onOpenChange(false);
       return;
     }
 
-    // ✅ Create mode: add new
+    // ✅ Create mode
     addPriceAlert({
       asset,
-      assetDisplayName: selectedAsset?.displayName || asset,
+      assetDisplayName,
       direction,
       triggerType,
       price: priceNum,
@@ -125,7 +114,7 @@ export function CreatePriceAlertModal({
     toast.success("Price alert created");
     onOpenChange(false);
 
-    // Reset form (next open)
+    // Reset (nice-to-have; useEffect also handles next open)
     setAsset(defaultAsset || "");
     setDirection("above");
     setTriggerType("wick");
@@ -133,15 +122,15 @@ export function CreatePriceAlertModal({
     setTimeframe("15m");
   };
 
-  const getPreviewMessage = () => {
+  const previewMessage = useMemo(() => {
     if (!asset || !price) return null;
-    const assetName = selectedAsset?.displayName || asset;
 
+    const assetName = selectedAsset?.displayName || asset;
     if (triggerType === "wick") {
       return `"${assetName} wicked ${direction} ${price}"`;
     }
     return `"${assetName} closed ${direction} ${price} on ${timeframe}"`;
-  };
+  }, [asset, price, selectedAsset, triggerType, direction, timeframe]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -157,7 +146,7 @@ export function CreatePriceAlertModal({
           {/* Asset Selection */}
           <div className="space-y-2">
             <Label>Instrument</Label>
-            <Select value={asset} onValueChange={setAsset} disabled={isEditMode}>
+            <Select value={asset} onValueChange={setAsset}>
               <SelectTrigger>
                 <SelectValue placeholder="Select an asset" />
               </SelectTrigger>
@@ -174,12 +163,6 @@ export function CreatePriceAlertModal({
                 ))}
               </SelectContent>
             </Select>
-
-            {isEditMode && (
-              <p className="text-[11px] text-muted-foreground">
-                Instrument is locked for edits (delete + recreate if you want to change it).
-              </p>
-            )}
           </div>
 
           {/* Direction */}
@@ -221,7 +204,9 @@ export function CreatePriceAlertModal({
                   <Label htmlFor="wick" className="cursor-pointer font-medium">
                     Wick / Touch
                   </Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">Triggers when price trades beyond the level</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Triggers when price trades beyond the level (any touch)
+                  </p>
                 </div>
               </div>
               <div className="flex items-start space-x-2 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
@@ -273,13 +258,13 @@ export function CreatePriceAlertModal({
           </div>
 
           {/* Preview */}
-          {getPreviewMessage() && (
+          {previewMessage && (
             <div className="p-3 rounded-lg bg-muted/50 border border-border">
               <div className="flex items-start gap-2">
                 <Info className="h-4 w-4 text-primary mt-0.5" />
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Alert preview:</p>
-                  <p className="text-sm font-medium">{getPreviewMessage()}</p>
+                  <p className="text-sm font-medium">{previewMessage}</p>
                 </div>
               </div>
             </div>
