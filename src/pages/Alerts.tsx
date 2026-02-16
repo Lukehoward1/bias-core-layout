@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,7 @@ import { toast } from "sonner";
 
 // ✅ Calendar modal wiring
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
-import { calendarEvents } from "@/data/calendarEvents";
+import { calendarEvents, type CalendarEvent as CalendarEventData } from "@/data/calendarEvents";
 
 const news = [
   { title: "Fed Signals Potential Rate Hold", currency: "USD", time: "2h ago", sentiment: "hawkish" },
@@ -36,36 +36,81 @@ const sessions = [
   { name: "New York", status: "closed", time: "Opens in 5:45:12", accent: "#F77F00", region: "US Markets" },
 ];
 
-// --------------------
-// ✅ Helper: pick a relevant calendar event for a currency
-// (prioritise high-impact, then medium, then anything)
-// --------------------
-type CalendarEvent = (typeof calendarEvents)[0];
+/* =======================
+   ✅ SAFE MATCHER
+   - Only opens calendar event if there is a real name match
+   - Otherwise shows a toast (no “USD fallback to NFP”)
+======================= */
 
-const pickBestEventForCurrency = (currency: string): CalendarEvent | null => {
-  const c = (currency || "").toUpperCase();
+const normalize = (s: string) =>
+  (s || "")
+    .toLowerCase()
+    .replace(/\(.*?\)/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
-  const matches = calendarEvents.filter((ev) => (ev.currency || "").toUpperCase() === c);
-  if (matches.length === 0) return null;
+// Optional aliases to help matching without being “too loose”
+const normalizeNewsAlias = (title: string) => {
+  const t = normalize(title);
 
-  const impactRank = (impact: string) => {
-    const v = (impact || "").toLowerCase();
-    if (v === "high") return 3;
-    if (v === "medium") return 2;
-    return 1;
-  };
+  // Examples you might add over time:
+  if (t.includes("non farm payroll")) return "non farm payrolls";
+  if (t === "cpi") return "us cpi";
+  if (t.includes("core cpi")) return "us core cpi";
+  if (t.includes("interest rate decision")) return "interest rate decision";
 
-  // highest impact first; if equal, keep original order
-  const sorted = [...matches].sort((a, b) => impactRank(b.impact) - impactRank(a.impact));
-  return sorted[0] ?? null;
+  return t;
+};
+
+const scoreTitleToEvent = (newsTitle: string, ev: CalendarEventData) => {
+  const titleNorm = normalizeNewsAlias(newsTitle);
+  const eventNorm = normalize(ev.event);
+
+  let score = 0;
+
+  // Strong substring matches
+  if (titleNorm.includes(eventNorm)) score += 6;
+  if (eventNorm.includes(titleNorm)) score += 6;
+
+  // Token overlap
+  const titleTokens = new Set(titleNorm.split(" ").filter(Boolean));
+  const eventTokens = new Set(eventNorm.split(" ").filter(Boolean));
+
+  let overlap = 0;
+  titleTokens.forEach((t) => {
+    if (eventTokens.has(t)) overlap += 1;
+  });
+
+  score += overlap;
+
+  // Small bump for high impact (only as a tie-break)
+  if (ev.impact === "high") score += 0.25;
+
+  return score;
+};
+
+const pickBestEventForNewsTitle = (title: string): CalendarEventData | null => {
+  let best: { ev: CalendarEventData; score: number } | null = null;
+
+  for (const ev of calendarEvents) {
+    const s = scoreTitleToEvent(title, ev);
+    if (!best || s > best.score) best = { ev, score: s };
+  }
+
+  // ✅ IMPORTANT: require a meaningful match
+  // If not, do NOT open a random event
+  if (!best || best.score < 3) return null;
+
+  return best.ev;
 };
 
 export default function Alerts() {
   const [activeTab, setActiveTab] = useState("overview");
   const [showCreatePriceAlert, setShowCreatePriceAlert] = useState(false);
 
-  // ✅ Event modal state (for Top News click-through)
-  const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
+  // ✅ Event modal state
+  const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEventData | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
   const {
@@ -116,13 +161,14 @@ export default function Alerts() {
     });
   };
 
-  const activePriceAlertsCount = useMemo(
-    () => priceAlerts.filter((a) => !a.triggered && a.enabled).length,
-    [priceAlerts],
-  );
+  const activePriceAlertsCount = priceAlerts.filter((a) => !a.triggered && a.enabled).length;
 
-  // ✅ Open event modal safely (close then open next frame)
-  const openCalendarEvent = useCallback((ev: CalendarEvent) => {
+  /**
+   * ✅ IMPORTANT FIX (same modal pattern you already used elsewhere)
+   * Close current event modal first, then open the next event.
+   * Prevents “opens behind” behaviour.
+   */
+  const openCalendarEvent = useCallback((ev: CalendarEventData) => {
     setIsEventModalOpen(false);
     setSelectedCalendarEvent(null);
 
@@ -137,32 +183,22 @@ export default function Alerts() {
     setSelectedCalendarEvent(null);
   }, []);
 
-  // ✅ Click handler for Top News
+  // ✅ Click Top News item -> only open if a real match exists
   const handleTopNewsClick = useCallback(
-    (item: (typeof news)[0]) => {
-      const ev = pickBestEventForCurrency(item.currency);
+    (item: { title: string; currency: string }) => {
+      const matched = pickBestEventForNewsTitle(item.title);
 
-      if (!ev) {
-        toast.error("No matching calendar event found for this currency yet.");
+      if (!matched) {
+        toast.error("This news item isn’t linked to a calendar event yet.", {
+          description: "Add it to calendarEvents (or improve the name match) to enable deep linking.",
+        });
         return;
       }
 
-      openCalendarEvent(ev);
+      openCalendarEvent(matched);
     },
     [openCalendarEvent],
   );
-
-  // ✅ Always open Create Price Alert "on top"
-  const openCreatePriceAlert = useCallback(() => {
-    // If an event modal is open, close it first so we don't stack weirdly
-    if (isEventModalOpen) {
-      closeCalendarOverlay();
-      requestAnimationFrame(() => setShowCreatePriceAlert(true));
-      return;
-    }
-
-    setShowCreatePriceAlert(true);
-  }, [isEventModalOpen, closeCalendarOverlay]);
 
   return (
     <div className="p-6 space-y-6">
@@ -253,9 +289,6 @@ export default function Alerts() {
                               >
                                 {item.sentiment}
                               </Badge>
-
-                              {/* small hint */}
-                              <span className="text-[11px] text-muted-foreground ml-1">• click to view event</span>
                             </div>
                           </div>
                           <span className="text-xs text-muted-foreground whitespace-nowrap">{item.time}</span>
@@ -313,7 +346,7 @@ export default function Alerts() {
                     onAdd={() => handleAddCard(myAlertsTimersCardId)}
                     onRemove={() => handleRemoveCard(myAlertsTimersCardId)}
                   />
-                  <Button size="sm" className="h-8" onClick={openCreatePriceAlert}>
+                  <Button size="sm" className="h-8" onClick={() => setShowCreatePriceAlert(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Alert
                   </Button>
@@ -404,7 +437,7 @@ export default function Alerts() {
                   </div>
 
                   <div className="mt-4">
-                    <Button className="w-full" onClick={openCreatePriceAlert}>
+                    <Button className="w-full" onClick={() => setShowCreatePriceAlert(true)}>
                       <Plus className="h-4 w-4 mr-2" />
                       Create New Price Alert
                     </Button>
@@ -449,15 +482,14 @@ export default function Alerts() {
         </Tabs>
       </div>
 
-      {/* ✅ Top News → Calendar Event modal */}
+      <CreatePriceAlertModal open={showCreatePriceAlert} onOpenChange={setShowCreatePriceAlert} />
+
+      {/* ✅ Nested Calendar overlay for Top News */}
       <EventDetailsModal
         event={selectedCalendarEvent as any}
         isOpen={isEventModalOpen}
         onClose={closeCalendarOverlay}
       />
-
-      {/* ✅ Create Price Alert modal */}
-      <CreatePriceAlertModal open={showCreatePriceAlert} onOpenChange={setShowCreatePriceAlert} />
     </div>
   );
 }
