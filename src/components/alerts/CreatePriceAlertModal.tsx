@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,28 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset }: Crea
   const [price, setPrice] = useState("");
   const [timeframe, setTimeframe] = useState<PriceAlertTimeframe>("15m");
 
-  const selectedAsset = assetsData.find((a) => a.symbol === asset);
+  // Keep selected asset stable
+  const selectedAsset = useMemo(() => assetsData.find((a) => a.symbol === asset), [asset]);
+
+  // If defaultAsset changes while modal is closed, keep state aligned
+  useEffect(() => {
+    if (!open) {
+      setAsset(defaultAsset || "");
+    }
+  }, [defaultAsset, open]);
+
+  const resetForm = () => {
+    setAsset(defaultAsset || "");
+    setDirection("above");
+    setTriggerType("wick");
+    setPrice("");
+    setTimeframe("15m");
+  };
+
+  const handleClose = () => {
+    onOpenChange(false);
+    resetForm();
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +61,7 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset }: Crea
     }
 
     const priceNum = parseFloat(price);
-    if (isNaN(priceNum) || priceNum <= 0) {
+    if (Number.isNaN(priceNum) || priceNum <= 0) {
       toast.error("Please enter a valid price");
       return;
     }
@@ -60,29 +81,32 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset }: Crea
     });
 
     toast.success("Price alert created");
-    onOpenChange(false);
-
-    // Reset form
-    setAsset(defaultAsset || "");
-    setDirection("above");
-    setTriggerType("wick");
-    setPrice("");
-    setTimeframe("15m");
+    handleClose();
   };
 
-  const getPreviewMessage = () => {
+  const previewMessage = useMemo(() => {
     if (!asset || !price) return null;
+
     const assetName = selectedAsset?.displayName || asset;
 
     if (triggerType === "wick") {
       return `"${assetName} wicked ${direction} ${price}"`;
-    } else {
-      return `"${assetName} closed ${direction} ${price} on ${timeframe}"`;
     }
-  };
+    return `"${assetName} closed ${direction} ${price} on ${timeframe}"`;
+  }, [asset, price, selectedAsset, triggerType, direction, timeframe]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        // When closing via overlay/ESC, reset form too
+        if (!nextOpen) {
+          handleClose();
+          return;
+        }
+        onOpenChange(true);
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -158,6 +182,7 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset }: Crea
                   </p>
                 </div>
               </div>
+
               <div className="flex items-start space-x-2 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
                 <RadioGroupItem value="close" id="close" className="mt-0.5" />
                 <div>
@@ -207,23 +232,23 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset }: Crea
           </div>
 
           {/* Preview */}
-          {getPreviewMessage() && (
+          {previewMessage && (
             <div className="p-3 rounded-lg bg-muted/50 border border-border">
               <div className="flex items-start gap-2">
                 <Info className="h-4 w-4 text-primary mt-0.5" />
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Alert preview:</p>
-                  <p className="text-sm font-medium">{getPreviewMessage()}</p>
+                  <p className="text-sm font-medium">{previewMessage}</p>
                 </div>
               </div>
             </div>
           )}
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Button type="submit">{editAlert ? "Save Changes" : "Create Alert"}</Button>
+            <Button type="submit">Create Alert</Button>
           </DialogFooter>
         </form>
       </DialogContent>
