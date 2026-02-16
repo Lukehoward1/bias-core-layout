@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,44 +6,22 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
-import { Target, ArrowUp, ArrowDown, Info, Pencil } from "lucide-react";
+import { Target, ArrowUp, ArrowDown, Info } from "lucide-react";
 import { assetsData } from "@/data/assets";
 import type { PriceAlertDirection, PriceAlertTriggerType, PriceAlertTimeframe } from "@/types/alerts";
 import { useAlertsContext } from "@/contexts/AlertsContext";
 import { toast } from "sonner";
 
-type EditablePriceAlert = {
-  id: string;
-  asset: string;
-  assetDisplayName: string;
-  direction: PriceAlertDirection;
-  triggerType: PriceAlertTriggerType;
-  price: number;
-  timeframe?: PriceAlertTimeframe;
-  enabled?: boolean;
-  triggered?: boolean;
-};
-
 interface CreatePriceAlertModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultAsset?: string;
-
-  /** ✅ Optional: if provided, modal becomes "edit" */
-  editAlert?: EditablePriceAlert | null;
 }
 
 const timeframes: PriceAlertTimeframe[] = ["1m", "5m", "15m", "30m", "1h", "4h", "1D", "1W"];
 
-export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editAlert }: CreatePriceAlertModalProps) {
-  const ctx = useAlertsContext() as any;
-
-  // We support either naming (depending on what your context currently exposes)
-  const addPriceAlert: ((payload: any) => void) | undefined = ctx.addPriceAlert;
-  const updatePriceAlert: ((id: string, updates: Partial<EditablePriceAlert>) => void) | undefined =
-    ctx.updatePriceAlert;
-
-  const isEditMode = !!editAlert;
+export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset }: CreatePriceAlertModalProps) {
+  const { addPriceAlert } = useAlertsContext();
 
   const [asset, setAsset] = useState(defaultAsset || "");
   const [direction, setDirection] = useState<PriceAlertDirection>("above");
@@ -51,30 +29,7 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editAl
   const [price, setPrice] = useState("");
   const [timeframe, setTimeframe] = useState<PriceAlertTimeframe>("15m");
 
-  const selectedAsset = useMemo(() => assetsData.find((a) => a.symbol === asset), [asset]);
-
-  // ✅ When opening (or when edit target changes), hydrate form from editAlert (or reset for create)
-  useEffect(() => {
-    if (!open) return;
-
-    if (editAlert) {
-      setAsset(editAlert.asset);
-      setDirection(editAlert.direction);
-      setTriggerType(editAlert.triggerType);
-      setPrice(String(editAlert.price));
-      setTimeframe((editAlert.timeframe as PriceAlertTimeframe) || "15m");
-      return;
-    }
-
-    // Create mode reset
-    setAsset(defaultAsset || "");
-    setDirection("above");
-    setTriggerType("wick");
-    setPrice("");
-    setTimeframe("15m");
-  }, [open, editAlert, defaultAsset]);
-
-  const close = () => onOpenChange(false);
+  const selectedAsset = assetsData.find((a) => a.symbol === asset);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +40,7 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editAl
     }
 
     const priceNum = parseFloat(price);
-    if (Number.isNaN(priceNum) || priceNum <= 0) {
+    if (isNaN(priceNum) || priceNum <= 0) {
       toast.error("Please enter a valid price");
       return;
     }
@@ -95,45 +50,35 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editAl
       return;
     }
 
-    const payload = {
+    addPriceAlert({
       asset,
       assetDisplayName: selectedAsset?.displayName || asset,
       direction,
       triggerType,
       price: priceNum,
       timeframe: triggerType === "close" ? timeframe : undefined,
-    };
+    });
 
-    // ✅ EDIT MODE
-    if (editAlert) {
-      if (typeof updatePriceAlert !== "function") {
-        toast.error("Edit isn't wired yet (updatePriceAlert missing in AlertsContext).");
-        return;
-      }
-
-      updatePriceAlert(editAlert.id, payload);
-      toast.success("Price alert updated");
-      close();
-      return;
-    }
-
-    // ✅ CREATE MODE
-    if (typeof addPriceAlert !== "function") {
-      toast.error("Create isn't wired yet (addPriceAlert missing in AlertsContext).");
-      return;
-    }
-
-    addPriceAlert(payload);
     toast.success("Price alert created");
-    close();
+    onOpenChange(false);
+
+    // Reset form
+    setAsset(defaultAsset || "");
+    setDirection("above");
+    setTriggerType("wick");
+    setPrice("");
+    setTimeframe("15m");
   };
 
   const getPreviewMessage = () => {
     if (!asset || !price) return null;
     const assetName = selectedAsset?.displayName || asset;
 
-    if (triggerType === "wick") return `"${assetName} wicked ${direction} ${price}"`;
-    return `"${assetName} closed ${direction} ${price} on ${timeframe}"`;
+    if (triggerType === "wick") {
+      return `"${assetName} wicked ${direction} ${price}"`;
+    } else {
+      return `"${assetName} closed ${direction} ${price} on ${timeframe}"`;
+    }
   };
 
   return (
@@ -141,17 +86,8 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editAl
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {isEditMode ? (
-              <>
-                <Pencil className="h-5 w-5 text-primary" />
-                Edit Price Alert
-              </>
-            ) : (
-              <>
-                <Target className="h-5 w-5 text-primary" />
-                Create Price Alert
-              </>
-            )}
+            <Target className="h-5 w-5 text-primary" />
+            Create Price Alert
           </DialogTitle>
         </DialogHeader>
 
@@ -222,7 +158,6 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editAl
                   </p>
                 </div>
               </div>
-
               <div className="flex items-start space-x-2 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
                 <RadioGroupItem value="close" id="close" className="mt-0.5" />
                 <div>
@@ -285,10 +220,10 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editAl
           )}
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={close}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit">{isEditMode ? "Save Changes" : "Create Alert"}</Button>
+            <Button type="submit">{editAlert ? "Save Changes" : "Create Alert"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
