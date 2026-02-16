@@ -65,10 +65,9 @@ const pickBestEventForCurrency = (currency: string): CalendarEvent | null => {
 export default function Alerts() {
   const [activeTab, setActiveTab] = useState("overview");
 
-  // ✅ Create + Edit Price Alert modals
+  // ✅ Create / Edit Price Alert modal state
   const [showCreatePriceAlert, setShowCreatePriceAlert] = useState(false);
-  const [showEditPriceAlert, setShowEditPriceAlert] = useState(false);
-  const [editTarget, setEditTarget] = useState<PriceAlert | null>(null);
+  const [editingPriceAlert, setEditingPriceAlert] = useState<PriceAlert | null>(null);
 
   // ✅ Event modal state (for Top News click-through)
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
@@ -85,7 +84,6 @@ export default function Alerts() {
     updatePreferences,
     unreadCount,
     priceAlerts,
-    updatePriceAlert,
   } = useAlertsContext();
 
   // Dashboard integration - single hook at page level
@@ -161,42 +159,42 @@ export default function Alerts() {
 
   // ✅ Always open Create Price Alert "on top"
   const openCreatePriceAlert = useCallback(() => {
-    // close edit modal if open
-    setShowEditPriceAlert(false);
-    setEditTarget(null);
-
     // If an event modal is open, close it first so we don't stack weirdly
     if (isEventModalOpen) {
       closeCalendarOverlay();
-      requestAnimationFrame(() => setShowCreatePriceAlert(true));
+      requestAnimationFrame(() => {
+        setEditingPriceAlert(null);
+        setShowCreatePriceAlert(true);
+      });
       return;
     }
 
+    setEditingPriceAlert(null);
     setShowCreatePriceAlert(true);
   }, [isEventModalOpen, closeCalendarOverlay]);
 
-  // ✅ Open Edit modal (and pause underlying interactions)
+  // ✅ Edit handler (reuse the same modal, pre-filled)
   const openEditPriceAlert = useCallback(
     (alert: PriceAlert) => {
-      setShowCreatePriceAlert(false);
+      if (isEventModalOpen) {
+        closeCalendarOverlay();
+        requestAnimationFrame(() => {
+          setEditingPriceAlert(alert);
+          setShowCreatePriceAlert(true);
+        });
+        return;
+      }
 
-      // Close event overlay if open (prevents weird stacking)
-      if (isEventModalOpen) closeCalendarOverlay();
-
-      setShowEditPriceAlert(false);
-      setEditTarget(null);
-
-      requestAnimationFrame(() => {
-        setEditTarget(alert);
-        setShowEditPriceAlert(true);
-      });
+      setEditingPriceAlert(alert);
+      setShowCreatePriceAlert(true);
     },
     [isEventModalOpen, closeCalendarOverlay],
   );
 
-  const closeEditPriceAlert = useCallback((open: boolean) => {
-    setShowEditPriceAlert(open);
-    if (!open) setEditTarget(null);
+  // ✅ Close handler (clears edit state)
+  const handlePriceAlertModalOpenChange = useCallback((open: boolean) => {
+    setShowCreatePriceAlert(open);
+    if (!open) setEditingPriceAlert(null);
   }, []);
 
   return (
@@ -494,19 +492,11 @@ export default function Alerts() {
         onClose={closeCalendarOverlay}
       />
 
-      {/* ✅ Create Price Alert modal */}
-      <CreatePriceAlertModal open={showCreatePriceAlert} onOpenChange={setShowCreatePriceAlert} />
-
-      {/* ✅ Edit Price Alert modal (same component, editMode) */}
+      {/* ✅ Create / Edit Price Alert modal (reused) */}
       <CreatePriceAlertModal
-        open={showEditPriceAlert}
-        onOpenChange={closeEditPriceAlert}
-        editAlert={editTarget}
-        onSaveEdit={(updates) => {
-          if (!editTarget) return;
-          updatePriceAlert(editTarget.id, updates);
-          toast.success("Price alert updated");
-        }}
+        open={showCreatePriceAlert}
+        onOpenChange={handlePriceAlertModalOpenChange}
+        editingAlert={editingPriceAlert}
       />
     </div>
   );
