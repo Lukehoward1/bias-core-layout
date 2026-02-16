@@ -9,26 +9,26 @@ import { AlertsProvider } from "@/contexts/AlertsContext";
 import { GlobalNotifications } from "@/components/alerts/GlobalNotifications";
 import { AppLayout } from "@/layouts/AppLayout";
 
-import Dashboard from "./pages/Dashboard";
-import Markets from "./pages/Markets";
-import AssetDetail from "./pages/AssetDetail";
-import Calendar from "./pages/Calendar";
-import Alerts from "./pages/Alerts";
-import RiskTools from "./pages/RiskTools";
-import Journal from "./pages/Journal";
-import StrategyTester from "./pages/StrategyTester";
-import ManualBacktesting from "./pages/ManualBacktesting";
-import AutomatedStrategyLab from "./pages/AutomatedStrategyLab";
-import FundingChallengeSim from "./pages/FundingChallengeSim";
-import Community from "./pages/Community";
-import Education from "./pages/Education";
-import Webinars from "./pages/Webinars";
+import Dashboard from "./pages/Dashboard.tsx";
+import Markets from "./pages/Markets.tsx";
+import AssetDetail from "./pages/AssetDetail.tsx";
+import Calendar from "./pages/Calendar.tsx";
+import Alerts from "./pages/Alerts.tsx";
+import RiskTools from "./pages/RiskTools.tsx";
+import Journal from "./pages/Journal.tsx";
+import StrategyTester from "./pages/StrategyTester.tsx";
+import ManualBacktesting from "./pages/ManualBacktesting.tsx";
+import AutomatedStrategyLab from "./pages/AutomatedStrategyLab.tsx";
+import FundingChallengeSim from "./pages/FundingChallengeSim.tsx";
+import Community from "./pages/Community.tsx";
+import Education from "./pages/Education.tsx";
+import Webinars from "./pages/Webinars.tsx";
 
-import Brokerage from "./pages/Brokerage";
-import Settings from "./pages/Settings";
-import Billing from "./pages/Billing";
-import Pricing from "./pages/Pricing";
-import NotFound from "./pages/NotFound";
+import Brokerage from "./pages/Brokerage.tsx";
+import Settings from "./pages/Settings.tsx";
+import Billing from "./pages/Billing.tsx";
+import Pricing from "./pages/Pricing.tsx";
+import NotFound from "./pages/NotFound.tsx";
 
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
