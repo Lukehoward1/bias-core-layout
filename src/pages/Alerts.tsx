@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,10 @@ import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { toast } from "sonner";
 
+// ✅ Calendar modal wiring
+import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
+import { calendarEvents } from "@/data/calendarEvents";
+
 const news = [
   { title: "Fed Signals Potential Rate Hold", currency: "USD", time: "2h ago", sentiment: "hawkish" },
   { title: "ECB Minutes Show Divided Opinion", currency: "EUR", time: "4h ago", sentiment: "mixed" },
@@ -32,9 +36,37 @@ const sessions = [
   { name: "New York", status: "closed", time: "Opens in 5:45:12", accent: "#F77F00", region: "US Markets" },
 ];
 
+// --------------------
+// ✅ Helper: pick a relevant calendar event for a currency
+// (prioritise high-impact, then medium, then anything)
+// --------------------
+type CalendarEvent = (typeof calendarEvents)[0];
+
+const pickBestEventForCurrency = (currency: string): CalendarEvent | null => {
+  const c = (currency || "").toUpperCase();
+
+  const matches = calendarEvents.filter((ev) => (ev.currency || "").toUpperCase() === c);
+  if (matches.length === 0) return null;
+
+  const impactRank = (impact: string) => {
+    const v = (impact || "").toLowerCase();
+    if (v === "high") return 3;
+    if (v === "medium") return 2;
+    return 1;
+  };
+
+  // highest impact first; if equal, keep original order
+  const sorted = [...matches].sort((a, b) => impactRank(b.impact) - impactRank(a.impact));
+  return sorted[0] ?? null;
+};
+
 export default function Alerts() {
   const [activeTab, setActiveTab] = useState("overview");
   const [showCreatePriceAlert, setShowCreatePriceAlert] = useState(false);
+
+  // ✅ Event modal state (for Top News click-through)
+  const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
   const {
     alerts,
@@ -84,7 +116,53 @@ export default function Alerts() {
     });
   };
 
-  const activePriceAlertsCount = priceAlerts.filter((a) => !a.triggered && a.enabled).length;
+  const activePriceAlertsCount = useMemo(
+    () => priceAlerts.filter((a) => !a.triggered && a.enabled).length,
+    [priceAlerts],
+  );
+
+  // ✅ Open event modal safely (close then open next frame)
+  const openCalendarEvent = useCallback((ev: CalendarEvent) => {
+    setIsEventModalOpen(false);
+    setSelectedCalendarEvent(null);
+
+    requestAnimationFrame(() => {
+      setSelectedCalendarEvent(ev);
+      setIsEventModalOpen(true);
+    });
+  }, []);
+
+  const closeCalendarOverlay = useCallback(() => {
+    setIsEventModalOpen(false);
+    setSelectedCalendarEvent(null);
+  }, []);
+
+  // ✅ Click handler for Top News
+  const handleTopNewsClick = useCallback(
+    (item: (typeof news)[0]) => {
+      const ev = pickBestEventForCurrency(item.currency);
+
+      if (!ev) {
+        toast.error("No matching calendar event found for this currency yet.");
+        return;
+      }
+
+      openCalendarEvent(ev);
+    },
+    [openCalendarEvent],
+  );
+
+  // ✅ Always open Create Price Alert "on top"
+  const openCreatePriceAlert = useCallback(() => {
+    // If an event modal is open, close it first so we don't stack weirdly
+    if (isEventModalOpen) {
+      closeCalendarOverlay();
+      requestAnimationFrame(() => setShowCreatePriceAlert(true));
+      return;
+    }
+
+    setShowCreatePriceAlert(true);
+  }, [isEventModalOpen, closeCalendarOverlay]);
 
   return (
     <div className="p-6 space-y-6">
@@ -148,9 +226,15 @@ export default function Alerts() {
                 <CardContent>
                   <div className="space-y-3">
                     {news.map((item, i) => (
-                      <div
+                      <button
                         key={i}
-                        className="p-4 bg-muted/50 rounded-lg border border-border hover:bg-muted transition-colors cursor-pointer"
+                        type="button"
+                        onPointerDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleTopNewsClick(item);
+                        }}
+                        className="w-full text-left p-4 bg-muted/50 rounded-lg border border-border hover:bg-muted transition-colors"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
@@ -169,11 +253,14 @@ export default function Alerts() {
                               >
                                 {item.sentiment}
                               </Badge>
+
+                              {/* small hint */}
+                              <span className="text-[11px] text-muted-foreground ml-1">• click to view event</span>
                             </div>
                           </div>
                           <span className="text-xs text-muted-foreground whitespace-nowrap">{item.time}</span>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </CardContent>
@@ -226,7 +313,7 @@ export default function Alerts() {
                     onAdd={() => handleAddCard(myAlertsTimersCardId)}
                     onRemove={() => handleRemoveCard(myAlertsTimersCardId)}
                   />
-                  <Button size="sm" className="h-8" onClick={() => setShowCreatePriceAlert(true)}>
+                  <Button size="sm" className="h-8" onClick={openCreatePriceAlert}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Alert
                   </Button>
@@ -317,7 +404,7 @@ export default function Alerts() {
                   </div>
 
                   <div className="mt-4">
-                    <Button className="w-full" onClick={() => setShowCreatePriceAlert(true)}>
+                    <Button className="w-full" onClick={openCreatePriceAlert}>
                       <Plus className="h-4 w-4 mr-2" />
                       Create New Price Alert
                     </Button>
@@ -362,6 +449,14 @@ export default function Alerts() {
         </Tabs>
       </div>
 
+      {/* ✅ Top News → Calendar Event modal */}
+      <EventDetailsModal
+        event={selectedCalendarEvent as any}
+        isOpen={isEventModalOpen}
+        onClose={closeCalendarOverlay}
+      />
+
+      {/* ✅ Create Price Alert modal */}
       <CreatePriceAlertModal open={showCreatePriceAlert} onOpenChange={setShowCreatePriceAlert} />
     </div>
   );
