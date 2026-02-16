@@ -1,10 +1,12 @@
 import { useMemo, useState, useCallback } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import {
   Inbox,
   CheckCheck,
@@ -19,6 +21,7 @@ import {
   BarChart2,
   ShieldAlert,
 } from "lucide-react";
+
 import type { AlertItem, AlertType } from "@/types/alerts";
 import { cn } from "@/lib/utils";
 
@@ -31,16 +34,14 @@ interface AlertInboxProps {
 }
 
 export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClearAll }: AlertInboxProps) {
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<"all" | "unread">("all");
 
-  const navigate = useNavigate();
-  const location = useLocation();
+  const unreadCount = useMemo(() => alerts.filter((a) => !a.read).length, [alerts]);
 
   const filteredAlerts = useMemo(() => {
     return filter === "unread" ? alerts.filter((a) => !a.read) : alerts;
   }, [alerts, filter]);
-
-  const unreadCount = useMemo(() => alerts.filter((a) => !a.read).length, [alerts]);
 
   const getIcon = (type: AlertType) => {
     switch (type) {
@@ -79,7 +80,7 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
 
   const formatTime = (date: Date) => {
     const now = new Date();
-    const diffMs = now.getTime() - new Date(date).getTime();
+    const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
@@ -90,41 +91,41 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
     return `${diffDays}d ago`;
   };
 
-  const buildPathWithParams = (path: string, params?: Record<string, string>) => {
-    if (!params || Object.keys(params).length === 0) return path;
-    const qs = new URLSearchParams(params).toString();
-    return `${path}${path.includes("?") ? "&" : "?"}${qs}`;
-  };
+  const applyRouteParams = useCallback((route: string, params?: Record<string, string>) => {
+    if (!params) return route;
+    let out = route;
+    for (const [k, v] of Object.entries(params)) {
+      out = out.replace(`:${k}`, encodeURIComponent(v));
+    }
+    return out;
+  }, []);
+
+  const buildNavigateTarget = useCallback(
+    (alert: AlertItem) => {
+      if (!alert.routeTo) return null;
+
+      // Replace dynamic segments like /asset/:symbol
+      let target = applyRouteParams(alert.routeTo, alert.routeParams);
+
+      // Calendar deep-link support
+      if (alert.eventId) {
+        const joiner = target.includes("?") ? "&" : "?";
+        target = `${target}${joiner}eventId=${encodeURIComponent(alert.eventId)}`;
+      }
+
+      return target;
+    },
+    [applyRouteParams],
+  );
 
   const handleAlertClick = useCallback(
     (alert: AlertItem) => {
-      // Always mark read first
       onMarkRead(alert.id);
 
-      // 1) Calendar deep-link (preferred for news/calendar alerts)
-      if (alert.eventId) {
-        navigate(buildPathWithParams("/calendar", { eventId: alert.eventId }), {
-          state: { backgroundLocation: (location.state as any)?.backgroundLocation ?? location },
-        });
-        return;
-      }
-
-      // 2) Explicit routeTo (+ params)
-      if (alert.routeTo) {
-        navigate(buildPathWithParams(alert.routeTo, alert.routeParams), {
-          state: { backgroundLocation: (location.state as any)?.backgroundLocation ?? location },
-        });
-        return;
-      }
-
-      // 3) Fallback: relatedAsset opens asset modal
-      if (alert.relatedAsset) {
-        navigate(`/asset/${alert.relatedAsset}`, {
-          state: { backgroundLocation: (location.state as any)?.backgroundLocation ?? location },
-        });
-      }
+      const target = buildNavigateTarget(alert);
+      if (target) navigate(target);
     },
-    [navigate, location, onMarkRead],
+    [onMarkRead, buildNavigateTarget, navigate],
   );
 
   return (
@@ -148,6 +149,7 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
                 Mark all read
               </Button>
             )}
+
             {alerts.length > 0 && (
               <Button variant="ghost" size="sm" onClick={onClearAll} className="text-xs h-7 text-muted-foreground">
                 <Trash2 className="h-3 w-3 mr-1" />
@@ -178,100 +180,93 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {filteredAlerts.map((alert) => (
-                    <div
-                      key={alert.id}
-                      className={cn(
-                        "p-3 rounded-lg border cursor-pointer transition-colors hover:bg-muted/50",
-                        getSeverityStyles(alert.severity, alert.read),
-                      )}
-                      onPointerDown={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleAlertClick(alert);
-                      }}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div
-                          className={cn(
-                            "p-1.5 rounded-md mt-0.5",
-                            alert.severity === "high"
-                              ? "bg-destructive/20 text-destructive"
-                              : alert.severity === "warning"
-                                ? "bg-warning/20 text-warning"
-                                : "bg-primary/20 text-primary",
-                            alert.read && "opacity-50",
-                          )}
-                        >
-                          {getIcon(alert.type)}
-                        </div>
+                  {filteredAlerts.map((alert) => {
+                    const target = buildNavigateTarget(alert);
 
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2 mb-0.5">
-                            <p
-                              className={cn(
-                                "text-sm font-medium truncate",
-                                alert.read ? "text-muted-foreground" : "text-foreground",
-                              )}
-                            >
-                              {alert.title}
-                            </p>
-                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                              {formatTime(alert.timestamp)}
-                            </span>
-                          </div>
-
-                          <p
+                    return (
+                      <div
+                        key={alert.id}
+                        role="button"
+                        tabIndex={0}
+                        className={cn(
+                          "p-3 rounded-lg border cursor-pointer transition-colors hover:bg-muted/50",
+                          getSeverityStyles(alert.severity, alert.read),
+                        )}
+                        onClick={() => handleAlertClick(alert)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") handleAlertClick(alert);
+                        }}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div
                             className={cn(
-                              "text-xs line-clamp-2",
-                              alert.read ? "text-muted-foreground/70" : "text-muted-foreground",
+                              "p-1.5 rounded-md mt-0.5",
+                              alert.severity === "high"
+                                ? "bg-destructive/20 text-destructive"
+                                : alert.severity === "warning"
+                                  ? "bg-warning/20 text-warning"
+                                  : "bg-primary/20 text-primary",
+                              alert.read && "opacity-50",
                             )}
                           >
-                            {alert.message}
-                          </p>
+                            {getIcon(alert.type)}
+                          </div>
 
-                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                            {alert.relatedAsset && (
-                              <Badge variant="secondary" className="text-[10px]">
-                                {alert.relatedAsset}
-                              </Badge>
-                            )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2 mb-0.5">
+                              <p
+                                className={cn(
+                                  "text-sm font-medium truncate",
+                                  alert.read ? "text-muted-foreground" : "text-foreground",
+                                )}
+                              >
+                                {alert.title}
+                              </p>
+                              <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                {formatTime(alert.timestamp)}
+                              </span>
+                            </div>
 
-                            {alert.eventId && (
-                              <Badge variant="outline" className="text-[10px]">
-                                Event
-                              </Badge>
-                            )}
+                            <p
+                              className={cn(
+                                "text-xs line-clamp-2",
+                                alert.read ? "text-muted-foreground/70" : "text-muted-foreground",
+                              )}
+                            >
+                              {alert.message}
+                            </p>
 
-                            {alert.routeTo && (
-                              <Badge variant="outline" className="text-[10px]">
-                                Open
-                              </Badge>
-                            )}
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              {alert.relatedAsset && (
+                                <Badge variant="secondary" className="text-[10px]">
+                                  {alert.relatedAsset}
+                                </Badge>
+                              )}
+
+                              {target && <span className="text-[11px] text-muted-foreground">• click to open</span>}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {!alert.read && <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-2" />}
+
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onDelete(alert.id);
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
                           </div>
                         </div>
-
-                        {!alert.read && <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-2" />}
                       </div>
-
-                      {/* Optional: delete button without hijacking row click */}
-                      <div className="flex justify-end mt-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
-                          onPointerDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onDelete(alert.id);
-                          }}
-                        >
-                          <Trash2 className="h-3 w-3 mr-1" />
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </ScrollArea>
