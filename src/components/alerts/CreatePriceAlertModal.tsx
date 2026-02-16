@@ -40,10 +40,9 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
   const [price, setPrice] = useState("");
   const [timeframe, setTimeframe] = useState<PriceAlertTimeframe>("15m");
 
-  // Keep selected asset lookup stable
   const selectedAsset = useMemo(() => assetsData.find((a) => a.symbol === asset), [asset]);
 
-  // ✅ When editingAlert changes (or modal opens), prefill form
+  // Prefill when opening
   useEffect(() => {
     if (!open) return;
 
@@ -56,7 +55,6 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
       return;
     }
 
-    // Create mode defaults
     setAsset(defaultAsset || "");
     setDirection("above");
     setTriggerType("wick");
@@ -86,7 +84,6 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
     const assetDisplayName = selectedAsset?.displayName || asset;
 
     if (editingAlert) {
-      // ✅ Edit mode: update only the editable fields
       updatePriceAlert(editingAlert.id, {
         asset,
         assetDisplayName,
@@ -101,7 +98,6 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
       return;
     }
 
-    // ✅ Create mode
     addPriceAlert({
       asset,
       assetDisplayName,
@@ -114,7 +110,7 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
     toast.success("Price alert created");
     onOpenChange(false);
 
-    // Reset (nice-to-have; useEffect also handles next open)
+    // Reset (useEffect also handles next open)
     setAsset(defaultAsset || "");
     setDirection("above");
     setTriggerType("wick");
@@ -134,7 +130,8 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      {/* z-[60] keeps the modal above most app content; SelectContent is z-50+ in select.tsx */}
+      <DialogContent className="sm:max-w-md z-[60]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Target className="h-5 w-5 text-primary" />
@@ -209,6 +206,7 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
                   </p>
                 </div>
               </div>
+
               <div className="flex items-start space-x-2 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
                 <RadioGroupItem value="close" id="close" className="mt-0.5" />
                 <div>
