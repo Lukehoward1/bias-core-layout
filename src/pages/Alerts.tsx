@@ -17,11 +17,11 @@ import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { toast } from "sonner";
 
-// ✅ Calendar modal wiring
+// Calendar modal wiring
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { calendarEvents } from "@/data/calendarEvents";
 
-// ✅ Types
+// Types
 import type { PriceAlert } from "@/types/alerts";
 
 const news = [
@@ -39,15 +39,10 @@ const sessions = [
   { name: "New York", status: "closed", time: "Opens in 5:45:12", accent: "#F77F00", region: "US Markets" },
 ];
 
-// --------------------
-// ✅ Helper: pick a relevant calendar event for a currency
-// (prioritise high-impact, then medium, then anything)
-// --------------------
 type CalendarEvent = (typeof calendarEvents)[0];
 
 const pickBestEventForCurrency = (currency: string): CalendarEvent | null => {
   const c = (currency || "").toUpperCase();
-
   const matches = calendarEvents.filter((ev) => (ev.currency || "").toUpperCase() === c);
   if (matches.length === 0) return null;
 
@@ -65,11 +60,11 @@ const pickBestEventForCurrency = (currency: string): CalendarEvent | null => {
 export default function Alerts() {
   const [activeTab, setActiveTab] = useState("overview");
 
-  // ✅ Create / Edit Price Alert modal state
+  // Create / Edit Price Alert modal state
   const [showCreatePriceAlert, setShowCreatePriceAlert] = useState(false);
   const [editingPriceAlert, setEditingPriceAlert] = useState<PriceAlert | null>(null);
 
-  // ✅ Event modal state (for Top News click-through)
+  // Event modal state (Top News click-through)
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
@@ -86,20 +81,17 @@ export default function Alerts() {
     priceAlerts,
   } = useAlertsContext();
 
-  // Dashboard integration - single hook at page level
   const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
 
   const topNewsCardId = "top-news";
   const sessionTimersCardId = "session-timers";
   const myAlertsTimersCardId = "alerts-my-alerts-timers";
   const priceAlertsCardId = "alerts-price-alerts";
-  const highImpactCardId = "high-impact-events";
 
   const isTopNewsAdded = isCardOnDashboard(topNewsCardId);
   const isSessionTimersAdded = isCardOnDashboard(sessionTimersCardId);
   const isMyAlertsTimersAdded = isCardOnDashboard(myAlertsTimersCardId);
   const isPriceAlertsAdded = isCardOnDashboard(priceAlertsCardId);
-  const isHighImpactAdded = isCardOnDashboard(highImpactCardId);
 
   const handleAddCard = (cardId: string) => {
     addCard(cardId);
@@ -126,7 +118,7 @@ export default function Alerts() {
     [priceAlerts],
   );
 
-  // ✅ Open event modal safely (close then open next frame)
+  // Open event modal safely (close then open next frame)
   const openCalendarEvent = useCallback((ev: CalendarEvent) => {
     setIsEventModalOpen(false);
     setSelectedCalendarEvent(null);
@@ -142,7 +134,6 @@ export default function Alerts() {
     setSelectedCalendarEvent(null);
   }, []);
 
-  // ✅ Click handler for Top News
   const handleTopNewsClick = useCallback(
     (item: (typeof news)[0]) => {
       const ev = pickBestEventForCurrency(item.currency);
@@ -157,9 +148,8 @@ export default function Alerts() {
     [openCalendarEvent],
   );
 
-  // ✅ Always open Create Price Alert "on top"
+  // Always open Create Price Alert "on top"
   const openCreatePriceAlert = useCallback(() => {
-    // If an event modal is open, close it first so we don't stack weirdly
     if (isEventModalOpen) {
       closeCalendarOverlay();
       requestAnimationFrame(() => {
@@ -173,7 +163,7 @@ export default function Alerts() {
     setShowCreatePriceAlert(true);
   }, [isEventModalOpen, closeCalendarOverlay]);
 
-  // ✅ Edit handler (reuse the same modal, pre-filled)
+  // Edit handler (reuses same modal, pre-filled)
   const openEditPriceAlert = useCallback(
     (alert: PriceAlert) => {
       if (isEventModalOpen) {
@@ -191,7 +181,6 @@ export default function Alerts() {
     [isEventModalOpen, closeCalendarOverlay],
   );
 
-  // ✅ Close handler (clears edit state)
   const handlePriceAlertModalOpenChange = useCallback((open: boolean) => {
     setShowCreatePriceAlert(open);
     if (!open) setEditingPriceAlert(null);
@@ -485,14 +474,14 @@ export default function Alerts() {
         </Tabs>
       </div>
 
-      {/* ✅ Top News → Calendar Event modal */}
+      {/* Top News → Calendar Event modal */}
       <EventDetailsModal
         event={selectedCalendarEvent as any}
         isOpen={isEventModalOpen}
         onClose={closeCalendarOverlay}
       />
 
-      {/* ✅ Create / Edit Price Alert modal (reused) */}
+      {/* Create / Edit Price Alert modal (reused) */}
       <CreatePriceAlertModal
         open={showCreatePriceAlert}
         onOpenChange={handlePriceAlertModalOpenChange}
