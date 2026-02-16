@@ -17,11 +17,13 @@ import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { toast } from "sonner";
 
+// ✅ Calendar modal wiring
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { calendarEvents } from "@/data/calendarEvents";
+
+// ✅ Types
 import type { PriceAlert } from "@/types/alerts";
 
-/** Demo Top News (Alerts overview) */
 const news = [
   { title: "Fed Signals Potential Rate Hold", currency: "USD", time: "2h ago", sentiment: "hawkish" },
   { title: "ECB Minutes Show Divided Opinion", currency: "EUR", time: "4h ago", sentiment: "mixed" },
@@ -37,52 +39,38 @@ const sessions = [
   { name: "New York", status: "closed", time: "Opens in 5:45:12", accent: "#F77F00", region: "US Markets" },
 ];
 
-/* =======================
-   Matching helpers (Top News → Calendar)
-======================= */
-
+// --------------------
+// ✅ Helper: pick a relevant calendar event for a currency
+// (prioritise high-impact, then medium, then anything)
+// --------------------
 type CalendarEvent = (typeof calendarEvents)[0];
 
-const normalize = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/\(.*?\)/g, " ")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+const pickBestEventForCurrency = (currency: string): CalendarEvent | null => {
+  const c = (currency || "").toUpperCase();
 
-const scoreCalendarMatch = (args: { label: string; currency: string; candidate: CalendarEvent }) => {
-  const labelNorm = normalize(args.label);
-  const candNorm = normalize(args.candidate.event);
+  const matches = calendarEvents.filter((ev) => (ev.currency || "").toUpperCase() === c);
+  if (matches.length === 0) return null;
 
-  let score = 0;
+  const impactRank = (impact: string) => {
+    const v = (impact || "").toLowerCase();
+    if (v === "high") return 3;
+    if (v === "medium") return 2;
+    return 1;
+  };
 
-  if (candNorm === labelNorm) score += 6;
-  if (candNorm.includes(labelNorm) || labelNorm.includes(candNorm)) score += 4;
-
-  const labelTokens = new Set(labelNorm.split(" ").filter(Boolean));
-  const candTokens = new Set(candNorm.split(" ").filter(Boolean));
-  let overlap = 0;
-  labelTokens.forEach((t) => {
-    if (candTokens.has(t)) overlap += 1;
-  });
-  score += overlap;
-
-  if ((args.candidate.currency || "").toUpperCase() === (args.currency || "").toUpperCase()) score += 3;
-
-  if (args.candidate.impact === "high") score += 0.5;
-
-  return score;
+  const sorted = [...matches].sort((a, b) => impactRank(b.impact) - impactRank(a.impact));
+  return sorted[0] ?? null;
 };
 
 export default function Alerts() {
   const [activeTab, setActiveTab] = useState("overview");
 
-  // Create/Edit modal
+  // ✅ Create + Edit Price Alert modals
   const [showCreatePriceAlert, setShowCreatePriceAlert] = useState(false);
-  const [editPriceAlert, setEditPriceAlert] = useState<PriceAlert | null>(null);
+  const [showEditPriceAlert, setShowEditPriceAlert] = useState(false);
+  const [editTarget, setEditTarget] = useState<PriceAlert | null>(null);
 
-  // Calendar overlay for Top News items
+  // ✅ Event modal state (for Top News click-through)
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
@@ -97,6 +85,7 @@ export default function Alerts() {
     updatePreferences,
     unreadCount,
     priceAlerts,
+    updatePriceAlert,
   } = useAlertsContext();
 
   // Dashboard integration - single hook at page level
@@ -139,9 +128,7 @@ export default function Alerts() {
     [priceAlerts],
   );
 
-  /**
-   * ✅ Same “close then open next frame” pattern (prevents behind-modal behaviour)
-   */
+  // ✅ Open event modal safely (close then open next frame)
   const openCalendarEvent = useCallback((ev: CalendarEvent) => {
     setIsEventModalOpen(false);
     setSelectedCalendarEvent(null);
@@ -157,31 +144,60 @@ export default function Alerts() {
     setSelectedCalendarEvent(null);
   }, []);
 
-  /**
-   * ✅ Top News click → try to open matching calendar event
-   * If no good match, show the “not linked” toast (instead of opening NFP incorrectly).
-   */
-  const openCalendarOverlayFromTopNews = useCallback(
-    (title: string, currency: string) => {
-      let best: { ev: CalendarEvent; score: number } | null = null;
+  // ✅ Click handler for Top News
+  const handleTopNewsClick = useCallback(
+    (item: (typeof news)[0]) => {
+      const ev = pickBestEventForCurrency(item.currency);
 
-      for (const ev of calendarEvents) {
-        const s = scoreCalendarMatch({ label: title, currency, candidate: ev });
-        if (!best || s > best.score) best = { ev, score: s };
-      }
-
-      // Threshold: prevents random wrong opens (like NFP)
-      if (!best || best.score < 5) {
-        toast.info("This news item isn’t linked to a calendar event yet.", {
-          description: "Add it to calendarEvents (or improve the name match) to enable deep linking.",
-        });
+      if (!ev) {
+        toast.error("No matching calendar event found for this currency yet.");
         return;
       }
 
-      openCalendarEvent(best.ev);
+      openCalendarEvent(ev);
     },
     [openCalendarEvent],
   );
+
+  // ✅ Always open Create Price Alert "on top"
+  const openCreatePriceAlert = useCallback(() => {
+    // close edit modal if open
+    setShowEditPriceAlert(false);
+    setEditTarget(null);
+
+    // If an event modal is open, close it first so we don't stack weirdly
+    if (isEventModalOpen) {
+      closeCalendarOverlay();
+      requestAnimationFrame(() => setShowCreatePriceAlert(true));
+      return;
+    }
+
+    setShowCreatePriceAlert(true);
+  }, [isEventModalOpen, closeCalendarOverlay]);
+
+  // ✅ Open Edit modal (and pause underlying interactions)
+  const openEditPriceAlert = useCallback(
+    (alert: PriceAlert) => {
+      setShowCreatePriceAlert(false);
+
+      // Close event overlay if open (prevents weird stacking)
+      if (isEventModalOpen) closeCalendarOverlay();
+
+      setShowEditPriceAlert(false);
+      setEditTarget(null);
+
+      requestAnimationFrame(() => {
+        setEditTarget(alert);
+        setShowEditPriceAlert(true);
+      });
+    },
+    [isEventModalOpen, closeCalendarOverlay],
+  );
+
+  const closeEditPriceAlert = useCallback((open: boolean) => {
+    setShowEditPriceAlert(open);
+    if (!open) setEditTarget(null);
+  }, []);
 
   return (
     <div className="p-6 space-y-6">
@@ -251,7 +267,7 @@ export default function Alerts() {
                         onPointerDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          openCalendarOverlayFromTopNews(item.title, item.currency);
+                          handleTopNewsClick(item);
                         }}
                         className="w-full text-left p-4 bg-muted/50 rounded-lg border border-border hover:bg-muted transition-colors"
                       >
@@ -272,6 +288,7 @@ export default function Alerts() {
                               >
                                 {item.sentiment}
                               </Badge>
+                              <span className="text-[11px] text-muted-foreground ml-1">• click to view event</span>
                             </div>
                           </div>
                           <span className="text-xs text-muted-foreground whitespace-nowrap">{item.time}</span>
@@ -329,14 +346,7 @@ export default function Alerts() {
                     onAdd={() => handleAddCard(myAlertsTimersCardId)}
                     onRemove={() => handleRemoveCard(myAlertsTimersCardId)}
                   />
-                  <Button
-                    size="sm"
-                    className="h-8"
-                    onClick={() => {
-                      setEditPriceAlert(null);
-                      setShowCreatePriceAlert(true);
-                    }}
-                  >
+                  <Button size="sm" className="h-8" onClick={openCreatePriceAlert}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Alert
                   </Button>
@@ -355,7 +365,6 @@ export default function Alerts() {
                         <th className="text-left py-3 px-5 text-xs font-medium text-muted-foreground">Actions</th>
                       </tr>
                     </thead>
-
                     <tbody>
                       {priceAlerts
                         .filter((a) => !a.triggered)
@@ -366,30 +375,23 @@ export default function Alerts() {
                                 Price
                               </Badge>
                             </td>
-
                             <td className="py-3 px-4 text-sm text-foreground font-medium">
                               {alert.assetDisplayName} {alert.direction} {alert.price}
                             </td>
-
                             <td className="py-3 px-4 text-sm text-muted-foreground">
                               {alert.triggerType === "wick" ? "Touch" : `Close ${alert.timeframe}`}
                             </td>
-
                             <td className="py-3 px-4">
                               <Badge variant={alert.enabled ? "default" : "secondary"} className="text-xs">
                                 {alert.enabled ? "Active" : "Paused"}
                               </Badge>
                             </td>
-
                             <td className="py-3 px-5">
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 className="h-7 px-2 text-xs"
-                                onClick={() => {
-                                  setEditPriceAlert(alert);
-                                  setShowCreatePriceAlert(true);
-                                }}
+                                onClick={() => openEditPriceAlert(alert)}
                               >
                                 Edit
                               </Button>
@@ -440,13 +442,7 @@ export default function Alerts() {
                   </div>
 
                   <div className="mt-4">
-                    <Button
-                      className="w-full"
-                      onClick={() => {
-                        setEditPriceAlert(null);
-                        setShowCreatePriceAlert(true);
-                      }}
-                    >
+                    <Button className="w-full" onClick={openCreatePriceAlert}>
                       <Plus className="h-4 w-4 mr-2" />
                       Create New Price Alert
                     </Button>
@@ -491,21 +487,26 @@ export default function Alerts() {
         </Tabs>
       </div>
 
-      {/* Calendar overlay for Top News items */}
+      {/* ✅ Top News → Calendar Event modal */}
       <EventDetailsModal
         event={selectedCalendarEvent as any}
         isOpen={isEventModalOpen}
         onClose={closeCalendarOverlay}
       />
 
-      {/* Create/Edit Price Alert Modal */}
+      {/* ✅ Create Price Alert modal */}
+      <CreatePriceAlertModal open={showCreatePriceAlert} onOpenChange={setShowCreatePriceAlert} />
+
+      {/* ✅ Edit Price Alert modal (same component, editMode) */}
       <CreatePriceAlertModal
-        open={showCreatePriceAlert}
-        onOpenChange={(open) => {
-          setShowCreatePriceAlert(open);
-          if (!open) setEditPriceAlert(null);
+        open={showEditPriceAlert}
+        onOpenChange={closeEditPriceAlert}
+        editAlert={editTarget}
+        onSaveEdit={(updates) => {
+          if (!editTarget) return;
+          updatePriceAlert(editTarget.id, updates);
+          toast.success("Price alert updated");
         }}
-        editAlert={editPriceAlert}
       />
     </div>
   );
