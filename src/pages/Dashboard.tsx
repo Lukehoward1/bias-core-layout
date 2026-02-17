@@ -1,5 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
-import type { RefObject } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,25 +52,23 @@ function SessionTimerDropdown({
   isOpen: boolean;
   onClose: () => void;
   sessions: SessionData[];
-  anchorRef: RefObject<HTMLDivElement>;
+  anchorRef: React.RefObject<HTMLDivElement>;
 }) {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const handleClickOutside = (event: MouseEvent) => {
-    if (
-      dropdownRef.current &&
-      !dropdownRef.current.contains(event.target as Node) &&
-      anchorRef.current &&
-      !anchorRef.current.contains(event.target as Node)
-    ) {
-      onClose();
-    }
-  };
-
   useEffect(() => {
-    if (isOpen) document.addEventListener("mousedown", handleClickOutside);
-    else document.removeEventListener("mousedown", handleClickOutside);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
+        anchorRef.current &&
+        !anchorRef.current.contains(event.target as Node)
+      ) {
+        onClose();
+      }
+    };
 
+    if (isOpen) document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen, onClose, anchorRef]);
 
@@ -123,6 +120,7 @@ export default function Dashboard() {
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
   const [dragOverCardId, setDragOverCardId] = useState<string | null>(null);
   const [dragOverRowId, setDragOverRowId] = useState<string | null>(null);
+
   const sessionCardRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -131,9 +129,9 @@ export default function Dashboard() {
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
   /**
-   * ✅ Close current modal first, then open next frame (prevents stacking)
+   * ✅ Open an event modal without stacking/ghosting
    */
-  const openCalendarEvent = (ev: CalendarEvent) => {
+  const openCalendarEvent = useCallback((ev: CalendarEvent) => {
     setIsEventModalOpen(false);
     setSelectedCalendarEvent(null);
 
@@ -141,12 +139,12 @@ export default function Dashboard() {
       setSelectedCalendarEvent(ev);
       setIsEventModalOpen(true);
     });
-  };
+  }, []);
 
-  const closeCalendarEvent = () => {
+  const closeCalendarEvent = useCallback(() => {
     setIsEventModalOpen(false);
     setSelectedCalendarEvent(null);
-  };
+  }, []);
 
   // Row-based dashboard layout
   const {
@@ -206,7 +204,11 @@ export default function Dashboard() {
     let cumulative = 0;
     return sampleTrades.map((t) => {
       cumulative += t.pnl;
-      return { date: t.date, equity: cumulative, formattedDate: format(new Date(t.date), "MMM d") };
+      return {
+        date: t.date,
+        equity: cumulative,
+        formattedDate: format(new Date(t.date), "MMM d"),
+      };
     });
   }, []);
 
@@ -223,79 +225,11 @@ export default function Dashboard() {
   ): React.ReactNode => {
     const cardId = cardEntry.id;
 
-    /**
-     * ✅ FORCE Upcoming Events to use our clickable version
-     * (because centralized renderers may override it otherwise)
-     */
-    if (cardId === "upcoming-events") {
-      const upcoming = calendarEvents
-        .slice()
-        .sort((a, b) => a.time.localeCompare(b.time))
-        .slice(0, 4);
-
-      return (
-        <Card className="h-full">
-          <CardHeader className="flex items-center justify-between">
-            <CardTitle>Upcoming Events</CardTitle>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => navigate("/calendar")}
-              disabled={isEditMode}
-            >
-              View all
-            </Button>
-          </CardHeader>
-
-          <CardContent>
-            <div className="space-y-2">
-              {upcoming.map((ev) => (
-                <button
-                  key={ev.id}
-                  type="button"
-                  disabled={isEditMode}
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (isEditMode) return;
-                    openCalendarEvent(ev);
-                  }}
-                  className="w-full text-left flex items-center gap-3 p-3 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors"
-                >
-                  <div className="flex flex-col min-w-[54px]">
-                    <span className="text-xs text-muted-foreground">{ev.currency}</span>
-                    <span className="text-sm font-medium text-foreground">{ev.time}</span>
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-foreground truncate">{ev.event}</div>
-                    <div
-                      className={`text-xs mt-0.5 ${
-                        ev.impact === "high"
-                          ? "text-destructive"
-                          : ev.impact === "medium"
-                            ? "text-accent"
-                            : "text-muted-foreground"
-                      }`}
-                    >
-                      {ev.impact.toUpperCase()} IMPACT
-                    </div>
-                  </div>
-
-                  <div className="text-xs text-muted-foreground whitespace-nowrap">{ev.date}</div>
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      );
-    }
-
     // First, try the centralized renderer (covers pinned and registry cards)
     const renderer = getCardRenderer(cardId);
-    if (renderer) return renderer({ slotType });
+    if (renderer) {
+      return renderer({ slotType });
+    }
 
     // Handle default dashboard-native cards (legacy hardcoded)
     switch (cardEntry.id) {
@@ -412,6 +346,69 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         );
+
+      // ✅ Upcoming events clickable → opens EventDetailsModal
+      case "upcoming-events": {
+        const upcoming = calendarEvents
+          .slice()
+          .sort((a, b) => a.time.localeCompare(b.time))
+          .slice(0, 4);
+
+        return (
+          <Card className="h-full flex flex-col">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Upcoming Events</CardTitle>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => navigate("/calendar")}
+                disabled={isEditMode}
+              >
+                View all
+              </Button>
+            </CardHeader>
+
+            <CardContent className="flex-1">
+              <div className="space-y-2">
+                {upcoming.map((ev) => (
+                  <button
+                    key={ev.id}
+                    type="button"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (isEditMode) return;
+                      openCalendarEvent(ev);
+                    }}
+                    className="w-full text-left flex items-center justify-between p-2 rounded-md bg-muted/40 hover:bg-muted transition-colors"
+                  >
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-foreground">{ev.event}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {ev.currency} • {ev.time}
+                      </span>
+                    </div>
+
+                    <span
+                      className={`text-[10px] font-semibold ${
+                        ev.impact === "high"
+                          ? "text-destructive"
+                          : ev.impact === "medium"
+                            ? "text-warning"
+                            : "text-muted-foreground"
+                      }`}
+                    >
+                      {ev.impact.toUpperCase()}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      }
 
       case "performance-overview":
         return (
