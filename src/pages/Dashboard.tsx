@@ -42,7 +42,6 @@ const sessionsData: SessionData[] = [
   { name: "New York", time: "Opens in 5:45:12", status: "closed", accent: "#F77F00", region: "US Markets" },
 ];
 
-// Local Session Timer Dropdown Component
 function SessionTimerDropdown({
   isOpen,
   onClose,
@@ -138,7 +137,6 @@ export default function Dashboard() {
     setSelectedCalendarEvent(null);
   };
 
-  // Row-based dashboard layout
   const {
     layout,
     isEditMode,
@@ -155,7 +153,6 @@ export default function Dashboard() {
     getMaxSlots,
   } = useDashboardLayout();
 
-  // Compute set of card IDs on dashboard for modal
   const cardsOnDashboardSet = useMemo(() => {
     const ids = new Set<string>();
     layout.rows.forEach((row) => row.cards.forEach((card) => ids.add(card.id)));
@@ -181,7 +178,6 @@ export default function Dashboard() {
     setDragOverRowId(null);
   };
 
-  // Sample equity data for pinned journal equity card - must be before early return
   useMemo(() => {
     const sampleTrades = [
       { date: "2025-01-03", pnl: 450 },
@@ -204,24 +200,86 @@ export default function Dashboard() {
     });
   }, []);
 
-  // Developer check: warn about missing renderers at mount
   useEffect(() => {
     const registryCardIds = DASHBOARD_CARD_REGISTRY.map((c) => c.id);
     warnMissingRenderers(registryCardIds);
   }, []);
 
-  // Render card content based on card ID and slot type
   const renderCardContent = (
     cardEntry: DashboardCardEntry,
     slotType: "wide" | "narrow" | "equal" | "hero" | "kpi",
   ): React.ReactNode => {
     const cardId = cardEntry.id;
 
-    // First, try the centralized renderer (covers pinned and registry cards)
+    // ✅ IMPORTANT: Force Upcoming Events to use the clickable implementation,
+    // even if a central renderer exists for "upcoming-events".
+    if (cardId === "upcoming-events") {
+      const upcoming = calendarEvents
+        .slice()
+        .sort((a, b) => a.time.localeCompare(b.time))
+        .slice(0, 4);
+
+      return (
+        <Card className="h-full">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-foreground">Upcoming Events</CardTitle>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => navigate("/calendar")}
+              disabled={isEditMode}
+            >
+              View all
+            </Button>
+          </CardHeader>
+
+          <CardContent>
+            <div className="space-y-2">
+              {upcoming.map((ev) => (
+                <button
+                  key={ev.id}
+                  type="button"
+                  className="w-full text-left flex items-center justify-between p-2 rounded-md bg-muted/40 hover:bg-muted transition-colors"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (isEditMode) return;
+                    openCalendarEvent(ev);
+                  }}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="min-w-[54px] text-xs text-muted-foreground">{ev.time}</div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-foreground">{ev.event}</span>
+                      <span className="text-[11px] text-muted-foreground">{ev.currency}</span>
+                    </div>
+                  </div>
+
+                  <span
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                      ev.impact === "high"
+                        ? "bg-destructive/20 text-destructive"
+                        : ev.impact === "medium"
+                          ? "bg-warning/20 text-warning"
+                          : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {ev.impact.toUpperCase()}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    // Otherwise use centralized renderers first
     const renderer = getCardRenderer(cardId);
     if (renderer) return renderer({ slotType });
 
-    // Handle default dashboard-native cards (legacy hardcoded)
     switch (cardEntry.id) {
       case "todays-bias":
         return (
@@ -337,70 +395,6 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         );
-
-      // ✅ Upcoming events clickable + consistent header styling
-      case "upcoming-events": {
-        const upcoming = calendarEvents
-          .slice()
-          .sort((a, b) => a.time.localeCompare(b.time))
-          .slice(0, 4);
-
-        return (
-          <Card className="h-full">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-foreground">Upcoming Events</CardTitle>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => navigate("/calendar")}
-                disabled={isEditMode}
-              >
-                View all
-              </Button>
-            </CardHeader>
-
-            <CardContent>
-              <div className="space-y-2">
-                {upcoming.map((ev) => (
-                  <button
-                    key={ev.id}
-                    type="button"
-                    className="w-full text-left flex items-center justify-between p-2 rounded-md bg-muted/40 hover:bg-muted transition-colors"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (isEditMode) return;
-                      openCalendarEvent(ev);
-                    }}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="min-w-[54px] text-xs text-muted-foreground">{ev.time}</div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium text-foreground">{ev.event}</span>
-                        <span className="text-[11px] text-muted-foreground">{ev.currency}</span>
-                      </div>
-                    </div>
-
-                    <span
-                      className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
-                        ev.impact === "high"
-                          ? "bg-destructive/20 text-destructive"
-                          : ev.impact === "medium"
-                            ? "bg-warning/20 text-warning"
-                            : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {ev.impact.toUpperCase()}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        );
-      }
 
       case "performance-overview":
         return (
@@ -539,7 +533,6 @@ export default function Dashboard() {
       <AppHeader title="Dashboard" />
 
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Welcome Header with Edit Controls */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <h1 className="text-3xl font-bold text-foreground">Welcome, Trader</h1>
@@ -557,7 +550,6 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Row-based layout */}
         {layout.rows.map((row, index) => (
           <DashboardRow
             key={row.id}
@@ -582,7 +574,6 @@ export default function Dashboard() {
           />
         ))}
 
-        {/* Add row button in edit mode */}
         {isEditMode && (
           <Button variant="outline" className="w-full border-dashed gap-2" onClick={() => handleAddRow()}>
             <Plus className="h-4 w-4" />
@@ -590,7 +581,6 @@ export default function Dashboard() {
           </Button>
         )}
 
-        {/* Empty state when no cards */}
         {layout.rows.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <p className="text-muted-foreground mb-4">No cards on your Dashboard.</p>
@@ -599,7 +589,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Add Cards Modal */}
       <AddCardsModal
         open={showAddCardsModal}
         onOpenChange={setShowAddCardsModal}
@@ -608,7 +597,6 @@ export default function Dashboard() {
         onRemoveCard={removeCard}
       />
 
-      {/* ✅ Event modal mount (Dashboard can open event details) */}
       <EventDetailsModal event={selectedCalendarEvent} isOpen={isEventModalOpen} onClose={closeCalendarEvent} />
     </div>
   );
