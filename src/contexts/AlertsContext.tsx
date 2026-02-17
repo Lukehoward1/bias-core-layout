@@ -56,7 +56,6 @@ const playNotificationSound = () => {
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + 0.3);
   } catch (e) {
-    // Silent fail if audio not supported
     console.log("Audio not supported");
   }
 };
@@ -68,7 +67,6 @@ const parsePriceNumber = (v: unknown): number | null => {
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v !== "string") return null;
 
-  // remove commas and any non-numeric chars except . and -
   const cleaned = v.replace(/,/g, "").replace(/[^\d.-]/g, "");
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
@@ -79,13 +77,12 @@ const getSeedPriceForAsset = (symbol: string): number => {
   const n = parsePriceNumber(a?.latestPrice);
   if (n && n > 0) return n;
 
-  // fallback "reasonable" defaults by asset type-ish
   const s = symbol.toUpperCase();
   if (s.startsWith("BTC")) return 40000;
   if (s.startsWith("ETH")) return 2500;
   if (s.startsWith("XAU")) return 2000;
   if (s.startsWith("SPX")) return 5000;
-  if (s.length === 6) return 1.25; // FX-ish
+  if (s.length === 6) return 1.25;
   return 100;
 };
 
@@ -94,16 +91,13 @@ const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(ma
 const randomWalkNext = (symbol: string, last: number): number => {
   const s = symbol.toUpperCase();
 
-  // crude volatility heuristics
-  let pct = 0.0008; // 0.08%
-  if (s.startsWith("BTC") || s.startsWith("ETH")) pct = 0.0035; // 0.35%
-  if (s.startsWith("XAU")) pct = 0.0015; // 0.15%
+  let pct = 0.0008;
+  if (s.startsWith("BTC") || s.startsWith("ETH")) pct = 0.0035;
+  if (s.startsWith("XAU")) pct = 0.0015;
   if (s.startsWith("SPX")) pct = 0.0012;
 
-  const step = last * pct * (Math.random() - 0.5) * 2; // [-pct..+pct]
+  const step = last * pct * (Math.random() - 0.5) * 2;
   const next = last + step;
-
-  // avoid drifting to nonsense
   return clamp(next, last * 0.2, last * 5);
 };
 
@@ -126,7 +120,6 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     const saved = localStorage.getItem("alertPreferences");
     if (saved) {
       const parsed = JSON.parse(saved);
-      // Merge with defaults to handle new fields
       return { ...defaultAlertPreferences, ...parsed };
     }
     return defaultAlertPreferences;
@@ -134,35 +127,31 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
 
   const lastAlertIdRef = useRef<string | null>(null);
 
-  // Track demo prices and confirmation ticks without bloating state
   const lastPriceBySymbolRef = useRef<Record<string, number>>({});
-  const closeConfirmRef = useRef<Record<string, number>>({}); // key: alertId -> ticks beyond level
+  const closeConfirmRef = useRef<Record<string, number>>({});
 
-  // Combine watchlist-derived currencies with manually selected currencies
   const relevantCurrencies = useMemo(() => {
     const combined = new Set([...watchlistCurrencies, ...preferences.relevantCurrencies]);
     return Array.from(combined);
   }, [watchlistCurrencies, preferences.relevantCurrencies]);
 
-  // Check if an alert is relevant based on watchlist and preferences
   const isAlertRelevant = useCallback(
     (alert: Omit<AlertItem, "id" | "timestamp" | "read">) => {
-      // Event-specific alerts always notify
       if (alert.type === "news" && preferences.eventSpecificNews.length > 0) {
         return true;
       }
 
-      // Bias alerts are watchlist-only
+      // Bias alerts are normally watchlist-only.
+      // NOTE: addAlert() now bypasses relevance gating for bias (see below),
+      // so this still applies for any future auto-generated bias alerts you might add.
       if (alert.type === "bias") {
         return alert.relatedAsset ? watchlist.includes(alert.relatedAsset) : false;
       }
 
-      // Price alerts always relevant (user created them)
       if (alert.type === "price") {
         return true;
       }
 
-      // For other alerts, check currency relevance
       if (alert.relatedAsset) {
         const assetCurrencies = alert.relatedAsset.match(/[A-Z]{3}/g) || [];
         return assetCurrencies.some((curr) => relevantCurrencies.includes(curr));
@@ -173,14 +162,11 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     [watchlist, relevantCurrencies, preferences.eventSpecificNews],
   );
 
-  // Check if currently in quiet hours
   const isQuietHours = useMemo(() => {
     if (!preferences.quietHoursEnabled) return false;
 
     const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentTime = currentHour * 60 + currentMinute;
+    const currentTime = now.getHours() * 60 + now.getMinutes();
 
     const [startH, startM] = preferences.quietHoursStart.split(":").map(Number);
     const [endH, endM] = preferences.quietHoursEnd.split(":").map(Number);
@@ -194,7 +180,6 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [preferences.quietHoursEnabled, preferences.quietHoursStart, preferences.quietHoursEnd]);
 
-  // Load data from localStorage on mount
   useEffect(() => {
     const savedAlerts = localStorage.getItem("alerts");
     if (savedAlerts) {
@@ -220,7 +205,6 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Save to localStorage on change
   useEffect(() => {
     localStorage.setItem("alerts", JSON.stringify(alerts));
   }, [alerts]);
@@ -237,8 +221,10 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
 
   const addAlert = useCallback(
     (alert: Omit<AlertItem, "id" | "timestamp" | "read">) => {
-      // Check relevance before adding (except for manual timers and price alerts)
-      if (alert.type !== "timer" && alert.type !== "price" && !isAlertRelevant(alert)) {
+      // ✅ FIX:
+      // Allow "bias" alerts through (same as timer/price),
+      // so Test Alerts always appear even if the symbol isn't in watchlist yet.
+      if (alert.type !== "timer" && alert.type !== "price" && alert.type !== "bias" && !isAlertRelevant(alert)) {
         return null;
       }
 
@@ -251,7 +237,6 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
 
       setAlerts((prev) => [newAlert, ...prev].slice(0, 100));
 
-      // Play sound if enabled and not quiet hours
       if (preferences.soundEnabled && !isQuietHours && lastAlertIdRef.current !== newAlert.id) {
         lastAlertIdRef.current = newAlert.id;
         playNotificationSound();
@@ -285,7 +270,6 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     setAlerts([]);
   }, []);
 
-  // Price Alert functions
   const addPriceAlert = useCallback((alert: Omit<PriceAlert, "id" | "createdAt" | "triggered" | "enabled">) => {
     const newAlert: PriceAlert = {
       ...alert,
@@ -312,7 +296,6 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
       prev.map((a) => {
         if (a.id !== id) return a;
         const nextEnabled = !a.enabled;
-        // reset close-confirm ticks when toggling
         closeConfirmRef.current[id] = 0;
         return { ...a, enabled: nextEnabled };
       }),
@@ -323,9 +306,7 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     setPreferences(newPrefs);
   }, []);
 
-  // --------------------
   // ✅ DEMO: simulated price feed + alert triggering
-  // --------------------
   useEffect(() => {
     const interval = window.setInterval(() => {
       setPriceAlerts((prev) => {
@@ -333,7 +314,6 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
 
         let mutated = false;
         const nextAlerts = prev.map((a) => {
-          // only process enabled + not triggered
           if (!a.enabled || a.triggered) return a;
 
           const symbol = (a.asset || "").toUpperCase();
@@ -345,11 +325,9 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
           const nextPrice = randomWalkNext(symbol, last);
           lastPriceBySymbolRef.current[symbol] = nextPrice;
 
-          // Evaluate trigger condition
           const hit =
             a.direction === "above" ? nextPrice >= a.price : a.direction === "below" ? nextPrice <= a.price : false;
 
-          // Close-based confirmation (demo): require N consecutive ticks beyond the level
           if (a.triggerType === "close") {
             const required = timeframeConfirmTicks[a.timeframe || "15m"] ?? 4;
             const current = closeConfirmRef.current[a.id] ?? 0;
@@ -361,15 +339,13 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
             if (confirmed) {
               mutated = true;
 
-              // ✅ create inbox alert (deep-link to asset)
               addAlert({
                 type: "price",
                 title: "Price Alert Triggered",
                 message: `${a.assetDisplayName} closed ${a.direction} ${a.price} (${a.timeframe})`,
                 severity: "high",
                 relatedAsset: a.asset,
-                routeTo: "/asset/:symbol",
-                routeParams: { symbol: a.asset },
+                routeTo: "/alerts",
               });
 
               return {
@@ -380,24 +356,20 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
               };
             }
 
-            // not confirmed yet
             mutated = true;
             return { ...a, lastCheckedPrice: nextPrice };
           }
 
-          // Wick/touch (immediate)
           if (hit) {
             mutated = true;
 
-            // ✅ create inbox alert (deep-link to asset)
             addAlert({
               type: "price",
               title: "Price Alert Triggered",
               message: `${a.assetDisplayName} wicked ${a.direction} ${a.price}`,
               severity: "high",
               relatedAsset: a.asset,
-              routeTo: "/asset/:symbol",
-              routeParams: { symbol: a.asset },
+              routeTo: "/alerts",
             });
 
             return {
@@ -408,7 +380,6 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
             };
           }
 
-          // update lastCheckedPrice even if not hit
           mutated = true;
           return { ...a, lastCheckedPrice: nextPrice };
         });
