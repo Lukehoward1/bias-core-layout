@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,6 @@ import {
   Clock,
   Calendar as CalendarIcon,
   Activity,
-  ChevronDown,
   AlertTriangle,
   BookOpen,
   Shield,
@@ -27,100 +26,95 @@ import { DASHBOARD_CARD_REGISTRY } from "@/data/dashboardCardRegistry";
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { calendarEvents, type CalendarEvent } from "@/data/calendarEvents";
 
-interface SessionData {
-  name: string;
-  time: string;
-  status: string;
-  accent: string;
-  region: string;
-}
+// ✅ Session details modal
+import { SessionDetailsModal, type TradingSession } from "@/components/dashboard/SessionDetailsModal";
 
-const sessionsData: SessionData[] = [
-  { name: "Sydney", time: "Opens in 8:30:00", status: "closed", accent: "#2EC4B6", region: "Asia-Pacific" },
-  { name: "Asia", time: "Closes in 1:23:45", status: "active", accent: "#4361EE", region: "Asia-Pacific Markets" },
-  { name: "London", time: "Opens in 2:15:30", status: "closed", accent: "#F4D35E", region: "European" },
-  { name: "New York", time: "Opens in 5:45:12", status: "closed", accent: "#F77F00", region: "US Markets" },
+/* =========================================================
+   SESSION SCHEDULE (UTC hours)
+   ========================================================= */
+const SESSION_SCHEDULE: {
+  name: TradingSession["name"];
+  region: string;
+  accent: string;
+  openUTC: number;
+  closeUTC: number;
+}[] = [
+  { name: "Sydney", region: "Asia-Pacific", accent: "#2EC4B6", openUTC: 22, closeUTC: 7 },
+  { name: "Asia", region: "Asia-Pacific Markets", accent: "#4361EE", openUTC: 0, closeUTC: 9 },
+  { name: "London", region: "European", accent: "#F4D35E", openUTC: 7, closeUTC: 16 },
+  { name: "New York", region: "US Markets", accent: "#F77F00", openUTC: 13, closeUTC: 22 },
 ];
 
-function SessionTimerDropdown({
-  isOpen,
-  onClose,
-  sessions,
-  anchorRef,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  sessions: SessionData[];
-  anchorRef: React.RefObject<HTMLDivElement>;
-}) {
-  const dropdownRef = useRef<HTMLDivElement>(null);
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node) &&
-        anchorRef.current &&
-        !anchorRef.current.contains(event.target as Node)
-      ) {
-        onClose();
+function computeSessions(now: Date): TradingSession[] {
+  const utcH = now.getUTCHours();
+  const utcM = now.getUTCMinutes();
+  const utcS = now.getUTCSeconds();
+  const nowTotalSec = utcH * 3600 + utcM * 60 + utcS;
+
+  return SESSION_SCHEDULE.map((sched) => {
+    const openSec = sched.openUTC * 3600;
+    const closeSec = sched.closeUTC * 3600;
+
+    let isActive: boolean;
+    let remainingSec: number;
+
+    if (sched.openUTC < sched.closeUTC) {
+      // Same-day session (e.g. London 07–16)
+      isActive = nowTotalSec >= openSec && nowTotalSec < closeSec;
+      if (isActive) {
+        remainingSec = closeSec - nowTotalSec;
+      } else {
+        // Time until it opens
+        remainingSec = nowTotalSec < openSec ? openSec - nowTotalSec : 86400 - nowTotalSec + openSec;
       }
-    };
+    } else {
+      // Overnight session (e.g. Sydney 22–07)
+      isActive = nowTotalSec >= openSec || nowTotalSec < closeSec;
+      if (isActive) {
+        remainingSec = nowTotalSec >= openSec ? 86400 - nowTotalSec + closeSec : closeSec - nowTotalSec;
+      } else {
+        remainingSec = openSec - nowTotalSec;
+        if (remainingSec < 0) remainingSec += 86400;
+      }
+    }
 
-    if (isOpen) document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen, onClose, anchorRef]);
+    const h = Math.floor(remainingSec / 3600);
+    const m = Math.floor((remainingSec % 3600) / 60);
+    const s = remainingSec % 60;
+    const timeLabel = isActive
+      ? `Closes in ${h}h ${pad2(m)}m ${pad2(s)}s`
+      : `Opens in ${h}h ${pad2(m)}m ${pad2(s)}s`;
 
-  if (!isOpen) return null;
+    return {
+      name: sched.name,
+      region: sched.region,
+      status: isActive ? "active" : "closed",
+      accent: sched.accent,
+      opensAtLabel: `${pad2(sched.openUTC)}:00 GMT`,
+      closesAtLabel: `${pad2(sched.closeUTC)}:00 GMT`,
+      timeRemainingLabel: timeLabel,
+      timeRemainingSeconds: remainingSec,
+    } satisfies TradingSession;
+  });
+}
 
-  const activeSession = sessions.find((s) => s.status === "active");
-  const upcomingSessions = sessions.filter((s) => s.status !== "active").sort((a, b) => a.time.localeCompare(b.time));
-
-  return (
-    <div
-      ref={dropdownRef}
-      className="absolute top-full left-0 mt-2 w-72 bg-popover border border-border rounded-lg shadow-lg z-50"
-    >
-      <div className="p-3 border-b border-border">
-        <p className="text-xs font-medium text-muted-foreground mb-1">Current Session</p>
-        {activeSession ? (
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: activeSession.accent }} />
-            <span className="font-medium text-foreground">{activeSession.name}</span>
-            <span className="text-xs text-muted-foreground ml-auto">{activeSession.time}</span>
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No active session</p>
-        )}
-      </div>
-
-      <div className="p-3">
-        <p className="text-xs font-medium text-muted-foreground mb-2">Upcoming Sessions</p>
-        <div className="space-y-2">
-          {upcomingSessions.map((session) => (
-            <div
-              key={session.name}
-              className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors"
-            >
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: session.accent }} />
-              <span className="text-sm text-foreground">{session.name}</span>
-              <span className="text-xs text-muted-foreground ml-auto">{session.time}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+function getPrimarySession(sessions: TradingSession[]): TradingSession {
+  const active = sessions.find((s) => s.status === "active");
+  if (active) return active;
+  // soonest upcoming
+  return sessions.reduce((a, b) => (a.timeRemainingSeconds <= b.timeRemainingSeconds ? a : b));
 }
 
 export default function Dashboard() {
-  const [showSessionDropdown, setShowSessionDropdown] = useState(false);
   const [showAddCardsModal, setShowAddCardsModal] = useState(false);
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
   const [dragOverCardId, setDragOverCardId] = useState<string | null>(null);
   const [dragOverRowId, setDragOverRowId] = useState<string | null>(null);
 
-  const sessionCardRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   // ✅ Event modal state (Dashboard → EventDetailsModal)
@@ -136,6 +130,30 @@ export default function Dashboard() {
     setIsEventModalOpen(false);
     setSelectedCalendarEvent(null);
   };
+
+  // ✅ Session modal state
+  const [selectedSession, setSelectedSession] = useState<TradingSession | null>(null);
+  const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
+
+  const openSessionModal = useCallback((session: TradingSession) => {
+    setSelectedSession(session);
+    setIsSessionModalOpen(true);
+  }, []);
+
+  const closeSessionModal = useCallback(() => {
+    setIsSessionModalOpen(false);
+    setSelectedSession(null);
+  }, []);
+
+  // ✅ Live session countdown
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const sessions = useMemo(() => computeSessions(now), [now]);
+  const primarySession = useMemo(() => getPrimarySession(sessions), [sessions]);
 
   const {
     layout,
@@ -311,35 +329,23 @@ export default function Dashboard() {
 
       case "next-session":
         return (
-          <div className="relative h-full" ref={sessionCardRef}>
-            <Card
-              className="cursor-pointer hover:bg-muted/30 transition-colors h-full flex flex-col"
-              onClick={() => !isEditMode && setShowSessionDropdown(!showSessionDropdown)}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 flex-shrink-0">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Next Session</CardTitle>
-                <div className="flex items-center gap-1">
-                  <Clock className="h-4 w-4 text-accent" />
-                  <ChevronDown
-                    className={`h-3 w-3 text-muted-foreground transition-transform ${
-                      showSessionDropdown ? "rotate-180" : ""
-                    }`}
-                  />
-                </div>
-              </CardHeader>
-              <CardContent className="flex-1 flex flex-col justify-center">
-                <div className="text-2xl font-bold text-foreground">London</div>
-                <p className="text-xs text-muted-foreground mt-1">Opens in 2h 15m</p>
-              </CardContent>
-            </Card>
-
-            <SessionTimerDropdown
-              isOpen={showSessionDropdown && !isEditMode}
-              onClose={() => setShowSessionDropdown(false)}
-              sessions={sessionsData}
-              anchorRef={sessionCardRef}
-            />
-          </div>
+          <Card
+            className="cursor-pointer hover:bg-muted/30 transition-colors h-full flex flex-col"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (!isEditMode) openSessionModal(primarySession);
+            }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 flex-shrink-0">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Next Session</CardTitle>
+              <Clock className="h-4 w-4 text-accent" />
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col justify-center">
+              <div className="text-2xl font-bold text-foreground">{primarySession.name}</div>
+              <p className="text-xs text-muted-foreground mt-1">{primarySession.timeRemainingLabel}</p>
+            </CardContent>
+          </Card>
         );
 
       case "high-impact-events":
@@ -367,10 +373,16 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {sessionsData.map((session) => (
-                  <div
+                {sessions.map((session) => (
+                  <button
                     key={session.name}
-                    className="relative p-3 bg-muted/50 rounded-lg border border-border overflow-hidden"
+                    type="button"
+                    className="relative w-full text-left p-3 bg-muted/50 rounded-lg border border-border overflow-hidden hover:bg-muted/70 transition-colors"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (!isEditMode) openSessionModal(session);
+                    }}
                   >
                     <div
                       className="absolute left-0 top-0 bottom-0 w-[3px]"
@@ -386,10 +398,10 @@ export default function Dashboard() {
                           session.status === "active" ? "text-success font-medium" : "text-muted-foreground"
                         }`}
                       >
-                        {session.time}
+                        {session.timeRemainingLabel}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </CardContent>
@@ -598,6 +610,7 @@ export default function Dashboard() {
       />
 
       <EventDetailsModal event={selectedCalendarEvent} isOpen={isEventModalOpen} onClose={closeCalendarEvent} />
+      <SessionDetailsModal session={selectedSession} isOpen={isSessionModalOpen} onClose={closeSessionModal} />
     </div>
   );
 }
