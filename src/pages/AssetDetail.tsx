@@ -12,6 +12,12 @@ import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { calendarEvents } from "@/data/calendarEvents";
 import { toast } from "sonner";
 
+/**
+ * ✅ Impact engine (your new mapping file)
+ * If your file name/path differs, tell me what it is and I’ll adjust.
+ */
+import { getEventImpact } from "@/data/eventImpactRules";
+
 /* =======================
    DATA (demo placeholders)
 ======================= */
@@ -173,21 +179,48 @@ const toPillImpact = (impact: CalendarEvent["impact"]): "High" | "Medium" | "Low
   return "Low";
 };
 
-const getRelevantCurrenciesForAsset = (symbol: string): string[] => {
-  const s = (symbol || "").toUpperCase();
+/* =======================
+   ✅ IMPACT ENGINE ADAPTER (SAFE)
+   We don't assume exact return shape of getEventImpact.
+======================= */
 
-  if (s.includes("USD") && (s.startsWith("BTC") || s.startsWith("ETH") || s.startsWith("XAU") || s.startsWith("SPX"))) {
-    return ["USD"];
+type ImpactResult = {
+  affectedPairs?: string[];
+  affectedAssets?: string[];
+  affectedSymbols?: string[];
+  affected?: string[];
+};
+
+const ensureStringArray = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x) => typeof x === "string") : []);
+
+const getAffectedSymbols = (res: unknown): string[] => {
+  const r = (res || {}) as ImpactResult;
+  const merged = new Set<string>([
+    ...ensureStringArray(r.affectedPairs),
+    ...ensureStringArray(r.affectedAssets),
+    ...ensureStringArray(r.affectedSymbols),
+    ...ensureStringArray(r.affected),
+  ]);
+  return Array.from(merged).map((s) => s.toUpperCase());
+};
+
+const isSymbolAffectedByEvent = (symbol: string, ev: { event: string; currency?: string; impact?: string }) => {
+  try {
+    const result = getEventImpact({
+      // common fields calendars provide
+      event: ev.event,
+      title: ev.event,
+      name: ev.event,
+      currency: ev.currency,
+      impact: ev.impact,
+    } as any);
+
+    const affected = getAffectedSymbols(result);
+    return affected.includes(symbol.toUpperCase());
+  } catch {
+    // Fail safe: if mapping fails, don’t crash the page; just treat as not affected
+    return false;
   }
-
-  if (s.length === 6) {
-    const base = s.slice(0, 3);
-    const quote = s.slice(3, 6);
-    return [base, quote];
-  }
-
-  const known = ["USD", "EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF"];
-  return known.filter((c) => s.includes(c));
 };
 
 /* =======================
@@ -217,7 +250,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
   /**
    * ✅ Close current event modal first, then open the next event.
-   * Prevents “event changes behind another modal” behaviour.
    */
   const openCalendarEvent = useCallback((ev: CalendarEvent) => {
     setIsEventModalOpen(false);
@@ -286,13 +318,24 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
     );
   }, [symbol, asset]);
 
+  /**
+   * ✅ News Impact pills (NOW USING THE IMPACT ENGINE)
+   * - Calendar events included if they affect this symbol
+   * - Extra placeholder events included if they affect this symbol
+   * - High-only toggle still works
+   */
   const newsImpactPills: NewsPill[] = useMemo(() => {
     if (!symbol) return [];
 
-    const relevantCurrencies = new Set(getRelevantCurrenciesForAsset(symbol));
-
+    // 1) Calendar events that affect this asset according to rules engine
     const fromCalendar: NewsPill[] = calendarEvents
-      .filter((ev) => relevantCurrencies.has((ev.currency || "").toUpperCase()))
+      .filter((ev) =>
+        isSymbolAffectedByEvent(symbol, {
+          event: ev.event,
+          currency: ev.currency,
+          impact: ev.impact,
+        }),
+      )
       .map((ev) => ({
         key: `cal-${ev.id}`,
         event: ev.event,
@@ -301,20 +344,34 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
         calendarEvent: ev,
       }));
 
-    const extras: NewsPill[] = (assetNewsEvents[symbol] || []).map((n, idx) => ({
-      key: `extra-${symbol}-${idx}-${n.event}`,
-      event: n.event,
-      time: n.time,
-      impact: n.impact,
-    }));
+    // 2) Placeholder “extras” for today — ALSO filtered by rules engine (best-effort)
+    const extrasRaw = assetNewsEvents[symbol] || [];
+    const extras: NewsPill[] = extrasRaw
+      .filter((n) => {
+        const inferredCurrency = extractCurrencyFromLabel(n.event) ?? undefined;
+        return isSymbolAffectedByEvent(symbol, {
+          event: n.event,
+          currency: inferredCurrency,
+          impact: n.impact?.toLowerCase(),
+        });
+      })
+      .map((n, idx) => ({
+        key: `extra-${symbol}-${idx}-${n.event}`,
+        event: n.event,
+        time: n.time,
+        impact: n.impact,
+      }));
 
+    // 3) Deduplicate extras that are basically the same as calendar event titles
     const calNormSet = new Set(fromCalendar.map((p) => normalize(p.event)));
     const filteredExtras = extras.filter((x) => !calNormSet.has(normalize(x.event)));
 
     const combined = [...fromCalendar, ...filteredExtras];
 
+    // 4) Apply “High only” toggle
     const filtered = showAllRelevantNews ? combined : combined.filter((p) => p.impact === "High");
 
+    // Fallback: if high-only yields nothing but we *do* have relevant events, show them anyway
     if (!showAllRelevantNews && filtered.length === 0 && combined.length > 0) return combined;
 
     return filtered;
@@ -622,7 +679,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
             </CardContent>
           </Card>
 
-          {/* ✅ Now clickable → opens EventDetailsModal via matching */}
+          {/* ✅ Clickable → opens EventDetailsModal via matching */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
