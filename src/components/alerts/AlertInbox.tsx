@@ -102,18 +102,43 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
 
   const buildNavigateTarget = useCallback(
     (alert: AlertItem) => {
-      if (!alert.routeTo) return null;
+      // If routeTo exists, use it (with params + optional calendar deep-link)
+      if (alert.routeTo) {
+        let target = applyRouteParams(alert.routeTo, alert.routeParams);
 
-      // Replace dynamic segments like /asset/:symbol
-      let target = applyRouteParams(alert.routeTo, alert.routeParams);
+        // ✅ Only append eventId when going to calendar
+        if (alert.eventId && target.startsWith("/calendar")) {
+          const joiner = target.includes("?") ? "&" : "?";
+          target = `${target}${joiner}eventId=${encodeURIComponent(alert.eventId)}`;
+        }
 
-      // Calendar deep-link support
-      if (alert.eventId) {
-        const joiner = target.includes("?") ? "&" : "?";
-        target = `${target}${joiner}eventId=${encodeURIComponent(alert.eventId)}`;
+        return target;
       }
 
-      return target;
+      // Otherwise, fall back to sensible defaults (same logic as GlobalNotifications)
+      switch (alert.type) {
+        case "bias":
+        case "price":
+        case "level":
+          if (alert.relatedAsset) return `/asset/${encodeURIComponent(alert.relatedAsset)}`;
+          return "/markets";
+
+        case "news":
+        case "summary":
+        case "breaking":
+          if (alert.eventId) return `/calendar?eventId=${encodeURIComponent(alert.eventId)}`;
+          return "/calendar";
+
+        case "risk":
+        case "exposure":
+          return "/risk-tools";
+
+        case "session":
+          return "/alerts";
+
+        default:
+          return null;
+      }
     },
     [applyRouteParams],
   );
