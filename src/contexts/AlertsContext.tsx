@@ -361,14 +361,15 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
             if (confirmed) {
               mutated = true;
 
-              // create inbox alert
+              // ✅ create inbox alert (deep-link to asset)
               addAlert({
                 type: "price",
                 title: "Price Alert Triggered",
                 message: `${a.assetDisplayName} closed ${a.direction} ${a.price} (${a.timeframe})`,
                 severity: "high",
                 relatedAsset: a.asset,
-                routeTo: "/alerts",
+                routeTo: "/asset/:symbol",
+                routeParams: { symbol: a.asset },
               });
 
               return {
@@ -388,13 +389,15 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
           if (hit) {
             mutated = true;
 
+            // ✅ create inbox alert (deep-link to asset)
             addAlert({
               type: "price",
               title: "Price Alert Triggered",
               message: `${a.assetDisplayName} wicked ${a.direction} ${a.price}`,
               severity: "high",
               relatedAsset: a.asset,
-              routeTo: "/alerts",
+              routeTo: "/asset/:symbol",
+              routeParams: { symbol: a.asset },
             });
 
             return {
