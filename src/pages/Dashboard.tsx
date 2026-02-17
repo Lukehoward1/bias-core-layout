@@ -37,7 +37,6 @@ interface SessionData {
   region: string;
 }
 
-// NOTE: This is still demo data. SessionDetailsModal handles live countdown.
 const sessionsData: SessionData[] = [
   { name: "Sydney", time: "Opens in 8:30:00", status: "closed", accent: "#2EC4B6", region: "Asia-Pacific" },
   { name: "Asia", time: "Closes in 1:23:45", status: "active", accent: "#4361EE", region: "Asia-Pacific Markets" },
@@ -61,8 +60,8 @@ export default function Dashboard() {
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [selectedSessionName, setSelectedSessionName] = useState<string>("New York");
 
-  // ✅ Close current event modal first, then open next event (prevents stacking)
   const openCalendarEvent = useCallback((ev: CalendarEvent) => {
+    // prevent stacking
     setIsEventModalOpen(false);
     setSelectedCalendarEvent(null);
 
@@ -179,7 +178,6 @@ export default function Dashboard() {
       return renderer({ slotType });
     }
 
-    // Handle default dashboard-native cards (legacy hardcoded)
     switch (cardEntry.id) {
       case "todays-bias":
         return (
@@ -209,19 +207,23 @@ export default function Dashboard() {
           </Card>
         );
 
-      // ✅ Next Session opens SessionDetailsModal (NOT routing away)
+      // ✅ Next Session opens SessionDetailsModal (clickable)
       case "next-session": {
-        // choose the "active" session if present, otherwise default to New York
         const active = sessionsData.find((s) => s.status === "active")?.name ?? "New York";
 
         return (
           <Card
-            className="cursor-pointer hover:bg-muted/30 transition-colors h-full flex flex-col"
-            onPointerDown={(e) => {
-              e.preventDefault();
+            className="h-full flex flex-col transition-colors"
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
               e.stopPropagation();
               if (isEditMode) return;
               openSessionModal(active);
+            }}
+            onKeyDown={(e) => {
+              if (isEditMode) return;
+              if (e.key === "Enter" || e.key === " ") openSessionModal(active);
             }}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 flex-shrink-0">
@@ -230,7 +232,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="flex-1 flex flex-col justify-center">
               <div className="text-2xl font-bold text-foreground">{active}</div>
-              <p className="text-xs text-muted-foreground mt-1">Click for session details</p>
+              <p className="text-xs text-muted-foreground mt-1">Click session for details</p>
             </CardContent>
           </Card>
         );
@@ -266,8 +268,7 @@ export default function Dashboard() {
                     key={session.name}
                     type="button"
                     disabled={isEditMode}
-                    onPointerDown={(e) => {
-                      e.preventDefault();
+                    onClick={(e) => {
                       e.stopPropagation();
                       if (isEditMode) return;
                       openSessionModal(session.name);
@@ -314,7 +315,11 @@ export default function Dashboard() {
                 variant="ghost"
                 size="sm"
                 className="text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => navigate("/calendar")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isEditMode) return;
+                  navigate("/calendar");
+                }}
                 disabled={isEditMode}
               >
                 View all
@@ -328,8 +333,7 @@ export default function Dashboard() {
                     key={ev.id}
                     type="button"
                     disabled={isEditMode}
-                    onPointerDown={(e) => {
-                      e.preventDefault();
+                    onClick={(e) => {
                       e.stopPropagation();
                       if (isEditMode) return;
                       openCalendarEvent(ev);
@@ -538,7 +542,7 @@ export default function Dashboard() {
         onRemoveCard={removeCard}
       />
 
-      {/* ✅ Event modal mount (Dashboard can open event details) */}
+      {/* ✅ Event modal mount */}
       <EventDetailsModal event={selectedCalendarEvent} isOpen={isEventModalOpen} onClose={closeCalendarEvent} />
 
       {/* ✅ Session modal mount */}
