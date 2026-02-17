@@ -1,22 +1,29 @@
-import type { ReactNode } from "react";
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FlaskConical, Clock, Calendar, TrendingUp, AlertTriangle, Radio, Bell, Zap, Target } from "lucide-react";
 import type { AlertItem } from "@/types/alerts";
+import { useAlertsContext } from "@/contexts/AlertsContext";
 
 interface TestAlertsPanelProps {
   onTriggerAlert: (alert: Omit<AlertItem, "id" | "timestamp" | "read">) => void;
 }
 
-type TestAlertRow = {
-  label: string;
-  icon: ReactNode;
-  alert: Omit<AlertItem, "id" | "timestamp" | "read">;
-};
-
 export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
-  const testAlerts: TestAlertRow[] = [
+  const { watchlist } = useAlertsContext();
+
+  // ✅ Bias alerts are watchlist-gated in AlertsContext,
+  // so we pick a guaranteed watchlist symbol (fallback EURUSD).
+  const biasSymbol = useMemo(() => {
+    return (watchlist?.[0] || "EURUSD").toUpperCase();
+  }, [watchlist]);
+
+  const testAlerts: {
+    label: string;
+    icon: React.ReactNode;
+    alert: Omit<AlertItem, "id" | "timestamp" | "read">;
+  }[] = [
     {
       label: "Session Open",
       icon: <Clock className="h-3.5 w-3.5" />,
@@ -25,6 +32,7 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         title: "London Session Opening",
         message: "London session opens in 15 minutes. Prepare for increased liquidity.",
         severity: "info",
+        routeTo: "/alerts",
       },
     },
     {
@@ -35,10 +43,9 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         title: "London–NY Overlap Active",
         message: "High liquidity period active for the next 4 hours.",
         severity: "info",
+        routeTo: "/alerts",
       },
     },
-
-    // ✅ Calendar deep-link examples (eventId only — AlertInbox will route to /calendar?eventId=...)
     {
       label: "High Impact News",
       icon: <Calendar className="h-3.5 w-3.5" />,
@@ -47,8 +54,9 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         title: "USD CPI Release",
         message: "US CPI data releasing in 30 minutes. High volatility expected on USD pairs.",
         severity: "high",
-        eventId: "us-cpi-2025-01",
-        relatedAsset: "EURUSD",
+        relatedAsset: "USD",
+        eventId: "us-cpi-2025-01", // ✅ must exist in calendarEvents
+        routeTo: "/calendar",
       },
     },
     {
@@ -59,8 +67,9 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         title: "BREAKING: Fed Emergency Statement",
         message: "Unscheduled Federal Reserve announcement incoming. Markets may react sharply.",
         severity: "high",
-        eventId: "nfp-2025-01",
-        relatedAsset: "USDJPY",
+        relatedAsset: "USD",
+        // ✅ Remove eventId unless you KNOW it exists in calendarEvents
+        routeTo: "/calendar",
       },
     },
     {
@@ -71,21 +80,24 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         title: "NFP Result Summary",
         message: "Actual: 256K vs Forecast: 164K — Better than expected (Bullish USD)",
         severity: "info",
-        eventId: "nfp-2025-01",
-        relatedAsset: "GBPUSD",
+        relatedAsset: "USD",
+        eventId: "nfp-2025-01", // ✅ must exist in calendarEvents
+        routeTo: "/calendar",
       },
     },
 
-    // ✅ Asset deep-link examples (no eventId; will route to /asset/:symbol via relatedAsset fallback)
+    // ✅ Bias alerts now guaranteed to appear (watchlist symbol)
     {
       label: "Bias Flip",
       icon: <TrendingUp className="h-3.5 w-3.5" />,
       alert: {
         type: "bias",
-        title: "EURUSD Bias Flip",
-        message: "H4 bias changed from Bearish to Bullish on EURUSD.",
+        title: `${biasSymbol} Bias Flip`,
+        message: `H4 bias changed from Bearish to Bullish on ${biasSymbol}.`,
         severity: "warning",
-        relatedAsset: "EURUSD",
+        relatedAsset: biasSymbol,
+        routeTo: "/asset/:symbol",
+        routeParams: { symbol: biasSymbol },
       },
     },
     {
@@ -93,12 +105,15 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
       icon: <TrendingUp className="h-3.5 w-3.5" />,
       alert: {
         type: "bias",
-        title: "GBPUSD Bias Alignment",
-        message: "H4 and Daily bias now aligned Bullish on GBPUSD.",
+        title: `${biasSymbol} Bias Alignment`,
+        message: `H4 and Daily bias now aligned Bullish on ${biasSymbol}.`,
         severity: "info",
-        relatedAsset: "GBPUSD",
+        relatedAsset: biasSymbol,
+        routeTo: "/asset/:symbol",
+        routeParams: { symbol: biasSymbol },
       },
     },
+
     {
       label: "Exposure Warning",
       icon: <AlertTriangle className="h-3.5 w-3.5" />,
@@ -107,7 +122,8 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         title: "Pre-News Exposure Warning",
         message: "You have open positions in USD pairs. High-impact news in 10 minutes.",
         severity: "warning",
-        relatedAsset: "EURUSD",
+        relatedAsset: "USD",
+        routeTo: "/risk-tools",
       },
     },
     {
@@ -118,8 +134,11 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         title: "Low Liquidity Period",
         message: "Market liquidity is low. Consider reducing position sizes.",
         severity: "warning",
+        routeTo: "/risk-tools",
       },
     },
+
+    // ✅ Daily summary should NOT dump you into Calendar
     {
       label: "Daily Summary",
       icon: <Bell className="h-3.5 w-3.5" />,
@@ -128,10 +147,11 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         title: "Daily Bias Summary",
         message: "Your watchlist: 4 Bullish, 2 Bearish, 1 Neutral. Top mover: XAUUSD +1.2%",
         severity: "info",
+        routeTo: "/alerts",
       },
     },
 
-    // ✅ Explicit routeTo examples (kept for cases where you want direct navigation)
+    // ✅ Price alerts deep-link to asset route (modal routing handled elsewhere)
     {
       label: "Price Alert (Wick)",
       icon: <Target className="h-3.5 w-3.5" />,
@@ -141,7 +161,8 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         message: "Your price alert for XAUUSD was triggered.",
         severity: "info",
         relatedAsset: "XAUUSD",
-        routeTo: "/asset/XAUUSD",
+        routeTo: "/asset/:symbol",
+        routeParams: { symbol: "XAUUSD" },
       },
     },
     {
@@ -153,7 +174,8 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         message: "Candle close confirmed above your alert level.",
         severity: "info",
         relatedAsset: "EURUSD",
-        routeTo: "/asset/EURUSD",
+        routeTo: "/asset/:symbol",
+        routeParams: { symbol: "EURUSD" },
       },
     },
   ];
@@ -169,12 +191,10 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
           </Badge>
         </CardTitle>
       </CardHeader>
-
       <CardContent>
         <p className="text-xs text-muted-foreground mb-4">
           Click buttons to trigger simulated alerts for testing purposes.
         </p>
-
         <div className="grid grid-cols-2 gap-2">
           {testAlerts.map((item, i) => (
             <Button
