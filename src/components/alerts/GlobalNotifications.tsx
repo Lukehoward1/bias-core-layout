@@ -1,35 +1,48 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, Bell, Clock, TrendingUp, AlertTriangle, Calendar, Radio, Target, BarChart2, ShieldAlert } from "lucide-react";
+import {
+  X,
+  Bell,
+  Clock,
+  TrendingUp,
+  AlertTriangle,
+  Calendar,
+  Radio,
+  Target,
+  BarChart2,
+  ShieldAlert,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAlertsContext } from "@/contexts/AlertsContext";
-import type { AlertType } from "@/types/alerts";
+import type { AlertItem, AlertType } from "@/types/alerts";
 
 export function GlobalNotifications() {
   const navigate = useNavigate();
   const { alerts, dismissAlert, markRead, isQuietHours } = useAlertsContext();
+
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
 
   // Only show unread alerts, max 3
-  const visibleAlerts = alerts
-    .filter(a => !a.read && !dismissedIds.has(a.id))
-    .slice(0, 3);
+  const visibleAlerts = alerts.filter((a) => !a.read && !dismissedIds.has(a.id)).slice(0, 3);
 
   // Auto-dismiss after 6-8 seconds unless hovered
   useEffect(() => {
-    const timers: NodeJS.Timeout[] = [];
-    
-    visibleAlerts.forEach(alert => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
+    visibleAlerts.forEach((alert) => {
       if (hoveredId !== alert.id && !isQuietHours) {
-        const timer = setTimeout(() => {
-          setDismissedIds(prev => new Set([...prev, alert.id]));
-        }, 6000 + Math.random() * 2000);
+        const timer = setTimeout(
+          () => {
+            setDismissedIds((prev) => new Set([...prev, alert.id]));
+          },
+          6000 + Math.random() * 2000,
+        );
         timers.push(timer);
       }
     });
 
-    return () => timers.forEach(t => clearTimeout(t));
+    return () => timers.forEach((t) => clearTimeout(t));
   }, [visibleAlerts, hoveredId, isQuietHours]);
 
   // Don't render toasts during quiet hours (but alerts still go to inbox)
@@ -37,73 +50,128 @@ export function GlobalNotifications() {
 
   const getIcon = (type: AlertType) => {
     switch (type) {
-      case 'session': return <Clock className="h-4 w-4" />;
-      case 'news': return <Calendar className="h-4 w-4" />;
-      case 'bias': return <TrendingUp className="h-4 w-4" />;
-      case 'exposure': return <AlertTriangle className="h-4 w-4" />;
-      case 'breaking': return <Radio className="h-4 w-4" />;
-      case 'price': return <Target className="h-4 w-4" />;
-      case 'level': return <BarChart2 className="h-4 w-4" />;
-      case 'risk': return <ShieldAlert className="h-4 w-4" />;
-      default: return <Bell className="h-4 w-4" />;
+      case "session":
+        return <Clock className="h-4 w-4" />;
+      case "news":
+        return <Calendar className="h-4 w-4" />;
+      case "bias":
+        return <TrendingUp className="h-4 w-4" />;
+      case "exposure":
+        return <AlertTriangle className="h-4 w-4" />;
+      case "breaking":
+        return <Radio className="h-4 w-4" />;
+      case "price":
+        return <Target className="h-4 w-4" />;
+      case "level":
+        return <BarChart2 className="h-4 w-4" />;
+      case "risk":
+        return <ShieldAlert className="h-4 w-4" />;
+      default:
+        return <Bell className="h-4 w-4" />;
     }
   };
 
-  const getSeverityStyles = (severity: 'info' | 'warning' | 'high') => {
+  const getSeverityStyles = (severity: AlertItem["severity"]) => {
     switch (severity) {
-      case 'high': return 'border-destructive/50 bg-destructive/10';
-      case 'warning': return 'border-warning/50 bg-warning/10';
-      default: return 'border-border bg-card';
+      case "high":
+        return "border-destructive/50 bg-destructive/10";
+      case "warning":
+        return "border-warning/50 bg-warning/10";
+      default:
+        return "border-border bg-card";
     }
   };
 
-  const handleAlertClick = (alert: typeof visibleAlerts[0]) => {
-    markRead(alert.id);
-    setDismissedIds(prev => new Set([...prev, alert.id]));
-    
-    // Click-through routing based on alert type and routeTo
-    if (alert.routeTo) {
-      // If there's an eventId, append it as query param for calendar deep-linking
-      if (alert.eventId && alert.routeTo === '/calendar') {
-        navigate(`/calendar?eventId=${encodeURIComponent(alert.eventId)}`);
+  /**
+   * ✅ Helpers: route params + calendar deep-link support
+   */
+  const applyRouteParams = useCallback((route: string, params?: Record<string, string>) => {
+    if (!params) return route;
+    let out = route;
+    for (const [k, v] of Object.entries(params)) {
+      out = out.replace(`:${k}`, encodeURIComponent(v));
+    }
+    return out;
+  }, []);
+
+  const buildNavigateTarget = useCallback(
+    (alert: AlertItem) => {
+      if (!alert.routeTo) return null;
+
+      // Replace dynamic segments like /asset/:symbol
+      let target = applyRouteParams(alert.routeTo, alert.routeParams);
+
+      // If this alert references a calendar event, deep-link via query param
+      if (alert.eventId && target.startsWith("/calendar")) {
+        const joiner = target.includes("?") ? "&" : "?";
+        target = `${target}${joiner}eventId=${encodeURIComponent(alert.eventId)}`;
+      }
+
+      return target;
+    },
+    [applyRouteParams],
+  );
+
+  /**
+   * ✅ Unified click handling
+   * - mark as read
+   * - dismiss toast
+   * - navigate using routeTo/routeParams/eventId when provided
+   * - fallback to default routing
+   */
+  const handleAlertClick = useCallback(
+    (alert: AlertItem) => {
+      markRead(alert.id);
+      setDismissedIds((prev) => new Set([...prev, alert.id]));
+
+      // 1) Prefer explicit routing
+      const target = buildNavigateTarget(alert);
+      if (target) {
+        navigate(target);
         return;
       }
-      navigate(alert.routeTo);
-      return;
-    }
-    
-    // Default routing based on type
-    switch (alert.type) {
-      case 'bias':
-      case 'price':
-      case 'level':
-        if (alert.relatedAsset) {
-          navigate(`/asset/${alert.relatedAsset}`);
-        } else {
-          navigate('/markets');
-        }
-        break;
-      case 'news':
-      case 'summary':
-      case 'breaking':
-        // Deep-link to specific event if eventId is present
-        if (alert.eventId) {
-          navigate(`/calendar?eventId=${encodeURIComponent(alert.eventId)}`);
-        } else {
-          navigate('/calendar');
-        }
-        break;
-      case 'risk':
-      case 'exposure':
-        navigate('/risk-tools');
-        break;
-      case 'session':
-        navigate('/alerts');
-        break;
-      default:
-        navigate('/alerts');
-    }
-  };
+
+      // 2) Default routing based on type
+      switch (alert.type) {
+        case "bias":
+        case "price":
+        case "level":
+          if (alert.relatedAsset) navigate(`/asset/${alert.relatedAsset}`);
+          else navigate("/markets");
+          return;
+
+        case "news":
+        case "summary":
+        case "breaking":
+          if (alert.eventId) navigate(`/calendar?eventId=${encodeURIComponent(alert.eventId)}`);
+          else navigate("/calendar");
+          return;
+
+        case "risk":
+        case "exposure":
+          navigate("/risk-tools");
+          return;
+
+        case "session":
+          navigate("/alerts");
+          return;
+
+        default:
+          navigate("/alerts");
+          return;
+      }
+    },
+    [markRead, buildNavigateTarget, navigate],
+  );
+
+  const handleDismiss = useCallback(
+    (alertId: string) => {
+      // "dismiss" in the toast sense: keep in inbox, but hide toast
+      dismissAlert(alertId); // your context maps this to markRead currently (fine)
+      setDismissedIds((prev) => new Set([...prev, alertId]));
+    },
+    [dismissAlert],
+  );
 
   return (
     <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm pointer-events-auto">
@@ -113,7 +181,7 @@ export function GlobalNotifications() {
           className={cn(
             "p-3 rounded-lg border shadow-lg backdrop-blur-sm transition-all duration-300 cursor-pointer",
             getSeverityStyles(alert.severity),
-            "animate-in slide-in-from-right-5 fade-in-0"
+            "animate-in slide-in-from-right-5 fade-in-0",
           )}
           style={{ animationDelay: `${index * 100}ms` }}
           onMouseEnter={() => setHoveredId(alert.id)}
@@ -121,25 +189,36 @@ export function GlobalNotifications() {
           onClick={() => handleAlertClick(alert)}
         >
           <div className="flex items-start gap-3">
-            <div className={cn(
-              "p-1.5 rounded-md",
-              alert.severity === 'high' ? 'bg-destructive/20 text-destructive' :
-              alert.severity === 'warning' ? 'bg-warning/20 text-warning' :
-              'bg-primary/20 text-primary'
-            )}>
+            <div
+              className={cn(
+                "p-1.5 rounded-md",
+                alert.severity === "high"
+                  ? "bg-destructive/20 text-destructive"
+                  : alert.severity === "warning"
+                    ? "bg-warning/20 text-warning"
+                    : "bg-primary/20 text-primary",
+              )}
+            >
               {getIcon(alert.type)}
             </div>
+
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-foreground truncate">{alert.title}</p>
               <p className="text-xs text-muted-foreground line-clamp-2">{alert.message}</p>
+
+              {/* Small hint if it’s clickable */}
+              {(alert.routeTo || alert.relatedAsset || alert.eventId) && (
+                <p className="text-[11px] text-muted-foreground mt-1">• click to open</p>
+              )}
             </div>
+
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                dismissAlert(alert.id);
-                setDismissedIds(prev => new Set([...prev, alert.id]));
+                handleDismiss(alert.id);
               }}
               className="text-muted-foreground hover:text-foreground transition-colors"
+              type="button"
             >
               <X className="h-4 w-4" />
             </button>
