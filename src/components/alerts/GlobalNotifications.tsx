@@ -114,6 +114,15 @@ export function GlobalNotifications() {
     return () => timers.forEach((t) => clearTimeout(t));
   }, [visibleAlerts, hoveredId, isQuietHours]);
 
+  // ✅ Optional safety: prune dismissedIds so it can't grow forever
+  useEffect(() => {
+    setDismissedIds((prev) => {
+      const valid = new Set(alerts.map((a) => a.id));
+      const next = new Set([...prev].filter((id) => valid.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [alerts]);
+
   // Early return AFTER all hooks
   if (isQuietHours || visibleAlerts.length === 0) return null;
 
