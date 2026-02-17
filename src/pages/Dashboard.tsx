@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import type { RefObject } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,7 +53,7 @@ function SessionTimerDropdown({
   isOpen: boolean;
   onClose: () => void;
   sessions: SessionData[];
-  anchorRef: React.RefObject<HTMLDivElement>;
+  anchorRef: RefObject<HTMLDivElement>;
 }) {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -134,9 +135,21 @@ export default function Dashboard() {
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
+  /**
+   * ✅ IMPORTANT:
+   * Close current modal first, then open next frame.
+   * Prevents "stacking" / event changing behind a modal.
+   */
   const openCalendarEvent = (ev: CalendarEvent) => {
-    setSelectedCalendarEvent(ev);
-    setIsEventModalOpen(true);
+    if (!ev) return;
+
+    setIsEventModalOpen(false);
+    setSelectedCalendarEvent(null);
+
+    requestAnimationFrame(() => {
+      setSelectedCalendarEvent(ev);
+      setIsEventModalOpen(true);
+    });
   };
 
   const closeCalendarEvent = () => {
@@ -279,7 +292,9 @@ export default function Dashboard() {
                 <div className="flex items-center gap-1">
                   <Clock className="h-4 w-4 text-accent" />
                   <ChevronDown
-                    className={`h-3 w-3 text-muted-foreground transition-transform ${showSessionDropdown ? "rotate-180" : ""}`}
+                    className={`h-3 w-3 text-muted-foreground transition-transform ${
+                      showSessionDropdown ? "rotate-180" : ""
+                    }`}
                   />
                 </div>
               </CardHeader>
@@ -351,7 +366,7 @@ export default function Dashboard() {
           </Card>
         );
 
-      // ✅ Upcoming events now clickable and opens EventDetailsModal
+      // ✅ Upcoming events clickable → opens EventDetailsModal (non-stacking)
       case "upcoming-events": {
         const upcoming = calendarEvents
           .slice()
