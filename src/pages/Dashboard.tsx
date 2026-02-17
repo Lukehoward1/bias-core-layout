@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useMemo, useRef, useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import {
   Clock,
   Calendar as CalendarIcon,
   Activity,
+  ChevronDown,
   AlertTriangle,
   BookOpen,
   Shield,
@@ -26,33 +27,120 @@ import { DASHBOARD_CARD_REGISTRY } from "@/data/dashboardCardRegistry";
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { calendarEvents, type CalendarEvent } from "@/data/calendarEvents";
 
-// ✅ Session details modal (created via prompt)
+// ✅ Session modal (dashboard → session details)
 import { SessionDetailsModal } from "@/components/dashboard/SessionDetailsModal";
 
-export default function Dashboard() {
-  const navigate = useNavigate();
+interface SessionData {
+  name: string;
+  time: string;
+  status: "active" | "closed";
+  accent: string;
+  region: string;
+}
 
+const sessionsData: SessionData[] = [
+  { name: "Sydney", time: "Opens in 8:30:00", status: "closed", accent: "#2EC4B6", region: "Asia-Pacific" },
+  { name: "Asia", time: "Closes in 1:23:45", status: "active", accent: "#4361EE", region: "Asia-Pacific Markets" },
+  { name: "London", time: "Opens in 2:15:30", status: "closed", accent: "#F4D35E", region: "European" },
+  { name: "New York", time: "Opens in 5:45:12", status: "closed", accent: "#F77F00", region: "US Markets" },
+];
+
+// Local Session Timer Dropdown Component (kept as-is)
+function SessionTimerDropdown({
+  isOpen,
+  onClose,
+  sessions,
+  anchorRef,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  sessions: SessionData[];
+  anchorRef: React.RefObject<HTMLDivElement>;
+}) {
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleClickOutside = (event: MouseEvent) => {
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target as Node) &&
+      anchorRef.current &&
+      !anchorRef.current.contains(event.target as Node)
+    ) {
+      onClose();
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen, onClose, anchorRef]);
+
+  if (!isOpen) return null;
+
+  const activeSession = sessions.find((s) => s.status === "active");
+  const upcomingSessions = sessions.filter((s) => s.status !== "active").sort((a, b) => a.time.localeCompare(b.time));
+
+  return (
+    <div
+      ref={dropdownRef}
+      className="absolute top-full left-0 mt-2 w-72 bg-popover border border-border rounded-lg shadow-lg z-50"
+    >
+      <div className="p-3 border-b border-border">
+        <p className="text-xs font-medium text-muted-foreground mb-1">Current Session</p>
+        {activeSession ? (
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: activeSession.accent }} />
+            <span className="font-medium text-foreground">{activeSession.name}</span>
+            <span className="text-xs text-muted-foreground ml-auto">{activeSession.time}</span>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No active session</p>
+        )}
+      </div>
+
+      <div className="p-3">
+        <p className="text-xs font-medium text-muted-foreground mb-2">Upcoming Sessions</p>
+        <div className="space-y-2">
+          {upcomingSessions.map((session) => (
+            <div
+              key={session.name}
+              className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors"
+            >
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: session.accent }} />
+              <span className="text-sm text-foreground">{session.name}</span>
+              <span className="text-xs text-muted-foreground ml-auto">{session.time}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Dashboard() {
+  const [showSessionDropdown, setShowSessionDropdown] = useState(false);
   const [showAddCardsModal, setShowAddCardsModal] = useState(false);
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
   const [dragOverCardId, setDragOverCardId] = useState<string | null>(null);
   const [dragOverRowId, setDragOverRowId] = useState<string | null>(null);
+  const sessionCardRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   // ✅ Event modal state (Dashboard → EventDetailsModal)
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
-  // ✅ Session modal state (Dashboard → SessionDetailsModal)
-  const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
-
   const openCalendarEvent = useCallback((ev: CalendarEvent) => {
-    // prevent stacking
-    setIsEventModalOpen(false);
-    setSelectedCalendarEvent(null);
-
-    requestAnimationFrame(() => {
-      setSelectedCalendarEvent(ev);
-      setIsEventModalOpen(true);
-    });
+    // ensure we reuse the same modal (no stacking)
+    setSelectedCalendarEvent(ev);
+    setIsEventModalOpen(true);
   }, []);
 
   const closeCalendarEvent = useCallback(() => {
@@ -60,7 +148,19 @@ export default function Dashboard() {
     setSelectedCalendarEvent(null);
   }, []);
 
-  const openSessionModal = useCallback(() => {
+  // ✅ Session modal state (Dashboard → SessionDetailsModal)
+  const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
+  const [selectedSessionName, setSelectedSessionName] = useState<string>(() => {
+    const active = sessionsData.find((s) => s.status === "active")?.name;
+    return active ?? "New York";
+  });
+
+  const selectedSession = useMemo(() => {
+    return sessionsData.find((s) => s.name === selectedSessionName) ?? sessionsData[sessionsData.length - 1];
+  }, [selectedSessionName]);
+
+  const openSessionModal = useCallback((name: string) => {
+    setSelectedSessionName(name);
     setIsSessionModalOpen(true);
   }, []);
 
@@ -161,6 +261,7 @@ export default function Dashboard() {
       return renderer({ slotType });
     }
 
+    // Handle default dashboard-native cards (legacy hardcoded)
     switch (cardEntry.id) {
       case "todays-bias":
         return (
@@ -190,33 +291,39 @@ export default function Dashboard() {
           </Card>
         );
 
-      // ✅ Next Session opens SessionDetailsModal
-      case "next-session":
+      // ✅ Next Session card opens SessionDetailsModal (and does NOT route away)
+      case "next-session": {
+        const active = sessionsData.find((s) => s.status === "active")?.name ?? "New York";
+
         return (
           <Card
-            className="h-full flex flex-col transition-colors cursor-pointer hover:bg-muted/30"
-            role="button"
-            tabIndex={0}
+            className="cursor-pointer hover:bg-muted/30 transition-colors h-full flex flex-col"
+            onPointerDown={(e) => {
+              // prevent dashboard drag layer from swallowing the click
+              e.preventDefault();
+              e.stopPropagation();
+            }}
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
               if (isEditMode) return;
-              openSessionModal();
-            }}
-            onKeyDown={(e) => {
-              if (isEditMode) return;
-              if (e.key === "Enter" || e.key === " ") openSessionModal();
+              openSessionModal(active);
             }}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 flex-shrink-0">
               <CardTitle className="text-sm font-medium text-muted-foreground">Next Session</CardTitle>
-              <Clock className="h-4 w-4 text-accent" />
+              <div className="flex items-center gap-1">
+                <Clock className="h-4 w-4 text-accent" />
+                <ChevronDown className="h-3 w-3 text-muted-foreground opacity-0" />
+              </div>
             </CardHeader>
             <CardContent className="flex-1 flex flex-col justify-center">
-              <div className="text-2xl font-bold text-foreground">Click</div>
+              <div className="text-2xl font-bold text-foreground">{active}</div>
               <p className="text-xs text-muted-foreground mt-1">Click session for details</p>
             </CardContent>
           </Card>
         );
+      }
 
       case "high-impact-events":
         return (
@@ -235,23 +342,61 @@ export default function Dashboard() {
       case "watchlist-overview":
         return <WatchlistOverviewCard isEditMode={isEditMode} slotType={slotType} />;
 
-      // ✅ Upcoming events clickable and opens EventDetailsModal
+      case "session-timers":
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle>Session Timers</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {sessionsData.map((session) => (
+                  <div
+                    key={session.name}
+                    className="relative p-3 bg-muted/50 rounded-lg border border-border overflow-hidden"
+                  >
+                    <div
+                      className="absolute left-0 top-0 bottom-0 w-[3px]"
+                      style={{ backgroundColor: session.accent }}
+                    />
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium text-foreground text-sm">{session.name}</div>
+                        <div className="text-xs text-muted-foreground">{session.region}</div>
+                      </div>
+                      <div
+                        className={`text-xs ${
+                          session.status === "active" ? "text-success font-medium" : "text-muted-foreground"
+                        }`}
+                      >
+                        {session.time}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      // ✅ Upcoming events clickable (opens EventDetailsModal)
       case "upcoming-events": {
         const upcoming = calendarEvents
           .slice()
           .sort((a, b) => a.time.localeCompare(b.time))
-          .slice(0, 3);
+          .slice(0, 4);
 
         return (
           <Card className="h-full">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Upcoming Events</CardTitle>
+            <CardHeader className="flex items-center justify-between">
+              <CardTitle className="text-left">Upcoming Events</CardTitle>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 className="text-xs text-muted-foreground hover:text-foreground"
                 onClick={(e) => {
+                  e.preventDefault();
                   e.stopPropagation();
                   if (isEditMode) return;
                   navigate("/calendar");
@@ -262,35 +407,44 @@ export default function Dashboard() {
               </Button>
             </CardHeader>
 
-            <CardContent>
-              <div className="space-y-3">
+            <CardContent className="flex-1">
+              <div className="space-y-2">
                 {upcoming.map((ev) => (
                   <button
                     key={ev.id}
                     type="button"
-                    disabled={isEditMode}
+                    className="w-full text-left flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/40 hover:bg-muted transition-colors"
+                    onPointerDown={(e) => {
+                      // critical: prevent drag/edit layer swallowing the click
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
                       if (isEditMode) return;
                       openCalendarEvent(ev);
                     }}
-                    className="w-full text-left flex items-start gap-3 p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
                   >
-                    <div className="text-sm font-medium text-muted-foreground min-w-[56px]">{ev.time}</div>
-                    <div className="flex-1">
-                      <div className="text-sm font-medium text-foreground">{ev.event}</div>
-                      <div
-                        className={`text-xs mt-1 ${
-                          ev.impact === "high"
-                            ? "text-destructive"
-                            : ev.impact === "medium"
-                              ? "text-accent"
-                              : "text-muted-foreground"
-                        }`}
-                      >
-                        {ev.impact.toUpperCase()} IMPACT
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="text-xs font-medium text-muted-foreground min-w-[52px]">{ev.time}</div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-foreground truncate">{ev.event}</div>
+                        <div
+                          className={`text-[11px] mt-0.5 ${
+                            ev.impact === "high"
+                              ? "text-destructive"
+                              : ev.impact === "medium"
+                                ? "text-accent"
+                                : "text-muted-foreground"
+                          }`}
+                        >
+                          {(ev.impact || "low").toUpperCase()} IMPACT
+                        </div>
                       </div>
                     </div>
+
+                    <div className="text-xs text-muted-foreground shrink-0">{ev.currency}</div>
                   </button>
                 ))}
               </div>
@@ -380,6 +534,35 @@ export default function Dashboard() {
           </Card>
         );
 
+      case "calendar-events":
+        return (
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle>Week Ahead</CardTitle>
+              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 p-2 bg-muted/50 rounded-lg">
+                  <div className="text-xs font-medium text-muted-foreground min-w-[40px]">Mon</div>
+                  <div className="text-sm text-foreground">FOMC Minutes</div>
+                  <AlertTriangle className="h-3.5 w-3.5 text-destructive ml-auto shrink-0" />
+                </div>
+                <div className="flex items-start gap-3 p-2 bg-muted/50 rounded-lg">
+                  <div className="text-xs font-medium text-muted-foreground min-w-[40px]">Wed</div>
+                  <div className="text-sm text-foreground">CPI Data</div>
+                  <AlertTriangle className="h-3.5 w-3.5 text-destructive ml-auto shrink-0" />
+                </div>
+                <div className="flex items-start gap-3 p-2 bg-muted/50 rounded-lg">
+                  <div className="text-xs font-medium text-muted-foreground min-w-[40px]">Fri</div>
+                  <div className="text-sm text-foreground">NFP Release</div>
+                  <AlertTriangle className="h-3.5 w-3.5 text-destructive ml-auto shrink-0" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+
       default:
         return (
           <Card className="h-full border-warning/30 bg-warning/5">
@@ -439,7 +622,7 @@ export default function Dashboard() {
             dragOverCardId={dragOverCardId}
             dragOverRowId={dragOverRowId}
             renderCardContent={renderCardContent}
-            onDragStart={setDraggingCardId}
+            onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
             onDragOverRow={handleDragOverRow}
@@ -478,11 +661,11 @@ export default function Dashboard() {
         onRemoveCard={removeCard}
       />
 
-      {/* ✅ Event modal mount */}
+      {/* ✅ Event modal mount (Dashboard can open event details) */}
       <EventDetailsModal event={selectedCalendarEvent} isOpen={isEventModalOpen} onClose={closeCalendarEvent} />
 
-      {/* ✅ Session modal mount (NO sessionName prop) */}
-      <SessionDetailsModal isOpen={isSessionModalOpen} onClose={closeSessionModal} />
+      {/* ✅ Session modal mount (Dashboard can open session details) */}
+      <SessionDetailsModal isOpen={isSessionModalOpen} onClose={closeSessionModal} session={selectedSession} />
     </div>
   );
 }
