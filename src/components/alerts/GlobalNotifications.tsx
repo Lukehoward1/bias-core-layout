@@ -26,10 +26,80 @@ export function GlobalNotifications() {
   // Only show unread alerts, max 3
   const visibleAlerts = alerts.filter((a) => !a.read && !dismissedIds.has(a.id)).slice(0, 3);
 
+  // All hooks MUST be called unconditionally before any early return
+
+  const applyRouteParams = useCallback((route: string, params?: Record<string, string>) => {
+    if (!params) return route;
+    let out = route;
+    for (const [k, v] of Object.entries(params)) {
+      out = out.replace(`:${k}`, encodeURIComponent(v));
+    }
+    return out;
+  }, []);
+
+  const buildNavigateTarget = useCallback(
+    (alert: AlertItem) => {
+      if (!alert.routeTo) return null;
+      let target = applyRouteParams(alert.routeTo, alert.routeParams);
+      if (alert.eventId && target.startsWith("/calendar")) {
+        const joiner = target.includes("?") ? "&" : "?";
+        target = `${target}${joiner}eventId=${encodeURIComponent(alert.eventId)}`;
+      }
+      return target;
+    },
+    [applyRouteParams],
+  );
+
+  const handleAlertClick = useCallback(
+    (alert: AlertItem) => {
+      markRead(alert.id);
+      setDismissedIds((prev) => new Set([...prev, alert.id]));
+
+      const target = buildNavigateTarget(alert);
+      if (target) {
+        navigate(target);
+        return;
+      }
+
+      switch (alert.type) {
+        case "bias":
+        case "price":
+        case "level":
+          if (alert.relatedAsset) navigate(`/asset/${alert.relatedAsset}`);
+          else navigate("/markets");
+          return;
+        case "news":
+        case "summary":
+        case "breaking":
+          if (alert.eventId) navigate(`/calendar?eventId=${encodeURIComponent(alert.eventId)}`);
+          else navigate("/calendar");
+          return;
+        case "risk":
+        case "exposure":
+          navigate("/risk-tools");
+          return;
+        case "session":
+          navigate("/alerts");
+          return;
+        default:
+          navigate("/alerts");
+          return;
+      }
+    },
+    [markRead, buildNavigateTarget, navigate],
+  );
+
+  const handleDismiss = useCallback(
+    (alertId: string) => {
+      dismissAlert(alertId);
+      setDismissedIds((prev) => new Set([...prev, alertId]));
+    },
+    [dismissAlert],
+  );
+
   // Auto-dismiss after 6-8 seconds unless hovered
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
-
     visibleAlerts.forEach((alert) => {
       if (hoveredId !== alert.id && !isQuietHours) {
         const timer = setTimeout(
@@ -41,11 +111,10 @@ export function GlobalNotifications() {
         timers.push(timer);
       }
     });
-
     return () => timers.forEach((t) => clearTimeout(t));
   }, [visibleAlerts, hoveredId, isQuietHours]);
 
-  // Don't render toasts during quiet hours (but alerts still go to inbox)
+  // Early return AFTER all hooks
   if (isQuietHours || visibleAlerts.length === 0) return null;
 
   const getIcon = (type: AlertType) => {
@@ -82,97 +151,6 @@ export function GlobalNotifications() {
     }
   };
 
-  /**
-   * ✅ Helpers: route params + calendar deep-link support
-   */
-  const applyRouteParams = useCallback((route: string, params?: Record<string, string>) => {
-    if (!params) return route;
-    let out = route;
-    for (const [k, v] of Object.entries(params)) {
-      out = out.replace(`:${k}`, encodeURIComponent(v));
-    }
-    return out;
-  }, []);
-
-  const buildNavigateTarget = useCallback(
-    (alert: AlertItem) => {
-      if (!alert.routeTo) return null;
-
-      // Replace dynamic segments like /asset/:symbol
-      let target = applyRouteParams(alert.routeTo, alert.routeParams);
-
-      // If this alert references a calendar event, deep-link via query param
-      if (alert.eventId && target.startsWith("/calendar")) {
-        const joiner = target.includes("?") ? "&" : "?";
-        target = `${target}${joiner}eventId=${encodeURIComponent(alert.eventId)}`;
-      }
-
-      return target;
-    },
-    [applyRouteParams],
-  );
-
-  /**
-   * ✅ Unified click handling
-   * - mark as read
-   * - dismiss toast
-   * - navigate using routeTo/routeParams/eventId when provided
-   * - fallback to default routing
-   */
-  const handleAlertClick = useCallback(
-    (alert: AlertItem) => {
-      markRead(alert.id);
-      setDismissedIds((prev) => new Set([...prev, alert.id]));
-
-      // 1) Prefer explicit routing
-      const target = buildNavigateTarget(alert);
-      if (target) {
-        navigate(target);
-        return;
-      }
-
-      // 2) Default routing based on type
-      switch (alert.type) {
-        case "bias":
-        case "price":
-        case "level":
-          if (alert.relatedAsset) navigate(`/asset/${alert.relatedAsset}`);
-          else navigate("/markets");
-          return;
-
-        case "news":
-        case "summary":
-        case "breaking":
-          if (alert.eventId) navigate(`/calendar?eventId=${encodeURIComponent(alert.eventId)}`);
-          else navigate("/calendar");
-          return;
-
-        case "risk":
-        case "exposure":
-          navigate("/risk-tools");
-          return;
-
-        case "session":
-          navigate("/alerts");
-          return;
-
-        default:
-          navigate("/alerts");
-          return;
-      }
-    },
-    [markRead, buildNavigateTarget, navigate],
-  );
-
-  const handleDismiss = useCallback(
-    (alertId: string) => {
-      // "dismiss" in the toast sense: keep in inbox, but hide toast
-      dismissAlert(alertId); // your context maps this to markRead currently (fine)
-      setDismissedIds((prev) => new Set([...prev, alertId]));
-    },
-    [dismissAlert],
-  );
-
   return (
     <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm pointer-events-auto">
       {visibleAlerts.map((alert, index) => (
@@ -206,7 +184,6 @@ export function GlobalNotifications() {
               <p className="text-sm font-medium text-foreground truncate">{alert.title}</p>
               <p className="text-xs text-muted-foreground line-clamp-2">{alert.message}</p>
 
-              {/* Small hint if it’s clickable */}
               {(alert.routeTo || alert.relatedAsset || alert.eventId) && (
                 <p className="text-[11px] text-muted-foreground mt-1">• click to open</p>
               )}
