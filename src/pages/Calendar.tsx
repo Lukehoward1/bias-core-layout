@@ -1,278 +1,221 @@
-import { useMemo, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
+import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-import {
-  Inbox,
-  CheckCheck,
-  Clock,
-  Bell,
-  TrendingUp,
-  AlertTriangle,
-  Calendar,
-  Radio,
-  Trash2,
-  Target,
-  BarChart2,
-  ShieldAlert,
-} from "lucide-react";
-
-import type { AlertItem, AlertType } from "@/types/alerts";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Filter } from "lucide-react";
+import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
+import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
+import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-interface AlertInboxProps {
-  alerts: AlertItem[];
-  onMarkRead: (id: string) => void;
-  onMarkAllRead: () => void;
-  onDelete: (id: string) => void;
-  onClearAll: () => void;
-}
+import { calendarEvents, keyEvents } from "@/data/calendarEvents";
 
-export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClearAll }: AlertInboxProps) {
-  const navigate = useNavigate();
-  const [filter, setFilter] = useState<"all" | "unread">("all");
+type CalendarEvent = (typeof calendarEvents)[0];
 
-  const unreadCount = useMemo(() => alerts.filter((a) => !a.read).length, [alerts]);
+function Calendar() {
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const filteredAlerts = useMemo(() => {
-    return filter === "unread" ? alerts.filter((a) => !a.read) : alerts;
-  }, [alerts, filter]);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
 
-  const getIcon = (type: AlertType) => {
-    switch (type) {
-      case "session":
-        return <Clock className="h-4 w-4" />;
-      case "news":
-        return <Calendar className="h-4 w-4" />;
-      case "bias":
-        return <TrendingUp className="h-4 w-4" />;
-      case "exposure":
-        return <AlertTriangle className="h-4 w-4" />;
-      case "breaking":
-        return <Radio className="h-4 w-4" />;
-      case "price":
-        return <Target className="h-4 w-4" />;
-      case "level":
-        return <BarChart2 className="h-4 w-4" />;
-      case "risk":
-        return <ShieldAlert className="h-4 w-4" />;
-      default:
-        return <Bell className="h-4 w-4" />;
-    }
+  const eventRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
+
+  const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
+
+  const upcomingEventsCardId = "upcoming-events";
+  const isUpcomingEventsAdded = isCardOnDashboard(upcomingEventsCardId);
+
+  const handleAddCard = () => {
+    addCard(upcomingEventsCardId);
+    toast.success("Pinned to Dashboard");
   };
 
-  const getSeverityStyles = (severity: AlertItem["severity"], read: boolean) => {
-    if (read) return "bg-muted/30 border-border/50";
-    switch (severity) {
-      case "high":
-        return "bg-destructive/5 border-destructive/30";
-      case "warning":
-        return "bg-warning/5 border-warning/30";
-      default:
-        return "bg-card border-border";
-    }
+  const handleRemoveCard = () => {
+    removeCard(upcomingEventsCardId);
+    toast.success("Unpinned from Dashboard");
   };
 
-  const formatTime = (date: Date) => {
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
-  };
-
-  const applyRouteParams = useCallback((route: string, params?: Record<string, string>) => {
-    if (!params) return route;
-    let out = route;
-    for (const [k, v] of Object.entries(params)) {
-      out = out.replace(`:${k}`, encodeURIComponent(v));
-    }
-    return out;
+  const setEventRef = useCallback((eventId: string, el: HTMLTableRowElement | null) => {
+    if (el) eventRefs.current.set(eventId, el);
+    else eventRefs.current.delete(eventId);
   }, []);
 
-  const buildNavigateTarget = useCallback(
-    (alert: AlertItem) => {
-      if (!alert.routeTo) return null;
+  /**
+   * Always close current modal before opening another
+   */
+  const openEvent = useCallback((ev: CalendarEvent | null) => {
+    if (!ev) return;
 
-      // Replace dynamic segments like /asset/:symbol
-      let target = applyRouteParams(alert.routeTo, alert.routeParams);
+    setIsModalOpen(false);
+    setSelectedEvent(null);
 
-      // If this alert references a calendar event, deep-link via query param
-      if (alert.eventId) {
-        const joiner = target.includes("?") ? "&" : "?";
-        target = `${target}${joiner}eventId=${encodeURIComponent(alert.eventId)}`;
-      }
+    requestAnimationFrame(() => {
+      setSelectedEvent(ev);
+      setIsModalOpen(true);
+    });
+  }, []);
 
-      return target;
-    },
-    [applyRouteParams],
-  );
+  const closeModal = useCallback(() => {
+    setIsModalOpen(false);
+    setSelectedEvent(null);
+  }, []);
 
-  const handleAlertClick = useCallback(
-    (alert: AlertItem) => {
-      onMarkRead(alert.id);
+  /**
+   * Deep-link support:
+   * /calendar?eventId=xxx
+   */
+  useEffect(() => {
+    const eventId = searchParams.get("eventId");
+    if (!eventId) return;
 
-      const target = buildNavigateTarget(alert);
-      if (target) navigate(target);
-    },
-    [onMarkRead, buildNavigateTarget, navigate],
-  );
+    const match = calendarEvents.find((e) => e.id === eventId) ?? null;
+
+    if (!match) return;
+
+    setHighlightedEventId(match.id);
+
+    setTimeout(() => {
+      eventRefs.current.get(match.id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+
+      openEvent(match);
+    }, 100);
+
+    setTimeout(() => setHighlightedEventId(null), 3000);
+
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams, openEvent]);
+
+  const getImpactVariant = (impact: string) =>
+    impact === "high" ? "destructive" : impact === "medium" ? "default" : "secondary";
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Inbox className="h-4 w-4 text-primary" />
-            Alert Inbox
-            {unreadCount > 0 && (
-              <Badge variant="destructive" className="text-xs">
-                {unreadCount}
-              </Badge>
-            )}
-          </CardTitle>
+    <div className="p-6 space-y-6">
+      <AppHeader title="Calendar" />
 
-          <div className="flex gap-2">
-            {unreadCount > 0 && (
-              <Button variant="ghost" size="sm" onClick={onMarkAllRead} className="text-xs h-7">
-                <CheckCheck className="h-3 w-3 mr-1" />
-                Mark all read
-              </Button>
-            )}
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Filters */}
+        <Card>
+          <CardContent className="py-4 flex flex-wrap gap-3">
+            <Select defaultValue="today">
+              <SelectTrigger className="w-[160px] h-9">
+                <SelectValue placeholder="Date Range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="week">This Week</SelectItem>
+                <SelectItem value="month">This Month</SelectItem>
+              </SelectContent>
+            </Select>
 
-            {alerts.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={onClearAll} className="text-xs h-7 text-muted-foreground">
-                <Trash2 className="h-3 w-3 mr-1" />
-                Clear
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardHeader>
+            <Select defaultValue="all">
+              <SelectTrigger className="w-[160px] h-9">
+                <SelectValue placeholder="Impact" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Impact</SelectItem>
+                <SelectItem value="high">High Impact</SelectItem>
+                <SelectItem value="medium">Medium Impact</SelectItem>
+                <SelectItem value="low">Low Impact</SelectItem>
+              </SelectContent>
+            </Select>
 
-      <CardContent>
-        <Tabs value={filter} onValueChange={(v) => setFilter(v as "all" | "unread")}>
-          <TabsList className="h-8 mb-3">
-            <TabsTrigger value="all" className="text-xs">
-              All ({alerts.length})
-            </TabsTrigger>
-            <TabsTrigger value="unread" className="text-xs">
-              Unread ({unreadCount})
-            </TabsTrigger>
-          </TabsList>
+            <Button variant="outline" size="sm" className="h-9">
+              <Filter className="h-4 w-4 mr-2" />
+              More Filters
+            </Button>
+          </CardContent>
+        </Card>
 
-          <TabsContent value={filter} className="mt-0">
-            <ScrollArea className="h-[400px] pr-4">
-              {filteredAlerts.length === 0 ? (
-                <div className="py-12 text-center text-muted-foreground">
-                  <Inbox className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                  <p className="text-sm">No alerts</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {filteredAlerts.map((alert) => {
-                    const target = buildNavigateTarget(alert);
+        {/* Key Events */}
+        <Card>
+          <CardHeader className="flex flex-row justify-between">
+            <CardTitle>Key Events Today</CardTitle>
+            <AddToDashboardButton isAdded={isUpcomingEventsAdded} onAdd={handleAddCard} onRemove={handleRemoveCard} />
+          </CardHeader>
 
-                    return (
-                      <div
-                        key={alert.id}
-                        role="button"
-                        tabIndex={0}
-                        className={cn(
-                          "p-3 rounded-lg border cursor-pointer transition-colors hover:bg-muted/50",
-                          getSeverityStyles(alert.severity, alert.read),
-                        )}
-                        onClick={() => handleAlertClick(alert)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") handleAlertClick(alert);
-                        }}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div
-                            className={cn(
-                              "p-1.5 rounded-md mt-0.5",
-                              alert.severity === "high"
-                                ? "bg-destructive/20 text-destructive"
-                                : alert.severity === "warning"
-                                  ? "bg-warning/20 text-warning"
-                                  : "bg-primary/20 text-primary",
-                              alert.read && "opacity-50",
-                            )}
-                          >
-                            {getIcon(alert.type)}
-                          </div>
+          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {keyEvents.map((event) => {
+              const fullEvent = calendarEvents.find((e) => e.id === event.id) ?? null;
 
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2 mb-0.5">
-                              <p
-                                className={cn(
-                                  "text-sm font-medium truncate",
-                                  alert.read ? "text-muted-foreground" : "text-foreground",
-                                )}
-                              >
-                                {alert.title}
-                              </p>
-                              <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                                {formatTime(alert.timestamp)}
-                              </span>
-                            </div>
+              return (
+                <button
+                  key={event.id}
+                  type="button"
+                  onClick={() => openEvent(fullEvent)}
+                  className={cn(
+                    "text-left p-4 rounded-lg border bg-muted/50 hover:bg-muted/70 transition-colors",
+                    highlightedEventId === event.id && "ring-2 ring-primary",
+                  )}
+                >
+                  <div className="flex justify-between mb-2">
+                    <Badge variant={getImpactVariant(event.impact)}>{event.impact.toUpperCase()}</Badge>
+                    <span className="text-sm text-muted-foreground">{event.time}</span>
+                  </div>
+                  <div className="font-semibold text-sm">{event.currency}</div>
+                  <div className="text-xs text-muted-foreground">{event.event}</div>
+                </button>
+              );
+            })}
+          </CardContent>
+        </Card>
 
-                            <p
-                              className={cn(
-                                "text-xs line-clamp-2",
-                                alert.read ? "text-muted-foreground/70" : "text-muted-foreground",
-                              )}
-                            >
-                              {alert.message}
-                            </p>
+        {/* All Events Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>All Events</CardTitle>
+          </CardHeader>
 
-                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                              {alert.relatedAsset && (
-                                <Badge variant="secondary" className="text-[10px]">
-                                  {alert.relatedAsset}
-                                </Badge>
-                              )}
+          <CardContent className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  {["Time", "Currency", "Event", "Previous", "Forecast", "Actual", "Impact"].map((h) => (
+                    <th key={h} className="text-left px-4 py-2 text-xs text-muted-foreground">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
 
-                              {target && <span className="text-[11px] text-muted-foreground">• click to open</span>}
-                            </div>
-                          </div>
+              <tbody>
+                {calendarEvents.map((event) => (
+                  <tr
+                    key={event.id}
+                    ref={(el) => setEventRef(event.id, el)}
+                    onClick={() => openEvent(event)}
+                    className={cn(
+                      "border-b cursor-pointer hover:bg-muted/50",
+                      highlightedEventId === event.id && "bg-primary/10",
+                    )}
+                  >
+                    <td className="px-4 py-2">{event.time}</td>
+                    <td className="px-4 py-2">
+                      <Badge variant="outline">{event.currency}</Badge>
+                    </td>
+                    <td className="px-4 py-2 font-medium">{event.event}</td>
+                    <td className="px-4 py-2">{event.previous}</td>
+                    <td className="px-4 py-2">{event.forecast}</td>
+                    <td className="px-4 py-2">{event.actual}</td>
+                    <td className="px-4 py-2">
+                      <Badge variant={getImpactVariant(event.impact)}>{event.impact.toUpperCase()}</Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      </div>
 
-                          <div className="flex items-center gap-2">
-                            {!alert.read && <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-2" />}
-
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onDelete(alert.id);
-                              }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </ScrollArea>
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+      {/* Single authoritative event modal */}
+      <EventDetailsModal event={selectedEvent} isOpen={isModalOpen} onClose={closeModal} />
+    </div>
   );
 }
+
+export default Calendar;
