@@ -69,15 +69,10 @@ function SessionTimerDropdown({
   };
 
   useEffect(() => {
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    } else {
-      document.removeEventListener("mousedown", handleClickOutside);
-    }
+    if (isOpen) document.addEventListener("mousedown", handleClickOutside);
+    else document.removeEventListener("mousedown", handleClickOutside);
 
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen, onClose, anchorRef]);
 
   if (!isOpen) return null;
@@ -136,13 +131,9 @@ export default function Dashboard() {
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
   /**
-   * ✅ IMPORTANT:
-   * Close current modal first, then open next frame.
-   * Prevents "stacking" / event changing behind a modal.
+   * ✅ Close current modal first, then open next frame (prevents stacking)
    */
   const openCalendarEvent = (ev: CalendarEvent) => {
-    if (!ev) return;
-
     setIsEventModalOpen(false);
     setSelectedCalendarEvent(null);
 
@@ -181,28 +172,20 @@ export default function Dashboard() {
     return ids;
   }, [layout]);
 
-  const handleDragStart = (cardId: string) => {
-    setDraggingCardId(cardId);
-  };
+  const handleDragStart = (cardId: string) => setDraggingCardId(cardId);
 
   const handleDragOver = (cardId: string) => {
-    if (draggingCardId && cardId !== draggingCardId) {
-      setDragOverCardId(cardId);
-    }
+    if (draggingCardId && cardId !== draggingCardId) setDragOverCardId(cardId);
   };
 
   const handleDragOverRow = (rowId: string) => {
-    if (draggingCardId) {
-      setDragOverRowId(rowId);
-    }
+    if (draggingCardId) setDragOverRowId(rowId);
   };
 
   const handleDragEnd = () => {
-    if (draggingCardId && dragOverCardId) {
-      moveCard(draggingCardId, dragOverCardId);
-    } else if (draggingCardId && dragOverRowId) {
-      moveCardToRow(draggingCardId, dragOverRowId);
-    }
+    if (draggingCardId && dragOverCardId) moveCard(draggingCardId, dragOverCardId);
+    else if (draggingCardId && dragOverRowId) moveCardToRow(draggingCardId, dragOverRowId);
+
     setDraggingCardId(null);
     setDragOverCardId(null);
     setDragOverRowId(null);
@@ -223,11 +206,7 @@ export default function Dashboard() {
     let cumulative = 0;
     return sampleTrades.map((t) => {
       cumulative += t.pnl;
-      return {
-        date: t.date,
-        equity: cumulative,
-        formattedDate: format(new Date(t.date), "MMM d"),
-      };
+      return { date: t.date, equity: cumulative, formattedDate: format(new Date(t.date), "MMM d") };
     });
   }, []);
 
@@ -244,11 +223,79 @@ export default function Dashboard() {
   ): React.ReactNode => {
     const cardId = cardEntry.id;
 
+    /**
+     * ✅ FORCE Upcoming Events to use our clickable version
+     * (because centralized renderers may override it otherwise)
+     */
+    if (cardId === "upcoming-events") {
+      const upcoming = calendarEvents
+        .slice()
+        .sort((a, b) => a.time.localeCompare(b.time))
+        .slice(0, 4);
+
+      return (
+        <Card className="h-full">
+          <CardHeader className="flex items-center justify-between">
+            <CardTitle>Upcoming Events</CardTitle>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => navigate("/calendar")}
+              disabled={isEditMode}
+            >
+              View all
+            </Button>
+          </CardHeader>
+
+          <CardContent>
+            <div className="space-y-2">
+              {upcoming.map((ev) => (
+                <button
+                  key={ev.id}
+                  type="button"
+                  disabled={isEditMode}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (isEditMode) return;
+                    openCalendarEvent(ev);
+                  }}
+                  className="w-full text-left flex items-center gap-3 p-3 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors"
+                >
+                  <div className="flex flex-col min-w-[54px]">
+                    <span className="text-xs text-muted-foreground">{ev.currency}</span>
+                    <span className="text-sm font-medium text-foreground">{ev.time}</span>
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-foreground truncate">{ev.event}</div>
+                    <div
+                      className={`text-xs mt-0.5 ${
+                        ev.impact === "high"
+                          ? "text-destructive"
+                          : ev.impact === "medium"
+                            ? "text-accent"
+                            : "text-muted-foreground"
+                      }`}
+                    >
+                      {ev.impact.toUpperCase()} IMPACT
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-muted-foreground whitespace-nowrap">{ev.date}</div>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
     // First, try the centralized renderer (covers pinned and registry cards)
     const renderer = getCardRenderer(cardId);
-    if (renderer) {
-      return renderer({ slotType });
-    }
+    if (renderer) return renderer({ slotType });
 
     // Handle default dashboard-native cards (legacy hardcoded)
     switch (cardEntry.id) {
@@ -365,66 +412,6 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         );
-
-      // ✅ Upcoming events clickable → opens EventDetailsModal (non-stacking)
-      case "upcoming-events": {
-        const upcoming = calendarEvents
-          .slice()
-          .sort((a, b) => a.time.localeCompare(b.time))
-          .slice(0, 3);
-
-        return (
-          <Card className="h-full">
-            <CardHeader className="flex items-center justify-between">
-              <CardTitle>Upcoming Events</CardTitle>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => navigate("/calendar")}
-                disabled={isEditMode}
-              >
-                View all
-              </Button>
-            </CardHeader>
-
-            <CardContent>
-              <div className="space-y-3">
-                {upcoming.map((ev) => (
-                  <button
-                    key={ev.id}
-                    type="button"
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (isEditMode) return;
-                      openCalendarEvent(ev);
-                    }}
-                    className="w-full text-left flex items-start gap-3 p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
-                  >
-                    <div className="text-sm font-medium text-muted-foreground min-w-[56px]">{ev.time}</div>
-                    <div className="flex-1">
-                      <div className="text-sm font-medium text-foreground">{ev.event}</div>
-                      <div
-                        className={`text-xs mt-1 ${
-                          ev.impact === "high"
-                            ? "text-destructive"
-                            : ev.impact === "medium"
-                              ? "text-accent"
-                              : "text-muted-foreground"
-                        }`}
-                      >
-                        {ev.impact.toUpperCase()} IMPACT
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        );
-      }
 
       case "performance-overview":
         return (
@@ -556,16 +543,13 @@ export default function Dashboard() {
     }
   };
 
-  const handleAddRow = (afterRowId?: string) => {
-    addRow("equal", afterRowId);
-  };
+  const handleAddRow = (afterRowId?: string) => addRow("equal", afterRowId);
 
   return (
     <div className="p-6 space-y-6">
       <AppHeader title="Dashboard" />
 
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Welcome Header with Edit Controls */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <h1 className="text-3xl font-bold text-foreground">Welcome, Trader</h1>
@@ -583,7 +567,6 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Row-based layout */}
         {layout.rows.map((row, index) => (
           <DashboardRow
             key={row.id}
@@ -608,7 +591,6 @@ export default function Dashboard() {
           />
         ))}
 
-        {/* Add row button in edit mode */}
         {isEditMode && (
           <Button variant="outline" className="w-full border-dashed gap-2" onClick={() => handleAddRow()}>
             <Plus className="h-4 w-4" />
@@ -616,7 +598,6 @@ export default function Dashboard() {
           </Button>
         )}
 
-        {/* Empty state when no cards */}
         {layout.rows.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <p className="text-muted-foreground mb-4">No cards on your Dashboard.</p>
@@ -625,7 +606,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Add Cards Modal */}
       <AddCardsModal
         open={showAddCardsModal}
         onOpenChange={setShowAddCardsModal}
@@ -634,7 +614,6 @@ export default function Dashboard() {
         onRemoveCard={removeCard}
       />
 
-      {/* ✅ Event modal mount (Dashboard can open event details) */}
       <EventDetailsModal event={selectedCalendarEvent} isOpen={isEventModalOpen} onClose={closeCalendarEvent} />
     </div>
   );
