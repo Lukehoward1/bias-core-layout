@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   X,
   Bell,
@@ -18,15 +18,13 @@ import type { AlertItem, AlertType } from "@/types/alerts";
 
 export function GlobalNotifications() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { alerts, dismissAlert, markRead, isQuietHours } = useAlertsContext();
 
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
 
-  // Only show unread alerts, max 3
   const visibleAlerts = alerts.filter((a) => !a.read && !dismissedIds.has(a.id)).slice(0, 3);
-
-  // All hooks MUST be called unconditionally before any early return
 
   const applyRouteParams = useCallback((route: string, params?: Record<string, string>) => {
     if (!params) return route;
@@ -41,13 +39,28 @@ export function GlobalNotifications() {
     (alert: AlertItem) => {
       if (!alert.routeTo) return null;
       let target = applyRouteParams(alert.routeTo, alert.routeParams);
+
       if (alert.eventId && target.startsWith("/calendar")) {
         const joiner = target.includes("?") ? "&" : "?";
         target = `${target}${joiner}eventId=${encodeURIComponent(alert.eventId)}`;
       }
+
       return target;
     },
     [applyRouteParams],
+  );
+
+  const navigateWithModalSupport = useCallback(
+    (target: string) => {
+      // ✅ If it's an asset route, navigate with backgroundLocation so App.tsx renders it as a modal overlay
+      if (target.startsWith("/asset/")) {
+        navigate(target, { state: { backgroundLocation: location } });
+        return;
+      }
+
+      navigate(target);
+    },
+    [navigate, location],
   );
 
   const handleAlertClick = useCallback(
@@ -57,7 +70,7 @@ export function GlobalNotifications() {
 
       const target = buildNavigateTarget(alert);
       if (target) {
-        navigate(target);
+        navigateWithModalSupport(target);
         return;
       }
 
@@ -65,28 +78,32 @@ export function GlobalNotifications() {
         case "bias":
         case "price":
         case "level":
-          if (alert.relatedAsset) navigate(`/asset/${alert.relatedAsset}`);
-          else navigate("/markets");
+          if (alert.relatedAsset) navigateWithModalSupport(`/asset/${alert.relatedAsset}`);
+          else navigateWithModalSupport("/markets");
           return;
+
         case "news":
         case "summary":
         case "breaking":
-          if (alert.eventId) navigate(`/calendar?eventId=${encodeURIComponent(alert.eventId)}`);
-          else navigate("/calendar");
+          if (alert.eventId) navigateWithModalSupport(`/calendar?eventId=${encodeURIComponent(alert.eventId)}`);
+          else navigateWithModalSupport("/calendar");
           return;
+
         case "risk":
         case "exposure":
-          navigate("/risk-tools");
+          navigateWithModalSupport("/risk-tools");
           return;
+
         case "session":
-          navigate("/alerts");
+          navigateWithModalSupport("/alerts");
           return;
+
         default:
-          navigate("/alerts");
+          navigateWithModalSupport("/alerts");
           return;
       }
     },
-    [markRead, buildNavigateTarget, navigate],
+    [markRead, buildNavigateTarget, navigateWithModalSupport],
   );
 
   const handleDismiss = useCallback(
@@ -97,15 +114,12 @@ export function GlobalNotifications() {
     [dismissAlert],
   );
 
-  // Auto-dismiss after 6-8 seconds unless hovered
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
     visibleAlerts.forEach((alert) => {
       if (hoveredId !== alert.id && !isQuietHours) {
         const timer = setTimeout(
-          () => {
-            setDismissedIds((prev) => new Set([...prev, alert.id]));
-          },
+          () => setDismissedIds((prev) => new Set([...prev, alert.id])),
           6000 + Math.random() * 2000,
         );
         timers.push(timer);
@@ -114,16 +128,6 @@ export function GlobalNotifications() {
     return () => timers.forEach((t) => clearTimeout(t));
   }, [visibleAlerts, hoveredId, isQuietHours]);
 
-  // ✅ Optional safety: prune dismissedIds so it can't grow forever
-  useEffect(() => {
-    setDismissedIds((prev) => {
-      const valid = new Set(alerts.map((a) => a.id));
-      const next = new Set([...prev].filter((id) => valid.has(id)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [alerts]);
-
-  // Early return AFTER all hooks
   if (isQuietHours || visibleAlerts.length === 0) return null;
 
   const getIcon = (type: AlertType) => {
