@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -128,23 +128,15 @@ export default function Dashboard() {
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
-  /**
-   * ✅ Open an event modal without stacking/ghosting
-   */
-  const openCalendarEvent = useCallback((ev: CalendarEvent) => {
+  const openCalendarEvent = (ev: CalendarEvent) => {
+    setSelectedCalendarEvent(ev);
+    setIsEventModalOpen(true);
+  };
+
+  const closeCalendarEvent = () => {
     setIsEventModalOpen(false);
     setSelectedCalendarEvent(null);
-
-    requestAnimationFrame(() => {
-      setSelectedCalendarEvent(ev);
-      setIsEventModalOpen(true);
-    });
-  }, []);
-
-  const closeCalendarEvent = useCallback(() => {
-    setIsEventModalOpen(false);
-    setSelectedCalendarEvent(null);
-  }, []);
+  };
 
   // Row-based dashboard layout
   const {
@@ -227,9 +219,7 @@ export default function Dashboard() {
 
     // First, try the centralized renderer (covers pinned and registry cards)
     const renderer = getCardRenderer(cardId);
-    if (renderer) {
-      return renderer({ slotType });
-    }
+    if (renderer) return renderer({ slotType });
 
     // Handle default dashboard-native cards (legacy hardcoded)
     switch (cardEntry.id) {
@@ -284,6 +274,7 @@ export default function Dashboard() {
                 <p className="text-xs text-muted-foreground mt-1">Opens in 2h 15m</p>
               </CardContent>
             </Card>
+
             <SessionTimerDropdown
               isOpen={showSessionDropdown && !isEditMode}
               onClose={() => setShowSessionDropdown(false)}
@@ -347,7 +338,7 @@ export default function Dashboard() {
           </Card>
         );
 
-      // ✅ Upcoming events clickable → opens EventDetailsModal
+      // ✅ Upcoming events clickable + consistent header styling
       case "upcoming-events": {
         const upcoming = calendarEvents
           .slice()
@@ -355,14 +346,14 @@ export default function Dashboard() {
           .slice(0, 4);
 
         return (
-          <Card className="h-full flex flex-col">
+          <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Upcoming Events</CardTitle>
+              <CardTitle className="text-sm font-medium text-foreground">Upcoming Events</CardTitle>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="text-xs text-muted-foreground hover:text-foreground"
+                className="h-7 text-xs text-muted-foreground hover:text-foreground"
                 onClick={() => navigate("/calendar")}
                 disabled={isEditMode}
               >
@@ -370,34 +361,35 @@ export default function Dashboard() {
               </Button>
             </CardHeader>
 
-            <CardContent className="flex-1">
+            <CardContent>
               <div className="space-y-2">
                 {upcoming.map((ev) => (
                   <button
-  key={ev.id}
-  type="button"
-  onClick={(e) => {
-    e.stopPropagation();
-    if (isEditMode) return;
-    openCalendarEvent(ev);
-  }}
-  className="w-full text-left flex items-center justify-between p-2 rounded-md bg-muted/40 hover:bg-muted transition-colors"
->
+                    key={ev.id}
+                    type="button"
+                    className="w-full text-left flex items-center justify-between p-2 rounded-md bg-muted/40 hover:bg-muted transition-colors"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (isEditMode) return;
+                      openCalendarEvent(ev);
+                    }}
                   >
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-foreground">{ev.event}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {ev.currency} • {ev.time}
-                      </span>
+                    <div className="flex items-start gap-3">
+                      <div className="min-w-[54px] text-xs text-muted-foreground">{ev.time}</div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-foreground">{ev.event}</span>
+                        <span className="text-[11px] text-muted-foreground">{ev.currency}</span>
+                      </div>
                     </div>
 
                     <span
-                      className={`text-[10px] font-semibold ${
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
                         ev.impact === "high"
-                          ? "text-destructive"
+                          ? "bg-destructive/20 text-destructive"
                           : ev.impact === "medium"
-                            ? "text-warning"
-                            : "text-muted-foreground"
+                            ? "bg-warning/20 text-warning"
+                            : "bg-muted text-muted-foreground"
                       }`}
                     >
                       {ev.impact.toUpperCase()}
@@ -547,6 +539,7 @@ export default function Dashboard() {
       <AppHeader title="Dashboard" />
 
       <div className="max-w-7xl mx-auto space-y-6">
+        {/* Welcome Header with Edit Controls */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <h1 className="text-3xl font-bold text-foreground">Welcome, Trader</h1>
@@ -564,6 +557,7 @@ export default function Dashboard() {
           />
         </div>
 
+        {/* Row-based layout */}
         {layout.rows.map((row, index) => (
           <DashboardRow
             key={row.id}
@@ -588,6 +582,7 @@ export default function Dashboard() {
           />
         ))}
 
+        {/* Add row button in edit mode */}
         {isEditMode && (
           <Button variant="outline" className="w-full border-dashed gap-2" onClick={() => handleAddRow()}>
             <Plus className="h-4 w-4" />
@@ -595,6 +590,7 @@ export default function Dashboard() {
           </Button>
         )}
 
+        {/* Empty state when no cards */}
         {layout.rows.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <p className="text-muted-foreground mb-4">No cards on your Dashboard.</p>
@@ -603,6 +599,7 @@ export default function Dashboard() {
         )}
       </div>
 
+      {/* Add Cards Modal */}
       <AddCardsModal
         open={showAddCardsModal}
         onOpenChange={setShowAddCardsModal}
@@ -611,6 +608,7 @@ export default function Dashboard() {
         onRemoveCard={removeCard}
       />
 
+      {/* ✅ Event modal mount (Dashboard can open event details) */}
       <EventDetailsModal event={selectedCalendarEvent} isOpen={isEventModalOpen} onClose={closeCalendarEvent} />
     </div>
   );
