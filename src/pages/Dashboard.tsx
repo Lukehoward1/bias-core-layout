@@ -374,15 +374,15 @@ export default function Dashboard() {
               <div className="space-y-2">
                 {upcoming.map((ev) => (
                   <button
-                    key={ev.id}
-                    type="button"
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (isEditMode) return;
-                      openCalendarEvent(ev);
-                    }}
-                    className="w-full text-left flex items-center justify-between p-2 rounded-md bg-muted/40 hover:bg-muted transition-colors"
+  key={ev.id}
+  type="button"
+  onClick={(e) => {
+    e.stopPropagation();
+    if (isEditMode) return;
+    openCalendarEvent(ev);
+  }}
+  className="w-full text-left flex items-center justify-between p-2 rounded-md bg-muted/40 hover:bg-muted transition-colors"
+>
                   >
                     <div className="flex flex-col">
                       <span className="text-sm font-medium text-foreground">{ev.event}</span>
