@@ -1,81 +1,148 @@
-import React, { useMemo, useEffect, useState, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
+
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+
 import {
   TrendingUp,
   Clock,
   Calendar as CalendarIcon,
   Activity,
-  ChevronDown,
   AlertTriangle,
   BookOpen,
   Shield,
   Plus,
 } from "lucide-react";
+
 import { useDashboardLayout, type DashboardCardEntry } from "@/hooks/use-dashboard-layout";
 import { DashboardEditToolbar } from "@/components/dashboard/DashboardEditToolbar";
 import { DashboardRow } from "@/components/dashboard/DashboardRow";
 import { AddCardsModal } from "@/components/dashboard/AddCardsModal";
 import { WatchlistOverviewCard } from "@/components/dashboard/WatchlistOverviewCard";
-import { format } from "date-fns";
-import { Button } from "@/components/ui/button";
+
 import { getCardRenderer, warnMissingRenderers } from "@/data/dashboardCardRenderers";
 import { DASHBOARD_CARD_REGISTRY } from "@/data/dashboardCardRegistry";
+import { cn } from "@/lib/utils";
 
+// ✅ Calendar event modal wiring (dashboard → event details)
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { calendarEvents, type CalendarEvent } from "@/data/calendarEvents";
 
-import { SessionDetailsModal, type TradingSession } from "@/components/dashboard/SessionDetailsModal";
+// ✅ Session details modal (created via prompt)
+import { SessionDetailsModal } from "@/components/dashboard/SessionDetailsModal";
 
-type SessionName = TradingSession["name"];
+type TradingSessionName = "Sydney" | "Asia" | "London" | "New York";
 
-const sessionsDataBase: Array<{
-  name: SessionName;
+type TradingSession = {
+  name: TradingSessionName;
   region: string;
   status: "active" | "closed";
   accent: string;
-}> = [
-  { name: "Sydney", region: "Asia-Pacific", status: "closed", accent: "#2EC4B6" },
-  { name: "Asia", region: "Asia-Pacific Markets", status: "active", accent: "#4361EE" },
-  { name: "London", region: "European", status: "closed", accent: "#F4D35E" },
-  { name: "New York", region: "US Markets", status: "closed", accent: "#F77F00" },
-];
 
-const buildDemoSession = (s: (typeof sessionsDataBase)[number]): TradingSession => {
-  const seconds = s.status === "active" ? 60 * 60 + 23 * 60 + 45 : 2 * 60 * 60 + 15 * 60 + 30;
+  // Required by SessionDetailsModal typing (based on your build errors)
+  opensAtLabel: string;
+  closesAtLabel: string;
+  timeRemainingLabel: string;
+  timeRemainingSeconds: number;
+};
 
-  const opensAtLabel = s.status === "active" ? "—" : "Opens 08:30";
-  const closesAtLabel = s.status === "active" ? "Closes 01:23" : "—";
-  const timeRemainingLabel = s.status === "active" ? "Session closes in" : "Session opens in";
-
-  return {
-    name: s.name,
-    region: s.region,
-    status: s.status,
-    accent: s.accent,
-    opensAtLabel,
-    closesAtLabel,
-    timeRemainingLabel,
-    timeRemainingSeconds: seconds,
-  };
+const buildSessions = (): TradingSession[] => {
+  // Demo seconds so the modal can tick consistently
+  // (If your SessionDetailsModal manages its own ticking, this still works fine.)
+  return [
+    {
+      name: "Sydney",
+      region: "Asia-Pacific",
+      status: "closed",
+      accent: "#2EC4B6",
+      opensAtLabel: "Opens 08:30",
+      closesAtLabel: "—",
+      timeRemainingLabel: "Session opens in",
+      timeRemainingSeconds: 8 * 3600 + 30 * 60,
+    },
+    {
+      name: "Asia",
+      region: "Asia-Pacific Markets",
+      status: "active",
+      accent: "#4361EE",
+      opensAtLabel: "—",
+      closesAtLabel: "Closes 01:23",
+      timeRemainingLabel: "Session closes in",
+      timeRemainingSeconds: 1 * 3600 + 23 * 60 + 45,
+    },
+    {
+      name: "London",
+      region: "European",
+      status: "closed",
+      accent: "#F4D35E",
+      opensAtLabel: "Opens 02:15",
+      closesAtLabel: "—",
+      timeRemainingLabel: "Session opens in",
+      timeRemainingSeconds: 2 * 3600 + 15 * 60 + 30,
+    },
+    {
+      name: "New York",
+      region: "US Markets",
+      status: "closed",
+      accent: "#F77F00",
+      opensAtLabel: "Opens 05:45",
+      closesAtLabel: "—",
+      timeRemainingLabel: "Session opens in",
+      timeRemainingSeconds: 5 * 3600 + 45 * 60 + 12,
+    },
+  ];
 };
 
 export default function Dashboard() {
   const navigate = useNavigate();
 
   const [showAddCardsModal, setShowAddCardsModal] = useState(false);
+
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
   const [dragOverCardId, setDragOverCardId] = useState<string | null>(null);
   const [dragOverRowId, setDragOverRowId] = useState<string | null>(null);
 
-  // ✅ Event modal state
+  // ✅ Event modal state (Dashboard → EventDetailsModal)
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
+  // ✅ Session modal state (Dashboard → SessionDetailsModal)
+  const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
+  const [selectedSessionName, setSelectedSessionName] = useState<TradingSessionName>("Asia");
+
+  const sessions = useMemo(() => buildSessions(), []);
+  const selectedSession = useMemo(() => {
+    const found = sessions.find((s) => s.name === selectedSessionName);
+    return found ?? sessions.find((s) => s.status === "active") ?? sessions[0];
+  }, [sessions, selectedSessionName]);
+
+  // Optional: keep the timeRemainingSeconds ticking here in case the modal expects updates
+  const [sessionTick, setSessionTick] = useState(0);
+  useEffect(() => {
+    if (!isSessionModalOpen) return;
+    const t = window.setInterval(() => setSessionTick((x) => x + 1), 1000);
+    return () => window.clearInterval(t);
+  }, [isSessionModalOpen]);
+
+  const selectedSessionWithTick = useMemo(() => {
+    // Decrement locally while modal is open (demo)
+    const dec = isSessionModalOpen ? sessionTick : 0;
+    const next = Math.max(0, (selectedSession?.timeRemainingSeconds ?? 0) - dec);
+    return { ...selectedSession, timeRemainingSeconds: next } as TradingSession;
+  }, [selectedSession, sessionTick, isSessionModalOpen]);
+
   const openCalendarEvent = useCallback((ev: CalendarEvent) => {
-    setSelectedCalendarEvent(ev);
-    setIsEventModalOpen(true);
+    // prevent stacking
+    setIsEventModalOpen(false);
+    setSelectedCalendarEvent(null);
+
+    requestAnimationFrame(() => {
+      setSelectedCalendarEvent(ev);
+      setIsEventModalOpen(true);
+    });
   }, []);
 
   const closeCalendarEvent = useCallback(() => {
@@ -83,24 +150,28 @@ export default function Dashboard() {
     setSelectedCalendarEvent(null);
   }, []);
 
-  // ✅ Session modal state
-  const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
-  const [selectedSession, setSelectedSession] = useState<TradingSession | null>(null);
+  const openSessionModal = useCallback(
+    (name?: TradingSessionName) => {
+      // prevent stacking / stale open
+      setIsSessionModalOpen(false);
 
-  const openSessionModal = useCallback((sessionName?: SessionName) => {
-    const activeName = sessionsDataBase.find((s) => s.status === "active")?.name ?? "Asia";
-    const pickName = sessionName ?? activeName;
-
-    const base = sessionsDataBase.find((s) => s.name === pickName) ?? sessionsDataBase[1];
-    setSelectedSession(buildDemoSession(base));
-    setIsSessionModalOpen(true);
-  }, []);
+      requestAnimationFrame(() => {
+        if (name) setSelectedSessionName(name);
+        else {
+          const active = sessions.find((s) => s.status === "active")?.name ?? "Asia";
+          setSelectedSessionName(active);
+        }
+        setIsSessionModalOpen(true);
+      });
+    },
+    [sessions],
+  );
 
   const closeSessionModal = useCallback(() => {
     setIsSessionModalOpen(false);
-    setSelectedSession(null);
   }, []);
 
+  // Row-based dashboard layout
   const {
     layout,
     isEditMode,
@@ -117,11 +188,22 @@ export default function Dashboard() {
     getMaxSlots,
   } = useDashboardLayout();
 
+  // Compute set of card IDs on dashboard for modal
   const cardsOnDashboardSet = useMemo(() => {
     const ids = new Set<string>();
     layout.rows.forEach((row) => row.cards.forEach((card) => ids.add(card.id)));
     return ids;
   }, [layout]);
+
+  const handleDragStart = (cardId: string) => setDraggingCardId(cardId);
+
+  const handleDragOver = (cardId: string) => {
+    if (draggingCardId && cardId !== draggingCardId) setDragOverCardId(cardId);
+  };
+
+  const handleDragOverRow = (rowId: string) => {
+    if (draggingCardId) setDragOverRowId(rowId);
+  };
 
   const handleDragEnd = () => {
     if (draggingCardId && dragOverCardId) {
@@ -134,29 +216,43 @@ export default function Dashboard() {
     setDragOverRowId(null);
   };
 
+  // Sample equity data for pinned journal equity card - must be before early return
+  useMemo(() => {
+    const sampleTrades = [
+      { date: "2025-01-03", pnl: 450 },
+      { date: "2025-01-06", pnl: 300 },
+      { date: "2025-01-08", pnl: -400 },
+      { date: "2025-01-10", pnl: 480 },
+      { date: "2025-01-12", pnl: -400 },
+      { date: "2025-01-13", pnl: -73 },
+      { date: "2025-01-14", pnl: 1350 },
+      { date: "2025-01-15", pnl: 600 },
+    ];
+    let cumulative = 0;
+    return sampleTrades.map((t) => {
+      cumulative += t.pnl;
+      return {
+        date: t.date,
+        equity: cumulative,
+        formattedDate: format(new Date(t.date), "MMM d"),
+      };
+    });
+  }, []);
+
   useEffect(() => {
     const registryCardIds = DASHBOARD_CARD_REGISTRY.map((c) => c.id);
     warnMissingRenderers(registryCardIds);
   }, []);
 
-  // ✅ robust click helper (prevents parent drag wrappers eating the click)
-  const handleUpcomingEventActivate = useCallback(
-    (ev: CalendarEvent, e?: any) => {
-      if (e) {
-        e.preventDefault?.();
-        e.stopPropagation?.();
-      }
-      if (isEditMode) return;
-      openCalendarEvent(ev);
-    },
-    [isEditMode, openCalendarEvent],
-  );
-
+  // Render card content based on card ID and slot type
   const renderCardContent = (
     cardEntry: DashboardCardEntry,
     slotType: "wide" | "narrow" | "equal" | "hero" | "kpi",
   ): React.ReactNode => {
-    const renderer = getCardRenderer(cardEntry.id);
+    const cardId = cardEntry.id;
+
+    // Try centralized renderer first
+    const renderer = getCardRenderer(cardId);
     if (renderer) return renderer({ slotType });
 
     switch (cardEntry.id) {
@@ -188,28 +284,29 @@ export default function Dashboard() {
           </Card>
         );
 
+      // ✅ Next Session opens SessionDetailsModal (no routing away)
       case "next-session": {
-        const active = sessionsDataBase.find((s) => s.status === "active") ?? sessionsDataBase[1];
-
+        const active = sessions.find((s) => s.status === "active")?.name ?? "Asia";
         return (
           <Card
-            className="cursor-pointer hover:bg-muted/30 transition-colors h-full flex flex-col"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
+            className={cn("h-full flex flex-col", !isEditMode && "cursor-pointer hover:bg-muted/30 transition-colors")}
+            onClick={() => {
               if (isEditMode) return;
-              openSessionModal(active.name);
+              openSessionModal(active);
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (isEditMode) return;
+              if (e.key === "Enter" || e.key === " ") openSessionModal(active);
             }}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 flex-shrink-0">
               <CardTitle className="text-sm font-medium text-muted-foreground">Next Session</CardTitle>
-              <div className="flex items-center gap-1">
-                <Clock className="h-4 w-4 text-accent" />
-                <ChevronDown className="h-3 w-3 text-muted-foreground" />
-              </div>
+              <Clock className="h-4 w-4 text-accent" />
             </CardHeader>
             <CardContent className="flex-1 flex flex-col justify-center">
-              <div className="text-2xl font-bold text-foreground">{active.name}</div>
+              <div className="text-2xl font-bold text-foreground">{active}</div>
               <p className="text-xs text-muted-foreground mt-1">Click session for details</p>
             </CardContent>
           </Card>
@@ -233,7 +330,108 @@ export default function Dashboard() {
       case "watchlist-overview":
         return <WatchlistOverviewCard isEditMode={isEditMode} slotType={slotType} />;
 
-      // ✅ restore: performance card (fixes Unknown Card)
+      case "session-timers":
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle>Session Timers</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {sessions.map((s) => (
+                  <div
+                    key={s.name}
+                    className="relative p-3 bg-muted/50 rounded-lg border border-border overflow-hidden"
+                  >
+                    <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: s.accent }} />
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium text-foreground text-sm">{s.name}</div>
+                        <div className="text-xs text-muted-foreground">{s.region}</div>
+                      </div>
+                      <div
+                        className={cn(
+                          "text-xs",
+                          s.status === "active" ? "text-success font-medium" : "text-muted-foreground",
+                        )}
+                      >
+                        {s.status === "active" ? "Active" : "Closed"}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      // ✅ Upcoming events clickable and opens EventDetailsModal (reliable click handling)
+      case "upcoming-events": {
+        const upcoming = calendarEvents
+          .slice()
+          .sort((a, b) => (a.time || "").localeCompare(b.time || ""))
+          .slice(0, 4);
+
+        return (
+          <Card className="h-full">
+            <CardHeader className="flex items-center justify-between">
+              <CardTitle className="text-left w-full">Upcoming Events</CardTitle>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => navigate("/calendar")}
+                disabled={isEditMode}
+              >
+                View all
+              </Button>
+            </CardHeader>
+
+            <CardContent>
+              <div className="space-y-3">
+                {upcoming.map((ev) => (
+                  <button
+                    key={ev.id}
+                    type="button"
+                    disabled={isEditMode}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isEditMode) return;
+                      openCalendarEvent(ev);
+                    }}
+                    className={cn(
+                      "w-full text-left flex items-start gap-3 p-3 rounded-lg transition-colors",
+                      "bg-muted/50 hover:bg-muted",
+                      isEditMode && "opacity-60 cursor-not-allowed",
+                    )}
+                  >
+                    <div className="min-w-[56px] text-sm font-medium text-muted-foreground">{ev.time}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-foreground truncate">{ev.event}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{ev.currency}</div>
+                      <div
+                        className={cn(
+                          "text-xs mt-1 font-medium",
+                          ev.impact === "high"
+                            ? "text-destructive"
+                            : ev.impact === "medium"
+                              ? "text-accent"
+                              : "text-muted-foreground",
+                        )}
+                      >
+                        {(ev.impact || "low").toUpperCase()} IMPACT
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      }
+
       case "performance-overview":
         return (
           <Card className="h-full">
@@ -263,72 +461,57 @@ export default function Dashboard() {
           </Card>
         );
 
-      // ✅ Upcoming events clickable → EventDetailsModal
-      case "upcoming-events": {
-        const upcoming = calendarEvents
-          .slice()
-          .sort((a, b) => a.time.localeCompare(b.time))
-          .slice(0, 4);
-
+      case "journal-summary":
         return (
           <Card className="h-full">
-            <CardHeader className="flex items-center justify-between">
-              <CardTitle>Upcoming Events</CardTitle>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="text-xs text-muted-foreground hover:text-foreground"
-                disabled={isEditMode}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  if (isEditMode) return;
-                  navigate("/calendar");
-                }}
-              >
-                View all
-              </Button>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle>Journal Summary</CardTitle>
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-
             <CardContent>
               <div className="space-y-3">
-                {upcoming.map((ev) => (
-                  <button
-                    key={ev.id}
-                    type="button"
-                    className="w-full text-left flex items-center justify-between gap-3 p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors cursor-pointer"
-                    // ✅ pointerdown for drag-wrapper environments
-                    onPointerDown={(e) => handleUpcomingEventActivate(ev, e)}
-                    // ✅ click fallback
-                    onClick={(e) => handleUpcomingEventActivate(ev, e)}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="text-sm font-medium text-muted-foreground min-w-[56px]">{ev.time}</div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium text-foreground truncate">{ev.event}</div>
-                        <div
-                          className={`text-xs mt-1 ${
-                            ev.impact === "high"
-                              ? "text-destructive"
-                              : ev.impact === "medium"
-                                ? "text-accent"
-                                : "text-muted-foreground"
-                          }`}
-                        >
-                          {ev.impact.toUpperCase()} IMPACT
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-xs text-muted-foreground shrink-0">{ev.currency}</div>
-                  </button>
-                ))}
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Entries This Week</span>
+                  <span className="font-medium text-foreground">12</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Avg. Mood</span>
+                  <span className="font-medium text-success">Positive</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Last Entry</span>
+                  <span className="font-medium text-foreground">2h ago</span>
+                </div>
               </div>
             </CardContent>
           </Card>
         );
-      }
+
+      case "risk-snapshot":
+        return (
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle>Risk Snapshot</CardTitle>
+              <Shield className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Daily Drawdown</span>
+                  <span className="font-medium text-foreground">1.2%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Max Position</span>
+                  <span className="font-medium text-foreground">2.5%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Risk Status</span>
+                  <span className="font-medium text-success">Healthy</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
 
       default:
         return (
@@ -350,9 +533,7 @@ export default function Dashboard() {
     }
   };
 
-  const handleAddRow = (afterRowId?: string) => {
-    addRow("equal", afterRowId);
-  };
+  const handleAddRow = (afterRowId?: string) => addRow("equal", afterRowId);
 
   return (
     <div className="p-6 space-y-6">
@@ -387,19 +568,10 @@ export default function Dashboard() {
             dragOverCardId={dragOverCardId}
             dragOverRowId={dragOverRowId}
             renderCardContent={renderCardContent}
-            onDragStart={(id) => setDraggingCardId(id)}
-            onDragOver={(id) => draggingCardId && id !== draggingCardId && setDragOverCardId(id)}
-            onDragEnd={() => {
-              if (draggingCardId && dragOverCardId) {
-                moveCard(draggingCardId, dragOverCardId);
-              } else if (draggingCardId && dragOverRowId) {
-                moveCardToRow(draggingCardId, dragOverRowId);
-              }
-              setDraggingCardId(null);
-              setDragOverCardId(null);
-              setDragOverRowId(null);
-            }}
-            onDragOverRow={(id) => draggingCardId && setDragOverRowId(id)}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+            onDragOverRow={handleDragOverRow}
             onRemoveCard={removeCard}
             onChangeRowType={changeRowType}
             onMoveRow={moveRow}
@@ -432,9 +604,11 @@ export default function Dashboard() {
         onRemoveCard={removeCard}
       />
 
+      {/* ✅ Dashboard → Event Details */}
       <EventDetailsModal event={selectedCalendarEvent} isOpen={isEventModalOpen} onClose={closeCalendarEvent} />
 
-      <SessionDetailsModal isOpen={isSessionModalOpen} onClose={closeSessionModal} session={selectedSession} />
+      {/* ✅ Dashboard → Session Details */}
+      <SessionDetailsModal isOpen={isSessionModalOpen} onClose={closeSessionModal} session={selectedSessionWithTick} />
     </div>
   );
 }
