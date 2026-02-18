@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 
@@ -42,59 +42,55 @@ type TradingSession = {
   status: "active" | "closed";
   accent: string;
 
-  // Required by SessionDetailsModal typing (based on your build errors)
+  // Required by SessionDetailsModal typing
   opensAtLabel: string;
   closesAtLabel: string;
   timeRemainingLabel: string;
   timeRemainingSeconds: number;
 };
 
-const buildSessions = (): TradingSession[] => {
-  // Demo seconds so the modal can tick consistently
-  // (If your SessionDetailsModal manages its own ticking, this still works fine.)
-  return [
-    {
-      name: "Sydney",
-      region: "Asia-Pacific",
-      status: "closed",
-      accent: "#2EC4B6",
-      opensAtLabel: "Opens 08:30",
-      closesAtLabel: "—",
-      timeRemainingLabel: "Session opens in",
-      timeRemainingSeconds: 8 * 3600 + 30 * 60,
-    },
-    {
-      name: "Asia",
-      region: "Asia-Pacific Markets",
-      status: "active",
-      accent: "#4361EE",
-      opensAtLabel: "—",
-      closesAtLabel: "Closes 01:23",
-      timeRemainingLabel: "Session closes in",
-      timeRemainingSeconds: 1 * 3600 + 23 * 60 + 45,
-    },
-    {
-      name: "London",
-      region: "European",
-      status: "closed",
-      accent: "#F4D35E",
-      opensAtLabel: "Opens 02:15",
-      closesAtLabel: "—",
-      timeRemainingLabel: "Session opens in",
-      timeRemainingSeconds: 2 * 3600 + 15 * 60 + 30,
-    },
-    {
-      name: "New York",
-      region: "US Markets",
-      status: "closed",
-      accent: "#F77F00",
-      opensAtLabel: "Opens 05:45",
-      closesAtLabel: "—",
-      timeRemainingLabel: "Session opens in",
-      timeRemainingSeconds: 5 * 3600 + 45 * 60 + 12,
-    },
-  ];
-};
+const buildSessions = (): TradingSession[] => [
+  {
+    name: "Sydney",
+    region: "Asia-Pacific",
+    status: "closed",
+    accent: "#2EC4B6",
+    opensAtLabel: "Opens 08:30",
+    closesAtLabel: "—",
+    timeRemainingLabel: "Session opens in",
+    timeRemainingSeconds: 8 * 3600 + 30 * 60,
+  },
+  {
+    name: "Asia",
+    region: "Asia-Pacific Markets",
+    status: "active",
+    accent: "#4361EE",
+    opensAtLabel: "—",
+    closesAtLabel: "Closes 01:23",
+    timeRemainingLabel: "Session closes in",
+    timeRemainingSeconds: 1 * 3600 + 23 * 60 + 45,
+  },
+  {
+    name: "London",
+    region: "European",
+    status: "closed",
+    accent: "#F4D35E",
+    opensAtLabel: "Opens 02:15",
+    closesAtLabel: "—",
+    timeRemainingLabel: "Session opens in",
+    timeRemainingSeconds: 2 * 3600 + 15 * 60 + 30,
+  },
+  {
+    name: "New York",
+    region: "US Markets",
+    status: "closed",
+    accent: "#F77F00",
+    opensAtLabel: "Opens 05:45",
+    closesAtLabel: "—",
+    timeRemainingLabel: "Session opens in",
+    timeRemainingSeconds: 5 * 3600 + 45 * 60 + 12,
+  },
+];
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -105,11 +101,11 @@ export default function Dashboard() {
   const [dragOverCardId, setDragOverCardId] = useState<string | null>(null);
   const [dragOverRowId, setDragOverRowId] = useState<string | null>(null);
 
-  // ✅ Event modal state (Dashboard → EventDetailsModal)
+  // ✅ Event modal state
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
-  // ✅ Session modal state (Dashboard → SessionDetailsModal)
+  // ✅ Session modal state
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [selectedSessionName, setSelectedSessionName] = useState<TradingSessionName>("Asia");
 
@@ -119,7 +115,7 @@ export default function Dashboard() {
     return found ?? sessions.find((s) => s.status === "active") ?? sessions[0];
   }, [sessions, selectedSessionName]);
 
-  // Optional: keep the timeRemainingSeconds ticking here in case the modal expects updates
+  // tick countdown while modal open (demo)
   const [sessionTick, setSessionTick] = useState(0);
   useEffect(() => {
     if (!isSessionModalOpen) return;
@@ -128,17 +124,14 @@ export default function Dashboard() {
   }, [isSessionModalOpen]);
 
   const selectedSessionWithTick = useMemo(() => {
-    // Decrement locally while modal is open (demo)
     const dec = isSessionModalOpen ? sessionTick : 0;
     const next = Math.max(0, (selectedSession?.timeRemainingSeconds ?? 0) - dec);
     return { ...selectedSession, timeRemainingSeconds: next } as TradingSession;
   }, [selectedSession, sessionTick, isSessionModalOpen]);
 
   const openCalendarEvent = useCallback((ev: CalendarEvent) => {
-    // prevent stacking
     setIsEventModalOpen(false);
     setSelectedCalendarEvent(null);
-
     requestAnimationFrame(() => {
       setSelectedCalendarEvent(ev);
       setIsEventModalOpen(true);
@@ -152,9 +145,7 @@ export default function Dashboard() {
 
   const openSessionModal = useCallback(
     (name?: TradingSessionName) => {
-      // prevent stacking / stale open
       setIsSessionModalOpen(false);
-
       requestAnimationFrame(() => {
         if (name) setSelectedSessionName(name);
         else {
@@ -167,11 +158,9 @@ export default function Dashboard() {
     [sessions],
   );
 
-  const closeSessionModal = useCallback(() => {
-    setIsSessionModalOpen(false);
-  }, []);
+  const closeSessionModal = useCallback(() => setIsSessionModalOpen(false), []);
 
-  // Row-based dashboard layout
+  // Layout system
   const {
     layout,
     isEditMode,
@@ -188,7 +177,6 @@ export default function Dashboard() {
     getMaxSlots,
   } = useDashboardLayout();
 
-  // Compute set of card IDs on dashboard for modal
   const cardsOnDashboardSet = useMemo(() => {
     const ids = new Set<string>();
     layout.rows.forEach((row) => row.cards.forEach((card) => ids.add(card.id)));
@@ -206,17 +194,14 @@ export default function Dashboard() {
   };
 
   const handleDragEnd = () => {
-    if (draggingCardId && dragOverCardId) {
-      moveCard(draggingCardId, dragOverCardId);
-    } else if (draggingCardId && dragOverRowId) {
-      moveCardToRow(draggingCardId, dragOverRowId);
-    }
+    if (draggingCardId && dragOverCardId) moveCard(draggingCardId, dragOverCardId);
+    else if (draggingCardId && dragOverRowId) moveCardToRow(draggingCardId, dragOverRowId);
+
     setDraggingCardId(null);
     setDragOverCardId(null);
     setDragOverRowId(null);
   };
 
-  // Sample equity data for pinned journal equity card - must be before early return
   useMemo(() => {
     const sampleTrades = [
       { date: "2025-01-03", pnl: 450 },
@@ -231,11 +216,7 @@ export default function Dashboard() {
     let cumulative = 0;
     return sampleTrades.map((t) => {
       cumulative += t.pnl;
-      return {
-        date: t.date,
-        equity: cumulative,
-        formattedDate: format(new Date(t.date), "MMM d"),
-      };
+      return { date: t.date, equity: cumulative, formattedDate: format(new Date(t.date), "MMM d") };
     });
   }, []);
 
@@ -244,18 +225,119 @@ export default function Dashboard() {
     warnMissingRenderers(registryCardIds);
   }, []);
 
-  // Render card content based on card ID and slot type
   const renderCardContent = (
     cardEntry: DashboardCardEntry,
     slotType: "wide" | "narrow" | "equal" | "hero" | "kpi",
   ): React.ReactNode => {
     const cardId = cardEntry.id;
 
-    // Try centralized renderer first
+    /**
+     * ✅ IMPORTANT:
+     * Force these to render HERE, NOT via dashboardCardRenderers registry.
+     * This is the reason your clicks kept “not working”.
+     */
+    if (cardId === "upcoming-events") {
+      const upcoming = calendarEvents
+        .slice()
+        .sort((a, b) => (a.time || "").localeCompare(b.time || ""))
+        .slice(0, 4);
+
+      return (
+        <Card className="h-full">
+          <CardHeader className="flex items-center justify-between">
+            <CardTitle className="text-left w-full">Upcoming Events</CardTitle>
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => navigate("/calendar")}
+              disabled={isEditMode}
+            >
+              View all
+            </Button>
+          </CardHeader>
+
+          <CardContent>
+            <div className="space-y-3">
+              {upcoming.map((ev) => (
+                <button
+                  key={ev.id}
+                  type="button"
+                  disabled={isEditMode}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (isEditMode) return;
+                    openCalendarEvent(ev);
+                  }}
+                  className={cn(
+                    "w-full text-left flex items-start gap-3 p-3 rounded-lg transition-colors",
+                    "bg-muted/50 hover:bg-muted",
+                    isEditMode && "opacity-60 cursor-not-allowed",
+                  )}
+                >
+                  <div className="min-w-[56px] text-sm font-medium text-muted-foreground">{ev.time}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-foreground truncate">{ev.event}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{ev.currency}</div>
+                    <div
+                      className={cn(
+                        "text-xs mt-1 font-medium",
+                        ev.impact === "high"
+                          ? "text-destructive"
+                          : ev.impact === "medium"
+                            ? "text-accent"
+                            : "text-muted-foreground",
+                      )}
+                    >
+                      {(ev.impact || "low").toUpperCase()} IMPACT
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    if (cardId === "next-session") {
+      const active = sessions.find((s) => s.status === "active")?.name ?? "Asia";
+
+      return (
+        <Card
+          className={cn("h-full flex flex-col", !isEditMode && "cursor-pointer hover:bg-muted/30 transition-colors")}
+          onClick={() => {
+            if (isEditMode) return;
+            openSessionModal(active);
+          }}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (isEditMode) return;
+            if (e.key === "Enter" || e.key === " ") openSessionModal(active);
+          }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 flex-shrink-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Next Session</CardTitle>
+            <Clock className="h-4 w-4 text-accent" />
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col justify-center">
+            <div className="text-2xl font-bold text-foreground">{active}</div>
+            <p className="text-xs text-muted-foreground mt-1">Click session for details</p>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    // Central renderer for everything else
     const renderer = getCardRenderer(cardId);
     if (renderer) return renderer({ slotType });
 
-    switch (cardEntry.id) {
+    // Legacy fallbacks
+    switch (cardId) {
       case "todays-bias":
         return (
           <Card className="h-full flex flex-col">
@@ -284,35 +366,6 @@ export default function Dashboard() {
           </Card>
         );
 
-      // ✅ Next Session opens SessionDetailsModal (no routing away)
-      case "next-session": {
-        const active = sessions.find((s) => s.status === "active")?.name ?? "Asia";
-        return (
-          <Card
-            className={cn("h-full flex flex-col", !isEditMode && "cursor-pointer hover:bg-muted/30 transition-colors")}
-            onClick={() => {
-              if (isEditMode) return;
-              openSessionModal(active);
-            }}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (isEditMode) return;
-              if (e.key === "Enter" || e.key === " ") openSessionModal(active);
-            }}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 flex-shrink-0">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Next Session</CardTitle>
-              <Clock className="h-4 w-4 text-accent" />
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col justify-center">
-              <div className="text-2xl font-bold text-foreground">{active}</div>
-              <p className="text-xs text-muted-foreground mt-1">Click session for details</p>
-            </CardContent>
-          </Card>
-        );
-      }
-
       case "high-impact-events":
         return (
           <Card className="h-full flex flex-col">
@@ -329,137 +382,6 @@ export default function Dashboard() {
 
       case "watchlist-overview":
         return <WatchlistOverviewCard isEditMode={isEditMode} slotType={slotType} />;
-
-      case "session-timers":
-        return (
-          <Card className="h-full">
-            <CardHeader>
-              <CardTitle>Session Timers</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {sessions.map((s) => (
-                  <div
-                    key={s.name}
-                    className="relative p-3 bg-muted/50 rounded-lg border border-border overflow-hidden"
-                  >
-                    <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: s.accent }} />
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium text-foreground text-sm">{s.name}</div>
-                        <div className="text-xs text-muted-foreground">{s.region}</div>
-                      </div>
-                      <div
-                        className={cn(
-                          "text-xs",
-                          s.status === "active" ? "text-success font-medium" : "text-muted-foreground",
-                        )}
-                      >
-                        {s.status === "active" ? "Active" : "Closed"}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        );
-
-      // ✅ Upcoming events clickable and opens EventDetailsModal (reliable click handling)
-      case "upcoming-events": {
-        const upcoming = calendarEvents
-          .slice()
-          .sort((a, b) => (a.time || "").localeCompare(b.time || ""))
-          .slice(0, 4);
-
-        return (
-          <Card className="h-full">
-            <CardHeader className="flex items-center justify-between">
-              <CardTitle className="text-left w-full">Upcoming Events</CardTitle>
-
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => navigate("/calendar")}
-                disabled={isEditMode}
-              >
-                View all
-              </Button>
-            </CardHeader>
-
-            <CardContent>
-              <div className="space-y-3">
-                {upcoming.map((ev) => (
-                  <button
-                    key={ev.id}
-                    type="button"
-                    disabled={isEditMode}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (isEditMode) return;
-                      openCalendarEvent(ev);
-                    }}
-                    className={cn(
-                      "w-full text-left flex items-start gap-3 p-3 rounded-lg transition-colors",
-                      "bg-muted/50 hover:bg-muted",
-                      isEditMode && "opacity-60 cursor-not-allowed",
-                    )}
-                  >
-                    <div className="min-w-[56px] text-sm font-medium text-muted-foreground">{ev.time}</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-foreground truncate">{ev.event}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{ev.currency}</div>
-                      <div
-                        className={cn(
-                          "text-xs mt-1 font-medium",
-                          ev.impact === "high"
-                            ? "text-destructive"
-                            : ev.impact === "medium"
-                              ? "text-accent"
-                              : "text-muted-foreground",
-                        )}
-                      >
-                        {(ev.impact || "low").toUpperCase()} IMPACT
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        );
-      }
-
-      case "performance-overview":
-        return (
-          <Card className="h-full">
-            <CardHeader>
-              <CardTitle>Performance Overview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">This Week</span>
-                  <span className="text-lg font-bold text-success">+$8,240</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">This Month</span>
-                  <span className="text-lg font-bold text-success">+$24,680</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Win Rate</span>
-                  <span className="text-lg font-bold text-foreground">68%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Total Trades</span>
-                  <span className="text-lg font-bold text-foreground">127</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
 
       case "journal-summary":
         return (
@@ -549,6 +471,7 @@ export default function Dashboard() {
               </p>
             )}
           </div>
+
           <DashboardEditToolbar
             isEditMode={isEditMode}
             onToggleEdit={toggleEditMode}
