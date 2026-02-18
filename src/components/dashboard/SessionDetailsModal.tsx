@@ -1,210 +1,230 @@
-import { useMemo } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Clock, Activity, X } from "lucide-react";
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Clock, X } from "lucide-react";
+import { useAssets } from "@/hooks/use-watchlist";
+
+export type TradingSessionName = "Asia" | "London" | "New York" | "Sydney";
 
 export type TradingSession = {
-  name: "Sydney" | "Asia" | "London" | "New York";
+  name: TradingSessionName;
   region: string;
   status: "active" | "closed";
-  accent: string; // hex for left bar / dot
-  opensAtLabel: string; // e.g. "22:00 GMT"
-  closesAtLabel: string; // e.g. "07:00 GMT"
-  timeRemainingLabel: string; // e.g. "Closes in 1h 23m 45s"
-  timeRemainingSeconds: number; // live countdown value from Dashboard
+  accent: string;
+
+  opensAtLabel: string;
+  closesAtLabel: string;
+  timeRemainingLabel: string;
+  timeRemainingSeconds: number;
 };
 
-interface SessionDetailsModalProps {
-  session: TradingSession | null;
+type SessionDetailsModalProps = {
   isOpen: boolean;
   onClose: () => void;
-}
-
-const formatHMS = (totalSeconds: number) => {
-  const s = Math.max(0, Math.floor(totalSeconds));
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+  session: TradingSession | null;
 };
 
-// Demo placeholders (you'll wire real stats later)
-const sessionVolumeStats: Record<string, { label: string; value: string }[]> = {
-  Sydney: [
-    { label: "Typical volatility", value: "Low–Medium" },
-    { label: "Average range", value: "Smaller" },
-    { label: "Best for", value: "AUD / NZD" },
-  ],
-  Asia: [
-    { label: "Typical volatility", value: "Low" },
-    { label: "Average range", value: "Consolidation" },
-    { label: "Best for", value: "JPY crosses" },
-  ],
-  London: [
-    { label: "Typical volatility", value: "High" },
-    { label: "Average range", value: "Large" },
-    { label: "Best for", value: "EUR / GBP" },
-  ],
-  "New York": [
-    { label: "Typical volatility", value: "High" },
-    { label: "Average range", value: "Large" },
-    { label: "Best for", value: "USD + indices" },
-  ],
+const pad2 = (n: number) => String(Math.max(0, Math.floor(n))).padStart(2, "0");
+
+const formatHMS = (seconds: number) => {
+  const s = Math.max(0, Math.floor(seconds));
+  const hh = Math.floor(s / 3600);
+  const mm = Math.floor((s % 3600) / 60);
+  const ss = s % 60;
+  return `${pad2(hh)}:${pad2(mm)}:${pad2(ss)}`;
 };
 
-const sessionActiveAssets: Record<string, string[]> = {
-  Sydney: ["AUDUSD", "NZDUSD", "AUDJPY"],
-  Asia: ["USDJPY", "EURJPY", "GBPJPY"],
-  London: ["EURUSD", "GBPUSD", "EURGBP", "XAUUSD"],
-  "New York": ["SPX500", "NAS100", "XAUUSD", "EURUSD", "USDJPY"],
-};
+export function SessionDetailsModal({ isOpen, onClose, session }: SessionDetailsModalProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { getAssetBySymbol } = useAssets();
 
-export function SessionDetailsModal({ session, isOpen, onClose }: SessionDetailsModalProps) {
-  // keep hooks stable
-  const safeSession: TradingSession = useMemo(
-    () =>
+  // keep a ticking counter derived from the incoming session seconds
+  const initialSeconds = session?.timeRemainingSeconds ?? 0;
+  const [secondsLeft, setSecondsLeft] = useState<number>(initialSeconds);
+
+  useEffect(() => {
+    // reset when session changes / opens
+    setSecondsLeft(initialSeconds);
+  }, [initialSeconds, session?.name, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!session) return;
+
+    const id = window.setInterval(() => {
+      setSecondsLeft((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => window.clearInterval(id);
+  }, [isOpen, session]);
+
+  const safeSession = useMemo<TradingSession>(() => {
+    return (
       session ?? {
-        name: "London",
-        region: "—",
-        status: "closed",
+        name: "Asia",
+        region: "Asia-Pacific Markets",
+        status: "active",
         accent: "#4361EE",
         opensAtLabel: "—",
-        closesAtLabel: "—",
-        timeRemainingLabel: "—",
-        timeRemainingSeconds: 0,
-      },
-    [session],
+        closesAtLabel: "Closes 01:23",
+        timeRemainingLabel: "Session closes in",
+        timeRemainingSeconds: 3600,
+      }
+    );
+  }, [session]);
+
+  // demo “most active assets” by session
+  const activeAssets = useMemo(() => {
+    switch (safeSession.name) {
+      case "Asia":
+        return ["USDJPY", "EURJPY", "GBPJPY"];
+      case "London":
+        return ["EURUSD", "GBPUSD", "EURGBP"];
+      case "New York":
+        return ["XAUUSD", "US30", "NAS100"];
+      case "Sydney":
+      default:
+        return ["AUDUSD", "NZDUSD", "AUDJPY"];
+    }
+  }, [safeSession.name]);
+
+  const goToAsset = useCallback(
+    (symbol: string) => {
+      onClose();
+
+      requestAnimationFrame(() => {
+        const state = location.state as { backgroundLocation?: Location } | null;
+        const backgroundLocation = state?.backgroundLocation ?? location;
+
+        navigate(`/asset/${symbol}`, {
+          state: { backgroundLocation },
+        });
+      });
+    },
+    [navigate, location, onClose],
   );
 
-  const isActive = safeSession.status === "active";
-  const hms = useMemo(() => formatHMS(safeSession.timeRemainingSeconds), [safeSession.timeRemainingSeconds]);
-
-  // If no session, render nothing (hooks already ran safely)
   if (!session) return null;
-
-  const stats = sessionVolumeStats[safeSession.name] ?? [];
-  const assets = sessionActiveAssets[safeSession.name] ?? [];
 
   return (
     <DialogPrimitive.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogPrimitive.Portal>
-        {/* Overlay */}
         <DialogPrimitive.Overlay
-          className="fixed inset-0 z-[9000] bg-black/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0"
-          onPointerDown={(e) => {
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[10000]"
+          onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
             onClose();
           }}
         />
 
-        {/* Content */}
         <DialogPrimitive.Content
-          className="fixed left-[50%] top-[50%] z-[9001] w-full max-w-lg translate-x-[-50%] translate-y-[-50%] rounded-xl border border-border bg-background shadow-2xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]"
-          onPointerDown={(e) => e.stopPropagation()}
+          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] max-w-2xl max-h-[88vh] overflow-y-auto bg-background border border-border rounded-xl p-0 z-[10001]"
+          onClick={(e) => e.stopPropagation()}
         >
-          {/* Sticky header */}
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border">
             <div className="flex items-center gap-3">
-              <div
-                className="h-3 w-3 rounded-full"
-                style={{ backgroundColor: safeSession.accent }}
-              />
-              <span className="text-lg font-semibold text-foreground">
-                {safeSession.name} Session
-              </span>
-              <Badge variant="secondary" className="text-[10px]">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: safeSession.accent }} />
+              <div className="text-lg font-semibold text-foreground">{safeSession.name} Session</div>
+              <Badge variant="secondary" className="text-xs">
                 {safeSession.region}
               </Badge>
-              <Badge
-                variant={isActive ? "default" : "outline"}
-                className="text-[10px]"
-              >
-                {isActive ? "ACTIVE" : "CLOSED"}
-              </Badge>
+              <Badge className="text-xs">{safeSession.status === "active" ? "ACTIVE" : "CLOSED"}</Badge>
             </div>
 
-            <Button variant="ghost" size="icon" onClick={onClose}>
+            <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
               <X className="h-4 w-4" />
             </Button>
           </div>
 
-          <div className="max-h-[70vh] overflow-y-auto px-5 py-4 space-y-4">
-            {/* Countdown */}
-            <Card>
-              <CardContent className="py-4">
+          <div className="p-6 space-y-4">
+            {/* Time remaining */}
+            <Card className="bg-card border-border">
+              <CardContent className="p-5">
                 <div className="flex items-center gap-2 mb-3">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground">
-                    Time Remaining
-                  </span>
+                  <Clock className="h-4 w-4 text-primary" />
+                  <div className="font-semibold text-foreground">Time Remaining</div>
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
                   <div>
-                    <p className="text-xs text-muted-foreground">
-                      {isActive ? "Session closes in" : "Session opens in"}
-                    </p>
-                    <p className="text-3xl font-mono font-bold text-foreground tracking-wider">
-                      {hms}
-                    </p>
+                    <div className="text-sm text-muted-foreground">{safeSession.timeRemainingLabel}</div>
+                    <div className="text-3xl font-mono font-bold text-foreground mt-1">{formatHMS(secondsLeft)}</div>
                   </div>
 
-                  <div className="text-right text-xs text-muted-foreground space-y-1">
-                    <p>Opens</p>
-                    <p className="text-foreground font-medium">{safeSession.opensAtLabel}</p>
-                    <p>Closes</p>
-                    <p className="text-foreground font-medium">{safeSession.closesAtLabel}</p>
+                  <div className="text-sm text-muted-foreground justify-self-end text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <span>Opens</span>
+                      <span className="text-foreground">{safeSession.opensAtLabel}</span>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 mt-1">
+                      <span>Closes</span>
+                      <span className="text-foreground">{safeSession.closesAtLabel}</span>
+                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Stats */}
-            <Card>
-              <CardContent className="py-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Activity className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground">
-                    Session Stats
-                  </span>
-                </div>
-
+            {/* Session stats (demo) */}
+            <Card className="bg-card border-border">
+              <CardContent className="p-5">
+                <div className="font-semibold text-foreground mb-3">Session Stats</div>
                 <div className="grid grid-cols-3 gap-3">
-                  {stats.map((s) => (
-                    <div key={s.label} className="text-center p-2 rounded-lg bg-muted/40">
-                      <p className="text-[11px] text-muted-foreground">{s.label}</p>
-                      <p className="text-sm font-semibold text-foreground">{s.value}</p>
-                    </div>
-                  ))}
+                  <div className="bg-muted/30 border border-border/50 rounded-lg p-3 text-center">
+                    <div className="text-xs text-muted-foreground">Typical volatility</div>
+                    <div className="font-semibold text-foreground mt-1">Low</div>
+                  </div>
+                  <div className="bg-muted/30 border border-border/50 rounded-lg p-3 text-center">
+                    <div className="text-xs text-muted-foreground">Average range</div>
+                    <div className="font-semibold text-foreground mt-1">Consolidation</div>
+                  </div>
+                  <div className="bg-muted/30 border border-border/50 rounded-lg p-3 text-center">
+                    <div className="text-xs text-muted-foreground">Best for</div>
+                    <div className="font-semibold text-foreground mt-1">JPY crosses</div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
             {/* Most active assets */}
-            <Card>
-              <CardContent className="py-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Activity className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-foreground">
-                    Most Active Assets
-                  </span>
-                </div>
-
+            <Card className="bg-card border-border">
+              <CardContent className="p-5">
+                <div className="font-semibold text-foreground mb-3">Most Active Assets</div>
                 <div className="flex flex-wrap gap-2">
-                  {assets.map((a) => (
-                    <Badge key={a} variant="secondary" className="text-xs">
-                      {a}
-                    </Badge>
-                  ))}
-                </div>
+                  {activeAssets.map((sym) => {
+                    const exists = !!getAssetBySymbol(sym);
 
-                <p className="text-[11px] text-muted-foreground mt-3">
+                    return exists ? (
+                      <button
+                        key={sym}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          goToAsset(sym);
+                        }}
+                        className="focus:outline-none"
+                      >
+                        <Badge className="cursor-pointer hover:opacity-90 transition-opacity">{sym}</Badge>
+                      </button>
+                    ) : (
+                      <span key={sym} title="Coming soon">
+                        <Badge variant="secondary" className="opacity-50 cursor-not-allowed">
+                          {sym}
+                        </Badge>
+                      </span>
+                    );
+                  })}
+                </div>
+                <div className="text-xs text-muted-foreground mt-3">
                   (Demo list for now — later this will come from real activity data.)
-                </p>
+                </div>
               </CardContent>
             </Card>
           </div>
