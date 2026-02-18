@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect, useState, useCallback } from "react";
+import React, { useMemo, useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -139,6 +139,19 @@ export default function Dashboard() {
     warnMissingRenderers(registryCardIds);
   }, []);
 
+  // ✅ robust click helper (prevents parent drag wrappers eating the click)
+  const handleUpcomingEventActivate = useCallback(
+    (ev: CalendarEvent, e?: any) => {
+      if (e) {
+        e.preventDefault?.();
+        e.stopPropagation?.();
+      }
+      if (isEditMode) return;
+      openCalendarEvent(ev);
+    },
+    [isEditMode, openCalendarEvent],
+  );
+
   const renderCardContent = (
     cardEntry: DashboardCardEntry,
     slotType: "wide" | "narrow" | "equal" | "hero" | "kpi",
@@ -220,6 +233,37 @@ export default function Dashboard() {
       case "watchlist-overview":
         return <WatchlistOverviewCard isEditMode={isEditMode} slotType={slotType} />;
 
+      // ✅ restore: performance card (fixes Unknown Card)
+      case "performance-overview":
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle>Performance Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">This Week</span>
+                  <span className="text-lg font-bold text-success">+$8,240</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">This Month</span>
+                  <span className="text-lg font-bold text-success">+$24,680</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Win Rate</span>
+                  <span className="text-lg font-bold text-foreground">68%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Total Trades</span>
+                  <span className="text-lg font-bold text-foreground">127</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      // ✅ Upcoming events clickable → EventDetailsModal
       case "upcoming-events": {
         const upcoming = calendarEvents
           .slice()
@@ -254,12 +298,10 @@ export default function Dashboard() {
                     key={ev.id}
                     type="button"
                     className="w-full text-left flex items-center justify-between gap-3 p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors cursor-pointer"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (isEditMode) return;
-                      openCalendarEvent(ev);
-                    }}
+                    // ✅ pointerdown for drag-wrapper environments
+                    onPointerDown={(e) => handleUpcomingEventActivate(ev, e)}
+                    // ✅ click fallback
+                    onClick={(e) => handleUpcomingEventActivate(ev, e)}
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="text-sm font-medium text-muted-foreground min-w-[56px]">{ev.time}</div>
@@ -347,7 +389,16 @@ export default function Dashboard() {
             renderCardContent={renderCardContent}
             onDragStart={(id) => setDraggingCardId(id)}
             onDragOver={(id) => draggingCardId && id !== draggingCardId && setDragOverCardId(id)}
-            onDragEnd={handleDragEnd}
+            onDragEnd={() => {
+              if (draggingCardId && dragOverCardId) {
+                moveCard(draggingCardId, dragOverCardId);
+              } else if (draggingCardId && dragOverRowId) {
+                moveCardToRow(draggingCardId, dragOverRowId);
+              }
+              setDraggingCardId(null);
+              setDragOverCardId(null);
+              setDragOverRowId(null);
+            }}
             onDragOverRow={(id) => draggingCardId && setDragOverRowId(id)}
             onRemoveCard={removeCard}
             onChangeRowType={changeRowType}
