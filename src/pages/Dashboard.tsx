@@ -30,47 +30,41 @@ import { calendarEvents, type CalendarEvent } from "@/data/calendarEvents";
 // ✅ Session details modal (created via prompt)
 import { SessionDetailsModal } from "@/components/dashboard/SessionDetailsModal";
 
-// ---- Session type for Dashboard → SessionDetailsModal ----
-// (Matches what the build error told us TradingSession requires)
-type TradingSession = {
-  name: string;
+// ✅ Infer the EXACT session type from the modal props (prevents union mismatch errors)
+type TradingSession = NonNullable<React.ComponentProps<typeof SessionDetailsModal>["session"]>;
+type SessionName = TradingSession["name"];
+
+const sessionsDataBase: Array<{
+  name: SessionName;
   region: string;
   status: "active" | "closed";
   accent: string;
+}> = [
+  { name: "Sydney", region: "Asia-Pacific", status: "closed", accent: "#2EC4B6" },
+  { name: "Asia", region: "Asia-Pacific Markets", status: "active", accent: "#4361EE" },
+  { name: "London", region: "European", status: "closed", accent: "#F4D35E" },
+  { name: "New York", region: "US Markets", status: "closed", accent: "#F77F00" },
+];
 
-  opensAtLabel: string;
-  closesAtLabel: string;
-  timeRemainingLabel: string;
-  timeRemainingSeconds: number;
-};
-
-// Simple helper to build a stable “demo session” with required labels + seconds
-const buildDemoSession = (s: { name: string; region: string; status: "active" | "closed"; accent: string }) => {
-  // We keep this deterministic and non-NaN.
-  // If active → “Closes in …”, if closed → “Opens in …”
-  const seconds = s.status === "active" ? 60 * 60 + 23 * 60 + 45 : 2 * 60 * 60 + 15 * 60 + 30; // demo values
+// Build a session object that matches TradingSession (no NaN)
+const buildDemoSession = (s: (typeof sessionsDataBase)[number]): TradingSession => {
+  const seconds = s.status === "active" ? 60 * 60 + 23 * 60 + 45 : 2 * 60 * 60 + 15 * 60 + 30;
 
   const opensAtLabel = s.status === "active" ? "—" : "Opens 08:30";
   const closesAtLabel = s.status === "active" ? "Closes 01:23" : "—";
   const timeRemainingLabel = s.status === "active" ? "Session closes in" : "Session opens in";
 
-  const out: TradingSession = {
-    ...s,
+  return {
+    name: s.name,
+    region: s.region,
+    status: s.status,
+    accent: s.accent,
     opensAtLabel,
     closesAtLabel,
     timeRemainingLabel,
     timeRemainingSeconds: seconds,
   };
-
-  return out;
 };
-
-const sessionsDataBase = [
-  { name: "Sydney", region: "Asia-Pacific", status: "closed" as const, accent: "#2EC4B6" },
-  { name: "Asia", region: "Asia-Pacific Markets", status: "active" as const, accent: "#4361EE" },
-  { name: "London", region: "European", status: "closed" as const, accent: "#F4D35E" },
-  { name: "New York", region: "US Markets", status: "closed" as const, accent: "#F77F00" },
-];
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -100,7 +94,7 @@ export default function Dashboard() {
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<TradingSession | null>(null);
 
-  const openSessionModal = useCallback((sessionName?: string) => {
+  const openSessionModal = useCallback((sessionName?: SessionName) => {
     const activeName = sessionsDataBase.find((s) => s.status === "active")?.name ?? "Asia";
     const pickName = sessionName ?? activeName;
 
@@ -421,7 +415,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Total Trades</span>
-                  <span className="text-lg font-bold text-foreground">127</span>
+                  <span className="text-lg font-bold text-foreground">127%</span>
                 </div>
               </div>
             </CardContent>
@@ -568,10 +562,10 @@ export default function Dashboard() {
             dragOverCardId={dragOverCardId}
             dragOverRowId={dragOverRowId}
             renderCardContent={renderCardContent}
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
+            onDragStart={(id) => setDraggingCardId(id)}
+            onDragOver={(id) => draggingCardId && id !== draggingCardId && setDragOverCardId(id)}
             onDragEnd={handleDragEnd}
-            onDragOverRow={handleDragOverRow}
+            onDragOverRow={(id) => draggingCardId && setDragOverRowId(id)}
             onRemoveCard={removeCard}
             onChangeRowType={changeRowType}
             onMoveRow={moveRow}
