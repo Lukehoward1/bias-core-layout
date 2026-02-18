@@ -232,9 +232,7 @@ export default function Dashboard() {
     const cardId = cardEntry.id;
 
     /**
-     * ✅ IMPORTANT:
-     * Force these to render HERE, NOT via dashboardCardRenderers registry.
-     * This is the reason your clicks kept “not working”.
+     * ✅ Force these to render HERE, NOT via dashboardCardRenderers registry.
      */
     if (cardId === "upcoming-events") {
       const upcoming = calendarEvents
@@ -244,8 +242,9 @@ export default function Dashboard() {
 
       return (
         <Card className="h-full">
-          <CardHeader className="flex items-center justify-between">
-            <CardTitle className="text-left w-full">Upcoming Events</CardTitle>
+          {/* ✅ fixes View all alignment (no centering) */}
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-semibold text-foreground">Upcoming Events</CardTitle>
 
             <Button
               type="button"
@@ -382,6 +381,36 @@ export default function Dashboard() {
 
       case "watchlist-overview":
         return <WatchlistOverviewCard isEditMode={isEditMode} slotType={slotType} />;
+
+      // ✅ Fix: performance overview fallback so it never becomes Unknown Card
+      case "performance-overview":
+        return (
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle>Performance Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">This Week</span>
+                  <span className="text-lg font-bold text-success">+$8,240</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">This Month</span>
+                  <span className="text-lg font-bold text-success">+$24,680</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Win Rate</span>
+                  <span className="text-lg font-bold text-foreground">68%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Total Trades</span>
+                  <span className="text-lg font-bold text-foreground">127</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
 
       case "journal-summary":
         return (
