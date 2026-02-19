@@ -23,7 +23,7 @@ type CalendarEvent = (typeof calendarEvents)[0];
 const normalize = (s: string) =>
   s
     .toLowerCase()
-    .replace(/\(.*?\)/g, " ") // remove bracketed currency like (USD)
+    .replace(/\(.*?\)/g, " ")
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -40,16 +40,12 @@ const extractTimeHHMM = (timeStr: string) => {
   return `${hh.padStart(2, "0")}:${mm}`;
 };
 
-// Alias layer for common variations so it matches Calendar table names
 const normalizeEventAlias = (label: string) => {
   const raw = normalize(label);
-
-  // "CPI (USD)" should match "US CPI"
   if (raw === "cpi") return "us cpi";
   if (raw.includes("cpi") && raw.includes("core")) return "core cpi";
   if (raw.includes("interest rate decision")) return "interest rate decision";
   if (raw.includes("non farm payroll")) return "non farm payrolls";
-
   return raw;
 };
 
@@ -66,11 +62,9 @@ const scoreCalendarMatch = (args: {
 
   let score = 0;
 
-  // Exact / contains match
   if (candNorm === pillNorm) score += 6;
   if (candNorm.includes(pillNorm) || pillNorm.includes(candNorm)) score += 4;
 
-  // Token overlap
   const pillTokens = new Set(pillNorm.split(" ").filter(Boolean));
   const candTokens = new Set(candNorm.split(" ").filter(Boolean));
   let overlap = 0;
@@ -79,13 +73,8 @@ const scoreCalendarMatch = (args: {
   });
   score += overlap;
 
-  // Currency match
   if (pillCurrency && candidate.currency?.toUpperCase() === pillCurrency.toUpperCase()) score += 3;
-
-  // Time match
   if (pillTime && candidate.time === pillTime) score += 2;
-
-  // Slightly prefer higher impact if close
   if (candidate.impact === "high") score += 0.5;
 
   return score;
@@ -112,24 +101,40 @@ const matchCalendarEventId = (label: string, time: string) => {
   return best.ev.id;
 };
 
-// Very light “relevance” filter so cards only show events likely to matter for that symbol
 const isEventRelevantToSymbol = (symbol: string, ev: CalendarEvent) => {
-  // FX pairs: show events where event currency matches either base or quote currency
-  // EURUSD -> EUR or USD
   const base = symbol.slice(0, 3).toUpperCase();
   const quote = symbol.slice(3, 6).toUpperCase();
   const cur = ev.currency?.toUpperCase?.() ?? "";
 
-  // If it's a 6-char FX symbol, do the FX relevance check
   if (symbol.length === 6 && /^[A-Z]{6}$/.test(symbol.toUpperCase())) {
     return cur === base || cur === quote;
   }
 
-  // Non-FX assets: for now show all USD events as "relevant"
-  // (You can refine later by asset type)
   if (cur === "USD") return true;
-
   return false;
+};
+
+/* =======================
+   CATEGORY NORMALIZATION / ORDER
+======================= */
+
+const normalizeCategory = (cat: string) => {
+  const v = (cat || "").toLowerCase();
+  if (v === "fx" || v === "forex") return "Forex";
+  if (v === "indices" || v === "index") return "Indices";
+  if (v === "commodities" || v === "commodity") return "Commodities";
+  if (v === "crypto" || v === "cryptocurrency") return "Crypto";
+  if (v === "etfs" || v === "etf") return "ETFs";
+  if (v === "futures" || v === "future") return "Futures";
+  return cat;
+};
+
+const CATEGORY_ORDER = ["Forex", "Indices", "Commodities", "Crypto", "ETFs", "Futures"] as const;
+
+const categoryRank = (cat: string) => {
+  const norm = normalizeCategory(cat);
+  const idx = CATEGORY_ORDER.indexOf(norm as any);
+  return idx === -1 ? 999 : idx;
 };
 
 /* =======================
@@ -173,8 +178,6 @@ export default function Markets() {
   });
 
   const [searchQuery, setSearchQuery] = useState("");
-
-  // per-card toggle: show all relevant news vs high impact only
   const [expandedNews, setExpandedNews] = useState<Record<string, boolean>>({});
 
   const marketTypes: MarketType[] = ["Watchlist", "All", "FX", "Crypto", "Indices", "Commodities", "ETFs", "Futures"];
@@ -185,23 +188,37 @@ export default function Markets() {
   };
 
   const filteredPairs = useMemo(() => {
+    // base list
     let filtered =
       selectedType === "Watchlist"
         ? watchlistAssets
         : selectedType === "All"
           ? assets
-          : assets.filter((asset) => asset.category === selectedType);
+          : assets.filter((asset) => {
+              const cat = normalizeCategory(asset.category);
+              if (selectedType === "FX") return cat === "Forex";
+              return cat === selectedType;
+            });
 
+    // search
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (asset) =>
           asset.symbol.toLowerCase().includes(query) ||
           asset.displayName.toLowerCase().includes(query) ||
-          asset.category.toLowerCase().includes(query) ||
+          normalizeCategory(asset.category).toLowerCase().includes(query) ||
           asset.biasDirection.toLowerCase().includes(query),
       );
     }
+
+    // enforce category order especially for "All" (and also helps if assets come in random order)
+    filtered = filtered.slice().sort((a, b) => {
+      const ra = categoryRank(a.category);
+      const rb = categoryRank(b.category);
+      if (ra !== rb) return ra - rb;
+      return a.symbol.localeCompare(b.symbol);
+    });
 
     return filtered;
   }, [selectedType, watchlistAssets, searchQuery, assets]);
@@ -218,14 +235,13 @@ export default function Markets() {
     return "text-muted-foreground";
   };
 
-  // Keep your modal overlay routing
+  // ✅ Asset modal overlay routing (kept as-is)
   const openAssetDetail = (symbol: string) => {
     navigate(`/asset/${symbol}?from=${selectedType}`, {
       state: { backgroundLocation: location },
     });
   };
 
-  // When clicking a news pill: open the calendar modal via querystring
   const openCalendarEventByPill = (e: React.MouseEvent, label: string, time: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -245,7 +261,6 @@ export default function Markets() {
 
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          {/* Search Bar */}
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -362,8 +377,6 @@ export default function Markets() {
               const relevantEvents = calendarEvents.filter((ev) => isEventRelevantToSymbol(asset.symbol, ev));
               const highImpactRelevant = relevantEvents.filter((ev) => ev.impact === "high");
               const isExpanded = !!expandedNews[asset.symbol];
-
-              // Default view: high only
               const eventsToShow = isExpanded ? relevantEvents : highImpactRelevant;
 
               return (
@@ -449,7 +462,7 @@ export default function Markets() {
                       </div>
                     </div>
 
-                    {/* News (High only by default, with toggle to see all relevant) */}
+                    {/* News */}
                     <div className="pt-3 border-t border-border">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
@@ -478,7 +491,6 @@ export default function Markets() {
                         <p className="text-xs text-muted-foreground">No relevant events found.</p>
                       ) : (
                         <div className="space-y-2">
-                          {/* CHANGED: show 2 items instead of 3 */}
                           {eventsToShow.slice(0, 2).map((ev) => (
                             <button
                               key={ev.id}
@@ -505,7 +517,6 @@ export default function Markets() {
                             </button>
                           ))}
 
-                          {/* CHANGED: reflect 2-item limit */}
                           {eventsToShow.length > 2 && (
                             <div className="text-[11px] text-muted-foreground">
                               +{eventsToShow.length - 2} more (tap “See all”)
