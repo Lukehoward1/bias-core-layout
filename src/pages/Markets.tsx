@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -133,62 +133,59 @@ const isEventRelevantToSymbol = (symbol: string, ev: CalendarEvent) => {
 };
 
 /* =======================
-   DISPLAY FALLBACKS
-   (prevents "—" cards)
+   PRICE FORMATTING (CONSISTENT)
 ======================= */
 
-const isMissing = (v: unknown) => {
-  if (v === null || v === undefined) return true;
-  if (typeof v === "string") {
-    const s = v.trim();
-    return s === "" || s === "—" || s === "-" || s.toLowerCase() === "na";
-  }
-  return false;
+const toNumberSafe = (raw: unknown): number | null => {
+  if (raw == null) return null;
+  if (typeof raw === "number") return Number.isFinite(raw) ? raw : null;
+  if (typeof raw !== "string") return null;
+
+  const s = raw.trim();
+  if (!s || s === "—" || s === "-") return null;
+
+  // Remove commas and spaces
+  const cleaned = s.replace(/,/g, "").replace(/\s+/g, "");
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
 };
 
-const hashString = (s: string) => {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h = (h << 5) - h + s.charCodeAt(i);
-    h |= 0;
+const getDecimalsForAsset = (asset: any, price: number): number => {
+  const cat = String(asset?.category ?? "").toLowerCase();
+
+  // FX: typically 5dp (or 3 for JPY pairs, but keep it simple/consistent at 5 for now)
+  if (cat === "fx") return 5;
+
+  // Crypto: dynamic, but consistent and realistic
+  if (cat === "crypto") {
+    if (price >= 1000) return 2;
+    if (price >= 1) return 4;
+    return 6;
   }
-  return Math.abs(h);
+
+  // Indices / ETFs / Futures / Commodities: usually 2dp
+  if (cat === "indices" || cat === "etfs" || cat === "futures" || cat === "commodities") return 2;
+
+  // Fallback
+  if (price >= 1000) return 2;
+  if (price >= 1) return 4;
+  return 6;
 };
 
-// Deterministic demo price for missing data (keeps UI consistent)
-const getDemoPriceForSymbol = (symbol: string, category?: string) => {
-  const h = hashString(symbol + (category ?? ""));
-  // FX ~ 0.5 - 2.0, Indices/Comms higher
-  const upper = (category ?? "").toLowerCase();
-  if (upper === "indices") {
-    const n = 3000 + (h % 4000) + (h % 100) / 100;
-    return n.toFixed(2);
-  }
-  if (upper === "commodities") {
-    const n = 50 + (h % 250) + (h % 100) / 100;
-    return n.toFixed(2);
-  }
-  if (upper === "crypto") {
-    const n = 1000 + (h % 60000);
-    return n.toLocaleString();
-  }
-  // Default: FX-like
-  const n = 0.5 + (h % 1500) / 10000; // 0.5 - 0.65
-  // If looks like FX pair, give 5dp
-  if (symbol.length === 6 && /^[A-Z]{6}$/.test(symbol.toUpperCase())) return n.toFixed(5);
-  return n.toFixed(2);
-};
+const formatMarketPrice = (asset: any): string => {
+  const n = toNumberSafe(asset?.latestPrice);
+  if (n == null) return "—";
 
-const getDemoSpread = (symbol: string) => {
-  const h = hashString("spread:" + symbol);
-  const n = 0.6 + (h % 90) / 100; // 0.6 - 1.5
-  return n.toFixed(1);
-};
+  const decimals = getDecimalsForAsset(asset, n);
 
-const getDemoVolume = (symbol: string) => {
-  const h = hashString("vol:" + symbol);
-  const n = 100 + (h % 900); // 100 - 999
-  return `${n}K`;
+  // No commas/grouping – trading UIs typically avoid 10,118 style display
+  const formatted = new Intl.NumberFormat("en-GB", {
+    useGrouping: false,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(n);
+
+  return formatted;
 };
 
 /* =======================
@@ -261,9 +258,6 @@ export default function Markets() {
           asset.biasDirection.toLowerCase().includes(query),
       );
     }
-
-    // keep stable ordering; if you want alpha, you already said that's fine:
-    filtered = [...filtered].sort((a, b) => a.symbol.localeCompare(b.symbol));
 
     return filtered;
   }, [selectedType, watchlistAssets, searchQuery, assets]);
@@ -359,41 +353,32 @@ export default function Markets() {
             </CardHeader>
             <CardContent className="pt-0">
               <div className="space-y-2">
-                {watchlistAssets.map((asset) => {
-                  const displayPrice = !isMissing(asset.latestPrice)
-                    ? String(asset.latestPrice)
-                    : getDemoPriceForSymbol(asset.symbol, asset.category);
-
-                  return (
-                    <div
-                      key={asset.symbol}
-                      onClick={() => openAssetDetail(asset.symbol)}
-                      className="flex items-center gap-4 p-3 rounded-lg bg-background/50 hover:bg-background cursor-pointer transition-colors group"
-                    >
-                      <span className="font-semibold text-foreground min-w-[80px]">{asset.symbol}</span>
-                      <div className={`flex items-center gap-1 min-w-[80px] ${getBiasColor(asset.biasDirection)}`}>
-                        {getBiasIcon(asset.biasDirection)}
-                        <span className="text-sm">{asset.biasDirection}</span>
-                      </div>
-                      <span className="text-sm text-muted-foreground flex-1 truncate">{asset.insight}</span>
-                      <div className="flex items-center gap-3">
-                        <div className="text-xs text-muted-foreground hidden md:block">
-                          <span className="mr-3">Price: {displayPrice}</span>
-                          <span className="mr-3">
-                            Vol: {!isMissing(asset.volume) ? asset.volume : getDemoVolume(asset.symbol)}
-                          </span>
-                          <span>Spread: {!isMissing(asset.spread) ? asset.spread : getDemoSpread(asset.symbol)}</span>
-                        </div>
-                        {asset.news && (
-                          <Badge variant="destructive" className="text-[10px] hidden lg:inline-flex">
-                            News
-                          </Badge>
-                        )}
-                        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                      </div>
+                {watchlistAssets.map((asset) => (
+                  <div
+                    key={asset.symbol}
+                    onClick={() => openAssetDetail(asset.symbol)}
+                    className="flex items-center gap-4 p-3 rounded-lg bg-background/50 hover:bg-background cursor-pointer transition-colors group"
+                  >
+                    <span className="font-semibold text-foreground min-w-[80px]">{asset.symbol}</span>
+                    <div className={`flex items-center gap-1 min-w-[80px] ${getBiasColor(asset.biasDirection)}`}>
+                      {getBiasIcon(asset.biasDirection)}
+                      <span className="text-sm">{asset.biasDirection}</span>
                     </div>
-                  );
-                })}
+                    <span className="text-sm text-muted-foreground flex-1 truncate">{asset.insight}</span>
+                    <div className="flex items-center gap-3">
+                      <div className="text-xs text-muted-foreground hidden md:block">
+                        <span className="mr-3">Vol: {asset.volume}</span>
+                        <span>Spread: {asset.spread}</span>
+                      </div>
+                      {asset.news && (
+                        <Badge variant="destructive" className="text-[10px] hidden lg:inline-flex">
+                          News
+                        </Badge>
+                      )}
+                      <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -437,14 +422,6 @@ export default function Markets() {
               // Default view: high only
               const eventsToShow = isExpanded ? relevantEvents : highImpactRelevant;
 
-              // ✅ Display fallbacks (prevents "—" cards)
-              const displayPrice = !isMissing(asset.latestPrice)
-                ? String(asset.latestPrice)
-                : getDemoPriceForSymbol(asset.symbol, asset.category);
-              const displaySpread = !isMissing(asset.spread) ? String(asset.spread) : getDemoSpread(asset.symbol);
-              const displayVolume = !isMissing(asset.volume) ? String(asset.volume) : getDemoVolume(asset.symbol);
-              const displayChange = !isMissing(asset.priceChange) ? String(asset.priceChange) : "+0.00%";
-
               return (
                 <Card
                   key={asset.symbol}
@@ -476,13 +453,14 @@ export default function Markets() {
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-xl font-bold text-foreground">{displayPrice}</span>
+                      {/* CHANGED: consistent formatted price */}
+                      <span className="text-xl font-bold text-foreground">{formatMarketPrice(asset)}</span>
                       <span
                         className={`text-sm font-medium ${
-                          displayChange.startsWith("+") ? "text-success" : "text-destructive"
+                          asset.priceChange.startsWith("+") ? "text-success" : "text-destructive"
                         }`}
                       >
-                        {displayChange}
+                        {asset.priceChange}
                       </span>
                     </div>
                   </CardHeader>
@@ -491,11 +469,11 @@ export default function Markets() {
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
                         <span className="text-muted-foreground">Spread</span>
-                        <span className="font-medium text-foreground">{displaySpread}</span>
+                        <span className="font-medium text-foreground">{asset.spread}</span>
                       </div>
                       <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
                         <span className="text-muted-foreground">Vol</span>
-                        <span className="font-medium text-foreground">{displayVolume}</span>
+                        <span className="font-medium text-foreground">{asset.volume}</span>
                       </div>
                     </div>
 
@@ -521,9 +499,8 @@ export default function Markets() {
                         <div
                           className={`${asset.sentiment > 0 ? "bg-success" : "bg-destructive"} rounded-full h-1.5 transition-all`}
                           style={{
-                            width: `${Math.min(50, Math.abs(asset.sentiment) / 2)}%`,
-                            marginLeft:
-                              asset.sentiment > 0 ? "50%" : `${50 - Math.min(50, Math.abs(asset.sentiment) / 2)}%`,
+                            width: `${Math.abs(asset.sentiment) / 2}%`,
+                            marginLeft: asset.sentiment > 0 ? "50%" : `${50 - Math.abs(asset.sentiment) / 2}%`,
                           }}
                         />
                       </div>
@@ -558,7 +535,7 @@ export default function Markets() {
                         <p className="text-xs text-muted-foreground">No relevant events found.</p>
                       ) : (
                         <div className="space-y-2">
-                          {/* show 2 items */}
+                          {/* CHANGED: show 2 items instead of 3 */}
                           {eventsToShow.slice(0, 2).map((ev) => (
                             <button
                               key={ev.id}
@@ -585,6 +562,7 @@ export default function Markets() {
                             </button>
                           ))}
 
+                          {/* CHANGED: reflect 2-item limit */}
                           {eventsToShow.length > 2 && (
                             <div className="text-[11px] text-muted-foreground">
                               +{eventsToShow.length - 2} more (tap “See all”)
