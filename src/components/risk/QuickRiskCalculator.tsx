@@ -8,13 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calculator, DollarSign, TrendingUp, LinkIcon, RefreshCw, ArrowRight } from "lucide-react";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
-import { useLinkedAccounts, type LinkedAccount } from "@/hooks/use-linked-accounts";
-import { 
-  getFXInstruments, 
-  getFuturesInstruments, 
+import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
+import {
+  getFXInstruments,
+  getFuturesInstruments,
   getInstrumentBySymbol,
   calculatePositionSize,
-  type TradingInstrument 
 } from "@/data/tradingInstruments";
 import { cn } from "@/lib/utils";
 
@@ -26,46 +25,53 @@ interface QuickRiskCalculatorProps {
 }
 
 const RISK_PRESETS = [0.5, 1, 1.5, 2];
-const RISK_STORAGE_KEY = 'globalRiskPreset';
+const RISK_STORAGE_KEY = "globalRiskPreset";
+
+/** Allow empty inputs visually, but treat empty as 0 for maths */
+const toNumberOrZero = (v: string) => {
+  if (v.trim() === "") return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
 
 export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false }: QuickRiskCalculatorProps) {
   const navigate = useNavigate();
-  
+
   // Account linking - use multi-account hook
-  const { 
-    accounts, 
-    primaryAccount, 
-    isLoading: isAccountLoading,
-    refreshAccount,
-    setPrimaryAccount,
-  } = useLinkedAccounts();
+  const { accounts, primaryAccount, isLoading: isAccountLoading, refreshAccount } = useLinkedAccounts();
 
   // Derived state
   const hasLinkedAccounts = accounts.length > 0;
   const activeAccount = primaryAccount;
   const isConnected = hasLinkedAccounts && activeAccount?.isConnected;
   const balance = activeAccount?.balance ?? null;
-  const currency = activeAccount?.currency ?? 'GBP';
-  
-  // State
-  const [manualBalance, setManualBalance] = useState<number>(10000);
+  const currency = activeAccount?.currency ?? "GBP";
+
+  // ✅ INPUT STATES (STRING) so user can clear the field without it snapping to "0"
+  const [manualBalanceInput, setManualBalanceInput] = useState<string>("10000");
+  const [stopDistanceInput, setStopDistanceInput] = useState<string>("30");
+
+  // Other state
   const [riskPercent, setRiskPercent] = useState<number>(1);
-  const [assetCategory, setAssetCategory] = useState<'FX' | 'Futures'>('FX');
-  const [selectedInstrument, setSelectedInstrument] = useState<string>('EURUSD');
-  const [stopDistance, setStopDistance] = useState<number>(30);
+  const [assetCategory, setAssetCategory] = useState<"FX" | "Futures">("FX");
+  const [selectedInstrument, setSelectedInstrument] = useState<string>("EURUSD");
 
   // Mode indicator
-  const mode = isConnected ? 'Linked' : 'Manual';
+  const mode = isConnected ? "Linked" : "Manual";
 
   // Get instruments based on category
   const instruments = useMemo(() => {
-    return assetCategory === 'FX' ? getFXInstruments() : getFuturesInstruments();
+    return assetCategory === "FX" ? getFXInstruments() : getFuturesInstruments();
   }, [assetCategory]);
 
   // Current instrument
   const currentInstrument = useMemo(() => {
     return getInstrumentBySymbol(selectedInstrument);
   }, [selectedInstrument]);
+
+  // Numeric values used for calculations (empty => 0)
+  const manualBalance = useMemo(() => toNumberOrZero(manualBalanceInput), [manualBalanceInput]);
+  const stopDistance = useMemo(() => toNumberOrZero(stopDistanceInput), [stopDistanceInput]);
 
   // Effective balance (linked or manual)
   const effectiveBalance = isConnected && balance !== null ? balance : manualBalance;
@@ -83,13 +89,15 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
 
   // Update instrument when category changes
   useEffect(() => {
-    const availableInstruments = assetCategory === 'FX' ? getFXInstruments() : getFuturesInstruments();
-    if (availableInstruments.length > 0 && !availableInstruments.find(i => i.symbol === selectedInstrument)) {
+    const availableInstruments = assetCategory === "FX" ? getFXInstruments() : getFuturesInstruments();
+
+    if (availableInstruments.length > 0 && !availableInstruments.find((i) => i.symbol === selectedInstrument)) {
       setSelectedInstrument(availableInstruments[0].symbol);
-      // Reset stop distance to sensible default
-      setStopDistance(assetCategory === 'FX' ? 30 : 10);
     }
-  }, [assetCategory, selectedInstrument]);
+
+    // Reset stop distance to sensible default (as TEXT so it can later be cleared)
+    setStopDistanceInput(assetCategory === "FX" ? "30" : "10");
+  }, [assetCategory]); // intentionally only assetCategory
 
   // Save risk preset
   const handleRiskPresetChange = (value: number) => {
@@ -99,20 +107,15 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
 
   // Calculate results
   const results = useMemo(() => {
-    if (!currentInstrument || stopDistance <= 0) {
+    if (!currentInstrument || stopDistance <= 0 || effectiveBalance <= 0 || riskPercent <= 0) {
       return {
         riskAmount: 0,
         positionSize: 0,
-        formattedSize: '0.00 lots',
+        formattedSize: "0.00 lots",
       };
     }
 
-    return calculatePositionSize(
-      effectiveBalance,
-      riskPercent,
-      stopDistance,
-      currentInstrument
-    );
+    return calculatePositionSize(effectiveBalance, riskPercent, stopDistance, currentInstrument);
   }, [effectiveBalance, riskPercent, stopDistance, currentInstrument]);
 
   // Compact dashboard view
@@ -125,9 +128,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
               <Calculator className="h-4 w-4 text-primary" />
               <CardTitle className="text-sm font-medium">Quick Risk Calculator</CardTitle>
             </div>
-            {onAdd && onRemove && (
-              <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />
-            )}
+            {onAdd && onRemove && <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />}
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -135,7 +136,8 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
             <div>
               <Label className="text-xs text-muted-foreground">Balance</Label>
               <p className="text-sm font-medium">
-                {currency === 'GBP' ? '£' : '$'}{effectiveBalance.toLocaleString()}
+                {currency === "GBP" ? "£" : "$"}
+                {effectiveBalance.toLocaleString()}
               </p>
             </div>
             <div>
@@ -151,7 +153,8 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
             <div className="flex justify-between items-center mt-1">
               <span className="text-xs text-muted-foreground">Risk Amount</span>
               <span className="text-sm font-medium text-destructive">
-                {currency === 'GBP' ? '£' : '$'}{results.riskAmount.toFixed(2)}
+                {currency === "GBP" ? "£" : "$"}
+                {results.riskAmount.toFixed(2)}
               </span>
             </div>
           </div>
@@ -171,11 +174,10 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
               Mode: {mode}
             </Badge>
           </div>
-          {onAdd && onRemove && (
-            <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />
-          )}
+          {onAdd && onRemove && <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />}
         </div>
       </CardHeader>
+
       <CardContent>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column - Inputs */}
@@ -199,7 +201,8 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-2xl font-bold text-foreground">
-                          {currency === 'GBP' ? '£' : '$'}{balance.toLocaleString()}
+                          {currency === "GBP" ? "£" : "$"}
+                          {balance.toLocaleString()}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 mt-1">
@@ -211,17 +214,17 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                             variant="ghost"
                             size="sm"
                             className="text-xs text-primary hover:text-primary/80 h-auto py-0.5 px-1"
-                            onClick={() => navigate('/brokerage')}
+                            onClick={() => navigate("/brokerage")}
                           >
                             Change
                           </Button>
                         )}
                       </div>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => activeAccount && refreshAccount(activeAccount.id)}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => refreshAccount(activeAccount.id)}
                       disabled={isAccountLoading}
                       className="h-8 w-8 shrink-0"
                     >
@@ -230,7 +233,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                   </div>
                 </div>
               ) : (
-                // No linked account - prompt to link
+                // No linked account - prompt to link + manual input
                 <div className="space-y-3">
                   <div className="p-4 rounded-lg bg-muted/50 border border-border">
                     <div className="flex items-start gap-3">
@@ -242,11 +245,11 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                         <p className="text-xs text-muted-foreground mt-1">
                           Link a trading account to auto-sync your balance, or enter it manually below.
                         </p>
-                        <Button 
+                        <Button
                           variant="outline"
                           size="sm"
                           className="mt-3 gap-2"
-                          onClick={() => navigate('/brokerage')}
+                          onClick={() => navigate("/brokerage")}
                         >
                           <LinkIcon className="h-3 w-3" />
                           Link account
@@ -255,6 +258,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                       </div>
                     </div>
                   </div>
+
                   <div>
                     <Label htmlFor="manual-balance" className="text-xs text-muted-foreground">
                       Manual Balance (£)
@@ -262,10 +266,12 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                     <Input
                       id="manual-balance"
                       type="number"
-                      value={manualBalance}
-                      onChange={(e) => setManualBalance(parseFloat(e.target.value) || 0)}
+                      value={manualBalanceInput}
+                      onChange={(e) => setManualBalanceInput(e.target.value)}
                       className="h-9 mt-1"
                       placeholder="10000"
+                      min={0}
+                      step={1}
                     />
                   </div>
                 </div>
@@ -284,16 +290,14 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                       "py-2 px-3 text-sm font-medium rounded-md border transition-all",
                       riskPercent === preset
                         ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                        : "bg-muted/50 border-border hover:bg-muted hover:border-muted-foreground/20"
+                        : "bg-muted/50 border-border hover:bg-muted hover:border-muted-foreground/20",
                     )}
                   >
                     {preset}%
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Saved globally and used across all risk calculations
-              </p>
+              <p className="text-xs text-muted-foreground">Saved globally and used across all risk calculations</p>
             </div>
 
             {/* Asset Category Toggle */}
@@ -301,23 +305,23 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
               <Label className="text-sm font-medium">Asset Type</Label>
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => setAssetCategory('FX')}
+                  onClick={() => setAssetCategory("FX")}
                   className={cn(
                     "py-2 px-4 text-sm font-medium rounded-md border transition-all",
-                    assetCategory === 'FX'
+                    assetCategory === "FX"
                       ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-muted/50 border-border hover:bg-muted"
+                      : "bg-muted/50 border-border hover:bg-muted",
                   )}
                 >
                   FX / Commodities
                 </button>
                 <button
-                  onClick={() => setAssetCategory('Futures')}
+                  onClick={() => setAssetCategory("Futures")}
                   className={cn(
                     "py-2 px-4 text-sm font-medium rounded-md border transition-all",
-                    assetCategory === 'Futures'
+                    assetCategory === "Futures"
                       ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-muted/50 border-border hover:bg-muted"
+                      : "bg-muted/50 border-border hover:bg-muted",
                   )}
                 >
                   Futures
@@ -341,14 +345,14 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                   ))}
                 </SelectContent>
               </Select>
+
               {currentInstrument && (
                 <div className="flex gap-4 text-xs text-muted-foreground">
                   <span>
-                    {currentInstrument.type === 'Futures' ? 'Tick' : 'Pip'} value: £{currentInstrument.pipValue.toFixed(2)}
+                    {currentInstrument.type === "Futures" ? "Tick" : "Pip"} value: £
+                    {currentInstrument.pipValue.toFixed(2)}
                   </span>
-                  <span>
-                    {currentInstrument.type === 'Futures' ? 'Per contract' : 'Per standard lot'}
-                  </span>
+                  <span>{currentInstrument.type === "Futures" ? "Per contract" : "Per standard lot"}</span>
                 </div>
               )}
             </div>
@@ -356,16 +360,17 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
             {/* Stop Distance */}
             <div className="space-y-2">
               <Label htmlFor="stop-distance" className="text-sm font-medium">
-                Stop Distance ({currentInstrument?.unitLabel || 'pips'})
+                Stop Distance ({currentInstrument?.unitLabel || "pips"})
               </Label>
               <Input
                 id="stop-distance"
                 type="number"
-                value={stopDistance}
-                onChange={(e) => setStopDistance(parseFloat(e.target.value) || 0)}
+                value={stopDistanceInput}
+                onChange={(e) => setStopDistanceInput(e.target.value)}
                 className="h-10"
                 min={0}
-                step={currentInstrument?.type === 'Futures' ? 1 : 0.1}
+                step={currentInstrument?.type === "Futures" ? 1 : 0.1}
+                placeholder={assetCategory === "FX" ? "30" : "10"}
               />
             </div>
           </div>
@@ -374,7 +379,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
           <div className="space-y-4">
             <div className="p-6 bg-muted/50 rounded-xl border border-border">
               <h3 className="text-sm font-medium text-muted-foreground mb-5">Calculation Results</h3>
-              
+
               <div className="space-y-5">
                 {/* Account Balance Display */}
                 <div className="flex justify-between items-center pb-4 border-b border-border">
@@ -385,7 +390,8 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                     <span className="text-sm text-muted-foreground">Account Balance</span>
                   </div>
                   <span className="text-lg font-semibold text-foreground">
-                    {currency === 'GBP' ? '£' : '$'}{effectiveBalance.toLocaleString()}
+                    {currency === "GBP" ? "£" : "$"}
+                    {effectiveBalance.toLocaleString()}
                   </span>
                 </div>
 
@@ -401,7 +407,8 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">£ Risked</span>
                   <span className="text-xl font-bold text-destructive">
-                    {currency === 'GBP' ? '£' : '$'}{results.riskAmount.toFixed(2)}
+                    {currency === "GBP" ? "£" : "$"}
+                    {results.riskAmount.toFixed(2)}
                   </span>
                 </div>
 
@@ -411,12 +418,10 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                     <div className="flex items-center gap-2">
                       <TrendingUp className="h-5 w-5 text-primary" />
                       <span className="text-sm font-medium text-foreground">
-                        {currentInstrument?.type === 'Futures' ? 'Contracts' : 'Position Size'}
+                        {currentInstrument?.type === "Futures" ? "Contracts" : "Position Size"}
                       </span>
                     </div>
-                    <span className="text-2xl font-bold text-primary">
-                      {results.formattedSize}
-                    </span>
+                    <span className="text-2xl font-bold text-primary">{results.formattedSize}</span>
                   </div>
                 </div>
               </div>
@@ -425,8 +430,8 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
             {/* Info Note */}
             <div className="p-4 bg-muted/30 border border-border rounded-lg">
               <p className="text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">Note:</span> Calculations update instantly as you adjust inputs. 
-                Always verify position sizes with your broker before placing trades.
+                <span className="font-medium text-foreground">Note:</span> Calculations update instantly as you adjust
+                inputs. Always verify position sizes with your broker before placing trades.
               </p>
             </div>
 
@@ -444,11 +449,15 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                     <p className="font-medium text-foreground">{currentInstrument.type}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">{currentInstrument.type === 'Futures' ? 'Tick Value' : 'Pip Value'}</span>
+                    <span className="text-muted-foreground">
+                      {currentInstrument.type === "Futures" ? "Tick Value" : "Pip Value"}
+                    </span>
                     <p className="font-medium text-foreground">£{currentInstrument.pipValue.toFixed(2)}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">{currentInstrument.type === 'Futures' ? 'Tick Size' : 'Pip Size'}</span>
+                    <span className="text-muted-foreground">
+                      {currentInstrument.type === "Futures" ? "Tick Size" : "Pip Size"}
+                    </span>
                     <p className="font-medium text-foreground">{currentInstrument.pipSize}</p>
                   </div>
                 </div>
