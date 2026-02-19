@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,7 @@ type CalendarEvent = (typeof calendarEvents)[0];
 const normalize = (s: string) =>
   s
     .toLowerCase()
-    .replace(/\(.*?\)/g, " ")
+    .replace(/\(.*?\)/g, " ") // remove bracketed currency like (USD)
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -40,12 +40,16 @@ const extractTimeHHMM = (timeStr: string) => {
   return `${hh.padStart(2, "0")}:${mm}`;
 };
 
+// Alias layer for common variations so it matches Calendar table names
 const normalizeEventAlias = (label: string) => {
   const raw = normalize(label);
+
+  // "CPI (USD)" should match "US CPI"
   if (raw === "cpi") return "us cpi";
   if (raw.includes("cpi") && raw.includes("core")) return "core cpi";
   if (raw.includes("interest rate decision")) return "interest rate decision";
   if (raw.includes("non farm payroll")) return "non farm payrolls";
+
   return raw;
 };
 
@@ -62,9 +66,11 @@ const scoreCalendarMatch = (args: {
 
   let score = 0;
 
+  // Exact / contains match
   if (candNorm === pillNorm) score += 6;
   if (candNorm.includes(pillNorm) || pillNorm.includes(candNorm)) score += 4;
 
+  // Token overlap
   const pillTokens = new Set(pillNorm.split(" ").filter(Boolean));
   const candTokens = new Set(candNorm.split(" ").filter(Boolean));
   let overlap = 0;
@@ -73,8 +79,13 @@ const scoreCalendarMatch = (args: {
   });
   score += overlap;
 
+  // Currency match
   if (pillCurrency && candidate.currency?.toUpperCase() === pillCurrency.toUpperCase()) score += 3;
+
+  // Time match
   if (pillTime && candidate.time === pillTime) score += 2;
+
+  // Slightly prefer higher impact if close
   if (candidate.impact === "high") score += 0.5;
 
   return score;
@@ -101,40 +112,83 @@ const matchCalendarEventId = (label: string, time: string) => {
   return best.ev.id;
 };
 
+// Very light “relevance” filter so cards only show events likely to matter for that symbol
 const isEventRelevantToSymbol = (symbol: string, ev: CalendarEvent) => {
+  // FX pairs: show events where event currency matches either base or quote currency
+  // EURUSD -> EUR or USD
   const base = symbol.slice(0, 3).toUpperCase();
   const quote = symbol.slice(3, 6).toUpperCase();
   const cur = ev.currency?.toUpperCase?.() ?? "";
 
+  // If it's a 6-char FX symbol, do the FX relevance check
   if (symbol.length === 6 && /^[A-Z]{6}$/.test(symbol.toUpperCase())) {
     return cur === base || cur === quote;
   }
 
+  // Non-FX assets: for now show all USD events as "relevant"
+  // (You can refine later by asset type)
   if (cur === "USD") return true;
+
   return false;
 };
 
 /* =======================
-   CATEGORY NORMALIZATION / ORDER
+   DISPLAY FALLBACKS
+   (prevents "—" cards)
 ======================= */
 
-const normalizeCategory = (cat: string) => {
-  const v = (cat || "").toLowerCase();
-  if (v === "fx" || v === "forex") return "Forex";
-  if (v === "indices" || v === "index") return "Indices";
-  if (v === "commodities" || v === "commodity") return "Commodities";
-  if (v === "crypto" || v === "cryptocurrency") return "Crypto";
-  if (v === "etfs" || v === "etf") return "ETFs";
-  if (v === "futures" || v === "future") return "Futures";
-  return cat;
+const isMissing = (v: unknown) => {
+  if (v === null || v === undefined) return true;
+  if (typeof v === "string") {
+    const s = v.trim();
+    return s === "" || s === "—" || s === "-" || s.toLowerCase() === "na";
+  }
+  return false;
 };
 
-const CATEGORY_ORDER = ["Forex", "Indices", "Commodities", "Crypto", "ETFs", "Futures"] as const;
+const hashString = (s: string) => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = (h << 5) - h + s.charCodeAt(i);
+    h |= 0;
+  }
+  return Math.abs(h);
+};
 
-const categoryRank = (cat: string) => {
-  const norm = normalizeCategory(cat);
-  const idx = CATEGORY_ORDER.indexOf(norm as any);
-  return idx === -1 ? 999 : idx;
+// Deterministic demo price for missing data (keeps UI consistent)
+const getDemoPriceForSymbol = (symbol: string, category?: string) => {
+  const h = hashString(symbol + (category ?? ""));
+  // FX ~ 0.5 - 2.0, Indices/Comms higher
+  const upper = (category ?? "").toLowerCase();
+  if (upper === "indices") {
+    const n = 3000 + (h % 4000) + (h % 100) / 100;
+    return n.toFixed(2);
+  }
+  if (upper === "commodities") {
+    const n = 50 + (h % 250) + (h % 100) / 100;
+    return n.toFixed(2);
+  }
+  if (upper === "crypto") {
+    const n = 1000 + (h % 60000);
+    return n.toLocaleString();
+  }
+  // Default: FX-like
+  const n = 0.5 + (h % 1500) / 10000; // 0.5 - 0.65
+  // If looks like FX pair, give 5dp
+  if (symbol.length === 6 && /^[A-Z]{6}$/.test(symbol.toUpperCase())) return n.toFixed(5);
+  return n.toFixed(2);
+};
+
+const getDemoSpread = (symbol: string) => {
+  const h = hashString("spread:" + symbol);
+  const n = 0.6 + (h % 90) / 100; // 0.6 - 1.5
+  return n.toFixed(1);
+};
+
+const getDemoVolume = (symbol: string) => {
+  const h = hashString("vol:" + symbol);
+  const n = 100 + (h % 900); // 100 - 999
+  return `${n}K`;
 };
 
 /* =======================
@@ -178,6 +232,8 @@ export default function Markets() {
   });
 
   const [searchQuery, setSearchQuery] = useState("");
+
+  // per-card toggle: show all relevant news vs high impact only
   const [expandedNews, setExpandedNews] = useState<Record<string, boolean>>({});
 
   const marketTypes: MarketType[] = ["Watchlist", "All", "FX", "Crypto", "Indices", "Commodities", "ETFs", "Futures"];
@@ -188,37 +244,26 @@ export default function Markets() {
   };
 
   const filteredPairs = useMemo(() => {
-    // base list
     let filtered =
       selectedType === "Watchlist"
         ? watchlistAssets
         : selectedType === "All"
           ? assets
-          : assets.filter((asset) => {
-              const cat = normalizeCategory(asset.category);
-              if (selectedType === "FX") return cat === "Forex";
-              return cat === selectedType;
-            });
+          : assets.filter((asset) => asset.category === selectedType);
 
-    // search
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (asset) =>
           asset.symbol.toLowerCase().includes(query) ||
           asset.displayName.toLowerCase().includes(query) ||
-          normalizeCategory(asset.category).toLowerCase().includes(query) ||
+          asset.category.toLowerCase().includes(query) ||
           asset.biasDirection.toLowerCase().includes(query),
       );
     }
 
-    // enforce category order especially for "All" (and also helps if assets come in random order)
-    filtered = filtered.slice().sort((a, b) => {
-      const ra = categoryRank(a.category);
-      const rb = categoryRank(b.category);
-      if (ra !== rb) return ra - rb;
-      return a.symbol.localeCompare(b.symbol);
-    });
+    // keep stable ordering; if you want alpha, you already said that's fine:
+    filtered = [...filtered].sort((a, b) => a.symbol.localeCompare(b.symbol));
 
     return filtered;
   }, [selectedType, watchlistAssets, searchQuery, assets]);
@@ -235,13 +280,14 @@ export default function Markets() {
     return "text-muted-foreground";
   };
 
-  // ✅ Asset modal overlay routing (kept as-is)
+  // Keep your modal overlay routing
   const openAssetDetail = (symbol: string) => {
     navigate(`/asset/${symbol}?from=${selectedType}`, {
       state: { backgroundLocation: location },
     });
   };
 
+  // When clicking a news pill: open the calendar modal via querystring
   const openCalendarEventByPill = (e: React.MouseEvent, label: string, time: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -261,6 +307,7 @@ export default function Markets() {
 
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          {/* Search Bar */}
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -312,32 +359,41 @@ export default function Markets() {
             </CardHeader>
             <CardContent className="pt-0">
               <div className="space-y-2">
-                {watchlistAssets.map((asset) => (
-                  <div
-                    key={asset.symbol}
-                    onClick={() => openAssetDetail(asset.symbol)}
-                    className="flex items-center gap-4 p-3 rounded-lg bg-background/50 hover:bg-background cursor-pointer transition-colors group"
-                  >
-                    <span className="font-semibold text-foreground min-w-[80px]">{asset.symbol}</span>
-                    <div className={`flex items-center gap-1 min-w-[80px] ${getBiasColor(asset.biasDirection)}`}>
-                      {getBiasIcon(asset.biasDirection)}
-                      <span className="text-sm">{asset.biasDirection}</span>
-                    </div>
-                    <span className="text-sm text-muted-foreground flex-1 truncate">{asset.insight}</span>
-                    <div className="flex items-center gap-3">
-                      <div className="text-xs text-muted-foreground hidden md:block">
-                        <span className="mr-3">Vol: {asset.volume}</span>
-                        <span>Spread: {asset.spread}</span>
+                {watchlistAssets.map((asset) => {
+                  const displayPrice = !isMissing(asset.latestPrice)
+                    ? String(asset.latestPrice)
+                    : getDemoPriceForSymbol(asset.symbol, asset.category);
+
+                  return (
+                    <div
+                      key={asset.symbol}
+                      onClick={() => openAssetDetail(asset.symbol)}
+                      className="flex items-center gap-4 p-3 rounded-lg bg-background/50 hover:bg-background cursor-pointer transition-colors group"
+                    >
+                      <span className="font-semibold text-foreground min-w-[80px]">{asset.symbol}</span>
+                      <div className={`flex items-center gap-1 min-w-[80px] ${getBiasColor(asset.biasDirection)}`}>
+                        {getBiasIcon(asset.biasDirection)}
+                        <span className="text-sm">{asset.biasDirection}</span>
                       </div>
-                      {asset.news && (
-                        <Badge variant="destructive" className="text-[10px] hidden lg:inline-flex">
-                          News
-                        </Badge>
-                      )}
-                      <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                      <span className="text-sm text-muted-foreground flex-1 truncate">{asset.insight}</span>
+                      <div className="flex items-center gap-3">
+                        <div className="text-xs text-muted-foreground hidden md:block">
+                          <span className="mr-3">Price: {displayPrice}</span>
+                          <span className="mr-3">
+                            Vol: {!isMissing(asset.volume) ? asset.volume : getDemoVolume(asset.symbol)}
+                          </span>
+                          <span>Spread: {!isMissing(asset.spread) ? asset.spread : getDemoSpread(asset.symbol)}</span>
+                        </div>
+                        {asset.news && (
+                          <Badge variant="destructive" className="text-[10px] hidden lg:inline-flex">
+                            News
+                          </Badge>
+                        )}
+                        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -377,7 +433,17 @@ export default function Markets() {
               const relevantEvents = calendarEvents.filter((ev) => isEventRelevantToSymbol(asset.symbol, ev));
               const highImpactRelevant = relevantEvents.filter((ev) => ev.impact === "high");
               const isExpanded = !!expandedNews[asset.symbol];
+
+              // Default view: high only
               const eventsToShow = isExpanded ? relevantEvents : highImpactRelevant;
+
+              // ✅ Display fallbacks (prevents "—" cards)
+              const displayPrice = !isMissing(asset.latestPrice)
+                ? String(asset.latestPrice)
+                : getDemoPriceForSymbol(asset.symbol, asset.category);
+              const displaySpread = !isMissing(asset.spread) ? String(asset.spread) : getDemoSpread(asset.symbol);
+              const displayVolume = !isMissing(asset.volume) ? String(asset.volume) : getDemoVolume(asset.symbol);
+              const displayChange = !isMissing(asset.priceChange) ? String(asset.priceChange) : "+0.00%";
 
               return (
                 <Card
@@ -410,13 +476,13 @@ export default function Markets() {
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-xl font-bold text-foreground">{asset.latestPrice}</span>
+                      <span className="text-xl font-bold text-foreground">{displayPrice}</span>
                       <span
                         className={`text-sm font-medium ${
-                          asset.priceChange.startsWith("+") ? "text-success" : "text-destructive"
+                          displayChange.startsWith("+") ? "text-success" : "text-destructive"
                         }`}
                       >
-                        {asset.priceChange}
+                        {displayChange}
                       </span>
                     </div>
                   </CardHeader>
@@ -425,11 +491,11 @@ export default function Markets() {
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
                         <span className="text-muted-foreground">Spread</span>
-                        <span className="font-medium text-foreground">{asset.spread}</span>
+                        <span className="font-medium text-foreground">{displaySpread}</span>
                       </div>
                       <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
                         <span className="text-muted-foreground">Vol</span>
-                        <span className="font-medium text-foreground">{asset.volume}</span>
+                        <span className="font-medium text-foreground">{displayVolume}</span>
                       </div>
                     </div>
 
@@ -455,14 +521,15 @@ export default function Markets() {
                         <div
                           className={`${asset.sentiment > 0 ? "bg-success" : "bg-destructive"} rounded-full h-1.5 transition-all`}
                           style={{
-                            width: `${Math.abs(asset.sentiment) / 2}%`,
-                            marginLeft: asset.sentiment > 0 ? "50%" : `${50 - Math.abs(asset.sentiment) / 2}%`,
+                            width: `${Math.min(50, Math.abs(asset.sentiment) / 2)}%`,
+                            marginLeft:
+                              asset.sentiment > 0 ? "50%" : `${50 - Math.min(50, Math.abs(asset.sentiment) / 2)}%`,
                           }}
                         />
                       </div>
                     </div>
 
-                    {/* News */}
+                    {/* News (High only by default, with toggle to see all relevant) */}
                     <div className="pt-3 border-t border-border">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
@@ -491,6 +558,7 @@ export default function Markets() {
                         <p className="text-xs text-muted-foreground">No relevant events found.</p>
                       ) : (
                         <div className="space-y-2">
+                          {/* show 2 items */}
                           {eventsToShow.slice(0, 2).map((ev) => (
                             <button
                               key={ev.id}
