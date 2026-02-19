@@ -15,41 +15,59 @@ interface MaxDrawdownGuardProps {
   compact?: boolean;
 }
 
+/**
+ * ✅ Allow empty numeric inputs (show blank, treat as 0 for calculations)
+ * This avoids the "forced 0" look when clearing fields.
+ */
+const parseNumberOrNull = (raw: string): number | null => {
+  const t = raw.trim();
+  if (t === "") return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+};
+
+const toNumber = (n: number | null, fallback = 0) => (n === null ? fallback : n);
+
 export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: MaxDrawdownGuardProps) {
-  const [limitType, setLimitType] = useState<'percent' | 'cash'>('percent');
-  const [maxDrawdown, setMaxDrawdown] = useState<number>(10);
-  const [startingBalance, setStartingBalance] = useState<number>(10000);
-  const [currentBalance, setCurrentBalance] = useState<number>(9400);
+  const [limitType, setLimitType] = useState<"percent" | "cash">("percent");
+
+  // ✅ store as number|null so inputs can be blank
+  const [maxDrawdown, setMaxDrawdown] = useState<number | null>(10);
+  const [startingBalance, setStartingBalance] = useState<number | null>(10000);
+  const [currentBalance, setCurrentBalance] = useState<number | null>(9400);
 
   // Load saved settings
   useEffect(() => {
-    const saved = localStorage.getItem('maxDrawdownSettings');
+    const saved = localStorage.getItem("maxDrawdownSettings");
     if (saved) {
       const data = JSON.parse(saved);
-      setLimitType(data.type || 'percent');
-      setMaxDrawdown(data.limit || 10);
+      setLimitType(data.type || "percent");
+
+      // Persisted values might be undefined/null/strings — normalize safely
+      const savedLimit = typeof data.limit === "number" && Number.isFinite(data.limit) ? data.limit : undefined;
+      setMaxDrawdown(savedLimit ?? 10);
     }
   }, []);
 
-  // Save settings
+  // Save settings (only store the drawdown setting like before)
   useEffect(() => {
-    localStorage.setItem('maxDrawdownSettings', JSON.stringify({ type: limitType, limit: maxDrawdown }));
+    localStorage.setItem("maxDrawdownSettings", JSON.stringify({ type: limitType, limit: toNumber(maxDrawdown, 0) }));
   }, [limitType, maxDrawdown]);
 
   const results = useMemo(() => {
-    const drawdownCash = startingBalance - currentBalance;
-    const drawdownPercent = startingBalance > 0 ? (drawdownCash / startingBalance) * 100 : 0;
-    
-    const limitCash = limitType === 'percent' 
-      ? (startingBalance * maxDrawdown) / 100 
-      : maxDrawdown;
-    const limitPercent = limitType === 'percent'
-      ? maxDrawdown
-      : startingBalance > 0 ? (maxDrawdown / startingBalance) * 100 : 0;
-    
+    const sBal = toNumber(startingBalance, 0);
+    const cBal = toNumber(currentBalance, 0);
+    const limitVal = toNumber(maxDrawdown, 0);
+
+    const drawdownCash = sBal - cBal;
+    const drawdownPercent = sBal > 0 ? (drawdownCash / sBal) * 100 : 0;
+
+    const limitCash = limitType === "percent" ? (sBal * limitVal) / 100 : limitVal;
+    const limitPercent = limitType === "percent" ? limitVal : sBal > 0 ? (limitVal / sBal) * 100 : 0;
+
     const remainingCash = limitCash - drawdownCash;
     const percentOfLimit = limitCash > 0 ? (drawdownCash / limitCash) * 100 : 0;
-    
+
     return {
       drawdownCash: drawdownCash.toFixed(2),
       drawdownPercent: drawdownPercent.toFixed(2),
@@ -77,18 +95,18 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
               <Shield className="h-4 w-4 text-primary" />
               <CardTitle className="text-sm font-medium">Max Drawdown</CardTitle>
             </div>
-            {onAdd && onRemove && (
-              <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />
-            )}
+            {onAdd && onRemove && <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />}
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex justify-between items-center">
             <span className="text-xs text-muted-foreground">Current DD</span>
-            <span className={cn(
-              "text-lg font-bold",
-              results.isAtLimit ? "text-destructive" : results.isNearLimit ? "text-warning" : "text-foreground"
-            )}>
+            <span
+              className={cn(
+                "text-lg font-bold",
+                results.isAtLimit ? "text-destructive" : results.isNearLimit ? "text-warning" : "text-foreground",
+              )}
+            >
               {results.drawdownPercent}%
             </span>
           </div>
@@ -112,9 +130,7 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
             <Shield className="h-5 w-5 text-primary" />
             <CardTitle>Max Drawdown Guard</CardTitle>
           </div>
-          {onAdd && onRemove && (
-            <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />
-          )}
+          {onAdd && onRemove && <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />}
         </div>
       </CardHeader>
       <CardContent>
@@ -125,31 +141,34 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
               <Label className="text-sm">Limit Type</Label>
               <RadioGroup
                 value={limitType}
-                onValueChange={(v) => setLimitType(v as 'percent' | 'cash')}
+                onValueChange={(v) => setLimitType(v as "percent" | "cash")}
                 className="flex gap-4"
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="percent" id="dd-percent" />
-                  <Label htmlFor="dd-percent" className="cursor-pointer">Percentage</Label>
+                  <Label htmlFor="dd-percent" className="cursor-pointer">
+                    Percentage
+                  </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="cash" id="dd-cash" />
-                  <Label htmlFor="dd-cash" className="cursor-pointer">Cash Amount</Label>
+                  <Label htmlFor="dd-cash" className="cursor-pointer">
+                    Cash Amount
+                  </Label>
                 </div>
               </RadioGroup>
             </div>
 
             {/* Max Drawdown */}
             <div className="space-y-2">
-              <Label className="text-sm">
-                Max Drawdown {limitType === 'percent' ? '(%)' : '($)'}
-              </Label>
+              <Label className="text-sm">Max Drawdown {limitType === "percent" ? "(%)" : "($)"}</Label>
               <Input
                 type="number"
-                value={maxDrawdown}
-                onChange={(e) => setMaxDrawdown(parseFloat(e.target.value) || 0)}
-                step={limitType === 'percent' ? 1 : 100}
+                value={maxDrawdown ?? ""}
+                onChange={(e) => setMaxDrawdown(parseNumberOrNull(e.target.value))}
+                step={limitType === "percent" ? 1 : 100}
                 className="h-9"
+                placeholder={limitType === "percent" ? "10" : "1000"}
               />
             </div>
 
@@ -158,13 +177,12 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
               <Label className="text-sm">Starting Balance ($)</Label>
               <Input
                 type="number"
-                value={startingBalance}
-                onChange={(e) => setStartingBalance(parseFloat(e.target.value) || 0)}
+                value={startingBalance ?? ""}
+                onChange={(e) => setStartingBalance(parseNumberOrNull(e.target.value))}
                 className="h-9"
+                placeholder="10000"
               />
-              <p className="text-xs text-muted-foreground">
-                Your account balance at the start of the period
-              </p>
+              <p className="text-xs text-muted-foreground">Your account balance at the start of the period</p>
             </div>
 
             {/* Current Balance */}
@@ -172,9 +190,10 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
               <Label className="text-sm">Current Balance ($)</Label>
               <Input
                 type="number"
-                value={currentBalance}
-                onChange={(e) => setCurrentBalance(parseFloat(e.target.value) || 0)}
+                value={currentBalance ?? ""}
+                onChange={(e) => setCurrentBalance(parseNumberOrNull(e.target.value))}
                 className="h-9"
+                placeholder="9400"
               />
             </div>
           </div>
@@ -183,26 +202,32 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
             {/* Current Drawdown Display */}
             <div className="p-5 bg-muted/50 rounded-lg border border-border">
               <h3 className="text-sm font-medium text-muted-foreground mb-4">Drawdown Status</h3>
-              
+
               <div className="space-y-4">
                 {/* Current Drawdown */}
                 <div className="text-center pb-4 border-b border-border">
                   <div className="flex items-center justify-center gap-2 mb-2">
-                    <TrendingDown className={cn(
-                      "h-5 w-5",
-                      results.isAtLimit ? "text-destructive" : results.isNearLimit ? "text-warning" : "text-muted-foreground"
-                    )} />
+                    <TrendingDown
+                      className={cn(
+                        "h-5 w-5",
+                        results.isAtLimit
+                          ? "text-destructive"
+                          : results.isNearLimit
+                            ? "text-warning"
+                            : "text-muted-foreground",
+                      )}
+                    />
                     <span className="text-sm text-muted-foreground">Current Drawdown</span>
                   </div>
-                  <p className={cn(
-                    "text-3xl font-bold",
-                    results.isAtLimit ? "text-destructive" : results.isNearLimit ? "text-warning" : "text-foreground"
-                  )}>
+                  <p
+                    className={cn(
+                      "text-3xl font-bold",
+                      results.isAtLimit ? "text-destructive" : results.isNearLimit ? "text-warning" : "text-foreground",
+                    )}
+                  >
                     {results.drawdownPercent}%
                   </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    ${results.drawdownCash} loss
-                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">${results.drawdownCash} loss</p>
                 </div>
 
                 {/* Progress to Limit */}
@@ -227,10 +252,12 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Remaining</p>
-                    <p className={cn(
-                      "text-lg font-bold",
-                      parseFloat(results.remainingCash) <= 0 ? "text-destructive" : "text-success"
-                    )}>
+                    <p
+                      className={cn(
+                        "text-lg font-bold",
+                        parseFloat(results.remainingCash) <= 0 ? "text-destructive" : "text-success",
+                      )}
+                    >
                       ${results.remainingCash}
                     </p>
                   </div>
@@ -240,25 +267,23 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
 
             {/* Warning */}
             {results.isNearLimit && (
-              <div className={cn(
-                "p-4 rounded-lg border flex items-start gap-3",
-                results.isAtLimit 
-                  ? "bg-destructive/10 border-destructive/20" 
-                  : "bg-warning/10 border-warning/20"
-              )}>
-                <AlertTriangle className={cn(
-                  "h-5 w-5 mt-0.5",
-                  results.isAtLimit ? "text-destructive" : "text-warning"
-                )} />
+              <div
+                className={cn(
+                  "p-4 rounded-lg border flex items-start gap-3",
+                  results.isAtLimit ? "bg-destructive/10 border-destructive/20" : "bg-warning/10 border-warning/20",
+                )}
+              >
+                <AlertTriangle
+                  className={cn("h-5 w-5 mt-0.5", results.isAtLimit ? "text-destructive" : "text-warning")}
+                />
                 <div>
                   <p className="font-medium text-sm">
                     {results.isAtLimit ? "Max Drawdown Reached" : "Approaching Max Drawdown"}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {results.isAtLimit 
+                    {results.isAtLimit
                       ? "You've reached your maximum drawdown limit."
-                      : "You're approaching your maximum drawdown limit."
-                    }
+                      : "You're approaching your maximum drawdown limit."}
                   </p>
                 </div>
               </div>
@@ -267,8 +292,8 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
             {/* Info */}
             <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
               <p className="text-sm text-foreground">
-                <span className="font-semibold">Note:</span> This is visual guidance only. 
-                No account restrictions are enforced.
+                <span className="font-semibold">Note:</span> This is visual guidance only. No account restrictions are
+                enforced.
               </p>
             </div>
           </div>
