@@ -15,23 +15,40 @@ interface RiskRewardCalculatorProps {
   compact?: boolean;
 }
 
+/** Allow empty inputs visually, but treat empty as 0 for maths */
+const toNumberOrZero = (v: string) => {
+  if (v.trim() === "") return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
 export function RiskRewardCalculator({ isAdded, onAdd, onRemove, compact = false }: RiskRewardCalculatorProps) {
+  // ✅ Keep slider values as numbers (sliders can’t be empty)
   const [stopDistance, setStopDistance] = useState<number>(30);
   const [targetDistance, setTargetDistance] = useState<number>(60);
-  const [accountBalance, setAccountBalance] = useState<number>(10000);
   const [riskPercent, setRiskPercent] = useState<number>(1);
 
+  // ✅ Inputs that should be allowed to go blank
+  const [stopDistanceInput, setStopDistanceInput] = useState<string>("30");
+  const [targetDistanceInput, setTargetDistanceInput] = useState<string>("60");
+  const [accountBalanceInput, setAccountBalanceInput] = useState<string>("10000");
+
+  // Numeric values for calculations (blank => 0)
+  const stopDistanceNum = useMemo(() => toNumberOrZero(stopDistanceInput), [stopDistanceInput]);
+  const targetDistanceNum = useMemo(() => toNumberOrZero(targetDistanceInput), [targetDistanceInput]);
+  const accountBalanceNum = useMemo(() => toNumberOrZero(accountBalanceInput), [accountBalanceInput]);
+
   const results = useMemo(() => {
-    const rrRatio = stopDistance > 0 ? targetDistance / stopDistance : 0;
-    const riskAmount = (accountBalance * riskPercent) / 100;
+    const rrRatio = stopDistanceNum > 0 ? targetDistanceNum / stopDistanceNum : 0;
+    const riskAmount = (accountBalanceNum * riskPercent) / 100;
     const rewardAmount = riskAmount * rrRatio;
-    
+
     return {
-      rrRatio: rrRatio.toFixed(2),
-      riskAmount: riskAmount.toFixed(2),
-      rewardAmount: rewardAmount.toFixed(2),
+      rrRatio: (Number.isFinite(rrRatio) ? rrRatio : 0).toFixed(2),
+      riskAmount: (Number.isFinite(riskAmount) ? riskAmount : 0).toFixed(2),
+      rewardAmount: (Number.isFinite(rewardAmount) ? rewardAmount : 0).toFixed(2),
     };
-  }, [stopDistance, targetDistance, accountBalance, riskPercent]);
+  }, [stopDistanceNum, targetDistanceNum, accountBalanceNum, riskPercent]);
 
   const getRRColor = (ratio: number) => {
     if (ratio >= 2) return "text-success";
@@ -48,9 +65,7 @@ export function RiskRewardCalculator({ isAdded, onAdd, onRemove, compact = false
               <Scale className="h-4 w-4 text-primary" />
               <CardTitle className="text-sm font-medium">Risk:Reward</CardTitle>
             </div>
-            {onAdd && onRemove && (
-              <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />
-            )}
+            {onAdd && onRemove && <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />}
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -85,11 +100,10 @@ export function RiskRewardCalculator({ isAdded, onAdd, onRemove, compact = false
             <Scale className="h-5 w-5 text-primary" />
             <CardTitle>Risk-to-Reward Calculator</CardTitle>
           </div>
-          {onAdd && onRemove && (
-            <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />
-          )}
+          {onAdd && onRemove && <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />}
         </div>
       </CardHeader>
+
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-5">
@@ -97,17 +111,31 @@ export function RiskRewardCalculator({ isAdded, onAdd, onRemove, compact = false
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <Label className="text-sm">Stop Distance (pips)</Label>
-                <Badge variant="outline" className="text-xs">{stopDistance}</Badge>
+                <Badge variant="outline" className="text-xs">
+                  {stopDistance}
+                </Badge>
               </div>
               <Input
                 type="number"
-                value={stopDistance}
-                onChange={(e) => setStopDistance(parseFloat(e.target.value) || 0)}
+                value={stopDistanceInput}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setStopDistanceInput(v);
+
+                  // If user typed a valid number, sync slider value
+                  const n = toNumberOrZero(v);
+                  if (v.trim() !== "" && Number.isFinite(n)) setStopDistance(n);
+                }}
                 className="h-9"
+                placeholder="30"
+                min={0}
               />
               <Slider
                 value={[stopDistance]}
-                onValueChange={(v) => setStopDistance(v[0])}
+                onValueChange={(v) => {
+                  setStopDistance(v[0]);
+                  setStopDistanceInput(String(v[0]));
+                }}
                 min={5}
                 max={200}
                 step={5}
@@ -119,17 +147,30 @@ export function RiskRewardCalculator({ isAdded, onAdd, onRemove, compact = false
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <Label className="text-sm">Target Distance (pips)</Label>
-                <Badge variant="outline" className="text-xs">{targetDistance}</Badge>
+                <Badge variant="outline" className="text-xs">
+                  {targetDistance}
+                </Badge>
               </div>
               <Input
                 type="number"
-                value={targetDistance}
-                onChange={(e) => setTargetDistance(parseFloat(e.target.value) || 0)}
+                value={targetDistanceInput}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setTargetDistanceInput(v);
+
+                  const n = toNumberOrZero(v);
+                  if (v.trim() !== "" && Number.isFinite(n)) setTargetDistance(n);
+                }}
                 className="h-9"
+                placeholder="60"
+                min={0}
               />
               <Slider
                 value={[targetDistance]}
-                onValueChange={(v) => setTargetDistance(v[0])}
+                onValueChange={(v) => {
+                  setTargetDistance(v[0]);
+                  setTargetDistanceInput(String(v[0]));
+                }}
                 min={5}
                 max={400}
                 step={5}
@@ -142,9 +183,12 @@ export function RiskRewardCalculator({ isAdded, onAdd, onRemove, compact = false
               <Label className="text-sm">Account Balance ($)</Label>
               <Input
                 type="number"
-                value={accountBalance}
-                onChange={(e) => setAccountBalance(parseFloat(e.target.value) || 0)}
+                value={accountBalanceInput}
+                onChange={(e) => setAccountBalanceInput(e.target.value)}
                 className="h-9"
+                placeholder="10000"
+                min={0}
+                step={1}
               />
             </div>
 
@@ -152,7 +196,9 @@ export function RiskRewardCalculator({ isAdded, onAdd, onRemove, compact = false
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <Label className="text-sm">Risk per Trade</Label>
-                <Badge variant="outline" className="text-xs">{riskPercent}%</Badge>
+                <Badge variant="outline" className="text-xs">
+                  {riskPercent}%
+                </Badge>
               </div>
               <Slider
                 value={[riskPercent]}
@@ -169,9 +215,7 @@ export function RiskRewardCalculator({ isAdded, onAdd, onRemove, compact = false
             {/* Main Result */}
             <div className="p-6 bg-muted/50 rounded-lg border border-border text-center">
               <p className="text-sm text-muted-foreground mb-2">Risk:Reward Ratio</p>
-              <p className={cn("text-4xl font-bold", getRRColor(parseFloat(results.rrRatio)))}>
-                1:{results.rrRatio}
-              </p>
+              <p className={cn("text-4xl font-bold", getRRColor(parseFloat(results.rrRatio)))}>1:{results.rrRatio}</p>
             </div>
 
             {/* Amounts */}
@@ -195,8 +239,8 @@ export function RiskRewardCalculator({ isAdded, onAdd, onRemove, compact = false
             {/* Tips */}
             <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
               <p className="text-sm text-foreground">
-                <span className="font-semibold">Tip:</span> A minimum 1:2 R:R is recommended. 
-                This means you need to win only 34% of trades to break even.
+                <span className="font-semibold">Tip:</span> A minimum 1:2 R:R is recommended. This means you need to win
+                only 34% of trades to break even.
               </p>
             </div>
           </div>
