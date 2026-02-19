@@ -12,10 +12,6 @@ import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { calendarEvents } from "@/data/calendarEvents";
 import { toast } from "sonner";
 
-/**
- * ✅ Impact engine (your new mapping file)
- * If your file name/path differs, tell me what it is and I’ll adjust.
- */
 import { getEventImpact } from "@/data/eventImpactRules";
 
 /* =======================
@@ -181,7 +177,6 @@ const toPillImpact = (impact: CalendarEvent["impact"]): "High" | "Medium" | "Low
 
 /* =======================
    ✅ IMPACT ENGINE ADAPTER (SAFE)
-   We don't assume exact return shape of getEventImpact.
 ======================= */
 
 type ImpactResult = {
@@ -206,19 +201,15 @@ const getAffectedSymbols = (res: unknown): string[] => {
 
 const isSymbolAffectedByEvent = (symbol: string, ev: { event: string; currency?: string; impact?: string }) => {
   try {
+    const currency = (ev.currency || extractCurrencyFromLabel(ev.event) || "").toUpperCase();
     const result = getEventImpact({
-      // common fields calendars provide
-      event: ev.event,
       title: ev.event,
-      name: ev.event,
-      currency: ev.currency,
-      impact: ev.impact,
+      currency,
     } as any);
 
     const affected = getAffectedSymbols(result);
     return affected.includes(symbol.toUpperCase());
   } catch {
-    // Fail safe: if mapping fails, don’t crash the page; just treat as not affected
     return false;
   }
 };
@@ -234,23 +225,16 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
   const asset = symbol ? getAssetBySymbol(symbol) : undefined;
   const isWatchlisted = symbol ? isInWatchlist(symbol) : false;
 
-  // Nested calendar overlay
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
-  // ✅ default High-only, toggle to show all relevant
   const [showAllRelevantNews, setShowAllRelevantNews] = useState(false);
-
-  // Cap visible news pills to 3 by default
   const [newsExpanded, setNewsExpanded] = useState(false);
 
   const handleToggleWatchlist = () => {
     toggleWatchlist(symbol);
   };
 
-  /**
-   * ✅ Close current event modal first, then open the next event.
-   */
   const openCalendarEvent = useCallback((ev: CalendarEvent) => {
     setIsEventModalOpen(false);
     setSelectedCalendarEvent(null);
@@ -318,16 +302,9 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
     );
   }, [symbol, asset]);
 
-  /**
-   * ✅ News Impact pills (NOW USING THE IMPACT ENGINE)
-   * - Calendar events included if they affect this symbol
-   * - Extra placeholder events included if they affect this symbol
-   * - High-only toggle still works
-   */
   const newsImpactPills: NewsPill[] = useMemo(() => {
     if (!symbol) return [];
 
-    // 1) Calendar events that affect this asset according to rules engine
     const fromCalendar: NewsPill[] = calendarEvents
       .filter((ev) =>
         isSymbolAffectedByEvent(symbol, {
@@ -344,7 +321,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
         calendarEvent: ev,
       }));
 
-    // 2) Placeholder “extras” for today — ALSO filtered by rules engine (best-effort)
     const extrasRaw = assetNewsEvents[symbol] || [];
     const extras: NewsPill[] = extrasRaw
       .filter((n) => {
@@ -362,16 +338,12 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
         impact: n.impact,
       }));
 
-    // 3) Deduplicate extras that are basically the same as calendar event titles
     const calNormSet = new Set(fromCalendar.map((p) => normalize(p.event)));
     const filteredExtras = extras.filter((x) => !calNormSet.has(normalize(x.event)));
 
     const combined = [...fromCalendar, ...filteredExtras];
 
-    // 4) Apply “High only” toggle
     const filtered = showAllRelevantNews ? combined : combined.filter((p) => p.impact === "High");
-
-    // Fallback: if high-only yields nothing but we *do* have relevant events, show them anyway
     if (!showAllRelevantNews && filtered.length === 0 && combined.length > 0) return combined;
 
     return filtered;
@@ -388,7 +360,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
   return (
     <>
-      {/* Top bar */}
       <div className="sticky top-0 z-10 bg-background border-b border-border px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold text-foreground">{asset.symbol}</h2>
@@ -405,11 +376,9 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
       </div>
 
       <div className="p-6 space-y-6">
-        {/* UNIFIED HERO CARD */}
         <Card className="overflow-hidden">
           <CardContent className="p-8">
             <div className="grid lg:grid-cols-2 gap-8">
-              {/* LEFT */}
               <div className="flex flex-col">
                 <div className="flex items-center gap-3 mb-3">
                   <h1 className="text-4xl font-bold text-foreground">{asset.symbol}</h1>
@@ -451,7 +420,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                     })}
                   </div>
 
-                  {/* ✅ News Impact */}
                   {newsImpactPills.length > 0 && (
                     <div className="mt-5">
                       <div className="flex items-center justify-between mb-3">
@@ -521,7 +489,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                 </div>
               </div>
 
-              {/* RIGHT */}
               <div className="flex flex-col">
                 <div className="grid grid-cols-4 gap-3 mb-6">
                   <div className="p-3 bg-muted/30 rounded-lg text-center">
@@ -594,7 +561,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
           </CardContent>
         </Card>
 
-        {/* AI MARKET OVERVIEW */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -622,7 +588,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
           </CardContent>
         </Card>
 
-        {/* Grid */}
         <div className="grid lg:grid-cols-3 gap-6">
           <Card>
             <CardHeader>
@@ -679,7 +644,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
             </CardContent>
           </Card>
 
-          {/* ✅ Clickable → opens EventDetailsModal via matching */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
@@ -720,7 +684,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
         </div>
       </div>
 
-      {/* Nested Calendar overlay */}
       <EventDetailsModal
         event={selectedCalendarEvent as any}
         isOpen={isEventModalOpen}
@@ -730,15 +693,8 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
   );
 }
 
-/* =======================
-   ✅ PAGE ROUTE (NO DIALOG)
-   App.tsx already handles modal-routing dialog for /asset/:symbol.
-======================= */
-
 export default function AssetDetail() {
   const { symbol } = useParams<{ symbol: string }>();
-
   if (!symbol) return null;
-
   return <AssetDetailContent symbol={symbol} />;
 }
