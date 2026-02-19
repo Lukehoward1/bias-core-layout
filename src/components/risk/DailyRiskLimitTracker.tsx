@@ -16,39 +16,58 @@ interface DailyRiskLimitTrackerProps {
   compact?: boolean;
 }
 
+/** Allow empty inputs visually, but treat empty as 0 for maths */
+const toNumberOrZero = (v: string) => {
+  if (v.trim() === "") return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
 export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = false }: DailyRiskLimitTrackerProps) {
-  const [limitType, setLimitType] = useState<'percent' | 'cash'>('percent');
-  const [dailyLimit, setDailyLimit] = useState<number>(5);
-  const [accountBalance, setAccountBalance] = useState<number>(10000);
-  const [lossToday, setLossToday] = useState<number>(150);
+  const [limitType, setLimitType] = useState<"percent" | "cash">("percent");
+
+  // ✅ keep inputs as strings so they can be blank
+  const [dailyLimitInput, setDailyLimitInput] = useState<string>("5");
+  const [accountBalanceInput, setAccountBalanceInput] = useState<string>("10000");
+  const [lossTodayInput, setLossTodayInput] = useState<string>("150");
+
+  // Numeric values for calculations (blank => 0)
+  const dailyLimit = useMemo(() => toNumberOrZero(dailyLimitInput), [dailyLimitInput]);
+  const accountBalance = useMemo(() => toNumberOrZero(accountBalanceInput), [accountBalanceInput]);
+  const lossToday = useMemo(() => toNumberOrZero(lossTodayInput), [lossTodayInput]);
 
   // Load saved settings
   useEffect(() => {
-    const saved = localStorage.getItem('dailyRiskLimit');
+    const saved = localStorage.getItem("dailyRiskLimit");
     if (saved) {
-      const data = JSON.parse(saved);
-      setLimitType(data.type || 'percent');
-      setDailyLimit(data.limit || 5);
+      try {
+        const data = JSON.parse(saved);
+        setLimitType(data.type === "cash" ? "cash" : "percent");
+
+        // keep as string so user can still blank it later
+        const n = Number(data.limit);
+        setDailyLimitInput(Number.isFinite(n) ? String(n) : "5");
+      } catch {
+        // ignore bad storage
+      }
     }
   }, []);
 
-  // Save settings
+  // Save settings (store numeric)
   useEffect(() => {
-    localStorage.setItem('dailyRiskLimit', JSON.stringify({ type: limitType, limit: dailyLimit }));
+    localStorage.setItem("dailyRiskLimit", JSON.stringify({ type: limitType, limit: dailyLimit }));
   }, [limitType, dailyLimit]);
 
   const results = useMemo(() => {
-    const limitCash = limitType === 'percent' 
-      ? (accountBalance * dailyLimit) / 100 
-      : dailyLimit;
-    
+    const limitCash = limitType === "percent" ? (accountBalance * dailyLimit) / 100 : dailyLimit;
+
     const remaining = limitCash - lossToday;
     const percentUsed = limitCash > 0 ? (lossToday / limitCash) * 100 : 0;
-    
+
     return {
-      limitCash: limitCash.toFixed(2),
-      remaining: remaining.toFixed(2),
-      percentUsed: Math.min(percentUsed, 100).toFixed(1),
+      limitCash: (Number.isFinite(limitCash) ? limitCash : 0).toFixed(2),
+      remaining: (Number.isFinite(remaining) ? remaining : 0).toFixed(2),
+      percentUsed: Math.min(Number.isFinite(percentUsed) ? percentUsed : 0, 100).toFixed(1),
       isNearLimit: percentUsed >= 80,
       isAtLimit: percentUsed >= 100,
     };
@@ -69,19 +88,19 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
               <ShieldCheck className="h-4 w-4 text-primary" />
               <CardTitle className="text-sm font-medium">Daily Risk Limit</CardTitle>
             </div>
-            {onAdd && onRemove && (
-              <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />
-            )}
+            {onAdd && onRemove && <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />}
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-1.5">
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Used: {results.percentUsed}%</span>
-              <span className={cn(
-                "font-medium",
-                results.isAtLimit ? "text-destructive" : results.isNearLimit ? "text-warning" : "text-success"
-              )}>
+              <span
+                className={cn(
+                  "font-medium",
+                  results.isAtLimit ? "text-destructive" : results.isNearLimit ? "text-warning" : "text-success",
+                )}
+              >
                 ${results.remaining} left
               </span>
             </div>
@@ -106,11 +125,10 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
             <ShieldCheck className="h-5 w-5 text-primary" />
             <CardTitle>Daily Risk Limit Tracker</CardTitle>
           </div>
-          {onAdd && onRemove && (
-            <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />
-          )}
+          {onAdd && onRemove && <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />}
         </div>
       </CardHeader>
+
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-5">
@@ -119,31 +137,35 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
               <Label className="text-sm">Limit Type</Label>
               <RadioGroup
                 value={limitType}
-                onValueChange={(v) => setLimitType(v as 'percent' | 'cash')}
+                onValueChange={(v) => setLimitType(v as "percent" | "cash")}
                 className="flex gap-4"
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="percent" id="percent" />
-                  <Label htmlFor="percent" className="cursor-pointer">Percentage</Label>
+                  <Label htmlFor="percent" className="cursor-pointer">
+                    Percentage
+                  </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="cash" id="cash" />
-                  <Label htmlFor="cash" className="cursor-pointer">Cash Amount</Label>
+                  <Label htmlFor="cash" className="cursor-pointer">
+                    Cash Amount
+                  </Label>
                 </div>
               </RadioGroup>
             </div>
 
             {/* Daily Limit */}
             <div className="space-y-2">
-              <Label className="text-sm">
-                Daily Loss Limit {limitType === 'percent' ? '(%)' : '($)'}
-              </Label>
+              <Label className="text-sm">Daily Loss Limit {limitType === "percent" ? "(%)" : "($)"}</Label>
               <Input
                 type="number"
-                value={dailyLimit}
-                onChange={(e) => setDailyLimit(parseFloat(e.target.value) || 0)}
-                step={limitType === 'percent' ? 0.5 : 50}
+                value={dailyLimitInput}
+                onChange={(e) => setDailyLimitInput(e.target.value)}
+                step={limitType === "percent" ? 0.5 : 50}
                 className="h-9"
+                placeholder={limitType === "percent" ? "5" : "500"}
+                min={0}
               />
             </div>
 
@@ -152,9 +174,11 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
               <Label className="text-sm">Account Balance ($)</Label>
               <Input
                 type="number"
-                value={accountBalance}
-                onChange={(e) => setAccountBalance(parseFloat(e.target.value) || 0)}
+                value={accountBalanceInput}
+                onChange={(e) => setAccountBalanceInput(e.target.value)}
                 className="h-9"
+                placeholder="10000"
+                min={0}
               />
             </div>
 
@@ -163,13 +187,13 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
               <Label className="text-sm">Today's Loss ($)</Label>
               <Input
                 type="number"
-                value={lossToday}
-                onChange={(e) => setLossToday(parseFloat(e.target.value) || 0)}
+                value={lossTodayInput}
+                onChange={(e) => setLossTodayInput(e.target.value)}
                 className="h-9"
+                placeholder="0"
+                min={0}
               />
-              <p className="text-xs text-muted-foreground">
-                Enter your realized losses for today
-              </p>
+              <p className="text-xs text-muted-foreground">Enter your realized losses for today</p>
             </div>
           </div>
 
@@ -177,7 +201,7 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
             {/* Visual Progress */}
             <div className="p-5 bg-muted/50 rounded-lg border border-border">
               <h3 className="text-sm font-medium text-muted-foreground mb-4">Daily Limit Status</h3>
-              
+
               <div className="space-y-4">
                 {/* Progress Bar */}
                 <div className="space-y-2">
@@ -201,10 +225,12 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Remaining</p>
-                    <p className={cn(
-                      "text-lg font-bold",
-                      parseFloat(results.remaining) <= 0 ? "text-destructive" : "text-success"
-                    )}>
+                    <p
+                      className={cn(
+                        "text-lg font-bold",
+                        parseFloat(results.remaining) <= 0 ? "text-destructive" : "text-success",
+                      )}
+                    >
                       ${results.remaining}
                     </p>
                   </div>
@@ -214,25 +240,23 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
 
             {/* Warning */}
             {results.isNearLimit && (
-              <div className={cn(
-                "p-4 rounded-lg border flex items-start gap-3",
-                results.isAtLimit 
-                  ? "bg-destructive/10 border-destructive/20" 
-                  : "bg-warning/10 border-warning/20"
-              )}>
-                <AlertTriangle className={cn(
-                  "h-5 w-5 mt-0.5",
-                  results.isAtLimit ? "text-destructive" : "text-warning"
-                )} />
+              <div
+                className={cn(
+                  "p-4 rounded-lg border flex items-start gap-3",
+                  results.isAtLimit ? "bg-destructive/10 border-destructive/20" : "bg-warning/10 border-warning/20",
+                )}
+              >
+                <AlertTriangle
+                  className={cn("h-5 w-5 mt-0.5", results.isAtLimit ? "text-destructive" : "text-warning")}
+                />
                 <div>
                   <p className="font-medium text-sm">
                     {results.isAtLimit ? "Daily Limit Reached" : "Approaching Daily Limit"}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {results.isAtLimit 
+                    {results.isAtLimit
                       ? "You've reached your daily loss limit. Consider stopping trading for today."
-                      : "You're close to your daily loss limit. Trade cautiously."
-                    }
+                      : "You're close to your daily loss limit. Trade cautiously."}
                   </p>
                 </div>
               </div>
@@ -241,8 +265,8 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
             {/* Info */}
             <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
               <p className="text-sm text-foreground">
-                <span className="font-semibold">Note:</span> This is for tracking only. 
-                No trades will be blocked automatically.
+                <span className="font-semibold">Note:</span> This is for tracking only. No trades will be blocked
+                automatically.
               </p>
             </div>
           </div>
