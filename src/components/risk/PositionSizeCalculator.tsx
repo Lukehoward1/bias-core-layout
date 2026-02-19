@@ -15,52 +15,70 @@ interface PositionSizeCalculatorProps {
 
 // Pip value lookup (approximate values per standard lot)
 const pipValues: Record<string, number> = {
-  'EURUSD': 10,
-  'GBPUSD': 10,
-  'USDJPY': 9.09,
-  'XAUUSD': 1,
-  'NAS100': 1,
-  'US30': 1,
+  EURUSD: 10,
+  GBPUSD: 10,
+  USDJPY: 9.09,
+  XAUUSD: 1,
+  NAS100: 1,
+  US30: 1,
 };
 
 const instruments = [
-  { value: 'EURUSD', label: 'EUR/USD' },
-  { value: 'GBPUSD', label: 'GBP/USD' },
-  { value: 'USDJPY', label: 'USD/JPY' },
-  { value: 'XAUUSD', label: 'Gold (XAU/USD)' },
-  { value: 'NAS100', label: 'NAS100' },
-  { value: 'US30', label: 'US30' },
+  { value: "EURUSD", label: "EUR/USD" },
+  { value: "GBPUSD", label: "GBP/USD" },
+  { value: "USDJPY", label: "USD/JPY" },
+  { value: "XAUUSD", label: "Gold (XAU/USD)" },
+  { value: "NAS100", label: "NAS100" },
+  { value: "US30", label: "US30" },
 ];
 
+/** Allow empty inputs visually, but treat empty as 0 for maths */
+const toNumberOrZero = (v: string) => {
+  if (v.trim() === "") return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
 export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = false }: PositionSizeCalculatorProps) {
-  const [accountBalance, setAccountBalance] = useState<number>(10000);
-  const [riskPercent, setRiskPercent] = useState<number>(2);
-  const [instrument, setInstrument] = useState<string>('EURUSD');
-  const [entryPrice, setEntryPrice] = useState<number>(1.0850);
-  const [stopLoss, setStopLoss] = useState<number>(1.0820);
-  const [takeProfit, setTakeProfit] = useState<number>(1.0910);
-  const [leverage, setLeverage] = useState<string>('100');
+  const [instrument, setInstrument] = useState<string>("EURUSD");
+  const [leverage, setLeverage] = useState<string>("100");
+
+  // ✅ Input states as strings so they can be blank
+  const [accountBalanceInput, setAccountBalanceInput] = useState<string>("10000");
+  const [riskPercentInput, setRiskPercentInput] = useState<string>("2");
+  const [entryPriceInput, setEntryPriceInput] = useState<string>("1.0850");
+  const [stopLossInput, setStopLossInput] = useState<string>("1.0820");
+  const [takeProfitInput, setTakeProfitInput] = useState<string>("1.0910");
+
+  // Numeric values for calculations (blank => 0)
+  const accountBalance = useMemo(() => toNumberOrZero(accountBalanceInput), [accountBalanceInput]);
+  const riskPercent = useMemo(() => toNumberOrZero(riskPercentInput), [riskPercentInput]);
+  const entryPrice = useMemo(() => toNumberOrZero(entryPriceInput), [entryPriceInput]);
+  const stopLoss = useMemo(() => toNumberOrZero(stopLossInput), [stopLossInput]);
+  const takeProfit = useMemo(() => toNumberOrZero(takeProfitInput), [takeProfitInput]);
 
   const results = useMemo(() => {
-    const riskAmount = (accountBalance * riskPercent) / 100;
+    const riskAmountRaw = (accountBalance * riskPercent) / 100;
     const pipValue = pipValues[instrument] || 10;
-    
+
     // Calculate pip distances
-    const pipSize = instrument === 'USDJPY' ? 0.01 : instrument.includes('USD') && instrument !== 'XAUUSD' ? 0.0001 : 0.01;
-    const stopPips = Math.abs(entryPrice - stopLoss) / pipSize;
-    const tpPips = Math.abs(takeProfit - entryPrice) / pipSize;
-    
-    const lotSize = stopPips > 0 ? riskAmount / (stopPips * pipValue) : 0;
-    const rewardAmount = lotSize * tpPips * pipValue;
-    const rrRatio = stopPips > 0 ? tpPips / stopPips : 0;
+    const pipSize =
+      instrument === "USDJPY" ? 0.01 : instrument.includes("USD") && instrument !== "XAUUSD" ? 0.0001 : 0.01;
+
+    const stopPipsRaw = Math.abs(entryPrice - stopLoss) / pipSize;
+    const tpPipsRaw = Math.abs(takeProfit - entryPrice) / pipSize;
+
+    const lotSizeRaw = stopPipsRaw > 0 ? riskAmountRaw / (stopPipsRaw * pipValue) : 0;
+    const rewardAmountRaw = lotSizeRaw * tpPipsRaw * pipValue;
+    const rrRatioRaw = stopPipsRaw > 0 ? tpPipsRaw / stopPipsRaw : 0;
 
     return {
-      riskAmount: riskAmount.toFixed(2),
-      rewardAmount: rewardAmount.toFixed(2),
-      lotSize: lotSize.toFixed(2),
-      stopPips: stopPips.toFixed(1),
-      tpPips: tpPips.toFixed(1),
-      rrRatio: rrRatio.toFixed(2),
+      riskAmount: (Number.isFinite(riskAmountRaw) ? riskAmountRaw : 0).toFixed(2),
+      rewardAmount: (Number.isFinite(rewardAmountRaw) ? rewardAmountRaw : 0).toFixed(2),
+      lotSize: (Number.isFinite(lotSizeRaw) ? lotSizeRaw : 0).toFixed(2),
+      stopPips: (Number.isFinite(stopPipsRaw) ? stopPipsRaw : 0).toFixed(1),
+      tpPips: (Number.isFinite(tpPipsRaw) ? tpPipsRaw : 0).toFixed(1),
+      rrRatio: (Number.isFinite(rrRatioRaw) ? rrRatioRaw : 0).toFixed(2),
     };
   }, [accountBalance, riskPercent, instrument, entryPrice, stopLoss, takeProfit]);
 
@@ -73,9 +91,7 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
               <Ruler className="h-4 w-4 text-primary" />
               <CardTitle className="text-sm font-medium">Position Size</CardTitle>
             </div>
-            {onAdd && onRemove && (
-              <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />
-            )}
+            {onAdd && onRemove && <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />}
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -100,11 +116,10 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
             <Ruler className="h-5 w-5 text-primary" />
             <CardTitle>Position Size Calculator</CardTitle>
           </div>
-          {onAdd && onRemove && (
-            <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />
-          )}
+          {onAdd && onRemove && <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />}
         </div>
       </CardHeader>
+
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
@@ -128,9 +143,12 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
               <Label className="text-sm">Account Size ($)</Label>
               <Input
                 type="number"
-                value={accountBalance}
-                onChange={(e) => setAccountBalance(parseFloat(e.target.value) || 0)}
+                value={accountBalanceInput}
+                onChange={(e) => setAccountBalanceInput(e.target.value)}
                 className="h-9"
+                placeholder="10000"
+                min={0}
+                step={1}
               />
             </div>
 
@@ -138,10 +156,12 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
               <Label className="text-sm">Risk % per Trade</Label>
               <Input
                 type="number"
-                value={riskPercent}
-                onChange={(e) => setRiskPercent(parseFloat(e.target.value) || 0)}
+                value={riskPercentInput}
+                onChange={(e) => setRiskPercentInput(e.target.value)}
                 step="0.1"
                 className="h-9"
+                placeholder="2"
+                min={0}
               />
             </div>
 
@@ -149,10 +169,12 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
               <Label className="text-sm">Entry Price</Label>
               <Input
                 type="number"
-                value={entryPrice}
-                onChange={(e) => setEntryPrice(parseFloat(e.target.value) || 0)}
-                step="0.0001"
+                value={entryPriceInput}
+                onChange={(e) => setEntryPriceInput(e.target.value)}
+                step={instrument === "USDJPY" ? "0.01" : "0.0001"}
                 className="h-9"
+                placeholder="1.0850"
+                min={0}
               />
             </div>
 
@@ -160,10 +182,12 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
               <Label className="text-sm">Stop Loss</Label>
               <Input
                 type="number"
-                value={stopLoss}
-                onChange={(e) => setStopLoss(parseFloat(e.target.value) || 0)}
-                step="0.0001"
+                value={stopLossInput}
+                onChange={(e) => setStopLossInput(e.target.value)}
+                step={instrument === "USDJPY" ? "0.01" : "0.0001"}
                 className="h-9"
+                placeholder="1.0820"
+                min={0}
               />
             </div>
 
@@ -171,10 +195,12 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
               <Label className="text-sm">Take Profit</Label>
               <Input
                 type="number"
-                value={takeProfit}
-                onChange={(e) => setTakeProfit(parseFloat(e.target.value) || 0)}
-                step="0.0001"
+                value={takeProfitInput}
+                onChange={(e) => setTakeProfitInput(e.target.value)}
+                step={instrument === "USDJPY" ? "0.01" : "0.0001"}
                 className="h-9"
+                placeholder="1.0910"
+                min={0}
               />
             </div>
 
@@ -198,7 +224,7 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
           <div className="space-y-4">
             <div className="p-5 bg-muted/50 rounded-lg border border-border">
               <h3 className="text-sm font-medium text-muted-foreground mb-4">Results</h3>
-              
+
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Position Size</span>
