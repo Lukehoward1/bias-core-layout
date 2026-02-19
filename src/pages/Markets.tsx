@@ -133,6 +133,34 @@ const isEventRelevantToSymbol = (symbol: string, ev: CalendarEvent) => {
 };
 
 /* =======================
+   PRICE FORMATTING (CONSISTENT)
+   - No commas
+   - Keeps decimals where present
+======================= */
+
+const formatPriceNoCommas = (raw: string) => {
+  const cleaned = (raw ?? "").toString().trim();
+  if (!cleaned || cleaned === "—") return "—";
+
+  // Remove commas if any came in from demo data
+  const noCommas = cleaned.replace(/,/g, "");
+
+  // If it's not a number-ish string, return as-is
+  const n = Number(noCommas);
+  if (!Number.isFinite(n)) return noCommas;
+
+  // Preserve existing decimals count from the original string (after comma removal)
+  const m = noCommas.match(/^\d+(\.(\d+))?$/);
+  if (m) {
+    const decimals = m[2]?.length ?? 0;
+    if (decimals > 0) return n.toFixed(decimals);
+  }
+
+  // If no explicit decimals, still avoid commas
+  return String(n);
+};
+
+/* =======================
    PAGE
 ======================= */
 
@@ -239,17 +267,6 @@ export default function Markets() {
     navigate(`/calendar?eventId=${encodeURIComponent(eventId)}`);
   };
 
-  // 2.2 FILTERS UI STYLES (lighter outlines, clearer hover)
-  const filterPillBase =
-    "rounded-full h-8 px-4 text-xs border transition-colors " +
-    "bg-muted/10 border-border/30 text-foreground/90 " +
-    "hover:bg-muted/20 hover:border-border/45";
-
-  const filterPillActive =
-    "rounded-full h-8 px-4 text-xs border transition-colors " +
-    "bg-primary/20 border-primary/40 text-foreground " +
-    "hover:bg-primary/25 hover:border-primary/45";
-
   return (
     <div className="p-6 space-y-6">
       <AppHeader title="Markets" />
@@ -263,11 +280,10 @@ export default function Markets() {
               placeholder="Search markets..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 bg-muted/30 border border-border/30 focus-visible:ring-0 focus-visible:border-border/50"
+              className="pl-9 h-9 bg-muted/50"
             />
           </div>
-
-          <Badge variant="outline" className="text-xs border-border/30 text-muted-foreground">
+          <Badge variant="outline" className="text-xs">
             Updated 2 mins ago
           </Badge>
         </div>
@@ -277,17 +293,15 @@ export default function Markets() {
           {marketTypes.map((type) => (
             <Button
               key={type}
-              variant="ghost"
+              variant={selectedType === type ? "default" : "outline"}
               size="sm"
               onClick={() => setSelectedType(type)}
-              className={`${selectedType === type ? filterPillActive : filterPillBase} ${
-                type === "Watchlist" ? "gap-1.5" : ""
-              }`}
+              className={`rounded-full h-8 px-4 text-xs ${type === "Watchlist" ? "gap-1.5" : ""}`}
             >
               {type === "Watchlist" && <Star className="h-3.5 w-3.5" />}
               {type}
               {type === "Watchlist" && watchlist.length > 0 && (
-                <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px] bg-muted/40 border border-border/30">
+                <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
                   {watchlist.length}
                 </Badge>
               )}
@@ -297,7 +311,7 @@ export default function Markets() {
 
         {/* Watchlist Overview Bar */}
         {(selectedType === "Watchlist" || selectedType === "All") && watchlistAssets.length > 0 && (
-          <Card className="bg-muted/10 border border-border/25">
+          <Card>
             <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Activity className="h-5 w-5 text-primary" />
@@ -315,7 +329,7 @@ export default function Markets() {
                   <div
                     key={asset.symbol}
                     onClick={() => openAssetDetail(asset.symbol)}
-                    className="flex items-center gap-4 p-3 rounded-lg bg-background/40 border border-border/20 hover:bg-background/55 hover:border-border/35 cursor-pointer transition-colors group"
+                    className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/40 cursor-pointer transition-colors group"
                   >
                     <span className="font-semibold text-foreground min-w-[80px]">{asset.symbol}</span>
                     <div className={`flex items-center gap-1 min-w-[80px] ${getBiasColor(asset.biasDirection)}`}>
@@ -344,14 +358,14 @@ export default function Markets() {
 
         {/* Empty Watchlist State */}
         {selectedType === "Watchlist" && watchlistAssets.length === 0 && (
-          <Card className="bg-muted/10 border border-border/25">
+          <Card>
             <CardContent className="py-12 text-center">
               <Star className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-foreground mb-2">Your watchlist is empty</h3>
               <p className="text-sm text-muted-foreground mb-4">
                 Click the star icon on any asset card to add it to your watchlist
               </p>
-              <Button variant="outline" onClick={() => setSelectedType("All")} className="border-border/30">
+              <Button variant="outline" onClick={() => setSelectedType("All")}>
                 Browse All Assets
               </Button>
             </CardContent>
@@ -360,7 +374,7 @@ export default function Markets() {
 
         {/* No Search Results */}
         {searchQuery && filteredPairs.length === 0 && (
-          <Card className="bg-muted/10 border border-border/25">
+          <Card>
             <CardContent className="py-12 text-center">
               <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-foreground mb-2">No results found</h3>
@@ -384,19 +398,14 @@ export default function Markets() {
                 <Card
                   key={asset.symbol}
                   onClick={() => openAssetDetail(asset.symbol)}
-                  className={
-                    "cursor-pointer group relative " +
-                    "bg-muted/10 border border-border/25 " +
-                    "hover:bg-muted/15 hover:border-border/40 hover:shadow-md " +
-                    "transition-colors transition-shadow"
-                  }
+                  className="hover:shadow-lg transition-shadow cursor-pointer group relative"
                 >
                   {/* Watchlist Star */}
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={(e) => handleToggleWatchlist(asset.symbol, e)}
-                    className="absolute top-3 right-3 h-8 w-8 z-10 hover:bg-muted/20"
+                    className="absolute top-3 right-3 h-8 w-8 z-10"
                   >
                     <Star
                       className={`h-4 w-4 ${
@@ -416,7 +425,9 @@ export default function Markets() {
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-xl font-bold text-foreground">{asset.latestPrice}</span>
+                      <span className="text-xl font-bold text-foreground">
+                        {formatPriceNoCommas(asset.latestPrice)}
+                      </span>
                       <span
                         className={`text-sm font-medium ${
                           asset.priceChange.startsWith("+") ? "text-success" : "text-destructive"
@@ -429,11 +440,11 @@ export default function Markets() {
 
                   <CardContent className="space-y-3">
                     <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="flex items-center justify-between p-2 bg-muted/20 border border-border/15 rounded-lg">
+                      <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
                         <span className="text-muted-foreground">Spread</span>
                         <span className="font-medium text-foreground">{asset.spread}</span>
                       </div>
-                      <div className="flex items-center justify-between p-2 bg-muted/20 border border-border/15 rounded-lg">
+                      <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
                         <span className="text-muted-foreground">Vol</span>
                         <span className="font-medium text-foreground">{asset.volume}</span>
                       </div>
@@ -456,8 +467,8 @@ export default function Markets() {
                           {asset.sentiment}
                         </span>
                       </div>
-                      <div className="w-full bg-muted/40 border border-border/15 rounded-full h-1.5 relative">
-                        <div className="absolute left-1/2 top-0 w-px h-1.5 bg-border/40" />
+                      <div className="w-full bg-muted rounded-full h-1.5 relative">
+                        <div className="absolute left-1/2 top-0 w-px h-1.5 bg-border" />
                         <div
                           className={`${asset.sentiment > 0 ? "bg-success" : "bg-destructive"} rounded-full h-1.5 transition-all`}
                           style={{
@@ -469,7 +480,7 @@ export default function Markets() {
                     </div>
 
                     {/* News (High only by default, with toggle to see all relevant) */}
-                    <div className="pt-3 border-t border-border/25">
+                    <div className="pt-3 border-t border-border">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
@@ -497,13 +508,12 @@ export default function Markets() {
                         <p className="text-xs text-muted-foreground">No relevant events found.</p>
                       ) : (
                         <div className="space-y-2">
-                          {/* show 2 items instead of 3 */}
                           {eventsToShow.slice(0, 2).map((ev) => (
                             <button
                               key={ev.id}
                               type="button"
                               onClick={(e) => openCalendarEventByPill(e, ev.event, ev.time)}
-                              className="w-full flex items-center justify-between gap-3 p-2 rounded-md bg-muted/15 border border-border/10 hover:bg-muted/25 hover:border-border/20 transition-colors"
+                              className="w-full flex items-center justify-between gap-3 p-2 rounded-md bg-muted/30 hover:bg-muted/40 transition-colors"
                             >
                               <div className="flex items-center gap-2 min-w-0">
                                 <Badge
