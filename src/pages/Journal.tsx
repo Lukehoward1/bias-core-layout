@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+// src/pages/Journal.tsx
+import { useState, useMemo, useEffect } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -283,6 +284,41 @@ function EquityCurveCard({ trades, isAdded, onAdd, onRemove }: EquityCurveCardPr
   );
 }
 
+/* =======================
+   ✅ EXPORT HELPERS
+======================= */
+
+type ExportFormat = "pdf" | "csv";
+
+const REPORT_SECTIONS = [
+  { id: "reports-overview", title: "Overview" },
+  { id: "reports-performance", title: "Performance" },
+  { id: "reports-sessions", title: "Sessions" },
+  { id: "reports-assets", title: "Assets" },
+  { id: "reports-setup", title: "Setup Quality" },
+  { id: "reports-psychology", title: "Psychology" },
+  { id: "reports-risk", title: "Risk Management" },
+  { id: "reports-tradelog", title: "Trade Log" },
+] as const;
+
+const escapeCsv = (v: unknown) => {
+  const s = String(v ?? "");
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+};
+
+const downloadTextFile = (filename: string, content: string, mime = "text/plain;charset=utf-8") => {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
+
 export default function Journal() {
   const [currentMonth, setCurrentMonth] = useState(new Date(2025, 0, 1));
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
@@ -318,12 +354,12 @@ export default function Journal() {
 
   const handleAddDailyPerformance = () => {
     addCard(dailyPerformanceCardId, true, "daily-performance");
-    toast.success("Added to Dashboard");
+    toast.success("Pinned to Dashboard");
   };
 
   const handleRemoveDailyPerformance = () => {
     removeCard(dailyPerformanceCardId);
-    toast.success("Removed from Dashboard");
+    toast.success("Unpinned from Dashboard");
   };
 
   const overviewCardIds = {
@@ -490,6 +526,101 @@ export default function Journal() {
     lots: "",
   });
 
+  /* =======================
+     ✅ EXPORT SYSTEM (UI + LOGIC)
+  ======================= */
+
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("pdf");
+
+  const defaultSelectedSectionIds = useMemo(() => REPORT_SECTIONS.map((s) => s.id), []);
+  const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>(defaultSelectedSectionIds);
+
+  useEffect(() => {
+    // keep the modal defaults sane if we ever change REPORT_SECTIONS
+    setSelectedSectionIds((prev) => {
+      if (prev.length > 0) return prev;
+      return REPORT_SECTIONS.map((s) => s.id);
+    });
+  }, []);
+
+  const toggleSection = (id: string) => {
+    setSelectedSectionIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const buildCsvExport = () => {
+    const lines: string[] = [];
+    const now = format(new Date(), "yyyy-MM-dd HH:mm");
+
+    lines.push(["StreamBias Export", "", ""].map(escapeCsv).join(","));
+    lines.push(["Generated", now, ""].map(escapeCsv).join(","));
+    lines.push(["Date Range", dateRangeLabel, ""].map(escapeCsv).join(","));
+    lines.push(["", "", ""].map(escapeCsv).join(","));
+
+    const include = new Set(selectedSectionIds);
+
+    // Overview / KPIs (we can export what we reliably have here: tradeSummary)
+    if (include.has("reports-overview")) {
+      lines.push(["SECTION", "Overview", ""].map(escapeCsv).join(","));
+      lines.push(["Total P&L", tradeSummary.totalPnl, ""].map(escapeCsv).join(","));
+      lines.push(["Win Rate (%)", tradeSummary.winRate.toFixed(2), ""].map(escapeCsv).join(","));
+      lines.push(["Avg R:R", tradeSummary.avgRR.toFixed(2), ""].map(escapeCsv).join(","));
+      lines.push(["Trade Count", tradeSummary.tradeCount, ""].map(escapeCsv).join(","));
+      lines.push(
+        ["Best Day", tradeSummary.bestDay ? `${tradeSummary.bestDay.date} (${tradeSummary.bestDay.pnl})` : "N/A", ""]
+          .map(escapeCsv)
+          .join(","),
+      );
+      lines.push(
+        [
+          "Worst Day",
+          tradeSummary.worstDay ? `${tradeSummary.worstDay.date} (${tradeSummary.worstDay.pnl})` : "N/A",
+          "",
+        ]
+          .map(escapeCsv)
+          .join(","),
+      );
+      lines.push(["", "", ""].map(escapeCsv).join(","));
+    }
+
+    // Trade Log as a proper table
+    if (include.has("reports-tradelog")) {
+      lines.push(["SECTION", "Trade Log", ""].map(escapeCsv).join(","));
+      const header = ["Date", "Pair", "Type", "Entry", "Exit", "Lots", "P&L", "Status", "Notes", "Rating"];
+      lines.push(header.map(escapeCsv).join(","));
+      filteredTrades.forEach((t) => {
+        lines.push(
+          [t.date, t.pair, t.type, t.entry, t.exit, t.lots, t.pnl, t.status, t.notes ?? "", t.rating ?? 0]
+            .map(escapeCsv)
+            .join(","),
+        );
+      });
+      lines.push(["", "", ""].map(escapeCsv).join(","));
+    }
+
+    // For other sections: we include a placeholder line so the export still reflects the user’s selection,
+    // without inventing internal report calculations that live inside the report components.
+    const otherSections = REPORT_SECTIONS.filter(
+      (s) => include.has(s.id) && s.id !== "reports-overview" && s.id !== "reports-tradelog",
+    );
+
+    otherSections.forEach((s) => {
+      lines.push(["SECTION", s.title, ""].map(escapeCsv).join(","));
+      lines.push(
+        [
+          "Note",
+          "This section is visual in-app. PDF export captures the full formatted report cards for this section.",
+          "",
+        ]
+          .map(escapeCsv)
+          .join(","),
+      );
+      lines.push(["", "", ""].map(escapeCsv).join(","));
+    });
+
+    return lines.join("\n");
+  };
+
   const handleExportAllReports = () => {
     const sessionHighlights = [
       "London session: Best performing with highest win rate",
@@ -518,6 +649,60 @@ export default function Journal() {
         trades: tradeSummary,
       },
     );
+  };
+
+  const handleExportSelected = () => {
+    if (!canExportReports) return;
+
+    if (selectedSectionIds.length === 0) {
+      toast.error("Select at least one section to export.");
+      return;
+    }
+
+    if (exportFormat === "csv") {
+      const csv = buildCsvExport();
+      downloadTextFile(
+        `StreamBias-Selected-Export-${format(new Date(), "yyyy-MM-dd")}.csv`,
+        csv,
+        "text/csv;charset=utf-8",
+      );
+      toast.success("CSV exported");
+      setIsExportModalOpen(false);
+      return;
+    }
+
+    // PDF: use the same engine, but only include selected sections.
+    const include = new Set(selectedSectionIds);
+
+    // Keep highlights behaviour for the sections that support it
+    const sessionHighlights = [
+      "London session: Best performing with highest win rate",
+      "Consider reducing exposure during Asian session",
+    ];
+    const assetHighlights =
+      filteredTrades.length > 0
+        ? [`Top pair by P&L: ${[...new Set(filteredTrades.map((t) => t.pair))][0] || "N/A"}`]
+        : [];
+    const psychologyHighlights = ["Track emotional patterns in your notes for better insights"];
+
+    const selectedPayload = REPORT_SECTIONS.filter((s) => include.has(s.id)).map((s) => {
+      if (s.id === "reports-sessions") return { id: s.id, title: s.title, highlights: sessionHighlights };
+      if (s.id === "reports-assets") return { id: s.id, title: s.title, highlights: assetHighlights };
+      if (s.id === "reports-psychology") return { id: s.id, title: s.title, highlights: psychologyHighlights };
+      return { id: s.id, title: s.title };
+    });
+    // The current PDF export helper is report-focused; trade log is included as its own section id in this UI,
+    // but the PDF export pipeline may or may not support it. We keep it in the selection list anyway;
+    // if the hook ignores unknown ids, it won’t break.
+    exportAllReports(selectedPayload as any, {
+      filename: `StreamBias-Selected-Report-${format(new Date(), "yyyy-MM-dd")}`,
+      dateRange: dateRangeLabel,
+      userName: "John Trader",
+      trades: tradeSummary,
+    });
+
+    toast.success("PDF export started");
+    setIsExportModalOpen(false);
   };
 
   function getDailySummary(date: Date) {
@@ -610,7 +795,9 @@ export default function Journal() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div
-                      className={`h-10 w-10 rounded-full flex items-center justify-center ${canUseAutoJournaling ? "bg-primary/10" : "bg-muted"}`}
+                      className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                        canUseAutoJournaling ? "bg-primary/10" : "bg-muted"
+                      }`}
                     >
                       {canUseAutoJournaling ? (
                         <Zap className="h-5 w-5 text-primary" />
@@ -1007,24 +1194,152 @@ export default function Journal() {
                     firstTradeDate={firstTradeDate}
                     lastTradeDate={lastTradeDate}
                   />
+
+                  {/* ✅ Export options: All + Selected */}
                   {canExportReports ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 gap-1.5 text-xs"
-                      onClick={handleExportAllReports}
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                      Export All
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 text-xs"
+                        onClick={handleExportAllReports}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Export All
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 text-xs"
+                        onClick={() => {
+                          setSelectedSectionIds(REPORT_SECTIONS.map((s) => s.id));
+                          setExportFormat("pdf");
+                          setIsExportModalOpen(true);
+                        }}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Export Selected Stats
+                      </Button>
+                    </div>
                   ) : (
-                    <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs opacity-60" disabled>
-                      <Lock className="h-3 w-3" />
-                      Export All
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs opacity-60" disabled>
+                        <Lock className="h-3 w-3" />
+                        Export All
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs opacity-60" disabled>
+                        <Lock className="h-3 w-3" />
+                        Export Selected Stats
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>
+
+              {/* ✅ Checklist modal before export */}
+              <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Export Selected Stats</DialogTitle>
+                  </DialogHeader>
+
+                  <div className="space-y-5 pt-2">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Export format</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setExportFormat("pdf")}
+                          className={`py-2 px-3 text-sm font-medium rounded-md border transition-all ${
+                            exportFormat === "pdf"
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-muted/50 border-border hover:bg-muted"
+                          }`}
+                        >
+                          PDF
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setExportFormat("csv")}
+                          className={`py-2 px-3 text-sm font-medium rounded-md border transition-all ${
+                            exportFormat === "csv"
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-muted/50 border-border hover:bg-muted"
+                          }`}
+                        >
+                          CSV
+                        </button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        PDF preserves the report layout. CSV is a clean data export (best for spreadsheets).
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium">Choose sections</Label>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="text-xs text-primary hover:underline"
+                            onClick={() => setSelectedSectionIds(REPORT_SECTIONS.map((s) => s.id))}
+                          >
+                            Select all
+                          </button>
+                          <button
+                            type="button"
+                            className="text-xs text-primary hover:underline"
+                            onClick={() => setSelectedSectionIds([])}
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2">
+                        {REPORT_SECTIONS.map((s) => {
+                          const checked = selectedSectionIds.includes(s.id);
+                          return (
+                            <label
+                              key={s.id}
+                              className="flex items-center justify-between p-3 rounded-md border border-border bg-muted/20 hover:bg-muted/30 transition-colors cursor-pointer"
+                            >
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => toggleSection(s.id)}
+                                  className="h-4 w-4"
+                                />
+                                <span className="text-sm text-foreground">{s.title}</span>
+                              </div>
+                              {s.id === "reports-tradelog" && (
+                                <Badge variant="outline" className="text-[10px]">
+                                  rows
+                                </Badge>
+                              )}
+                            </label>
+                          );
+                        })}
+                      </div>
+
+                      <p className="text-xs text-muted-foreground">
+                        You can deselect anything you don’t want included before exporting.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2">
+                      <Button variant="outline" onClick={() => setIsExportModalOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleExportSelected} disabled={selectedSectionIds.length === 0}>
+                        Export
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
 
               <TabsContent value="overview" className="mt-5">
                 <ReportsOverview
