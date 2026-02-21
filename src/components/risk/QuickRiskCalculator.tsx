@@ -34,28 +34,6 @@ const toNumberOrZero = (v: string) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-/**
- * Best-effort: pull spread from linked account if it exists.
- * We don't assume a strict shape because the LinkedAccount type doesn't define spreads yet.
- */
-const getAccountSpreadForSymbol = (account: any, symbol: string): number | null => {
-  if (!account) return null;
-
-  const direct =
-    typeof account.spread === "number"
-      ? account.spread
-      : typeof account.spreadPips === "number"
-        ? account.spreadPips
-        : null;
-
-  if (direct !== null) return direct;
-
-  const bySymbol =
-    account.spreads?.[symbol] ?? account.spreadBySymbol?.[symbol] ?? account.instrumentSpreads?.[symbol] ?? null;
-
-  return typeof bySymbol === "number" ? bySymbol : null;
-};
-
 export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false }: QuickRiskCalculatorProps) {
   const navigate = useNavigate();
 
@@ -73,7 +51,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
   const [manualBalanceInput, setManualBalanceInput] = useState<string>("10000");
   const [stopDistanceInput, setStopDistanceInput] = useState<string>("30");
 
-  // ✅ Spread handling (only meaningful when connected)
+  // ✅ Spread handling: MANUAL INPUT ONLY (no auto-pull)
   const [includeSpread, setIncludeSpread] = useState<boolean>(false);
   const [spreadInput, setSpreadInput] = useState<string>(""); // pips/ticks (same unit as stop distance)
 
@@ -103,22 +81,11 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
   // Effective balance (linked or manual)
   const effectiveBalance = isConnected && balance !== null ? balance : manualBalance;
 
-  // ✅ If connected, default to including spread (as per checklist)
+  // ✅ If connected, default to including spread (manual input)
   useEffect(() => {
     if (isConnected) setIncludeSpread(true);
     if (!isConnected) setIncludeSpread(false);
   }, [isConnected]);
-
-  // ✅ Best-effort auto-fill spread when connected + instrument changes
-  useEffect(() => {
-    if (!isConnected) return;
-
-    const inferred = getAccountSpreadForSymbol(activeAccount as any, selectedInstrument);
-    if (typeof inferred === "number" && Number.isFinite(inferred)) {
-      // only set if user hasn't typed something custom yet
-      setSpreadInput((prev) => (prev.trim() === "" ? String(inferred) : prev));
-    }
-  }, [isConnected, activeAccount, selectedInstrument]);
 
   // Load saved risk preset
   useEffect(() => {
@@ -149,7 +116,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
     localStorage.setItem(RISK_STORAGE_KEY, value.toString());
   };
 
-  // ✅ Stop distance used in maths (optionally includes spread)
+  // ✅ Stop distance used in maths (optionally includes MANUAL spread)
   const effectiveStopDistance = useMemo(() => {
     if (!includeSpread) return stopDistance;
     return stopDistance + spread;
@@ -424,7 +391,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                 placeholder={assetCategory === "FX" ? "30" : "10"}
               />
 
-              {/* ✅ Spread inclusion (only if broker connected) */}
+              {/* ✅ Manual spread input (only if broker connected) */}
               {isConnected && (
                 <div className="flex items-center justify-between gap-3 pt-1">
                   <label className="flex items-center gap-2 text-xs text-muted-foreground select-none">
@@ -447,13 +414,12 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                       disabled={!includeSpread}
                       min={0}
                       step={currentInstrument?.type === "Futures" ? 1 : 0.1}
-                      placeholder="auto"
+                      placeholder="Enter current"
                     />
                   </div>
                 </div>
               )}
 
-              {/* Optional tiny helper (no warnings) */}
               {isConnected && includeSpread && (
                 <p className="text-[11px] text-muted-foreground">
                   Effective stop distance used: <span className="font-medium">{effectiveStopDistance || 0}</span>{" "}
@@ -500,7 +466,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                   </span>
                 </div>
 
-                {/* Position Size - Highlighted */}
+                {/* Position Size */}
                 <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
