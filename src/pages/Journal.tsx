@@ -192,19 +192,33 @@ interface EquityCurveCardProps {
   isAdded: boolean;
   onAdd: () => void;
   onRemove: () => void;
+
+  /**
+   * Starting balance for the equity curve.
+   * UI is unchanged; this only affects the curve math.
+   */
+  startingBalance?: number;
 }
 
-function EquityCurveCard({ trades, isAdded, onAdd, onRemove }: EquityCurveCardProps) {
+function EquityCurveCard({ trades, isAdded, onAdd, onRemove, startingBalance = 0 }: EquityCurveCardProps) {
   const equityData = useMemo(() => {
     const sortedTrades = [...trades].sort((a, b) => a.date.localeCompare(b.date));
-    let cumulative = 0;
+
+    // Start curve from the provided starting balance (default 0)
+    let cumulative = Number.isFinite(startingBalance) ? startingBalance : 0;
     let tradeCount = 0;
+
     return sortedTrades.map((t) => {
       cumulative += t.pnl;
       tradeCount += 1;
-      return { date: t.date, equity: cumulative, tradeCount, formattedDate: format(new Date(t.date), "MMM d") };
+      return {
+        date: t.date,
+        equity: cumulative,
+        tradeCount,
+        formattedDate: format(new Date(t.date), "MMM d"),
+      };
     });
-  }, [trades]);
+  }, [trades, startingBalance]);
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -213,7 +227,7 @@ function EquityCurveCard({ trades, isAdded, onAdd, onRemove }: EquityCurveCardPr
         <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
           <p className="text-xs text-muted-foreground mb-1">{data.formattedDate}</p>
           <p className={`text-sm font-semibold ${data.equity >= 0 ? "text-success" : "text-destructive"}`}>
-            {data.equity >= 0 ? "+" : ""}£{data.equity.toLocaleString()}
+            {data.equity >= 0 ? "+" : ""}£{Number(data.equity).toLocaleString()}
           </p>
           <p className="text-xs text-muted-foreground mt-1">{data.tradeCount} trades total</p>
         </div>
