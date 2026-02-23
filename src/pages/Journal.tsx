@@ -42,131 +42,17 @@ import { usePdfExport } from "@/hooks/use-pdf-export";
 import { Link } from "react-router-dom";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 
-// ✅ Canonical trades (manual + synced merge) — UI unchanged
-import { useJournalTrades, Trade } from "@/hooks/use-journal-trades";
+// ✅ Canonical trades store (manual + synced merge, persistent)
+import { useJournalTrades, Trade as JournalTrade } from "@/hooks/use-journal-trades";
 
 // ✅ Instrument-aware P&L engine (logic only; UI unchanged)
 import { getInstrumentBySymbol, calculateTradePnl } from "@/data/tradingInstruments";
 
-const initialTrades: Trade[] = [
-  {
-    id: "1",
-    date: "2025-01-15",
-    pair: "EURUSD",
-    type: "Long",
-    entry: 1.085,
-    exit: 1.091,
-    lots: 1.0,
-    pnl: 600,
-    status: "closed",
-    notes: "",
-    rating: 4,
-  },
-  {
-    id: "2",
-    date: "2025-01-14",
-    pair: "GBPUSD",
-    type: "Short",
-    entry: 1.265,
-    exit: 1.262,
-    lots: 0.5,
-    pnl: 150,
-    status: "closed",
-    notes: "Good setup",
-    rating: 5,
-  },
-  {
-    id: "3",
-    date: "2025-01-14",
-    pair: "USDJPY",
-    type: "Long",
-    entry: 148.2,
-    exit: 148.8,
-    lots: 2.0,
-    pnl: 1200,
-    status: "closed",
-    notes: "",
-    rating: 0,
-  },
-  {
-    id: "4",
-    date: "2025-01-13",
-    pair: "XAUUSD",
-    type: "Long",
-    entry: 2025.5,
-    exit: 2018.2,
-    lots: 0.1,
-    pnl: -73,
-    status: "closed",
-    notes: "Stopped out early",
-    rating: 2,
-  },
-  {
-    id: "5",
-    date: "2025-01-12",
-    pair: "EURUSD",
-    type: "Short",
-    entry: 1.088,
-    exit: 1.092,
-    lots: 1.0,
-    pnl: -400,
-    status: "closed",
-    notes: "",
-    rating: 0,
-  },
-  {
-    id: "6",
-    date: "2025-01-10",
-    pair: "GBPUSD",
-    type: "Long",
-    entry: 1.258,
-    exit: 1.264,
-    lots: 0.8,
-    pnl: 480,
-    status: "closed",
-    notes: "",
-    rating: 3,
-  },
-  {
-    id: "7",
-    date: "2025-01-08",
-    pair: "EURUSD",
-    type: "Long",
-    entry: 1.082,
-    exit: 1.078,
-    lots: 1.0,
-    pnl: -400,
-    status: "closed",
-    notes: "",
-    rating: 0,
-  },
-  {
-    id: "8",
-    date: "2025-01-06",
-    pair: "XAUUSD",
-    type: "Short",
-    entry: 2040.0,
-    exit: 2025.0,
-    lots: 0.2,
-    pnl: 300,
-    status: "closed",
-    notes: "",
-    rating: 4,
-  },
-  {
-    id: "9",
-    date: "2025-01-03",
-    pair: "USDJPY",
-    type: "Short",
-    entry: 149.5,
-    exit: 149.2,
-    lots: 1.5,
-    pnl: 450,
-    status: "closed",
-    notes: "",
-    rating: 0,
-  },
-];
+/**
+ * This page uses the canonical Trade model from useJournalTrades.
+ * Keep UI identical; only data plumbing changes.
+ */
+type Trade = JournalTrade;
 
 function StarRating({ rating, onRatingChange }: { rating: number; onRatingChange: (rating: number) => void }) {
   return (
@@ -192,20 +78,12 @@ interface EquityCurveCardProps {
   isAdded: boolean;
   onAdd: () => void;
   onRemove: () => void;
-
-  /**
-   * Starting balance for the equity curve.
-   * UI is unchanged; this only affects the curve math.
-   */
-  startingBalance?: number;
 }
 
-function EquityCurveCard({ trades, isAdded, onAdd, onRemove, startingBalance = 0 }: EquityCurveCardProps) {
+function EquityCurveCard({ trades, isAdded, onAdd, onRemove }: EquityCurveCardProps) {
   const equityData = useMemo(() => {
     const sortedTrades = [...trades].sort((a, b) => a.date.localeCompare(b.date));
-
-    // Start curve from the provided starting balance (default 0)
-    let cumulative = Number.isFinite(startingBalance) ? startingBalance : 0;
+    let cumulative = 0;
     let tradeCount = 0;
 
     return sortedTrades.map((t) => {
@@ -218,7 +96,7 @@ function EquityCurveCard({ trades, isAdded, onAdd, onRemove, startingBalance = 0
         formattedDate: format(new Date(t.date), "MMM d"),
       };
     });
-  }, [trades, startingBalance]);
+  }, [trades]);
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -227,7 +105,7 @@ function EquityCurveCard({ trades, isAdded, onAdd, onRemove, startingBalance = 0
         <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
           <p className="text-xs text-muted-foreground mb-1">{data.formattedDate}</p>
           <p className={`text-sm font-semibold ${data.equity >= 0 ? "text-success" : "text-destructive"}`}>
-            {data.equity >= 0 ? "+" : ""}£{Number(data.equity).toLocaleString()}
+            {data.equity >= 0 ? "+" : ""}£{data.equity.toLocaleString()}
           </p>
           <p className="text-xs text-muted-foreground mt-1">{data.tradeCount} trades total</p>
         </div>
@@ -358,46 +236,31 @@ export default function Journal() {
 
   const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
 
-  // ✅ Linked accounts (used for assigning accountId + CSV export)
+  // ✅ Linked accounts (used for assigning accountId + CSV export + future filtering UI)
   const { accounts, primaryAccount } = useLinkedAccounts();
-
-  const accountIds = useMemo(() => accounts.map((a) => a.id), [accounts]);
-
-  // ✅ Canonical trades for Journal + Reports
-  const { trades, addManualTrade, setTradeNotes, setTradeRating } = useJournalTrades(accountIds);
-
-  // ✅ Seed demo trades once (only if no manual trades exist yet)
-  useEffect(() => {
-    try {
-      const existing = localStorage.getItem("journalManualTrades:v1");
-      if (existing) {
-        const parsed = JSON.parse(existing);
-        if (Array.isArray(parsed) && parsed.length > 0) return;
-      }
-
-      // If storage is empty or invalid, seed the demo trades into manual storage.
-      // (This preserves the current demo experience but allows KPIs to update immediately.)
-      localStorage.setItem(
-        "journalManualTrades:v1",
-        JSON.stringify(initialTrades.map((t) => ({ ...t, source: "manual" }))),
-      );
-      window.dispatchEvent(new Event("journalTradesUpdated"));
-    } catch {
-      // If JSON parsing fails, we still try to seed safely
-      localStorage.setItem(
-        "journalManualTrades:v1",
-        JSON.stringify(initialTrades.map((t) => ({ ...t, source: "manual" }))),
-      );
-      window.dispatchEvent(new Event("journalTradesUpdated"));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const accountNameById = useMemo(() => {
     const map = new Map<string, string>();
     accounts.forEach((a) => map.set(a.id, a.name));
     return map;
   }, [accounts]);
+
+  // ✅ Canonical trade store (manual + synced).
+  // Pass in all known accountIds so synced keys are loaded.
+  const accountIds = useMemo(() => accounts.map((a) => a.id), [accounts]);
+  const { trades, addManualTrade, setTradeNotes, setTradeRating } = useJournalTrades(accountIds);
+
+  /**
+   * ✅ NEW (invisible for now):
+   * Account scope for analytics. Defaults to "all" so UI/output unchanged today.
+   * Later we can add a dropdown without touching report logic again.
+   */
+  const [activeAccountId] = useState<string | "all">("all");
+
+  const tradesScopedToAccount = useMemo(() => {
+    if (activeAccountId === "all") return trades;
+    return trades.filter((t) => t.accountId === activeAccountId);
+  }, [trades, activeAccountId]);
 
   const equityCurveCardId = "pinned-journal-equity";
   const isEquityCurveAdded = isCardOnDashboard(equityCurveCardId);
@@ -534,17 +397,18 @@ export default function Journal() {
   });
 
   const { firstTradeDate, lastTradeDate } = useMemo(() => {
-    if (trades.length === 0) return { firstTradeDate: undefined, lastTradeDate: undefined };
-    const sortedDates = trades.map((t) => parseISO(t.date)).sort((a, b) => a.getTime() - b.getTime());
+    if (tradesScopedToAccount.length === 0) return { firstTradeDate: undefined, lastTradeDate: undefined };
+    const sortedDates = tradesScopedToAccount.map((t) => parseISO(t.date)).sort((a, b) => a.getTime() - b.getTime());
     return { firstTradeDate: sortedDates[0], lastTradeDate: sortedDates[sortedDates.length - 1] };
-  }, [trades]);
+  }, [tradesScopedToAccount]);
 
+  // ✅ Date-range trades (these drive reports KPIs + charts)
   const filteredTrades = useMemo(() => {
-    return trades.filter((t) => {
+    return tradesScopedToAccount.filter((t) => {
       const tradeDate = parseISO(t.date);
       return isWithinInterval(tradeDate, { start: dateRange.from, end: dateRange.to });
     });
-  }, [trades, dateRange]);
+  }, [tradesScopedToAccount, dateRange]);
 
   const dateRangeLabel = `${format(dateRange.from, "MMM d, yyyy")} - ${format(dateRange.to, "MMM d, yyyy")}`;
 
@@ -580,23 +444,6 @@ export default function Journal() {
 
     return { totalPnl, winRate, avgRR, tradeCount: filteredTrades.length, bestDay, worstDay };
   }, [filteredTrades]);
-
-  // ✅ Top cards now reflect real trades (UI unchanged)
-  const topCardStats = useMemo(() => {
-    const totalTrades = trades.length;
-
-    const totalPnl = trades.reduce((s, t) => s + t.pnl, 0);
-    const winners = trades.filter((t) => t.pnl > 0);
-    const losers = trades.filter((t) => t.pnl < 0);
-
-    const winRate = totalTrades > 0 ? (winners.length / totalTrades) * 100 : 0;
-
-    const avgWin = winners.length > 0 ? winners.reduce((s, t) => s + t.pnl, 0) / winners.length : 0;
-    const avgLoss = losers.length > 0 ? Math.abs(losers.reduce((s, t) => s + t.pnl, 0) / losers.length) : 1;
-    const avgRR = avgLoss > 0 ? avgWin / avgLoss : 0;
-
-    return { totalTrades, totalPnl, winRate, avgRR };
-  }, [trades]);
 
   const [newTrade, setNewTrade] = useState({
     accountId: UNASSIGNED_ACCOUNT_VALUE,
@@ -782,7 +629,10 @@ export default function Journal() {
 
   function getDailySummary(date: Date) {
     const dateStr = format(date, "yyyy-MM-dd");
-    const dayTrades = trades.filter((t) => t.date === dateStr);
+
+    // ✅ Calendar should reflect the same account scope as everything else
+    const dayTrades = tradesScopedToAccount.filter((t) => t.date === dateStr);
+
     const totalPnl = dayTrades.reduce((sum, t) => sum + t.pnl, 0);
     return { trades: dayTrades, totalPnl, tradeCount: dayTrades.length };
   }
@@ -832,7 +682,7 @@ export default function Journal() {
 
     const symbol = normalizeSymbol(newTrade.pair);
 
-    // ✅ Instrument-aware P&L (falls back if missing metadata)
+    // ✅ instrument-aware P&L (falls back if missing metadata)
     const instrument = getInstrumentBySymbol(symbol);
     const pnl = instrument
       ? calculateTradePnl(instrument, entry, exit, lots, newTrade.type)
@@ -870,6 +720,7 @@ export default function Journal() {
       exit: "",
       lots: "",
     });
+
     setIsAddTradeOpen(false);
   };
 
@@ -925,13 +776,14 @@ export default function Journal() {
               </CardContent>
             </Card>
 
+            {/* KPI cards remain visually identical; they already update because data is now real */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">Total Trades</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-foreground">{topCardStats.totalTrades}</div>
+                  <div className="text-2xl font-bold text-foreground">{tradesScopedToAccount.length}</div>
                 </CardContent>
               </Card>
 
@@ -940,7 +792,13 @@ export default function Journal() {
                   <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-foreground">{topCardStats.winRate.toFixed(0)}%</div>
+                  <div className="text-2xl font-bold text-foreground">
+                    {tradesScopedToAccount.length > 0
+                      ? `${Math.round(
+                          (tradesScopedToAccount.filter((t) => t.pnl > 0).length / tradesScopedToAccount.length) * 100,
+                        )}%`
+                      : "—"}
+                  </div>
                 </CardContent>
               </Card>
 
@@ -949,9 +807,14 @@ export default function Journal() {
                   <CardTitle className="text-sm font-medium text-muted-foreground">Total P&amp;L</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-success">
-                    {topCardStats.totalPnl >= 0 ? "+" : "-"}${Math.abs(topCardStats.totalPnl).toLocaleString()}
-                  </div>
+                  {(() => {
+                    const total = tradesScopedToAccount.reduce((s, t) => s + t.pnl, 0);
+                    return (
+                      <div className={`text-2xl font-bold ${total >= 0 ? "text-success" : "text-destructive"}`}>
+                        {total >= 0 ? "+" : ""}£{total.toLocaleString()}
+                      </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
 
@@ -960,17 +823,26 @@ export default function Journal() {
                   <CardTitle className="text-sm font-medium text-muted-foreground">Avg R:R</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-foreground">{topCardStats.avgRR.toFixed(1)}</div>
+                  <div className="text-2xl font-bold text-foreground">
+                    {(() => {
+                      const wins = tradesScopedToAccount.filter((t) => t.pnl > 0);
+                      const losses = tradesScopedToAccount.filter((t) => t.pnl < 0);
+                      if (wins.length === 0 || losses.length === 0) return "—";
+                      const avgWin = wins.reduce((s, t) => s + t.pnl, 0) / wins.length;
+                      const avgLoss = Math.abs(losses.reduce((s, t) => s + t.pnl, 0) / losses.length);
+                      if (!avgLoss) return "—";
+                      return (avgWin / avgLoss).toFixed(1);
+                    })()}
+                  </div>
                 </CardContent>
               </Card>
             </div>
 
             <EquityCurveCard
-              trades={trades}
+              trades={tradesScopedToAccount}
               isAdded={isEquityCurveAdded}
               onAdd={handleAddEquityCurve}
               onRemove={handleRemoveEquityCurve}
-              startingBalance={primaryAccount?.isConnected ? primaryAccount.balance : 0}
             />
 
             <Card>
@@ -1115,6 +987,7 @@ export default function Journal() {
                                 {trade.pair}
                               </Badge>
                             </td>
+
                             <td className="py-3 px-3">
                               <div className="flex items-center gap-1.5">
                                 {trade.type === "Long" ? (
@@ -1125,9 +998,11 @@ export default function Journal() {
                                 <span className="text-sm text-foreground">{trade.type}</span>
                               </div>
                             </td>
+
                             <td className="py-3 px-3 text-sm text-foreground">{trade.entry}</td>
                             <td className="py-3 px-3 text-sm text-foreground">{trade.exit}</td>
                             <td className="py-3 px-3 text-sm text-foreground">{trade.lots}</td>
+
                             <td className="py-3 px-3">
                               <span
                                 className={`text-sm font-medium ${trade.pnl >= 0 ? "text-success" : "text-destructive"}`}
@@ -1135,11 +1010,13 @@ export default function Journal() {
                                 {trade.pnl >= 0 ? "+" : ""}£{trade.pnl}
                               </span>
                             </td>
+
                             <td className="py-3 px-3">
                               <Badge variant="secondary" className="text-xs">
                                 {trade.status}
                               </Badge>
                             </td>
+
                             <td className="py-3 px-3">
                               {editingNoteId === trade.id ? (
                                 <div className="flex gap-1">
@@ -1170,6 +1047,7 @@ export default function Journal() {
                                 </button>
                               )}
                             </td>
+
                             <td className="py-3 px-3">
                               <StarRating
                                 rating={trade.rating || 0}
@@ -1198,6 +1076,7 @@ export default function Journal() {
                 <DialogHeader>
                   <DialogTitle>Add New Trade</DialogTitle>
                 </DialogHeader>
+
                 <div className="space-y-4 pt-4">
                   <div className="space-y-2">
                     <Label htmlFor="account">Account</Label>
@@ -1241,6 +1120,7 @@ export default function Journal() {
                         onChange={(e) => setNewTrade({ ...newTrade, pair: e.target.value })}
                       />
                     </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="type">Type</Label>
                       <Select
@@ -1257,6 +1137,7 @@ export default function Journal() {
                       </Select>
                     </div>
                   </div>
+
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="entry">Entry</Label>
@@ -1269,6 +1150,7 @@ export default function Journal() {
                         onChange={(e) => setNewTrade({ ...newTrade, entry: e.target.value })}
                       />
                     </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="exit">Exit</Label>
                       <Input
@@ -1280,6 +1162,7 @@ export default function Journal() {
                         onChange={(e) => setNewTrade({ ...newTrade, exit: e.target.value })}
                       />
                     </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="lots">Lots</Label>
                       <Input
@@ -1292,6 +1175,7 @@ export default function Journal() {
                       />
                     </div>
                   </div>
+
                   <Button className="w-full" onClick={handleAddTrade}>
                     Add Trade
                   </Button>
