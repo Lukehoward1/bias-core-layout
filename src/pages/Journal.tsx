@@ -40,6 +40,7 @@ import { ReportsTradeLog } from "@/components/reports/ReportsTradeLog";
 import { ReportDateRangeFilter, DateRange } from "@/components/reports/ReportDateRangeFilter";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { Link } from "react-router-dom";
+import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 
 interface Trade {
   id: string;
@@ -53,6 +54,9 @@ interface Trade {
   status: string;
   notes?: string;
   rating?: number;
+
+  // ✅ NEW: which connected account this trade belongs to
+  accountId?: string;
 }
 
 const initialTrades: Trade[] = [
@@ -319,6 +323,8 @@ const downloadTextFile = (filename: string, content: string, mime = "text/plain;
   URL.revokeObjectURL(url);
 };
 
+const UNASSIGNED_ACCOUNT_VALUE = "__unassigned__";
+
 export default function Journal() {
   const [currentMonth, setCurrentMonth] = useState(new Date(2025, 0, 1));
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
@@ -335,6 +341,15 @@ export default function Journal() {
   const canUseAutoJournaling = limits.journal.autoJournaling;
 
   const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
+
+  // ✅ Linked accounts (used for assigning accountId + CSV export)
+  const { accounts, primaryAccount } = useLinkedAccounts();
+
+  const accountNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    accounts.forEach((a) => map.set(a.id, a.name));
+    return map;
+  }, [accounts]);
 
   const equityCurveCardId = "pinned-journal-equity";
   const isEquityCurveAdded = isCardOnDashboard(equityCurveCardId);
@@ -519,6 +534,7 @@ export default function Journal() {
   }, [filteredTrades]);
 
   const [newTrade, setNewTrade] = useState({
+    accountId: UNASSIGNED_ACCOUNT_VALUE, // ✅ NEW
     pair: "",
     type: "Long" as "Long" | "Short",
     entry: "",
@@ -537,7 +553,6 @@ export default function Journal() {
   const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>(defaultSelectedSectionIds);
 
   useEffect(() => {
-    // keep the modal defaults sane if we ever change REPORT_SECTIONS
     setSelectedSectionIds((prev) => {
       if (prev.length > 0) return prev;
       return REPORT_SECTIONS.map((s) => s.id);
@@ -559,7 +574,6 @@ export default function Journal() {
 
     const include = new Set(selectedSectionIds);
 
-    // Overview / KPIs (we can export what we reliably have here: tradeSummary)
     if (include.has("reports-overview")) {
       lines.push(["SECTION", "Overview", ""].map(escapeCsv).join(","));
       lines.push(["Total P&L", tradeSummary.totalPnl, ""].map(escapeCsv).join(","));
@@ -583,23 +597,24 @@ export default function Journal() {
       lines.push(["", "", ""].map(escapeCsv).join(","));
     }
 
-    // Trade Log as a proper table
     if (include.has("reports-tradelog")) {
       lines.push(["SECTION", "Trade Log", ""].map(escapeCsv).join(","));
-      const header = ["Date", "Pair", "Type", "Entry", "Exit", "Lots", "P&L", "Status", "Notes", "Rating"];
+      // ✅ NEW: Account column
+      const header = ["Date", "Account", "Pair", "Type", "Entry", "Exit", "Lots", "P&L", "Status", "Notes", "Rating"];
       lines.push(header.map(escapeCsv).join(","));
+
       filteredTrades.forEach((t) => {
+        const accountLabel = t.accountId ? accountNameById.get(t.accountId) || t.accountId : "Unknown";
         lines.push(
-          [t.date, t.pair, t.type, t.entry, t.exit, t.lots, t.pnl, t.status, t.notes ?? "", t.rating ?? 0]
+          [t.date, accountLabel, t.pair, t.type, t.entry, t.exit, t.lots, t.pnl, t.status, t.notes ?? "", t.rating ?? 0]
             .map(escapeCsv)
             .join(","),
         );
       });
+
       lines.push(["", "", ""].map(escapeCsv).join(","));
     }
 
-    // For other sections: we include a placeholder line so the export still reflects the user’s selection,
-    // without inventing internal report calculations that live inside the report components.
     const otherSections = REPORT_SECTIONS.filter(
       (s) => include.has(s.id) && s.id !== "reports-overview" && s.id !== "reports-tradelog",
     );
@@ -671,10 +686,8 @@ export default function Journal() {
       return;
     }
 
-    // PDF: use the same engine, but only include selected sections.
     const include = new Set(selectedSectionIds);
 
-    // Keep highlights behaviour for the sections that support it
     const sessionHighlights = [
       "London session: Best performing with highest win rate",
       "Consider reducing exposure during Asian session",
@@ -691,9 +704,7 @@ export default function Journal() {
       if (s.id === "reports-psychology") return { id: s.id, title: s.title, highlights: psychologyHighlights };
       return { id: s.id, title: s.title };
     });
-    // The current PDF export helper is report-focused; trade log is included as its own section id in this UI,
-    // but the PDF export pipeline may or may not support it. We keep it in the selection list anyway;
-    // if the hook ignores unknown ids, it won’t break.
+
     exportAllReports(selectedPayload as any, {
       filename: `StreamBias-Selected-Report-${format(new Date(), "yyyy-MM-dd")}`,
       dateRange: dateRangeLabel,
@@ -752,13 +763,22 @@ export default function Journal() {
     const entry = parseFloat(newTrade.entry);
     const exit = parseFloat(newTrade.exit);
     const lots = parseFloat(newTrade.lots);
+
+    if (!Number.isFinite(entry) || !Number.isFinite(exit) || !Number.isFinite(lots) || lots <= 0) return;
+
     const pnl =
       newTrade.type === "Long" ? Math.round((exit - entry) * lots * 10000) : Math.round((entry - exit) * lots * 10000);
+
+    // ✅ NEW: resolve accountId (explicit selection > primary > undefined)
+    const selectedAccountId =
+      newTrade.accountId && newTrade.accountId !== UNASSIGNED_ACCOUNT_VALUE ? newTrade.accountId : undefined;
+
+    const resolvedAccountId = selectedAccountId || primaryAccount?.id || undefined;
 
     const trade: Trade = {
       id: Date.now().toString(),
       date: format(selectedDay, "yyyy-MM-dd"),
-      pair: newTrade.pair.toUpperCase(),
+      pair: newTrade.pair.toUpperCase().replace("/", ""),
       type: newTrade.type,
       entry,
       exit,
@@ -767,10 +787,18 @@ export default function Journal() {
       status: "closed",
       notes: "",
       rating: 0,
+      accountId: resolvedAccountId,
     };
 
     setTrades([trade, ...trades]);
-    setNewTrade({ pair: "", type: "Long", entry: "", exit: "", lots: "" });
+    setNewTrade({
+      accountId: UNASSIGNED_ACCOUNT_VALUE,
+      pair: "",
+      type: "Long",
+      entry: "",
+      exit: "",
+      lots: "",
+    });
     setIsAddTradeOpen(false);
   };
 
@@ -982,6 +1010,9 @@ export default function Journal() {
                       <thead>
                         <tr className="border-b border-border">
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Date</th>
+                          {/* ✅ NEW */}
+                          <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Account</th>
+
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Pair</th>
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Type</th>
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Entry</th>
@@ -999,6 +1030,15 @@ export default function Journal() {
                         {selectedDayTrades.map((trade) => (
                           <tr key={trade.id} className="border-b border-border hover:bg-muted/50 transition-colors">
                             <td className="py-3 px-3 text-sm text-muted-foreground">{trade.date}</td>
+
+                            {/* ✅ NEW */}
+                            <td className="py-3 px-3">
+                              <Badge variant="secondary" className="text-xs">
+                                {trade.accountId ? accountNameById.get(trade.accountId) || "Account" : "Unknown"}
+                                {primaryAccount?.id && trade.accountId === primaryAccount.id ? " (Primary)" : ""}
+                              </Badge>
+                            </td>
+
                             <td className="py-3 px-3">
                               <Badge variant="outline" className="text-xs">
                                 {trade.pair}
@@ -1088,6 +1128,39 @@ export default function Journal() {
                   <DialogTitle>Add New Trade</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 pt-4">
+                  {/* ✅ NEW: Account selection */}
+                  <div className="space-y-2">
+                    <Label htmlFor="account">Account</Label>
+                    <Select
+                      value={newTrade.accountId || UNASSIGNED_ACCOUNT_VALUE}
+                      onValueChange={(value) => setNewTrade({ ...newTrade, accountId: value })}
+                    >
+                      <SelectTrigger id="account">
+                        <SelectValue
+                          placeholder={primaryAccount ? "Primary Account (default)" : "Select account (optional)"}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={UNASSIGNED_ACCOUNT_VALUE}>Unassigned / Unknown</SelectItem>
+
+                        {primaryAccount && (
+                          <SelectItem value={primaryAccount.id}>{primaryAccount.name} (Primary)</SelectItem>
+                        )}
+
+                        {accounts
+                          .filter((a) => a.id !== primaryAccount?.id)
+                          .map((a) => (
+                            <SelectItem key={a.id} value={a.id}>
+                              {a.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      If you leave it unassigned, we’ll use your Primary account (if connected).
+                    </p>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="pair">Pair</Label>
@@ -1195,7 +1268,6 @@ export default function Journal() {
                     lastTradeDate={lastTradeDate}
                   />
 
-                  {/* ✅ Export options: All + Selected */}
                   {canExportReports ? (
                     <div className="flex items-center gap-2">
                       <Button
@@ -1237,7 +1309,6 @@ export default function Journal() {
                 </div>
               </div>
 
-              {/* ✅ Checklist modal before export */}
               <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
                 <DialogContent className="max-w-lg">
                   <DialogHeader>
