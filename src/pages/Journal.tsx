@@ -42,31 +42,13 @@ import { usePdfExport } from "@/hooks/use-pdf-export";
 import { Link } from "react-router-dom";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 
-// ✅ Instrument metadata (logic only; UI unchanged)
-import { getInstrumentBySymbol } from "@/data/tradingInstruments";
+// ✅ Canonical trades (manual + synced merge) — UI unchanged
+import { useJournalTrades, Trade } from "@/hooks/use-journal-trades";
 
-interface Trade {
-  id: string;
-  date: string;
-  pair: string; // stored normalized (e.g. EURUSD)
-  type: "Long" | "Short";
-  entry: number;
-  exit: number;
-  lots: number;
-  pnl: number;
-  status: string;
-  notes?: string;
-  rating?: number;
+// ✅ Instrument-aware P&L engine (logic only; UI unchanged)
+import { getInstrumentBySymbol, calculateTradePnl } from "@/data/tradingInstruments";
 
-  // ✅ which connected account this trade belongs to
-  accountId?: string;
-}
-
-/**
- * Demo seed (used only when there is no stored journal yet)
- * NOTE: will be persisted to localStorage on first load.
- */
-const seedTrades: Trade[] = [
+const initialTrades: Trade[] = [
   {
     id: "1",
     date: "2025-01-15",
@@ -332,9 +314,6 @@ const downloadTextFile = (filename: string, content: string, mime = "text/plain;
 
 const UNASSIGNED_ACCOUNT_VALUE = "__unassigned__";
 
-// ✅ Canonical journal storage (single source of truth for trades on the client)
-const JOURNAL_TRADES_KEY = "streambias_journal_trades_v1";
-
 /**
  * ✅ Normalize symbol input so "EUR/USD" or "eurusd" becomes "EURUSD"
  */
@@ -349,37 +328,11 @@ const legacyFallbackPnl = (type: "Long" | "Short", entry: number, exit: number, 
   return Math.round(raw);
 };
 
-/**
- * ✅ Instrument-aware P&L (GBP-ish), based on your metadata:
- * - Use pip/tick count = |exit-entry| / pipSize
- * - Value per pip/tick per 1 lot/contract = pipValue
- * - Multiply by lots/contracts
- */
-const instrumentAwarePnl = (symbol: string, type: "Long" | "Short", entry: number, exit: number, lots: number) => {
-  const instrument = getInstrumentBySymbol(symbol);
-  if (!instrument || !instrument.pipSize || !instrument.pipValue) {
-    return legacyFallbackPnl(type, entry, exit, lots);
-  }
-
-  const direction = type === "Long" ? 1 : -1;
-  const move = (exit - entry) * direction;
-  const units = move / instrument.pipSize; // pips/ticks/points count (signed)
-  const pnl = units * instrument.pipValue * lots;
-
-  // Round for display consistency (Journal currently expects integers)
-  return Math.round(pnl);
-};
-
 export default function Journal() {
   const [currentMonth, setCurrentMonth] = useState(new Date(2025, 0, 1));
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAddTradeOpen, setIsAddTradeOpen] = useState(false);
-
-  // ✅ Canonical trades state (persisted)
-  const [trades, setTrades] = useState<Trade[]>([]);
-  const [isTradesLoaded, setIsTradesLoaded] = useState(false);
-
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [noteValue, setNoteValue] = useState("");
   const { exportAllReports } = usePdfExport();
@@ -394,42 +347,43 @@ export default function Journal() {
   // ✅ Linked accounts (used for assigning accountId + CSV export)
   const { accounts, primaryAccount } = useLinkedAccounts();
 
+  const accountIds = useMemo(() => accounts.map((a) => a.id), [accounts]);
+
+  // ✅ Canonical trades for Journal + Reports
+  const { trades, addManualTrade, setTradeNotes, setTradeRating } = useJournalTrades(accountIds);
+
+  // ✅ Seed demo trades once (only if no manual trades exist yet)
+  useEffect(() => {
+    try {
+      const existing = localStorage.getItem("journalManualTrades:v1");
+      if (existing) {
+        const parsed = JSON.parse(existing);
+        if (Array.isArray(parsed) && parsed.length > 0) return;
+      }
+
+      // If storage is empty or invalid, seed the demo trades into manual storage.
+      // (This preserves the current demo experience but allows KPIs to update immediately.)
+      localStorage.setItem(
+        "journalManualTrades:v1",
+        JSON.stringify(initialTrades.map((t) => ({ ...t, source: "manual" }))),
+      );
+      window.dispatchEvent(new Event("journalTradesUpdated"));
+    } catch {
+      // If JSON parsing fails, we still try to seed safely
+      localStorage.setItem(
+        "journalManualTrades:v1",
+        JSON.stringify(initialTrades.map((t) => ({ ...t, source: "manual" }))),
+      );
+      window.dispatchEvent(new Event("journalTradesUpdated"));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const accountNameById = useMemo(() => {
     const map = new Map<string, string>();
     accounts.forEach((a) => map.set(a.id, a.name));
     return map;
   }, [accounts]);
-
-  // ✅ Load trades once from storage, otherwise seed
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(JOURNAL_TRADES_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          setTrades(parsed);
-        } else {
-          setTrades(seedTrades);
-        }
-      } else {
-        setTrades(seedTrades);
-      }
-    } catch {
-      setTrades(seedTrades);
-    } finally {
-      setIsTradesLoaded(true);
-    }
-  }, []);
-
-  // ✅ Persist trades
-  useEffect(() => {
-    if (!isTradesLoaded) return;
-    try {
-      localStorage.setItem(JOURNAL_TRADES_KEY, JSON.stringify(trades));
-    } catch {
-      // ignore storage issues
-    }
-  }, [trades, isTradesLoaded]);
 
   const equityCurveCardId = "pinned-journal-equity";
   const isEquityCurveAdded = isCardOnDashboard(equityCurveCardId);
@@ -612,6 +566,23 @@ export default function Journal() {
 
     return { totalPnl, winRate, avgRR, tradeCount: filteredTrades.length, bestDay, worstDay };
   }, [filteredTrades]);
+
+  // ✅ Top cards now reflect real trades (UI unchanged)
+  const topCardStats = useMemo(() => {
+    const totalTrades = trades.length;
+
+    const totalPnl = trades.reduce((s, t) => s + t.pnl, 0);
+    const winners = trades.filter((t) => t.pnl > 0);
+    const losers = trades.filter((t) => t.pnl < 0);
+
+    const winRate = totalTrades > 0 ? (winners.length / totalTrades) * 100 : 0;
+
+    const avgWin = winners.length > 0 ? winners.reduce((s, t) => s + t.pnl, 0) / winners.length : 0;
+    const avgLoss = losers.length > 0 ? Math.abs(losers.reduce((s, t) => s + t.pnl, 0) / losers.length) : 1;
+    const avgRR = avgLoss > 0 ? avgWin / avgLoss : 0;
+
+    return { totalTrades, totalPnl, winRate, avgRR };
+  }, [trades]);
 
   const [newTrade, setNewTrade] = useState({
     accountId: UNASSIGNED_ACCOUNT_VALUE,
@@ -822,7 +793,7 @@ export default function Journal() {
   const selectedDayTrades = selectedDay ? getDailySummary(selectedDay).trades : [];
 
   const handleRatingChange = (tradeId: string, rating: number) => {
-    setTrades((prev) => prev.map((t) => (t.id === tradeId ? { ...t, rating } : t)));
+    setTradeRating(tradeId, rating);
   };
 
   const handleNoteClick = (tradeId: string, currentNote: string) => {
@@ -831,7 +802,7 @@ export default function Journal() {
   };
 
   const handleNoteSave = (tradeId: string) => {
-    setTrades((prev) => prev.map((t) => (t.id === tradeId ? { ...t, notes: noteValue } : t)));
+    setTradeNotes(tradeId, noteValue);
     setEditingNoteId(null);
     setNoteValue("");
   };
@@ -848,7 +819,10 @@ export default function Journal() {
     const symbol = normalizeSymbol(newTrade.pair);
 
     // ✅ Instrument-aware P&L (falls back if missing metadata)
-    const pnl = instrumentAwarePnl(symbol, newTrade.type, entry, exit, lots);
+    const instrument = getInstrumentBySymbol(symbol);
+    const pnl = instrument
+      ? calculateTradePnl(instrument, entry, exit, lots, newTrade.type)
+      : legacyFallbackPnl(newTrade.type, entry, exit, lots);
 
     // ✅ resolve accountId (explicit selection > primary > undefined)
     const selectedAccountId =
@@ -869,9 +843,11 @@ export default function Journal() {
       notes: "",
       rating: 0,
       accountId: resolvedAccountId,
+      source: "manual",
     };
 
-    setTrades((prev) => [trade, ...prev]);
+    addManualTrade(trade);
+
     setNewTrade({
       accountId: UNASSIGNED_ACCOUNT_VALUE,
       pair: "",
@@ -941,7 +917,7 @@ export default function Journal() {
                   <CardTitle className="text-sm font-medium text-muted-foreground">Total Trades</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-foreground">127</div>
+                  <div className="text-2xl font-bold text-foreground">{topCardStats.totalTrades}</div>
                 </CardContent>
               </Card>
 
@@ -950,7 +926,7 @@ export default function Journal() {
                   <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-foreground">68%</div>
+                  <div className="text-2xl font-bold text-foreground">{topCardStats.winRate.toFixed(0)}%</div>
                 </CardContent>
               </Card>
 
@@ -959,7 +935,9 @@ export default function Journal() {
                   <CardTitle className="text-sm font-medium text-muted-foreground">Total P&amp;L</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-success">+$24,680</div>
+                  <div className="text-2xl font-bold text-success">
+                    {topCardStats.totalPnl >= 0 ? "+" : "-"}${Math.abs(topCardStats.totalPnl).toLocaleString()}
+                  </div>
                 </CardContent>
               </Card>
 
@@ -968,7 +946,7 @@ export default function Journal() {
                   <CardTitle className="text-sm font-medium text-muted-foreground">Avg R:R</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-foreground">2.1</div>
+                  <div className="text-2xl font-bold text-foreground">{topCardStats.avgRR.toFixed(1)}</div>
                 </CardContent>
               </Card>
             </div>
