@@ -42,6 +42,9 @@ import { usePdfExport } from "@/hooks/use-pdf-export";
 import { Link } from "react-router-dom";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 
+// ✅ NEW: instrument-aware P&L engine (logic only; UI unchanged)
+import { getInstrumentBySymbol, calculateTradePnl } from "@/data/tradingInstruments";
+
 interface Trade {
   id: string;
   date: string;
@@ -55,7 +58,7 @@ interface Trade {
   notes?: string;
   rating?: number;
 
-  // ✅ NEW: which connected account this trade belongs to
+  // ✅ which connected account this trade belongs to
   accountId?: string;
 }
 
@@ -325,6 +328,20 @@ const downloadTextFile = (filename: string, content: string, mime = "text/plain;
 
 const UNASSIGNED_ACCOUNT_VALUE = "__unassigned__";
 
+/**
+ * ✅ Normalize symbol input so "EUR/USD" or "eurusd" becomes "EURUSD"
+ */
+const normalizeSymbol = (s: string) => s.trim().toUpperCase().replace("/", "");
+
+/**
+ * ✅ Backward-compatible fallback (your old formula).
+ * Used only if instrument metadata is not found.
+ */
+const legacyFallbackPnl = (type: "Long" | "Short", entry: number, exit: number, lots: number) => {
+  const raw = type === "Long" ? (exit - entry) * lots * 10000 : (entry - exit) * lots * 10000;
+  return Math.round(raw);
+};
+
 export default function Journal() {
   const [currentMonth, setCurrentMonth] = useState(new Date(2025, 0, 1));
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
@@ -534,7 +551,7 @@ export default function Journal() {
   }, [filteredTrades]);
 
   const [newTrade, setNewTrade] = useState({
-    accountId: UNASSIGNED_ACCOUNT_VALUE, // ✅ NEW
+    accountId: UNASSIGNED_ACCOUNT_VALUE,
     pair: "",
     type: "Long" as "Long" | "Short",
     entry: "",
@@ -599,7 +616,6 @@ export default function Journal() {
 
     if (include.has("reports-tradelog")) {
       lines.push(["SECTION", "Trade Log", ""].map(escapeCsv).join(","));
-      // ✅ NEW: Account column
       const header = ["Date", "Account", "Pair", "Type", "Entry", "Exit", "Lots", "P&L", "Status", "Notes", "Rating"];
       lines.push(header.map(escapeCsv).join(","));
 
@@ -766,10 +782,15 @@ export default function Journal() {
 
     if (!Number.isFinite(entry) || !Number.isFinite(exit) || !Number.isFinite(lots) || lots <= 0) return;
 
-    const pnl =
-      newTrade.type === "Long" ? Math.round((exit - entry) * lots * 10000) : Math.round((entry - exit) * lots * 10000);
+    const symbol = normalizeSymbol(newTrade.pair);
 
-    // ✅ NEW: resolve accountId (explicit selection > primary > undefined)
+    // ✅ NEW: instrument-aware P&L (falls back if missing metadata)
+    const instrument = getInstrumentBySymbol(symbol);
+    const pnl = instrument
+      ? calculateTradePnl(instrument, entry, exit, lots, newTrade.type)
+      : legacyFallbackPnl(newTrade.type, entry, exit, lots);
+
+    // ✅ resolve accountId (explicit selection > primary > undefined)
     const selectedAccountId =
       newTrade.accountId && newTrade.accountId !== UNASSIGNED_ACCOUNT_VALUE ? newTrade.accountId : undefined;
 
@@ -778,7 +799,7 @@ export default function Journal() {
     const trade: Trade = {
       id: Date.now().toString(),
       date: format(selectedDay, "yyyy-MM-dd"),
-      pair: newTrade.pair.toUpperCase().replace("/", ""),
+      pair: symbol,
       type: newTrade.type,
       entry,
       exit,
@@ -1010,9 +1031,7 @@ export default function Journal() {
                       <thead>
                         <tr className="border-b border-border">
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Date</th>
-                          {/* ✅ NEW */}
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Account</th>
-
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Pair</th>
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Type</th>
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Entry</th>
@@ -1031,7 +1050,6 @@ export default function Journal() {
                           <tr key={trade.id} className="border-b border-border hover:bg-muted/50 transition-colors">
                             <td className="py-3 px-3 text-sm text-muted-foreground">{trade.date}</td>
 
-                            {/* ✅ NEW */}
                             <td className="py-3 px-3">
                               <Badge variant="secondary" className="text-xs">
                                 {trade.accountId ? accountNameById.get(trade.accountId) || "Account" : "Unknown"}
@@ -1128,7 +1146,6 @@ export default function Journal() {
                   <DialogTitle>Add New Trade</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 pt-4">
-                  {/* ✅ NEW: Account selection */}
                   <div className="space-y-2">
                     <Label htmlFor="account">Account</Label>
                     <Select
