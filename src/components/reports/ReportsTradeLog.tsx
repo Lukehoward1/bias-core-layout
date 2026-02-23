@@ -1,3 +1,4 @@
+// src/components/reports/ReportsTradeLog.tsx
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,8 +23,7 @@ interface Trade {
   notes?: string;
   rating?: number;
 
-  // ✅ NEW: link trades to a connected account
-  // (optional for backward compatibility)
+  // ✅ Link trades to a connected account (optional for backward compatibility)
   accountId?: string;
 }
 
@@ -42,6 +42,12 @@ type SortOption = "date-desc" | "date-asc" | "pnl-desc" | "pnl-asc" | "rating-de
  * - "unknown" (trades with no accountId)
  */
 type AccountFilter = "all" | "primary" | "unknown" | `account:${string}`;
+
+const csvEscape = (v: unknown) => {
+  const s = String(v ?? "");
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+};
 
 export function ReportsTradeLog({ trades, dateRangeLabel }: ReportsTradeLogProps) {
   const { exportToPdf } = usePdfExport();
@@ -80,7 +86,7 @@ export function ReportsTradeLog({ trades, dateRangeLabel }: ReportsTradeLogProps
   const [pnlFilter, setPnlFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<SortOption>("date-desc");
 
-  // ✅ NEW
+  // ✅ Account filter
   const [accountFilter, setAccountFilter] = useState<AccountFilter>("all");
 
   const uniquePairs = useMemo(() => [...new Set(trades.map((t) => t.pair))], [trades]);
@@ -188,9 +194,11 @@ export function ReportsTradeLog({ trades, dateRangeLabel }: ReportsTradeLogProps
       t.notes || "",
     ]);
 
-    const csvContent = [headers.join(","), ...rows.map((row) => row.map((cell) => `"${cell}"`).join(","))].join("\n");
+    const csvContent = [headers.map(csvEscape).join(","), ...rows.map((row) => row.map(csvEscape).join(","))].join(
+      "\n",
+    );
 
-    const blob = new Blob([csvContent], { type: "text/csv" });
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -233,7 +241,7 @@ export function ReportsTradeLog({ trades, dateRangeLabel }: ReportsTradeLogProps
               </div>
             </div>
 
-            {/* ✅ NEW: Account filter */}
+            {/* ✅ Account filter */}
             <Select value={accountFilter} onValueChange={(v) => setAccountFilter(v as AccountFilter)}>
               <SelectTrigger>
                 <SelectValue placeholder="Account" />
@@ -339,6 +347,7 @@ export function ReportsTradeLog({ trades, dateRangeLabel }: ReportsTradeLogProps
               <tbody>
                 {filteredTrades.map((trade) => {
                   const accName = trade.accountId ? accountNameById.get(trade.accountId) || "Account" : "Unknown";
+                  const isPrimary = !!primaryAccount?.id && trade.accountId === primaryAccount.id;
 
                   return (
                     <tr key={trade.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
@@ -347,7 +356,7 @@ export function ReportsTradeLog({ trades, dateRangeLabel }: ReportsTradeLogProps
                       <td className="py-3 px-3">
                         <Badge variant="secondary" className="text-xs">
                           {accName}
-                          {primaryAccount?.id && trade.accountId === primaryAccount.id ? " (Primary)" : ""}
+                          {isPrimary ? " (Primary)" : ""}
                         </Badge>
                       </td>
 
