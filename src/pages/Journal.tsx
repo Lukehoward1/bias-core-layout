@@ -970,6 +970,7 @@ export default function Journal() {
               isAdded={isEquityCurveAdded}
               onAdd={handleAddEquityCurve}
               onRemove={handleRemoveEquityCurve}
+              startingBalance={primaryAccount?.isConnected ? primaryAccount.balance : 0}
             />
 
             <Card>
