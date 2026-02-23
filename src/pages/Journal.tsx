@@ -42,13 +42,13 @@ import { usePdfExport } from "@/hooks/use-pdf-export";
 import { Link } from "react-router-dom";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 
-// ✅ NEW: instrument-aware P&L engine (logic only; UI unchanged)
-import { getInstrumentBySymbol, calculateTradePnl } from "@/data/tradingInstruments";
+// ✅ Instrument metadata (logic only; UI unchanged)
+import { getInstrumentBySymbol } from "@/data/tradingInstruments";
 
 interface Trade {
   id: string;
   date: string;
-  pair: string;
+  pair: string; // stored normalized (e.g. EURUSD)
   type: "Long" | "Short";
   entry: number;
   exit: number;
@@ -62,7 +62,11 @@ interface Trade {
   accountId?: string;
 }
 
-const initialTrades: Trade[] = [
+/**
+ * Demo seed (used only when there is no stored journal yet)
+ * NOTE: will be persisted to localStorage on first load.
+ */
+const seedTrades: Trade[] = [
   {
     id: "1",
     date: "2025-01-15",
@@ -328,6 +332,9 @@ const downloadTextFile = (filename: string, content: string, mime = "text/plain;
 
 const UNASSIGNED_ACCOUNT_VALUE = "__unassigned__";
 
+// ✅ Canonical journal storage (single source of truth for trades on the client)
+const JOURNAL_TRADES_KEY = "streambias_journal_trades_v1";
+
 /**
  * ✅ Normalize symbol input so "EUR/USD" or "eurusd" becomes "EURUSD"
  */
@@ -342,12 +349,37 @@ const legacyFallbackPnl = (type: "Long" | "Short", entry: number, exit: number, 
   return Math.round(raw);
 };
 
+/**
+ * ✅ Instrument-aware P&L (GBP-ish), based on your metadata:
+ * - Use pip/tick count = |exit-entry| / pipSize
+ * - Value per pip/tick per 1 lot/contract = pipValue
+ * - Multiply by lots/contracts
+ */
+const instrumentAwarePnl = (symbol: string, type: "Long" | "Short", entry: number, exit: number, lots: number) => {
+  const instrument = getInstrumentBySymbol(symbol);
+  if (!instrument || !instrument.pipSize || !instrument.pipValue) {
+    return legacyFallbackPnl(type, entry, exit, lots);
+  }
+
+  const direction = type === "Long" ? 1 : -1;
+  const move = (exit - entry) * direction;
+  const units = move / instrument.pipSize; // pips/ticks/points count (signed)
+  const pnl = units * instrument.pipValue * lots;
+
+  // Round for display consistency (Journal currently expects integers)
+  return Math.round(pnl);
+};
+
 export default function Journal() {
   const [currentMonth, setCurrentMonth] = useState(new Date(2025, 0, 1));
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAddTradeOpen, setIsAddTradeOpen] = useState(false);
-  const [trades, setTrades] = useState<Trade[]>(initialTrades);
+
+  // ✅ Canonical trades state (persisted)
+  const [trades, setTrades] = useState<Trade[]>([]);
+  const [isTradesLoaded, setIsTradesLoaded] = useState(false);
+
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [noteValue, setNoteValue] = useState("");
   const { exportAllReports } = usePdfExport();
@@ -367,6 +399,37 @@ export default function Journal() {
     accounts.forEach((a) => map.set(a.id, a.name));
     return map;
   }, [accounts]);
+
+  // ✅ Load trades once from storage, otherwise seed
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(JOURNAL_TRADES_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setTrades(parsed);
+        } else {
+          setTrades(seedTrades);
+        }
+      } else {
+        setTrades(seedTrades);
+      }
+    } catch {
+      setTrades(seedTrades);
+    } finally {
+      setIsTradesLoaded(true);
+    }
+  }, []);
+
+  // ✅ Persist trades
+  useEffect(() => {
+    if (!isTradesLoaded) return;
+    try {
+      localStorage.setItem(JOURNAL_TRADES_KEY, JSON.stringify(trades));
+    } catch {
+      // ignore storage issues
+    }
+  }, [trades, isTradesLoaded]);
 
   const equityCurveCardId = "pinned-journal-equity";
   const isEquityCurveAdded = isCardOnDashboard(equityCurveCardId);
@@ -759,7 +822,7 @@ export default function Journal() {
   const selectedDayTrades = selectedDay ? getDailySummary(selectedDay).trades : [];
 
   const handleRatingChange = (tradeId: string, rating: number) => {
-    setTrades(trades.map((t) => (t.id === tradeId ? { ...t, rating } : t)));
+    setTrades((prev) => prev.map((t) => (t.id === tradeId ? { ...t, rating } : t)));
   };
 
   const handleNoteClick = (tradeId: string, currentNote: string) => {
@@ -768,7 +831,7 @@ export default function Journal() {
   };
 
   const handleNoteSave = (tradeId: string) => {
-    setTrades(trades.map((t) => (t.id === tradeId ? { ...t, notes: noteValue } : t)));
+    setTrades((prev) => prev.map((t) => (t.id === tradeId ? { ...t, notes: noteValue } : t)));
     setEditingNoteId(null);
     setNoteValue("");
   };
@@ -784,11 +847,8 @@ export default function Journal() {
 
     const symbol = normalizeSymbol(newTrade.pair);
 
-    // ✅ NEW: instrument-aware P&L (falls back if missing metadata)
-    const instrument = getInstrumentBySymbol(symbol);
-    const pnl = instrument
-      ? calculateTradePnl(instrument, entry, exit, lots, newTrade.type)
-      : legacyFallbackPnl(newTrade.type, entry, exit, lots);
+    // ✅ Instrument-aware P&L (falls back if missing metadata)
+    const pnl = instrumentAwarePnl(symbol, newTrade.type, entry, exit, lots);
 
     // ✅ resolve accountId (explicit selection > primary > undefined)
     const selectedAccountId =
@@ -811,7 +871,7 @@ export default function Journal() {
       accountId: resolvedAccountId,
     };
 
-    setTrades([trade, ...trades]);
+    setTrades((prev) => [trade, ...prev]);
     setNewTrade({
       accountId: UNASSIGNED_ACCOUNT_VALUE,
       pair: "",
