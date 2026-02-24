@@ -312,8 +312,8 @@ export default function Journal() {
     const avgWin =
       winningTrades.length > 0 ? winningTrades.reduce((sum, t) => sum + t.pnl, 0) / winningTrades.length : 0;
     const avgLoss =
-      losingTrades.length > 0 ? Math.abs(losingTrades.reduce((sum, t) => sum + t.pnl, 0) / losingTrades.length : 0) ||
-          1
+      losingTrades.length > 0
+        ? Math.abs(losingTrades.reduce((sum, t) => sum + t.pnl, 0) / losingTrades.length) || 1
         : 1;
     const avgRR = avgLoss > 0 ? avgWin / avgLoss : 0;
 
@@ -835,7 +835,9 @@ export default function Journal() {
                   <CardTitle className="text-sm font-medium text-muted-foreground">Total P&amp;L</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className={`text-2xl font-bold ${tradeSummary.totalPnl >= 0 ? "text-success" : "text-destructive"}`}>
+                  <div
+                    className={`text-2xl font-bold ${tradeSummary.totalPnl >= 0 ? "text-success" : "text-destructive"}`}
+                  >
                     {tradeSummary.totalPnl >= 0 ? "+" : ""}£{tradeSummary.totalPnl.toLocaleString()}
                   </div>
                 </CardContent>
