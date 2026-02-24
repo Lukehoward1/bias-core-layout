@@ -1,5 +1,5 @@
 // src/pages/Journal.tsx
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,14 +42,14 @@ import { usePdfExport } from "@/hooks/use-pdf-export";
 import { Link } from "react-router-dom";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 
-// ✅ Trades storage (manual + synced + overrides)
-import { useJournalTrades, Trade } from "@/hooks/use-journal-trades";
+// ✅ Canonical trades (manual + synced + overrides) now live here
+import { useJournalTrades, Trade as JournalTrade } from "@/hooks/use-journal-trades";
 
-// ✅ Instrument-aware P&L engine (logic only; UI unchanged)
+// ✅ instrument-aware P&L engine (logic only; UI unchanged)
 import { getInstrumentBySymbol, calculateTradePnl } from "@/data/tradingInstruments";
 
 /* =======================
-   ✅ UI Helpers
+   UI HELPERS
 ======================= */
 
 function StarRating({ rating, onRatingChange }: { rating: number; onRatingChange: (rating: number) => void }) {
@@ -72,7 +72,7 @@ function StarRating({ rating, onRatingChange }: { rating: number; onRatingChange
 }
 
 interface EquityCurveCardProps {
-  trades: Trade[];
+  trades: JournalTrade[];
   isAdded: boolean;
   onAdd: () => void;
   onRemove: () => void;
@@ -97,7 +97,7 @@ function EquityCurveCard({ trades, isAdded, onAdd, onRemove }: EquityCurveCardPr
         <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
           <p className="text-xs text-muted-foreground mb-1">{data.formattedDate}</p>
           <p className={`text-sm font-semibold ${data.equity >= 0 ? "text-success" : "text-destructive"}`}>
-            {data.equity >= 0 ? "+" : ""}£{data.equity.toLocaleString()}
+            {data.equity >= 0 ? "+" : ""}£{Number(data.equity).toLocaleString()}
           </p>
           <p className="text-xs text-muted-foreground mt-1">{data.tradeCount} trades total</p>
         </div>
@@ -162,7 +162,7 @@ function EquityCurveCard({ trades, isAdded, onAdd, onRemove }: EquityCurveCardPr
 }
 
 /* =======================
-   ✅ EXPORT HELPERS
+   EXPORT HELPERS
 ======================= */
 
 type ExportFormat = "pdf" | "csv";
@@ -204,7 +204,7 @@ const UNASSIGNED_ACCOUNT_VALUE = "__unassigned__";
 const normalizeSymbol = (s: string) => s.trim().toUpperCase().replace("/", "");
 
 /**
- * ✅ Backward-compatible fallback (old formula).
+ * ✅ Backward-compatible fallback (your old formula).
  * Used only if instrument metadata is not found.
  */
 const legacyFallbackPnl = (type: "Long" | "Short", entry: number, exit: number, lots: number) => {
@@ -212,7 +212,7 @@ const legacyFallbackPnl = (type: "Long" | "Short", entry: number, exit: number, 
   return Math.round(raw);
 };
 
-type AccountFilter = "all" | "primary" | "unknown" | `account:${string}`;
+type AccountFilterValue = "all" | "unassigned" | string;
 
 export default function Journal() {
   const [currentMonth, setCurrentMonth] = useState(new Date(2025, 0, 1));
@@ -225,12 +225,14 @@ export default function Journal() {
 
   const { exportAllReports } = usePdfExport();
   const { limits } = useSubscription();
+
   const canAccessReports = limits.journal.reports;
   const canExportReports = limits.journal.exportReports;
   const canUseAutoJournaling = limits.journal.autoJournaling;
 
   const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
 
+  // ✅ Linked accounts
   const { accounts, primaryAccount } = useLinkedAccounts();
   const accountIds = useMemo(() => accounts.map((a) => a.id), [accounts]);
 
@@ -240,60 +242,41 @@ export default function Journal() {
     return map;
   }, [accounts]);
 
-  // ✅ Canonical trades hook (manual + synced)
+  // ✅ Canonical trades from storage (manual + synced)
   const { trades, addManualTrade, setTradeNotes, setTradeRating } = useJournalTrades(accountIds);
 
-  // ✅ NEW: account filter for Journal-side stats/curve/calendar
-  const [accountFilter, setAccountFilter] = useState<AccountFilter>("all");
+  // ✅ Account filter (defaults to primary if exists, else all)
+  const [accountFilter, setAccountFilter] = useState<AccountFilterValue>("all");
 
-  const visibleTrades = useMemo(() => {
-    let result = [...trades];
-
-    if (accountFilter !== "all") {
-      if (accountFilter === "primary") {
-        const pid = primaryAccount?.id;
-        result = pid ? result.filter((t) => t.accountId === pid) : [];
-      } else if (accountFilter === "unknown") {
-        result = result.filter((t) => !t.accountId);
-      } else if (accountFilter.startsWith("account:")) {
-        const id = accountFilter.split(":")[1];
-        result = result.filter((t) => t.accountId === id);
-      }
+  useEffect(() => {
+    // If user has a primary and filter is still "all", default to primary for UX
+    if (primaryAccount?.id && accountFilter === "all") {
+      setAccountFilter(primaryAccount.id);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [primaryAccount?.id]);
 
-    return result;
-  }, [trades, accountFilter, primaryAccount?.id]);
-
-  // ✅ IMPORTANT FIX:
-  // Initialize dateRange to cover ALL trades so cards don’t show 0 when demo trades are in the past.
-  const [dateRange, setDateRange] = useState<DateRange>(() => ({
+  // ✅ Range for reports filtering
+  const [dateRange, setDateRange] = useState<DateRange>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
     label: "This Month",
-  }));
-
-  const didInitRange = useRef(false);
+  });
 
   const { firstTradeDate, lastTradeDate } = useMemo(() => {
-    if (visibleTrades.length === 0) return { firstTradeDate: undefined, lastTradeDate: undefined };
-    const sortedDates = visibleTrades.map((t) => parseISO(t.date)).sort((a, b) => a.getTime() - b.getTime());
+    if (trades.length === 0) return { firstTradeDate: undefined, lastTradeDate: undefined };
+    const sortedDates = trades.map((t) => parseISO(t.date)).sort((a, b) => a.getTime() - b.getTime());
     return { firstTradeDate: sortedDates[0], lastTradeDate: sortedDates[sortedDates.length - 1] };
-  }, [visibleTrades]);
+  }, [trades]);
 
-  useEffect(() => {
-    if (didInitRange.current) return;
-    if (!firstTradeDate || !lastTradeDate) return;
+  // ✅ Visible trades = account filter applied
+  const visibleTrades = useMemo(() => {
+    if (accountFilter === "all") return trades;
+    if (accountFilter === "unassigned") return trades.filter((t) => !t.accountId);
+    return trades.filter((t) => t.accountId === accountFilter);
+  }, [trades, accountFilter]);
 
-    // All-time range (works for demo + real)
-    setDateRange({
-      from: firstTradeDate,
-      to: lastTradeDate,
-      label: "All Time",
-    });
-
-    didInitRange.current = true;
-  }, [firstTradeDate, lastTradeDate]);
-
+  // ✅ Filter trades to dateRange (used for reports + cards)
   const filteredTrades = useMemo(() => {
     return visibleTrades.filter((t) => {
       const tradeDate = parseISO(t.date);
@@ -303,18 +286,23 @@ export default function Journal() {
 
   const dateRangeLabel = `${format(dateRange.from, "MMM d, yyyy")} - ${format(dateRange.to, "MMM d, yyyy")}`;
 
+  // ✅ FIXED (no ternary inside Math.abs)
   const tradeSummary = useMemo(() => {
     const totalPnl = filteredTrades.reduce((sum, t) => sum + t.pnl, 0);
+
     const winningTrades = filteredTrades.filter((t) => t.pnl > 0);
     const losingTrades = filteredTrades.filter((t) => t.pnl < 0);
+
     const winRate = filteredTrades.length > 0 ? (winningTrades.length / filteredTrades.length) * 100 : 0;
 
     const avgWin =
       winningTrades.length > 0 ? winningTrades.reduce((sum, t) => sum + t.pnl, 0) / winningTrades.length : 0;
+
     const avgLoss =
       losingTrades.length > 0
         ? Math.abs(losingTrades.reduce((sum, t) => sum + t.pnl, 0) / losingTrades.length) || 1
         : 1;
+
     const avgRR = avgLoss > 0 ? avgWin / avgLoss : 0;
 
     const dailyPnl = filteredTrades.reduce(
@@ -326,10 +314,12 @@ export default function Journal() {
     );
 
     const dailyEntries = Object.entries(dailyPnl);
+
     const bestDay = dailyEntries.reduce(
       (best, [date, pnl]) => (pnl > (best?.pnl ?? -Infinity) ? { date, pnl } : best),
       null as { date: string; pnl: number } | null,
     );
+
     const worstDay = dailyEntries.reduce(
       (worst, [date, pnl]) => (pnl < (worst?.pnl ?? Infinity) ? { date, pnl } : worst),
       null as { date: string; pnl: number } | null,
@@ -338,14 +328,9 @@ export default function Journal() {
     return { totalPnl, winRate, avgRR, tradeCount: filteredTrades.length, bestDay, worstDay };
   }, [filteredTrades]);
 
-  const [newTrade, setNewTrade] = useState({
-    accountId: UNASSIGNED_ACCOUNT_VALUE,
-    pair: "",
-    type: "Long" as "Long" | "Short",
-    entry: "",
-    exit: "",
-    lots: "",
-  });
+  /* =======================
+     DASHBOARD PINNING
+  ======================= */
 
   const equityCurveCardId = "pinned-journal-equity";
   const isEquityCurveAdded = isCardOnDashboard(equityCurveCardId);
@@ -476,7 +461,7 @@ export default function Journal() {
   };
 
   /* =======================
-     ✅ EXPORT SYSTEM (UI + LOGIC)
+     EXPORT SYSTEM
   ======================= */
 
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -486,10 +471,7 @@ export default function Journal() {
   const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>(defaultSelectedSectionIds);
 
   useEffect(() => {
-    setSelectedSectionIds((prev) => {
-      if (prev.length > 0) return prev;
-      return REPORT_SECTIONS.map((s) => s.id);
-    });
+    setSelectedSectionIds((prev) => (prev.length > 0 ? prev : REPORT_SECTIONS.map((s) => s.id)));
   }, []);
 
   const toggleSection = (id: string) => {
@@ -503,6 +485,19 @@ export default function Journal() {
     lines.push(["StreamBias Export", "", ""].map(escapeCsv).join(","));
     lines.push(["Generated", now, ""].map(escapeCsv).join(","));
     lines.push(["Date Range", dateRangeLabel, ""].map(escapeCsv).join(","));
+    lines.push(
+      [
+        "Account Filter",
+        accountFilter === "all"
+          ? "All Accounts"
+          : accountFilter === "unassigned"
+            ? "Unassigned"
+            : accountNameById.get(accountFilter) || accountFilter,
+        "",
+      ]
+        .map(escapeCsv)
+        .join(","),
+    );
     lines.push(["", "", ""].map(escapeCsv).join(","));
 
     const include = new Set(selectedSectionIds);
@@ -536,7 +531,7 @@ export default function Journal() {
       lines.push(header.map(escapeCsv).join(","));
 
       filteredTrades.forEach((t) => {
-        const accountLabel = t.accountId ? accountNameById.get(t.accountId) || t.accountId : "Unknown";
+        const accountLabel = t.accountId ? accountNameById.get(t.accountId) || t.accountId : "Unassigned";
         lines.push(
           [t.date, accountLabel, t.pair, t.type, t.entry, t.exit, t.lots, t.pnl, t.status, t.notes ?? "", t.rating ?? 0]
             .map(escapeCsv)
@@ -648,9 +643,13 @@ export default function Journal() {
     setIsExportModalOpen(false);
   };
 
+  /* =======================
+     CALENDAR HELPERS
+  ======================= */
+
   function getDailySummary(date: Date) {
     const dateStr = format(date, "yyyy-MM-dd");
-    const dayTrades = filteredTrades.filter((t) => t.date === dateStr);
+    const dayTrades = visibleTrades.filter((t) => t.date === dateStr);
     const totalPnl = dayTrades.reduce((sum, t) => sum + t.pnl, 0);
     return { trades: dayTrades, totalPnl, tradeCount: dayTrades.length };
   }
@@ -689,6 +688,15 @@ export default function Journal() {
     setNoteValue("");
   };
 
+  const [newTrade, setNewTrade] = useState({
+    accountId: UNASSIGNED_ACCOUNT_VALUE,
+    pair: "",
+    type: "Long" as "Long" | "Short",
+    entry: "",
+    exit: "",
+    lots: "",
+  });
+
   const handleAddTrade = () => {
     if (!selectedDay || !newTrade.pair || !newTrade.entry || !newTrade.exit || !newTrade.lots) return;
 
@@ -700,17 +708,19 @@ export default function Journal() {
 
     const symbol = normalizeSymbol(newTrade.pair);
 
+    // ✅ instrument-aware P&L (falls back if missing metadata)
     const instrument = getInstrumentBySymbol(symbol);
     const pnl = instrument
       ? calculateTradePnl(instrument, entry, exit, lots, newTrade.type)
       : legacyFallbackPnl(newTrade.type, entry, exit, lots);
 
+    // ✅ resolve accountId (explicit selection > primary > undefined)
     const selectedAccountId =
       newTrade.accountId && newTrade.accountId !== UNASSIGNED_ACCOUNT_VALUE ? newTrade.accountId : undefined;
 
     const resolvedAccountId = selectedAccountId || primaryAccount?.id || undefined;
 
-    const trade: Trade = {
+    const trade: JournalTrade = {
       id: Date.now().toString(),
       date: format(selectedDay, "yyyy-MM-dd"),
       pair: symbol,
@@ -723,6 +733,7 @@ export default function Journal() {
       notes: "",
       rating: 0,
       accountId: resolvedAccountId,
+      source: "manual",
     };
 
     addManualTrade(trade);
@@ -735,6 +746,7 @@ export default function Journal() {
       exit: "",
       lots: "",
     });
+
     setIsAddTradeOpen(false);
   };
 
@@ -783,19 +795,19 @@ export default function Journal() {
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <Select value={accountFilter} onValueChange={(v) => setAccountFilter(v as AccountFilter)}>
+                    {/* ✅ Account Filter */}
+                    <Select value={accountFilter} onValueChange={(v) => setAccountFilter(v)}>
                       <SelectTrigger className="w-[220px]">
-                        <SelectValue placeholder="Account" />
+                        <SelectValue placeholder="All Accounts" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Accounts</SelectItem>
-                        <SelectItem value="primary" disabled={!primaryAccount}>
-                          Primary Account
-                        </SelectItem>
-                        <SelectItem value="unknown">Unassigned / Unknown</SelectItem>
+                        <SelectItem value="unassigned">Unassigned / Unknown</SelectItem>
+
                         {accounts.map((a) => (
-                          <SelectItem key={a.id} value={`account:${a.id}`}>
+                          <SelectItem key={a.id} value={a.id}>
                             {a.name}
+                            {primaryAccount?.id === a.id ? " (Primary)" : ""}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -826,7 +838,7 @@ export default function Journal() {
                   <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-foreground">{Math.round(tradeSummary.winRate)}%</div>
+                  <div className="text-2xl font-bold text-foreground">{tradeSummary.winRate.toFixed(0)}%</div>
                 </CardContent>
               </Card>
 
@@ -838,7 +850,7 @@ export default function Journal() {
                   <div
                     className={`text-2xl font-bold ${tradeSummary.totalPnl >= 0 ? "text-success" : "text-destructive"}`}
                   >
-                    {tradeSummary.totalPnl >= 0 ? "+" : ""}£{tradeSummary.totalPnl.toLocaleString()}
+                    {tradeSummary.totalPnl >= 0 ? "+" : ""}£{Math.round(tradeSummary.totalPnl).toLocaleString()}
                   </div>
                 </CardContent>
               </Card>
@@ -854,7 +866,7 @@ export default function Journal() {
             </div>
 
             <EquityCurveCard
-              trades={filteredTrades}
+              trades={visibleTrades}
               isAdded={isEquityCurveAdded}
               onAdd={handleAddEquityCurve}
               onRemove={handleRemoveEquityCurve}
@@ -904,7 +916,7 @@ export default function Journal() {
                 <div className="grid grid-cols-7 gap-2">
                   {calendarDays.map((date, idx) => {
                     const summary = getDailySummary(date);
-                    const isCurrentMonth = isSameMonth(date, currentMonth);
+                    const isCurrent = isSameMonth(date, currentMonth);
                     const hasTrades = summary.tradeCount > 0;
 
                     let bgClass = "bg-muted/20";
@@ -926,21 +938,21 @@ export default function Journal() {
                     return (
                       <div
                         key={idx}
-                        onClick={() => isCurrentMonth && handleDayClick(date)}
+                        onClick={() => isCurrent && handleDayClick(date)}
                         className={`
                           min-h-[80px] p-2 rounded-lg border border-border/50 flex flex-col
                           ${bgClass}
-                          ${!isCurrentMonth ? "opacity-30" : "cursor-pointer"}
+                          ${!isCurrent ? "opacity-30" : "cursor-pointer"}
                           transition-colors
                         `}
                       >
-                        <span className={`text-xs ${isCurrentMonth ? "text-foreground" : "text-muted-foreground"}`}>
+                        <span className={`text-xs ${isCurrent ? "text-foreground" : "text-muted-foreground"}`}>
                           {format(date, "d")}
                         </span>
-                        {hasTrades && isCurrentMonth && (
+                        {hasTrades && isCurrent && (
                           <>
                             <span className={`text-sm font-bold mt-auto ${pnlColorClass}`}>
-                              {summary.totalPnl >= 0 ? "+" : ""}£{summary.totalPnl.toLocaleString()}
+                              {summary.totalPnl >= 0 ? "+" : ""}£{Math.round(summary.totalPnl).toLocaleString()}
                             </span>
                             <span className="text-xs text-muted-foreground">
                               {summary.tradeCount} trade{summary.tradeCount !== 1 ? "s" : ""}
@@ -954,6 +966,7 @@ export default function Journal() {
               </CardContent>
             </Card>
 
+            {/* Trades Modal */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto scrollbar-hidden flex flex-col">
                 <DialogHeader>
@@ -965,6 +978,7 @@ export default function Journal() {
                     </Button>
                   </div>
                 </DialogHeader>
+
                 <div className="overflow-x-auto flex-1">
                   {selectedDayTrades.length > 0 ? (
                     <table className="w-full">
@@ -992,7 +1006,7 @@ export default function Journal() {
 
                             <td className="py-3 px-3">
                               <Badge variant="secondary" className="text-xs">
-                                {trade.accountId ? accountNameById.get(trade.accountId) || "Account" : "Unknown"}
+                                {trade.accountId ? accountNameById.get(trade.accountId) || "Account" : "Unassigned"}
                                 {primaryAccount?.id && trade.accountId === primaryAccount.id ? " (Primary)" : ""}
                               </Badge>
                             </td>
@@ -1002,6 +1016,7 @@ export default function Journal() {
                                 {trade.pair}
                               </Badge>
                             </td>
+
                             <td className="py-3 px-3">
                               <div className="flex items-center gap-1.5">
                                 {trade.type === "Long" ? (
@@ -1012,21 +1027,25 @@ export default function Journal() {
                                 <span className="text-sm text-foreground">{trade.type}</span>
                               </div>
                             </td>
+
                             <td className="py-3 px-3 text-sm text-foreground">{trade.entry}</td>
                             <td className="py-3 px-3 text-sm text-foreground">{trade.exit}</td>
                             <td className="py-3 px-3 text-sm text-foreground">{trade.lots}</td>
+
                             <td className="py-3 px-3">
                               <span
                                 className={`text-sm font-medium ${trade.pnl >= 0 ? "text-success" : "text-destructive"}`}
                               >
-                                {trade.pnl >= 0 ? "+" : ""}£{trade.pnl}
+                                {trade.pnl >= 0 ? "+" : ""}£{Math.round(trade.pnl)}
                               </span>
                             </td>
+
                             <td className="py-3 px-3">
                               <Badge variant="secondary" className="text-xs">
                                 {trade.status}
                               </Badge>
                             </td>
+
                             <td className="py-3 px-3">
                               {editingNoteId === trade.id ? (
                                 <div className="flex gap-1">
@@ -1057,6 +1076,7 @@ export default function Journal() {
                                 </button>
                               )}
                             </td>
+
                             <td className="py-3 px-3">
                               <StarRating
                                 rating={trade.rating || 0}
@@ -1080,11 +1100,13 @@ export default function Journal() {
               </DialogContent>
             </Dialog>
 
+            {/* Add Trade Modal */}
             <Dialog open={isAddTradeOpen} onOpenChange={setIsAddTradeOpen}>
               <DialogContent className="max-w-md">
                 <DialogHeader>
                   <DialogTitle>Add New Trade</DialogTitle>
                 </DialogHeader>
+
                 <div className="space-y-4 pt-4">
                   <div className="space-y-2">
                     <Label htmlFor="account">Account</Label>
@@ -1099,11 +1121,9 @@ export default function Journal() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={UNASSIGNED_ACCOUNT_VALUE}>Unassigned / Unknown</SelectItem>
-
                         {primaryAccount && (
                           <SelectItem value={primaryAccount.id}>{primaryAccount.name} (Primary)</SelectItem>
                         )}
-
                         {accounts
                           .filter((a) => a.id !== primaryAccount?.id)
                           .map((a) => (
@@ -1144,6 +1164,7 @@ export default function Journal() {
                       </Select>
                     </div>
                   </div>
+
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="entry">Entry</Label>
@@ -1179,6 +1200,7 @@ export default function Journal() {
                       />
                     </div>
                   </div>
+
                   <Button className="w-full" onClick={handleAddTrade}>
                     Add Trade
                   </Button>
@@ -1187,6 +1209,7 @@ export default function Journal() {
             </Dialog>
           </TabsContent>
 
+          {/* REPORTS TAB */}
           <TabsContent value="reports" className="space-y-6 mt-5">
             <Tabs defaultValue="overview" className="w-full">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
@@ -1220,10 +1243,7 @@ export default function Journal() {
                 <div className="flex items-center gap-3">
                   <ReportDateRangeFilter
                     dateRange={dateRange}
-                    onDateRangeChange={(r) => {
-                      didInitRange.current = true; // user has made an explicit choice
-                      setDateRange(r);
-                    }}
+                    onDateRangeChange={setDateRange}
                     firstTradeDate={firstTradeDate}
                     lastTradeDate={lastTradeDate}
                   />
@@ -1380,6 +1400,7 @@ export default function Journal() {
                   isLocked={!canAccessReports}
                 />
               </TabsContent>
+
               <TabsContent value="performance" className="mt-5">
                 <ReportsPerformance
                   trades={filteredTrades}
@@ -1388,6 +1409,7 @@ export default function Journal() {
                   isLocked={!canAccessReports}
                 />
               </TabsContent>
+
               <TabsContent value="sessions" className="mt-5">
                 <ReportsSessions
                   trades={filteredTrades}
@@ -1396,6 +1418,7 @@ export default function Journal() {
                   isLocked={!canAccessReports}
                 />
               </TabsContent>
+
               <TabsContent value="assets" className="mt-5">
                 <ReportsAssets
                   trades={filteredTrades}
@@ -1404,6 +1427,7 @@ export default function Journal() {
                   isLocked={!canAccessReports}
                 />
               </TabsContent>
+
               <TabsContent value="setup" className="mt-5">
                 <ReportsSetupQuality
                   trades={filteredTrades}
@@ -1412,6 +1436,7 @@ export default function Journal() {
                   isLocked={!canAccessReports}
                 />
               </TabsContent>
+
               <TabsContent value="psychology" className="mt-5">
                 <ReportsPsychology
                   trades={filteredTrades}
@@ -1420,6 +1445,7 @@ export default function Journal() {
                   isLocked={!canAccessReports}
                 />
               </TabsContent>
+
               <TabsContent value="risk" className="mt-5">
                 <ReportsRiskManagement
                   trades={filteredTrades}
@@ -1428,6 +1454,7 @@ export default function Journal() {
                   isLocked={!canAccessReports}
                 />
               </TabsContent>
+
               <TabsContent value="tradelog" className="mt-5">
                 <ReportsTradeLog trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
               </TabsContent>
