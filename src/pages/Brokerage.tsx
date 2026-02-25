@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { ConnectedAccountsList } from "@/components/account/ConnectedAccountsList";
 import { ConnectAccountModal } from "@/components/account/ConnectAccountModal";
+
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
+import { useSelectedTradingAccount, SelectedTradingAccountId } from "@/hooks/use-selected-trading-account";
 
 // Broker data
 const brokers = [
@@ -89,6 +93,18 @@ export default function Brokerage() {
   });
   const [showConnectModal, setShowConnectModal] = useState(false);
 
+  // ✅ Linked accounts list
+  const { accounts, primaryAccount } = useLinkedAccounts();
+
+  // ✅ Global selected account for the whole app
+  const { selectedId, setSelectedId, selectedAccountId, resetToAll } = useSelectedTradingAccount();
+
+  const selectedAccountLabel = useMemo(() => {
+    if (selectedId === "all") return "All accounts";
+    const found = accounts.find((a) => a.id === selectedAccountId);
+    return found?.name ?? "Selected account";
+  }, [selectedId, selectedAccountId, accounts]);
+
   const handleSmartMatchAnswer = (question: string, answer: string) => {
     setSmartMatchAnswers((prev) => ({ ...prev, [question]: answer }));
     if (smartMatchStep < 3) {
@@ -164,6 +180,65 @@ export default function Brokerage() {
                     Connect an account to auto-sync balance and streamline risk sizing.
                   </p>
                 </div>
+
+                {/* ✅ NEW: Global account selector (data scope) */}
+                <Card className="bg-card border-border">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start sm:items-center justify-between gap-3 flex-col sm:flex-row">
+                      <div>
+                        <CardTitle className="text-base">Data Scope</CardTitle>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Choose which account the app should display across Journal, Reports and Dashboard.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {primaryAccount ? (
+                          <Badge variant="outline" className="text-[10px] sm:text-xs">
+                            Primary: {primaryAccount.name}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] sm:text-xs">
+                            No primary account
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="pt-0">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                      <div className="w-full sm:max-w-sm">
+                        <Label className="text-xs text-muted-foreground">Viewing</Label>
+                        <Select value={selectedId} onValueChange={(v) => setSelectedId(v as SelectedTradingAccountId)}>
+                          <SelectTrigger className="mt-2">
+                            <SelectValue placeholder="Select account scope" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All accounts</SelectItem>
+
+                            {accounts.map((a) => (
+                              <SelectItem key={a.id} value={`account:${a.id}`}>
+                                {a.name}
+                                {primaryAccount?.id === a.id ? " (Primary)" : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        <p className="text-[11px] text-muted-foreground mt-2">
+                          Current: <span className="text-foreground font-medium">{selectedAccountLabel}</span>
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 sm:ml-auto">
+                        <Button variant="outline" size="sm" onClick={resetToAll} disabled={selectedId === "all"}>
+                          View all
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
                 <Card className="bg-card border-border">
                   <CardContent className="pt-6">
