@@ -1,3 +1,4 @@
+// src/pages/Dashboard.tsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -31,8 +32,11 @@ import { cn } from "@/lib/utils";
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { calendarEvents, type CalendarEvent } from "@/data/calendarEvents";
 
-// ✅ Session details modal (created via prompt)
+// ✅ Session details modal
 import { SessionDetailsModal } from "@/components/dashboard/SessionDetailsModal";
+
+// ✅ NEW: central trading data (respects active account selection)
+import { useTradingData } from "@/hooks/use-trading-data";
 
 type TradingSessionName = "Sydney" | "Asia" | "London" | "New York";
 
@@ -94,6 +98,9 @@ const buildSessions = (): TradingSession[] => [
 
 export default function Dashboard() {
   const navigate = useNavigate();
+
+  // ✅ NEW: real trading stats (used by Performance Overview card)
+  const { stats } = useTradingData();
 
   const [showAddCardsModal, setShowAddCardsModal] = useState(false);
 
@@ -202,24 +209,6 @@ export default function Dashboard() {
     setDragOverRowId(null);
   };
 
-  useMemo(() => {
-    const sampleTrades = [
-      { date: "2025-01-03", pnl: 450 },
-      { date: "2025-01-06", pnl: 300 },
-      { date: "2025-01-08", pnl: -400 },
-      { date: "2025-01-10", pnl: 480 },
-      { date: "2025-01-12", pnl: -400 },
-      { date: "2025-01-13", pnl: -73 },
-      { date: "2025-01-14", pnl: 1350 },
-      { date: "2025-01-15", pnl: 600 },
-    ];
-    let cumulative = 0;
-    return sampleTrades.map((t) => {
-      cumulative += t.pnl;
-      return { date: t.date, equity: cumulative, formattedDate: format(new Date(t.date), "MMM d") };
-    });
-  }, []);
-
   useEffect(() => {
     const registryCardIds = DASHBOARD_CARD_REGISTRY.map((c) => c.id);
     warnMissingRenderers(registryCardIds);
@@ -242,7 +231,6 @@ export default function Dashboard() {
 
       return (
         <Card className="h-full">
-          {/* ✅ fixes View all alignment (no centering) */}
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-semibold text-foreground">Upcoming Events</CardTitle>
 
@@ -382,8 +370,11 @@ export default function Dashboard() {
       case "watchlist-overview":
         return <WatchlistOverviewCard isEditMode={isEditMode} slotType={slotType} />;
 
-      // ✅ Fix: performance overview fallback so it never becomes Unknown Card
-      case "performance-overview":
+      // ✅ NOW LIVE: pulls from useTradingData()
+      case "performance-overview": {
+        const weekPnl = stats.weekPnl ?? 0;
+        const monthPnl = stats.monthPnl ?? 0;
+
         return (
           <Card className="h-full">
             <CardHeader>
@@ -393,24 +384,32 @@ export default function Dashboard() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">This Week</span>
-                  <span className="text-lg font-bold text-success">+$8,240</span>
+                  <span className={`text-lg font-bold ${weekPnl >= 0 ? "text-success" : "text-destructive"}`}>
+                    {weekPnl >= 0 ? "+" : ""}£{Number(weekPnl).toLocaleString()}
+                  </span>
                 </div>
+
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">This Month</span>
-                  <span className="text-lg font-bold text-success">+$24,680</span>
+                  <span className={`text-lg font-bold ${monthPnl >= 0 ? "text-success" : "text-destructive"}`}>
+                    {monthPnl >= 0 ? "+" : ""}£{Number(monthPnl).toLocaleString()}
+                  </span>
                 </div>
+
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Win Rate</span>
-                  <span className="text-lg font-bold text-foreground">68%</span>
+                  <span className="text-lg font-bold text-foreground">{stats.winRate ?? 0}%</span>
                 </div>
+
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Total Trades</span>
-                  <span className="text-lg font-bold text-foreground">127</span>
+                  <span className="text-lg font-bold text-foreground">{stats.totalTrades ?? 0}</span>
                 </div>
               </div>
             </CardContent>
           </Card>
         );
+      }
 
       case "journal-summary":
         return (
