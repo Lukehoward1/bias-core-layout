@@ -57,23 +57,17 @@ import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 // ✅ Canonical trade store (manual + synced merge + overrides)
 import { useJournalTrades, Trade as JournalTrade } from "@/hooks/use-journal-trades";
 
+// ✅ Active account selector (Brokerage controls this)
+import { useActiveTradingAccount } from "@/hooks/use-active-trading-account";
+
 // ✅ Instrument-aware P&L
 import { getInstrumentBySymbol, calculateTradePnl } from "@/data/tradingInstruments";
 
 /* =======================
-   ACTIVE ACCOUNT (VIEWING)
-======================= */
-
-const ACTIVE_ACCOUNT_KEY = "activeTradingAccountId";
-const ACTIVE_ACCOUNT_EVENT = "activeTradingAccountChanged";
-const ALL_ACCOUNTS_VALUE = "__all__";
-
-/* =======================
-   TYPES / CONSTANTS
+   TYPES
 ======================= */
 
 type Trade = JournalTrade;
-
 type ExportFormat = "pdf" | "csv";
 
 const REPORT_SECTIONS = [
@@ -270,45 +264,16 @@ export default function Journal() {
     return map;
   }, [accounts]);
 
-  // ✅ Active account selection (from Brokerage)
-  const [activeAccountId, setActiveAccountId] = useState<string>(ALL_ACCOUNTS_VALUE);
+  // ✅ Active account selection (Brokerage)
+  const { activeAccountId } = useActiveTradingAccount();
 
-  useEffect(() => {
-    const read = () => {
-      const raw = localStorage.getItem(ACTIVE_ACCOUNT_KEY);
-      setActiveAccountId(raw && raw.trim().length > 0 ? raw : ALL_ACCOUNTS_VALUE);
-    };
-
-    read();
-
-    const onStorage = (e: StorageEvent) => {
-      if (!e.key || e.key === ACTIVE_ACCOUNT_KEY) read();
-    };
-
-    const onCustom = () => read();
-
-    window.addEventListener("storage", onStorage);
-    window.addEventListener(ACTIVE_ACCOUNT_EVENT, onCustom);
-
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener(ACTIVE_ACCOUNT_EVENT, onCustom);
-    };
-  }, []);
-
-  // If active account no longer exists, fall back to All Accounts
-  useEffect(() => {
-    if (activeAccountId === ALL_ACCOUNTS_VALUE) return;
-    const exists = accounts.some((a) => a.id === activeAccountId);
-    if (!exists) setActiveAccountId(ALL_ACCOUNTS_VALUE);
-  }, [accounts, activeAccountId]);
-
-  // ✅ Canonical trades (still load all; we filter for view)
+  // ✅ Canonical trades (all accounts)
   const { trades, addManualTrade, updateManualTrade, deleteManualTrade, setTradeNotes, setTradeRating } =
     useJournalTrades(accountIds);
 
-  const viewTrades = useMemo(() => {
-    if (activeAccountId === ALL_ACCOUNTS_VALUE) return trades;
+  // ✅ Visible trades (filtered by active account, if set)
+  const visibleTrades: Trade[] = useMemo(() => {
+    if (!activeAccountId) return trades;
     return trades.filter((t) => t.accountId === activeAccountId);
   }, [trades, activeAccountId]);
 
@@ -458,36 +423,36 @@ export default function Journal() {
   });
 
   const { firstTradeDate, lastTradeDate } = useMemo(() => {
-    if (viewTrades.length === 0) return { firstTradeDate: undefined, lastTradeDate: undefined };
-    const sortedDates = viewTrades.map((t) => parseISO(t.date)).sort((a, b) => a.getTime() - b.getTime());
+    if (visibleTrades.length === 0) return { firstTradeDate: undefined, lastTradeDate: undefined };
+    const sortedDates = visibleTrades.map((t) => parseISO(t.date)).sort((a, b) => a.getTime() - b.getTime());
     return { firstTradeDate: sortedDates[0], lastTradeDate: sortedDates[sortedDates.length - 1] };
-  }, [viewTrades]);
+  }, [visibleTrades]);
 
   const filteredTrades = useMemo(() => {
-    return viewTrades.filter((t) => {
+    return visibleTrades.filter((t) => {
       const tradeDate = parseISO(t.date);
       return isWithinInterval(tradeDate, { start: dateRange.from, end: dateRange.to });
     });
-  }, [viewTrades, dateRange]);
+  }, [visibleTrades, dateRange]);
 
   const dateRangeLabel = `${format(dateRange.from, "MMM d, yyyy")} - ${format(dateRange.to, "MMM d, yyyy")}`;
 
-  // Top cards (live)
+  // Top cards (live) — based on visibleTrades
   const topStats = useMemo(() => {
-    const totalTrades = viewTrades.length;
-    const wins = viewTrades.filter((t) => t.pnl > 0).length;
-    const totalPnl = viewTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+    const totalTrades = visibleTrades.length;
+    const wins = visibleTrades.filter((t) => t.pnl > 0).length;
+    const totalPnl = visibleTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
     const winRate = totalTrades > 0 ? Math.round((wins / totalTrades) * 100) : 0;
 
-    const winningTrades = viewTrades.filter((t) => t.pnl > 0);
-    const losingTrades = viewTrades.filter((t) => t.pnl < 0);
+    const winningTrades = visibleTrades.filter((t) => t.pnl > 0);
+    const losingTrades = visibleTrades.filter((t) => t.pnl < 0);
     const avgWin = winningTrades.length > 0 ? winningTrades.reduce((s, t) => s + t.pnl, 0) / winningTrades.length : 0;
     const avgLoss =
       losingTrades.length > 0 ? Math.abs(losingTrades.reduce((s, t) => s + t.pnl, 0) / losingTrades.length) : 1;
     const avgRR = avgLoss > 0 ? avgWin / avgLoss : 0;
 
     return { totalTrades, winRate, totalPnl, avgRR };
-  }, [viewTrades]);
+  }, [visibleTrades]);
 
   const tradeSummary = useMemo(() => {
     const totalPnl = filteredTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
@@ -668,8 +633,6 @@ export default function Journal() {
       return;
     }
 
-    const include = new Set(selectedSectionIds);
-
     const sessionHighlights = [
       "London session: Best performing with highest win rate",
       "Consider reducing exposure during Asian session",
@@ -677,6 +640,7 @@ export default function Journal() {
     const assetHighlights = filteredTrades.length > 0 ? [`Top pair by P&L: ${filteredTrades[0]?.pair || "N/A"}`] : [];
     const psychologyHighlights = ["Track emotional patterns in your notes for better insights"];
 
+    const include = new Set(selectedSectionIds);
     const selectedPayload = REPORT_SECTIONS.filter((s) => include.has(s.id)).map((s) => {
       if (s.id === "reports-sessions") return { id: s.id, title: s.title, highlights: sessionHighlights };
       if (s.id === "reports-assets") return { id: s.id, title: s.title, highlights: assetHighlights };
@@ -695,10 +659,10 @@ export default function Journal() {
     setIsExportModalOpen(false);
   };
 
-  // Calendar day summaries (respect active)
+  // Calendar day summaries (visibleTrades)
   function getDailySummary(date: Date) {
     const dateStr = format(date, "yyyy-MM-dd");
-    const dayTrades = viewTrades.filter((t) => t.date === dateStr);
+    const dayTrades = visibleTrades.filter((t) => t.date === dateStr);
     const totalPnl = dayTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
     return { trades: dayTrades, totalPnl, tradeCount: dayTrades.length };
   }
@@ -722,7 +686,7 @@ export default function Journal() {
 
   const selectedDayTrades = selectedDay ? getDailySummary(selectedDay).trades : [];
 
-  // Notes/rating editing in table (uses overrides; works for manual + synced)
+  // Notes/rating editing (overrides)
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [noteValue, setNoteValue] = useState("");
 
@@ -758,14 +722,10 @@ export default function Journal() {
       ? calculateTradePnl(instrument, entry, exit, lots, newTrade.type)
       : legacyFallbackPnl(newTrade.type, entry, exit, lots);
 
-    // resolve accountId:
-    // explicit selection > active (if specific) > primary > undefined
+    // resolve accountId (explicit selection > active > primary > undefined)
     const selectedAccountId =
       newTrade.accountId && newTrade.accountId !== UNASSIGNED_ACCOUNT_VALUE ? newTrade.accountId : undefined;
-
-    const activeAccountResolved = activeAccountId !== ALL_ACCOUNTS_VALUE ? activeAccountId : undefined;
-
-    const resolvedAccountId = selectedAccountId || activeAccountResolved || primaryAccount?.id || undefined;
+    const resolvedAccountId = selectedAccountId || activeAccountId || primaryAccount?.id || undefined;
 
     const trade: Trade = {
       id: Date.now().toString(),
@@ -798,7 +758,7 @@ export default function Journal() {
   };
 
   /* =======================
-     ✅ EDIT / DELETE
+     EDIT / DELETE
   ======================= */
 
   const [isEditTradeOpen, setIsEditTradeOpen] = useState(false);
@@ -922,7 +882,7 @@ export default function Journal() {
               </CardContent>
             </Card>
 
-            {/* Top stats (live, respects Active account) */}
+            {/* Top stats (live) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               <Card>
                 <CardHeader className="pb-2">
@@ -964,7 +924,7 @@ export default function Journal() {
             </div>
 
             <EquityCurveCard
-              trades={viewTrades}
+              trades={visibleTrades}
               isAdded={isEquityCurveAdded}
               onAdd={handleAddEquityCurve}
               onRemove={handleRemoveEquityCurve}
@@ -1105,7 +1065,7 @@ export default function Journal() {
                           const accName = trade.accountId
                             ? accountNameById.get(trade.accountId) || "Account"
                             : "Unknown";
-                          const synced = trade.source === "synced";
+                          const synced = isSyncedTrade(trade);
 
                           return (
                             <tr key={trade.id} className="border-b border-border hover:bg-muted/50 transition-colors">
@@ -1197,10 +1157,7 @@ export default function Journal() {
                                     variant="ghost"
                                     size="icon"
                                     className="h-8 w-8"
-                                    onClick={() => {
-                                      setEditingTrade(trade);
-                                      setIsEditTradeOpen(true);
-                                    }}
+                                    onClick={() => openEditTrade(trade)}
                                     title={synced ? "Edit notes/rating" : "Edit trade"}
                                   >
                                     <Pencil className="h-4 w-4" />
@@ -1252,11 +1209,23 @@ export default function Journal() {
                     >
                       <SelectTrigger id="account">
                         <SelectValue
-                          placeholder={primaryAccount ? "Primary Account (default)" : "Select account (optional)"}
+                          placeholder={
+                            activeAccountId
+                              ? "Active Account (default)"
+                              : primaryAccount
+                                ? "Primary Account (default)"
+                                : "Select account (optional)"
+                          }
                         />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={UNASSIGNED_ACCOUNT_VALUE}>Unassigned / Unknown</SelectItem>
+
+                        {activeAccountId && (
+                          <SelectItem value={activeAccountId}>
+                            {accountNameById.get(activeAccountId) || "Active Account"} (Active)
+                          </SelectItem>
+                        )}
 
                         {primaryAccount && (
                           <SelectItem value={primaryAccount.id}>{primaryAccount.name} (Primary)</SelectItem>
@@ -1273,8 +1242,7 @@ export default function Journal() {
                     </Select>
 
                     <p className="text-xs text-muted-foreground">
-                      If you leave it unassigned, we’ll use your Active account (if set), otherwise Primary (if
-                      connected).
+                      If you leave it unassigned, we’ll use your Active account (if set), otherwise your Primary.
                     </p>
                   </div>
 
@@ -1348,18 +1316,147 @@ export default function Journal() {
               </DialogContent>
             </Dialog>
 
-            {/* Edit trade modal (unchanged from your version) */}
+            {/* Edit trade modal */}
             <Dialog open={isEditTradeOpen} onOpenChange={setIsEditTradeOpen}>
               <DialogContent className="max-w-md">
                 <DialogHeader>
                   <DialogTitle>Edit Trade</DialogTitle>
                 </DialogHeader>
 
-                {/* keep your existing edit UI behaviour */}
-                {/* NOTE: your current code already implements this modal;
-                         leaving it intact would require re-pasting the whole section.
-                         If you want, paste your existing modal section here unchanged.
-                */}
+                {editingTrade && (
+                  <div className="space-y-4 pt-4">
+                    {isSyncedTrade(editingTrade) && (
+                      <div className="text-xs text-muted-foreground bg-muted/30 border border-border rounded-md p-3">
+                        This trade is synced from your broker. You can only edit{" "}
+                        <span className="font-medium">Notes</span> and <span className="font-medium">Rating</span>.
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label>Account</Label>
+                      <Select
+                        value={editingTrade.accountId || UNASSIGNED_ACCOUNT_VALUE}
+                        onValueChange={(v) =>
+                          setEditingTrade((prev) =>
+                            prev ? { ...prev, accountId: v === UNASSIGNED_ACCOUNT_VALUE ? undefined : v } : prev,
+                          )
+                        }
+                        disabled={isSyncedTrade(editingTrade)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select account" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={UNASSIGNED_ACCOUNT_VALUE}>Unassigned / Unknown</SelectItem>
+                          {primaryAccount && (
+                            <SelectItem value={primaryAccount.id}>{primaryAccount.name} (Primary)</SelectItem>
+                          )}
+                          {accounts
+                            .filter((a) => a.id !== primaryAccount?.id)
+                            .map((a) => (
+                              <SelectItem key={a.id} value={a.id}>
+                                {a.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Pair</Label>
+                        <Input
+                          value={editingTrade.pair}
+                          onChange={(e) => setEditingTrade((p) => (p ? { ...p, pair: e.target.value } : p))}
+                          disabled={isSyncedTrade(editingTrade)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Type</Label>
+                        <Select
+                          value={editingTrade.type}
+                          onValueChange={(v: "Long" | "Short") => setEditingTrade((p) => (p ? { ...p, type: v } : p))}
+                          disabled={isSyncedTrade(editingTrade)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Long">Long</SelectItem>
+                            <SelectItem value="Short">Short</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label>Entry</Label>
+                        <Input
+                          type="number"
+                          step="0.0001"
+                          value={editingTrade.entry}
+                          onChange={(e) => setEditingTrade((p) => (p ? { ...p, entry: Number(e.target.value) } : p))}
+                          disabled={isSyncedTrade(editingTrade)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Exit</Label>
+                        <Input
+                          type="number"
+                          step="0.0001"
+                          value={editingTrade.exit}
+                          onChange={(e) => setEditingTrade((p) => (p ? { ...p, exit: Number(e.target.value) } : p))}
+                          disabled={isSyncedTrade(editingTrade)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Lots</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={editingTrade.lots}
+                          onChange={(e) => setEditingTrade((p) => (p ? { ...p, lots: Number(e.target.value) } : p))}
+                          disabled={isSyncedTrade(editingTrade)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <Input
+                        value={editingTrade.status}
+                        onChange={(e) => setEditingTrade((p) => (p ? { ...p, status: e.target.value } : p))}
+                        disabled={isSyncedTrade(editingTrade)}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Notes</Label>
+                      <Input
+                        value={editingTrade.notes || ""}
+                        onChange={(e) => setEditingTrade((p) => (p ? { ...p, notes: e.target.value } : p))}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Rating</Label>
+                      <div>
+                        <StarRating
+                          rating={editingTrade.rating || 0}
+                          onRatingChange={(r) => setEditingTrade((p) => (p ? { ...p, rating: r } : p))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2">
+                      <Button variant="outline" onClick={closeEditTrade}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleSaveEditTrade}>Save</Button>
+                    </div>
+                  </div>
+                )}
               </DialogContent>
             </Dialog>
           </TabsContent>
@@ -1444,8 +1541,108 @@ export default function Journal() {
                 </div>
               </div>
 
-              {/* Export modal + report tabs are unchanged and already use filteredTrades */}
-              {/* Keep the rest of your reports UI exactly as-is */}
+              <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Export Selected Stats</DialogTitle>
+                  </DialogHeader>
+
+                  <div className="space-y-5 pt-2">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Export format</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setExportFormat("pdf")}
+                          className={`py-2 px-3 text-sm font-medium rounded-md border transition-all ${
+                            exportFormat === "pdf"
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-muted/50 border-border hover:bg-muted"
+                          }`}
+                        >
+                          PDF
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setExportFormat("csv")}
+                          className={`py-2 px-3 text-sm font-medium rounded-md border transition-all ${
+                            exportFormat === "csv"
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-muted/50 border-border hover:bg-muted"
+                          }`}
+                        >
+                          CSV
+                        </button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        PDF preserves the report layout. CSV is a clean data export (best for spreadsheets).
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium">Choose sections</Label>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="text-xs text-primary hover:underline"
+                            onClick={() => setSelectedSectionIds(REPORT_SECTIONS.map((s) => s.id))}
+                          >
+                            Select all
+                          </button>
+                          <button
+                            type="button"
+                            className="text-xs text-primary hover:underline"
+                            onClick={() => setSelectedSectionIds([])}
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2">
+                        {REPORT_SECTIONS.map((s) => {
+                          const checked = selectedSectionIds.includes(s.id);
+                          return (
+                            <label
+                              key={s.id}
+                              className="flex items-center justify-between p-3 rounded-md border border-border bg-muted/20 hover:bg-muted/30 transition-colors cursor-pointer"
+                            >
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => toggleSection(s.id)}
+                                  className="h-4 w-4"
+                                />
+                                <span className="text-sm text-foreground">{s.title}</span>
+                              </div>
+                              {s.id === "reports-tradelog" && (
+                                <Badge variant="outline" className="text-[10px]">
+                                  rows
+                                </Badge>
+                              )}
+                            </label>
+                          );
+                        })}
+                      </div>
+
+                      <p className="text-xs text-muted-foreground">
+                        You can deselect anything you don’t want included before exporting.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2">
+                      <Button variant="outline" onClick={() => setIsExportModalOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handleExportSelected} disabled={selectedSectionIds.length === 0}>
+                        Export
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
 
               <TabsContent value="overview" className="mt-5">
                 <ReportsOverview
@@ -1455,7 +1652,6 @@ export default function Journal() {
                   isLocked={!canAccessReports}
                 />
               </TabsContent>
-
               <TabsContent value="performance" className="mt-5">
                 <ReportsPerformance
                   trades={filteredTrades}
@@ -1464,7 +1660,6 @@ export default function Journal() {
                   isLocked={!canAccessReports}
                 />
               </TabsContent>
-
               <TabsContent value="sessions" className="mt-5">
                 <ReportsSessions
                   trades={filteredTrades}
@@ -1473,7 +1668,6 @@ export default function Journal() {
                   isLocked={!canAccessReports}
                 />
               </TabsContent>
-
               <TabsContent value="assets" className="mt-5">
                 <ReportsAssets
                   trades={filteredTrades}
@@ -1482,7 +1676,6 @@ export default function Journal() {
                   isLocked={!canAccessReports}
                 />
               </TabsContent>
-
               <TabsContent value="setup" className="mt-5">
                 <ReportsSetupQuality
                   trades={filteredTrades}
@@ -1491,7 +1684,6 @@ export default function Journal() {
                   isLocked={!canAccessReports}
                 />
               </TabsContent>
-
               <TabsContent value="psychology" className="mt-5">
                 <ReportsPsychology
                   trades={filteredTrades}
@@ -1500,7 +1692,6 @@ export default function Journal() {
                   isLocked={!canAccessReports}
                 />
               </TabsContent>
-
               <TabsContent value="risk" className="mt-5">
                 <ReportsRiskManagement
                   trades={filteredTrades}
@@ -1509,7 +1700,6 @@ export default function Journal() {
                   isLocked={!canAccessReports}
                 />
               </TabsContent>
-
               <TabsContent value="tradelog" className="mt-5">
                 <ReportsTradeLog trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
               </TabsContent>
