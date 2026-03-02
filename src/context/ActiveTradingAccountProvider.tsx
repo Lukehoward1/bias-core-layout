@@ -1,88 +1,59 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-  type ReactNode,
-} from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 
-const STORAGE_KEY = "streambias.activeTradingAccountId";
-const ALL = "all" as const;
+export type TradingScopeId = string; // account id
+export type TradingScopeValue = TradingScopeId | "all";
 
-interface ActiveTradingAccountContextValue {
-  activeAccountId: string;
-  setActiveAccountId: (id: string) => void;
+type ActiveTradingAccountContextValue = {
+  activeAccountId: TradingScopeValue;
+  setActiveAccountId: (id: TradingScopeValue) => void;
+  // useful helpers
   isAllAccounts: boolean;
-}
+};
 
-const ActiveTradingAccountContext =
-  createContext<ActiveTradingAccountContextValue | null>(null);
+const ActiveTradingAccountContext = createContext<ActiveTradingAccountContextValue | null>(null);
 
-function readStored(): string {
-  try {
-    const v = localStorage.getItem(STORAGE_KEY);
-    return v && v.trim().length > 0 ? v : ALL;
-  } catch {
-    return ALL;
-  }
-}
+const STORAGE_KEY = "streambias.activeTradingAccountId";
 
-function writeStored(id: string): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, id);
-  } catch {
-    // storage unavailable – silently ignore
-  }
-}
-
-export function ActiveTradingAccountProvider({ children }: { children: ReactNode }) {
+export function ActiveTradingAccountProvider({ children }: { children: React.ReactNode }) {
   const { accounts, primaryAccount } = useLinkedAccounts();
 
-  const [activeAccountId, setActiveAccountIdState] = useState<string>(readStored);
+  const [activeAccountId, setActiveAccountIdState] = useState<TradingScopeValue>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return (saved as TradingScopeValue) || "all";
+  });
 
-  // Auto-fallback: if the stored account no longer exists, reset
+  const setActiveAccountId = (id: TradingScopeValue) => {
+    setActiveAccountIdState(id);
+    localStorage.setItem(STORAGE_KEY, String(id));
+  };
+
+  // If user had an account selected that no longer exists, fall back gracefully
   useEffect(() => {
-    if (activeAccountId === ALL) return;
+    if (activeAccountId === "all") return;
 
-    const stillExists = accounts.some((a) => a.id === activeAccountId);
-    if (!stillExists) {
-      const fallback = primaryAccount?.id ?? ALL;
-      writeStored(fallback);
-      setActiveAccountIdState(fallback);
+    const exists = accounts.some((a) => a.id === activeAccountId);
+    if (!exists) {
+      // fallback: primary, else all
+      setActiveAccountId(primaryAccount?.id || "all");
     }
-  }, [activeAccountId, accounts, primaryAccount]);
-
-  const setActiveAccountId = useCallback((id: string) => {
-    const next = id && id.trim().length > 0 ? id : ALL;
-    writeStored(next);
-    setActiveAccountIdState(next);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts.map((a) => a.id).join("|")]);
 
   const value = useMemo<ActiveTradingAccountContextValue>(
     () => ({
       activeAccountId,
       setActiveAccountId,
-      isAllAccounts: activeAccountId === ALL,
+      isAllAccounts: activeAccountId === "all",
     }),
-    [activeAccountId, setActiveAccountId],
+    [activeAccountId],
   );
 
-  return (
-    <ActiveTradingAccountContext.Provider value={value}>
-      {children}
-    </ActiveTradingAccountContext.Provider>
-  );
+  return <ActiveTradingAccountContext.Provider value={value}>{children}</ActiveTradingAccountContext.Provider>;
 }
 
-export function useActiveTradingAccount(): ActiveTradingAccountContextValue {
+export function useActiveTradingAccount() {
   const ctx = useContext(ActiveTradingAccountContext);
-  if (!ctx) {
-    throw new Error(
-      "useActiveTradingAccount must be used within an <ActiveTradingAccountProvider>.",
-    );
-  }
+  if (!ctx) throw new Error("useActiveTradingAccount must be used within ActiveTradingAccountProvider");
   return ctx;
 }
