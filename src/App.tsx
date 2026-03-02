@@ -1,3 +1,4 @@
+// src/App.tsx
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,29 +9,30 @@ import { SessionLockProvider } from "@/hooks/use-session-lock";
 import { AlertsProvider } from "@/contexts/AlertsContext";
 import { GlobalNotifications } from "@/components/alerts/GlobalNotifications";
 import { AppLayout } from "@/layouts/AppLayout";
-
-import Dashboard from "./pages/Dashboard.tsx";
-import Markets from "./pages/Markets.tsx";
-import AssetDetail from "./pages/AssetDetail.tsx";
-import Calendar from "./pages/Calendar.tsx";
-import Alerts from "./pages/Alerts.tsx";
-import RiskTools from "./pages/RiskTools.tsx";
-import Journal from "./pages/Journal.tsx";
-import StrategyTester from "./pages/StrategyTester.tsx";
-import ManualBacktesting from "./pages/ManualBacktesting.tsx";
-import AutomatedStrategyLab from "./pages/AutomatedStrategyLab.tsx";
-import FundingChallengeSim from "./pages/FundingChallengeSim.tsx";
-import Community from "./pages/Community.tsx";
-import Education from "./pages/Education.tsx";
-import Webinars from "./pages/Webinars.tsx";
-
-import Brokerage from "./pages/Brokerage.tsx";
-import Settings from "./pages/Settings.tsx";
-import Billing from "./pages/Billing.tsx";
-import Pricing from "./pages/Pricing.tsx";
-import NotFound from "./pages/NotFound.tsx";
-
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+
+// ✅ NEW: global active-account scope (wraps app ONCE)
+import { ActiveTradingAccountProvider } from "@/providers/ActiveTradingAccountProvider";
+
+import Dashboard from "./pages/Dashboard";
+import Markets from "./pages/Markets";
+import AssetDetail from "./pages/AssetDetail";
+import Calendar from "./pages/Calendar";
+import Alerts from "./pages/Alerts";
+import RiskTools from "./pages/RiskTools";
+import Journal from "./pages/Journal";
+import StrategyTester from "./pages/StrategyTester";
+import ManualBacktesting from "./pages/ManualBacktesting";
+import AutomatedStrategyLab from "./pages/AutomatedStrategyLab";
+import FundingChallengeSim from "./pages/FundingChallengeSim";
+import Community from "./pages/Community";
+import Education from "./pages/Education";
+import Webinars from "./pages/Webinars";
+import Brokerage from "./pages/Brokerage";
+import Settings from "./pages/Settings";
+import Billing from "./pages/Billing";
+import Pricing from "./pages/Pricing";
+import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
@@ -114,20 +116,23 @@ function AppRoutes() {
   );
 }
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider defaultTheme="dark">
-      <TooltipProvider>
-        <AlertsProvider>
-          <SessionLockProvider>
-            <Toaster />
-            <Sonner />
-            <AppRoutes />
-          </SessionLockProvider>
-        </AlertsProvider>
-      </TooltipProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
-);
-
-export default App;
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider defaultTheme="dark">
+        <TooltipProvider>
+          <AlertsProvider>
+            <SessionLockProvider>
+              {/* ✅ Provider must wrap the app ONCE so Journal/Brokerage/Dashboard share the same selection */}
+              <ActiveTradingAccountProvider>
+                <Toaster />
+                <Sonner />
+                <AppRoutes />
+              </ActiveTradingAccountProvider>
+            </SessionLockProvider>
+          </AlertsProvider>
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  );
+}
