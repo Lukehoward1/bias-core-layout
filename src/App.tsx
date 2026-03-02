@@ -11,8 +11,9 @@ import { GlobalNotifications } from "@/components/alerts/GlobalNotifications";
 import { AppLayout } from "@/layouts/AppLayout";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
-// ✅ FIXED IMPORT (correct folder: context, not providers)
+// ✅ Global selection providers
 import { ActiveTradingAccountProvider } from "@/context/ActiveTradingAccountProvider";
+import { TraderStyleProvider } from "@/context/TraderStyleProvider";
 
 import Dashboard from "./pages/Dashboard";
 import Markets from "./pages/Markets";
@@ -122,12 +123,14 @@ export default function App() {
         <TooltipProvider>
           <AlertsProvider>
             <SessionLockProvider>
-              {/* ✅ Global account selection state shared across entire app */}
-              <ActiveTradingAccountProvider>
-                <Toaster />
-                <Sonner />
-                <AppRoutes />
-              </ActiveTradingAccountProvider>
+              {/* ✅ Global preferences shared across the entire app */}
+              <TraderStyleProvider>
+                <ActiveTradingAccountProvider>
+                  <Toaster />
+                  <Sonner />
+                  <AppRoutes />
+                </ActiveTradingAccountProvider>
+              </TraderStyleProvider>
             </SessionLockProvider>
           </AlertsProvider>
         </TooltipProvider>

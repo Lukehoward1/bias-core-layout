@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Link2, ArrowRight, Sparkles, ShieldOff, RefreshCw, Lock, KeyRound } from "lucide-react";
+import { Link2, ArrowRight, Sparkles, ShieldOff, RefreshCw, Lock, KeyRound, SlidersHorizontal } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useSessionLock } from "@/hooks/use-session-lock";
@@ -12,26 +12,36 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { SubscriptionPlan } from "@/types/subscription";
 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
+import { useActiveTradingAccount, ACTIVE_ACCOUNT_ALL } from "@/hooks/use-active-trading-account";
+import { useTraderBiasMode } from "@/hooks/use-trader-style";
+
 export default function Settings() {
   const { plan, setPlan } = useSubscription();
   const { pinEnabled, setPinEnabled, pinSet, setPin, clearPin } = useSessionLock();
-  
+
+  const { accounts, primaryAccount } = useLinkedAccounts();
+  const { activeAccountId, setActiveAccountId } = useActiveTradingAccount();
+
+  const { traderStyle, setTraderStyle, traderStyleLabel, biasTimeframes } = useTraderBiasMode();
+
   const [lockOverlayDisabled, setLockOverlayDisabled] = useState(() => {
-    return localStorage.getItem('dev-disable-lock-overlay') === 'true';
+    return localStorage.getItem("dev-disable-lock-overlay") === "true";
   });
 
   // PIN management state
   const [showPinSetup, setShowPinSetup] = useState(false);
-  const [newPin, setNewPin] = useState('');
-  const [confirmPin, setConfirmPin] = useState('');
-  const [pinSetupError, setPinSetupError] = useState('');
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [pinSetupError, setPinSetupError] = useState("");
 
   const handleToggleLockOverlay = (disabled: boolean) => {
     setLockOverlayDisabled(disabled);
     if (disabled) {
-      localStorage.setItem('dev-disable-lock-overlay', 'true');
+      localStorage.setItem("dev-disable-lock-overlay", "true");
     } else {
-      localStorage.removeItem('dev-disable-lock-overlay');
+      localStorage.removeItem("dev-disable-lock-overlay");
     }
   };
 
@@ -48,23 +58,23 @@ export default function Settings() {
 
   const handleSetPin = () => {
     if (newPin.length !== 4) {
-      setPinSetupError('PIN must be 4 digits');
+      setPinSetupError("PIN must be 4 digits");
       return;
     }
     if (!/^\d{4}$/.test(newPin)) {
-      setPinSetupError('PIN must contain only numbers');
+      setPinSetupError("PIN must contain only numbers");
       return;
     }
     if (newPin !== confirmPin) {
-      setPinSetupError('PINs do not match');
+      setPinSetupError("PINs do not match");
       return;
     }
-    
+
     setPin(newPin);
     setShowPinSetup(false);
-    setNewPin('');
-    setConfirmPin('');
-    setPinSetupError('');
+    setNewPin("");
+    setConfirmPin("");
+    setPinSetupError("");
   };
 
   const handleRemovePin = () => {
@@ -74,25 +84,99 @@ export default function Settings() {
 
   const handleCancelPinSetup = () => {
     setShowPinSetup(false);
-    setNewPin('');
-    setConfirmPin('');
-    setPinSetupError('');
+    setNewPin("");
+    setConfirmPin("");
+    setPinSetupError("");
     if (!pinSet) {
       setPinEnabled(false);
     }
   };
 
   const planOptions: { value: SubscriptionPlan; label: string; color: string }[] = [
-    { value: 'free', label: 'Free', color: 'bg-muted text-muted-foreground' },
-    { value: 'standard', label: 'Standard', color: 'bg-primary/20 text-primary' },
-    { value: 'premium', label: 'Premium', color: 'bg-accent text-accent-foreground' },
+    { value: "free", label: "Free", color: "bg-muted text-muted-foreground" },
+    { value: "standard", label: "Standard", color: "bg-primary/20 text-primary" },
+    { value: "premium", label: "Premium", color: "bg-accent text-accent-foreground" },
   ];
+
+  const activeAccountLabel = useMemo(() => {
+    if (activeAccountId === ACTIVE_ACCOUNT_ALL) return "All Accounts";
+    const found = accounts.find((a) => a.id === activeAccountId);
+    return found?.name ?? "Selected Account";
+  }, [activeAccountId, accounts]);
+
+  const primaryLabel = useMemo(() => primaryAccount?.name ?? "None", [primaryAccount]);
 
   return (
     <div className="flex flex-col min-h-full bg-background">
       <AppHeader title="Settings" />
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto space-y-6">
+          {/* ✅ Trading Preferences */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="h-5 w-5 text-primary" />
+                <CardTitle className="text-base">Trading Preferences</CardTitle>
+              </div>
+              <CardDescription className="text-xs">
+                Set global defaults for how StreamBias displays performance and calculates bias across the platform.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-5">
+              {/* Data Scope */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Data Scope (default viewing account)</Label>
+                  <Badge variant="outline" className="text-xs">
+                    Primary: {primaryLabel}
+                  </Badge>
+                </div>
+
+                <Select value={activeAccountId} onValueChange={(v) => setActiveAccountId(v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select viewing scope" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ACTIVE_ACCOUNT_ALL}>All Accounts</SelectItem>
+
+                    {accounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name}
+                        {primaryAccount?.id === a.id ? " (Primary)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <p className="text-xs text-muted-foreground">
+                  Current viewing scope: <span className="font-medium text-foreground">{activeAccountLabel}</span>
+                </p>
+              </div>
+
+              {/* Trader Style / Bias Mode */}
+              <div className="space-y-2">
+                <Label className="text-sm">Trader Style (bias mode)</Label>
+
+                <Select value={traderStyle} onValueChange={(v: "scalper" | "intraday" | "swing") => setTraderStyle(v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select trader style" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="scalper">Scalper</SelectItem>
+                    <SelectItem value="intraday">Intraday</SelectItem>
+                    <SelectItem value="swing">Swing</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <p className="text-xs text-muted-foreground">
+                  Current mode: <span className="font-medium text-foreground">{traderStyleLabel}</span> • Timeframes:{" "}
+                  <span className="font-medium text-foreground">{biasTimeframes.join(" / ")}</span>
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Session Privacy Section */}
           <Card>
             <CardHeader className="pb-3">
@@ -101,17 +185,14 @@ export default function Settings() {
                 <CardTitle className="text-base">Session Privacy</CardTitle>
               </div>
               <CardDescription className="text-xs">
-                Protect your dashboard with a 4-digit PIN. When enabled, you'll need to enter your PIN to unlock after inactivity.
+                Protect your dashboard with a 4-digit PIN. When enabled, you'll need to enter your PIN to unlock after
+                inactivity.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Switch
-                    id="pin-enabled"
-                    checked={pinEnabled}
-                    onCheckedChange={handleTogglePinEnabled}
-                  />
+                  <Switch id="pin-enabled" checked={pinEnabled} onCheckedChange={handleTogglePinEnabled} />
                   <Label htmlFor="pin-enabled" className="text-sm">
                     Enable PIN lock
                   </Label>
@@ -125,12 +206,7 @@ export default function Settings() {
 
               {pinEnabled && pinSet && !showPinSetup && (
                 <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowPinSetup(true)}
-                    className="gap-1"
-                  >
+                  <Button variant="outline" size="sm" onClick={() => setShowPinSetup(true)} className="gap-1">
                     <KeyRound className="h-3.5 w-3.5" />
                     Change PIN
                   </Button>
@@ -149,7 +225,7 @@ export default function Settings() {
                 <div className="space-y-3 p-4 bg-muted/50 rounded-lg border border-border">
                   <div className="space-y-2">
                     <Label htmlFor="new-pin" className="text-xs text-muted-foreground">
-                      {pinSet ? 'New PIN' : 'Enter PIN'}
+                      {pinSet ? "New PIN" : "Enter PIN"}
                     </Label>
                     <Input
                       id="new-pin"
@@ -159,9 +235,9 @@ export default function Settings() {
                       maxLength={4}
                       value={newPin}
                       onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                        const val = e.target.value.replace(/\D/g, "").slice(0, 4);
                         setNewPin(val);
-                        setPinSetupError('');
+                        setPinSetupError("");
                       }}
                       className="max-w-32 text-center tracking-[0.3em]"
                       placeholder="••••"
@@ -179,20 +255,18 @@ export default function Settings() {
                       maxLength={4}
                       value={confirmPin}
                       onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                        const val = e.target.value.replace(/\D/g, "").slice(0, 4);
                         setConfirmPin(val);
-                        setPinSetupError('');
+                        setPinSetupError("");
                       }}
                       className="max-w-32 text-center tracking-[0.3em]"
                       placeholder="••••"
                     />
                   </div>
-                  {pinSetupError && (
-                    <p className="text-xs text-destructive">{pinSetupError}</p>
-                  )}
+                  {pinSetupError && <p className="text-xs text-destructive">{pinSetupError}</p>}
                   <div className="flex gap-2 pt-1">
                     <Button size="sm" onClick={handleSetPin}>
-                      {pinSet ? 'Update PIN' : 'Set PIN'}
+                      {pinSet ? "Update PIN" : "Set PIN"}
                     </Button>
                     <Button size="sm" variant="outline" onClick={handleCancelPinSetup}>
                       Cancel
@@ -220,21 +294,12 @@ export default function Settings() {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Switch
-                    id="disable-lock"
-                    checked={lockOverlayDisabled}
-                    onCheckedChange={handleToggleLockOverlay}
-                  />
+                  <Switch id="disable-lock" checked={lockOverlayDisabled} onCheckedChange={handleToggleLockOverlay} />
                   <Label htmlFor="disable-lock" className="text-sm">
                     Disable lock overlay
                   </Label>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleForceReload}
-                  className="gap-1"
-                >
+                <Button variant="outline" size="sm" onClick={handleForceReload} className="gap-1">
                   <RefreshCw className="h-3.5 w-3.5" />
                   Reload to apply
                 </Button>
@@ -292,10 +357,7 @@ export default function Settings() {
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
                 To link a broker account, go to{" "}
-                <Link 
-                  to="/brokerage" 
-                  className="text-primary hover:underline inline-flex items-center gap-1"
-                >
+                <Link to="/brokerage" className="text-primary hover:underline inline-flex items-center gap-1">
                   Brokerage → Connections
                   <ArrowRight className="h-3 w-3" />
                 </Link>
