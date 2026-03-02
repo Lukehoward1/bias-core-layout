@@ -11,8 +11,8 @@ import { GlobalNotifications } from "@/components/alerts/GlobalNotifications";
 import { AppLayout } from "@/layouts/AppLayout";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
-// ✅ NEW: global active-account scope (wraps app ONCE)
-import { ActiveTradingAccountProvider } from "@/providers/ActiveTradingAccountProvider";
+// ✅ FIXED IMPORT (correct folder: context, not providers)
+import { ActiveTradingAccountProvider } from "@/context/ActiveTradingAccountProvider";
 
 import Dashboard from "./pages/Dashboard";
 import Markets from "./pages/Markets";
@@ -38,10 +38,10 @@ const queryClient = new QueryClient();
 
 /**
  * Modal routing:
- * - When navigating to /asset/:symbol from inside the app, we pass:
- *   navigate(`/asset/${symbol}`, { state: { backgroundLocation: location } })
- * - App then renders the "background" routes using backgroundLocation,
- *   and renders the asset route again on top as a modal.
+ * - When navigating to /asset/:symbol from inside the app,
+ *   we pass: navigate(`/asset/${symbol}`, { state: { backgroundLocation: location } })
+ * - App renders background routes normally
+ * - Then renders asset route again on top as modal
  */
 function AppRoutes() {
   const location = useLocation();
@@ -54,7 +54,7 @@ function AppRoutes() {
     <>
       <GlobalNotifications />
 
-      {/* 1) Render the normal app using the background location if present */}
+      {/* Normal app routes */}
       <Routes location={backgroundLocation || location}>
         <Route element={<AppLayout />}>
           <Route path="/" element={<Dashboard />} />
@@ -75,14 +75,13 @@ function AppRoutes() {
           <Route path="/billing" element={<Billing />} />
         </Route>
 
-        {/* Direct visit to asset detail still works as a full page */}
+        {/* Direct asset route (full page) */}
         <Route path="/asset/:symbol" element={<AssetDetail />} />
-
         <Route path="/pricing" element={<Pricing />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
 
-      {/* 2) If we have a backgroundLocation, render the asset page as a MODAL on top */}
+      {/* Asset modal overlay */}
       {backgroundLocation && (
         <Routes>
           <Route
@@ -123,7 +122,7 @@ export default function App() {
         <TooltipProvider>
           <AlertsProvider>
             <SessionLockProvider>
-              {/* ✅ Provider must wrap the app ONCE so Journal/Brokerage/Dashboard share the same selection */}
+              {/* ✅ Global account selection state shared across entire app */}
               <ActiveTradingAccountProvider>
                 <Toaster />
                 <Sonner />
