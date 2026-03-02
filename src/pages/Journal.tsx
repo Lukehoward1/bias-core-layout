@@ -52,13 +52,13 @@ import { ReportsTradeLog } from "@/components/reports/ReportsTradeLog";
 import { ReportDateRangeFilter, DateRange } from "@/components/reports/ReportDateRangeFilter";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { Link } from "react-router-dom";
-import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 
-// ✅ Canonical trade store (manual + synced merge + overrides)
-import { useJournalTrades, Trade as JournalTrade } from "@/hooks/use-journal-trades";
+// ✅ Trading data (active account scope + stats)
+import { useTradingData } from "@/hooks/use-trading-data";
+import { ACTIVE_ACCOUNT_ALL } from "@/hooks/use-active-trading-account";
 
-// ✅ Active account selector (Brokerage controls this)
-import { useActiveTradingAccount } from "@/hooks/use-active-trading-account";
+// ✅ Canonical trade type
+import { type Trade as JournalTrade } from "@/hooks/use-journal-trades";
 
 // ✅ Instrument-aware P&L
 import { getInstrumentBySymbol, calculateTradePnl } from "@/data/tradingInstruments";
@@ -68,6 +68,7 @@ import { getInstrumentBySymbol, calculateTradePnl } from "@/data/tradingInstrume
 ======================= */
 
 type Trade = JournalTrade;
+
 type ExportFormat = "pdf" | "csv";
 
 const REPORT_SECTIONS = [
@@ -145,7 +146,7 @@ interface EquityCurveCardProps {
 }
 
 function EquityCurveCard({ trades, isAdded, onAdd, onRemove }: EquityCurveCardProps) {
-  // ✅ Daily aggregation so curve shows day-by-day moves
+  // ✅ daily aggregation so curve shows day-by-day moves
   const equityData = useMemo(() => {
     const daily = trades.reduce(
       (acc, t) => {
@@ -254,28 +255,23 @@ export default function Journal() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAddTradeOpen, setIsAddTradeOpen] = useState(false);
 
-  // ✅ Linked accounts
-  const { accounts, primaryAccount } = useLinkedAccounts();
-  const accountIds = useMemo(() => accounts.map((a) => a.id), [accounts]);
+  // ✅ Active account scope + canonical journal actions
+  const { activeAccountId, activeAccountLabel, accounts, primaryAccount, viewTrades, journal } = useTradingData();
+
+  const {
+    trades: allTrades,
+    addManualTrade,
+    updateManualTrade,
+    deleteManualTrade,
+    setTradeNotes,
+    setTradeRating,
+  } = journal;
 
   const accountNameById = useMemo(() => {
     const map = new Map<string, string>();
     accounts.forEach((a) => map.set(a.id, a.name));
     return map;
   }, [accounts]);
-
-  // ✅ Active account selection (Brokerage)
-  const { activeAccountId } = useActiveTradingAccount();
-
-  // ✅ Canonical trades (all accounts)
-  const { trades, addManualTrade, updateManualTrade, deleteManualTrade, setTradeNotes, setTradeRating } =
-    useJournalTrades(accountIds);
-
-  // ✅ Visible trades (filtered by active account, if set)
-  const visibleTrades: Trade[] = useMemo(() => {
-    if (!activeAccountId) return trades;
-    return trades.filter((t) => t.accountId === activeAccountId);
-  }, [trades, activeAccountId]);
 
   const { exportAllReports } = usePdfExport();
 
@@ -423,36 +419,36 @@ export default function Journal() {
   });
 
   const { firstTradeDate, lastTradeDate } = useMemo(() => {
-    if (visibleTrades.length === 0) return { firstTradeDate: undefined, lastTradeDate: undefined };
-    const sortedDates = visibleTrades.map((t) => parseISO(t.date)).sort((a, b) => a.getTime() - b.getTime());
+    if (viewTrades.length === 0) return { firstTradeDate: undefined, lastTradeDate: undefined };
+    const sortedDates = viewTrades.map((t) => parseISO(t.date)).sort((a, b) => a.getTime() - b.getTime());
     return { firstTradeDate: sortedDates[0], lastTradeDate: sortedDates[sortedDates.length - 1] };
-  }, [visibleTrades]);
+  }, [viewTrades]);
 
   const filteredTrades = useMemo(() => {
-    return visibleTrades.filter((t) => {
+    return viewTrades.filter((t) => {
       const tradeDate = parseISO(t.date);
       return isWithinInterval(tradeDate, { start: dateRange.from, end: dateRange.to });
     });
-  }, [visibleTrades, dateRange]);
+  }, [viewTrades, dateRange]);
 
   const dateRangeLabel = `${format(dateRange.from, "MMM d, yyyy")} - ${format(dateRange.to, "MMM d, yyyy")}`;
 
-  // Top cards (live) — based on visibleTrades
+  // ✅ Top cards must use viewTrades (active scope)
   const topStats = useMemo(() => {
-    const totalTrades = visibleTrades.length;
-    const wins = visibleTrades.filter((t) => t.pnl > 0).length;
-    const totalPnl = visibleTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+    const totalTrades = viewTrades.length;
+    const wins = viewTrades.filter((t) => t.pnl > 0).length;
+    const totalPnl = viewTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
     const winRate = totalTrades > 0 ? Math.round((wins / totalTrades) * 100) : 0;
 
-    const winningTrades = visibleTrades.filter((t) => t.pnl > 0);
-    const losingTrades = visibleTrades.filter((t) => t.pnl < 0);
+    const winningTrades = viewTrades.filter((t) => t.pnl > 0);
+    const losingTrades = viewTrades.filter((t) => t.pnl < 0);
     const avgWin = winningTrades.length > 0 ? winningTrades.reduce((s, t) => s + t.pnl, 0) / winningTrades.length : 0;
     const avgLoss =
       losingTrades.length > 0 ? Math.abs(losingTrades.reduce((s, t) => s + t.pnl, 0) / losingTrades.length) : 1;
     const avgRR = avgLoss > 0 ? avgWin / avgLoss : 0;
 
     return { totalTrades, winRate, totalPnl, avgRR };
-  }, [visibleTrades]);
+  }, [viewTrades]);
 
   const tradeSummary = useMemo(() => {
     const totalPnl = filteredTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
@@ -521,6 +517,7 @@ export default function Journal() {
     lines.push(["StreamBias Export", "", ""].map(escapeCsv).join(","));
     lines.push(["Generated", now, ""].map(escapeCsv).join(","));
     lines.push(["Date Range", dateRangeLabel, ""].map(escapeCsv).join(","));
+    lines.push(["Account Scope", activeAccountLabel, ""].map(escapeCsv).join(","));
     lines.push(["", "", ""].map(escapeCsv).join(","));
 
     const include = new Set(selectedSectionIds);
@@ -633,6 +630,8 @@ export default function Journal() {
       return;
     }
 
+    const include = new Set(selectedSectionIds);
+
     const sessionHighlights = [
       "London session: Best performing with highest win rate",
       "Consider reducing exposure during Asian session",
@@ -640,7 +639,6 @@ export default function Journal() {
     const assetHighlights = filteredTrades.length > 0 ? [`Top pair by P&L: ${filteredTrades[0]?.pair || "N/A"}`] : [];
     const psychologyHighlights = ["Track emotional patterns in your notes for better insights"];
 
-    const include = new Set(selectedSectionIds);
     const selectedPayload = REPORT_SECTIONS.filter((s) => include.has(s.id)).map((s) => {
       if (s.id === "reports-sessions") return { id: s.id, title: s.title, highlights: sessionHighlights };
       if (s.id === "reports-assets") return { id: s.id, title: s.title, highlights: assetHighlights };
@@ -659,10 +657,10 @@ export default function Journal() {
     setIsExportModalOpen(false);
   };
 
-  // Calendar day summaries (visibleTrades)
+  // ✅ Calendar day summaries MUST use viewTrades
   function getDailySummary(date: Date) {
     const dateStr = format(date, "yyyy-MM-dd");
-    const dayTrades = visibleTrades.filter((t) => t.date === dateStr);
+    const dayTrades = viewTrades.filter((t) => t.date === dateStr);
     const totalPnl = dayTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
     return { trades: dayTrades, totalPnl, tradeCount: dayTrades.length };
   }
@@ -686,7 +684,7 @@ export default function Journal() {
 
   const selectedDayTrades = selectedDay ? getDailySummary(selectedDay).trades : [];
 
-  // Notes/rating editing (overrides)
+  // Notes/rating editing in table (uses overrides; works for manual + synced)
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [noteValue, setNoteValue] = useState("");
 
@@ -705,15 +703,21 @@ export default function Journal() {
     setTradeRating(tradeId, rating);
   };
 
-  // Add trade
+  // Add trade (writes to canonical store, with correct default account behavior)
   const handleAddTrade = () => {
-    if (!selectedDay || !newTrade.pair || !newTrade.entry || !newTrade.exit || !newTrade.lots) return;
+    if (!selectedDay || !newTrade.pair || !newTrade.entry || !newTrade.exit || !newTrade.lots) {
+      toast.error("Please fill in all trade fields.");
+      return;
+    }
 
     const entry = parseFloat(newTrade.entry);
     const exit = parseFloat(newTrade.exit);
     const lots = parseFloat(newTrade.lots);
 
-    if (!Number.isFinite(entry) || !Number.isFinite(exit) || !Number.isFinite(lots) || lots <= 0) return;
+    if (!Number.isFinite(entry) || !Number.isFinite(exit) || !Number.isFinite(lots) || lots <= 0) {
+      toast.error("Please enter valid numbers.");
+      return;
+    }
 
     const symbol = normalizeSymbol(newTrade.pair);
 
@@ -722,10 +726,17 @@ export default function Journal() {
       ? calculateTradePnl(instrument, entry, exit, lots, newTrade.type)
       : legacyFallbackPnl(newTrade.type, entry, exit, lots);
 
-    // resolve accountId (explicit selection > active > primary > undefined)
-    const selectedAccountId =
+    // ✅ Account resolution:
+    // 1) explicit dropdown selection
+    // 2) viewing account (if not ALL)
+    // 3) primary account
+    // 4) undefined
+    const explicitAccountId =
       newTrade.accountId && newTrade.accountId !== UNASSIGNED_ACCOUNT_VALUE ? newTrade.accountId : undefined;
-    const resolvedAccountId = selectedAccountId || activeAccountId || primaryAccount?.id || undefined;
+
+    const viewingAccountId = activeAccountId !== ACTIVE_ACCOUNT_ALL ? activeAccountId : undefined;
+
+    const resolvedAccountId = explicitAccountId || viewingAccountId || primaryAccount?.id || undefined;
 
     const trade: Trade = {
       id: Date.now().toString(),
@@ -758,7 +769,7 @@ export default function Journal() {
   };
 
   /* =======================
-     EDIT / DELETE
+     ✅ EDIT / DELETE
   ======================= */
 
   const [isEditTradeOpen, setIsEditTradeOpen] = useState(false);
@@ -798,6 +809,7 @@ export default function Journal() {
     }
 
     const symbol = normalizeSymbol(editingTrade.pair);
+
     const entry = Number(editingTrade.entry);
     const exit = Number(editingTrade.exit);
     const lots = Number(editingTrade.lots);
@@ -882,7 +894,14 @@ export default function Journal() {
               </CardContent>
             </Card>
 
-            {/* Top stats (live) */}
+            {/* ✅ Optional: show scope (keeps design consistent, subtle) */}
+            <div className="flex items-center justify-end">
+              <Badge variant="secondary" className="text-xs">
+                Viewing: {activeAccountLabel}
+              </Badge>
+            </div>
+
+            {/* Top stats (active scope) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               <Card>
                 <CardHeader className="pb-2">
@@ -923,14 +942,15 @@ export default function Journal() {
               </Card>
             </div>
 
+            {/* ✅ Equity curve uses active scope */}
             <EquityCurveCard
-              trades={visibleTrades}
+              trades={viewTrades}
               isAdded={isEquityCurveAdded}
               onAdd={handleAddEquityCurve}
               onRemove={handleRemoveEquityCurve}
             />
 
-            {/* Daily Performance calendar */}
+            {/* Daily Performance calendar (active scope) */}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -1210,8 +1230,8 @@ export default function Journal() {
                       <SelectTrigger id="account">
                         <SelectValue
                           placeholder={
-                            activeAccountId
-                              ? "Active Account (default)"
+                            activeAccountId !== ACTIVE_ACCOUNT_ALL
+                              ? `Viewing Account (default): ${activeAccountLabel}`
                               : primaryAccount
                                 ? "Primary Account (default)"
                                 : "Select account (optional)"
@@ -1219,13 +1239,7 @@ export default function Journal() {
                         />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value={UNASSIGNED_ACCOUNT_VALUE}>Unassigned / Unknown</SelectItem>
-
-                        {activeAccountId && (
-                          <SelectItem value={activeAccountId}>
-                            {accountNameById.get(activeAccountId) || "Active Account"} (Active)
-                          </SelectItem>
-                        )}
+                        <SelectItem value={UNASSIGNED_ACCOUNT_VALUE}>Use default</SelectItem>
 
                         {primaryAccount && (
                           <SelectItem value={primaryAccount.id}>{primaryAccount.name} (Primary)</SelectItem>
@@ -1242,7 +1256,7 @@ export default function Journal() {
                     </Select>
 
                     <p className="text-xs text-muted-foreground">
-                      If you leave it unassigned, we’ll use your Active account (if set), otherwise your Primary.
+                      Default = Viewing Account (if selected), otherwise Primary.
                     </p>
                   </div>
 
