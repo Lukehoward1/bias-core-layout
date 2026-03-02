@@ -256,7 +256,7 @@ export default function Journal() {
   const [isAddTradeOpen, setIsAddTradeOpen] = useState(false);
 
   // ✅ Active account scope + canonical journal actions
-  const { activeAccountId, activeAccountLabel, accounts, primaryAccount, viewTrades, journal } = useTradingData();
+  const { activeAccountId, setActiveAccountId, activeAccountLabel, accounts, primaryAccount, viewTrades, journal } = useTradingData();
 
   const {
     trades: allTrades,
@@ -896,9 +896,18 @@ export default function Journal() {
 
             {/* ✅ Optional: show scope (keeps design consistent, subtle) */}
             <div className="flex items-center justify-end">
-              <Badge variant="secondary" className="text-xs">
-                Viewing: {activeAccountLabel}
-              </Badge>
+              <Select value={activeAccountId} onValueChange={setActiveAccountId}>
+                <SelectTrigger className="h-7 w-auto min-w-[160px] text-xs gap-1.5">
+                  <span className="text-muted-foreground">Viewing:</span>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ACTIVE_ACCOUNT_ALL}>All Accounts</SelectItem>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Top stats (active scope) */}
