@@ -1,46 +1,42 @@
 // src/hooks/use-watchlist.ts
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { assetsData, getAssetBySymbol, getCurrenciesFromWatchlist, type Asset } from "@/data/assets";
-import { TRADER_STYLE_EVENT } from "@/context/TraderStyleProvider";
 
 const WATCHLIST_STORAGE_KEY = "watchlist";
 const WATCHLIST_CHANGE_EVENT = "watchlist-change";
+
+// ✅ keep these local (no importing provider files)
+const TRADER_STYLE_EVENT = "traderStyleUpdated";
 
 function dispatchWatchlistChange(watchlist: string[]) {
   window.dispatchEvent(new CustomEvent(WATCHLIST_CHANGE_EVENT, { detail: watchlist }));
 }
 
-/**
- * Shared watchlist hook - SINGLE SOURCE OF TRUTH for watchlist state.
- */
 export function useWatchlist() {
   const [watchlist, setWatchlist] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem(WATCHLIST_STORAGE_KEY);
-      const parsed = saved ? JSON.parse(saved) : [];
-      return Array.isArray(parsed) ? parsed : [];
+      return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
     }
   });
 
-  // Used only to force recompute of derived data when trader style changes
-  const [styleVersion, setStyleVersion] = useState(0);
+  // ✅ tick to force re-render on trader style changes
+  const [styleTick, setStyleTick] = useState(0);
 
-  // Same-tab watchlist sync
   useEffect(() => {
-    const handleWatchlistChange = (event: Event) => {
-      const e = event as CustomEvent<string[]>;
-      if (Array.isArray(e.detail)) setWatchlist(e.detail);
+    const handleWatchlistChange = (event: CustomEvent<string[]>) => {
+      setWatchlist(event.detail);
     };
 
-    window.addEventListener(WATCHLIST_CHANGE_EVENT, handleWatchlistChange);
-    return () => window.removeEventListener(WATCHLIST_CHANGE_EVENT, handleWatchlistChange);
+    window.addEventListener(WATCHLIST_CHANGE_EVENT, handleWatchlistChange as EventListener);
+    return () => window.removeEventListener(WATCHLIST_CHANGE_EVENT, handleWatchlistChange as EventListener);
   }, []);
 
-  // Re-render derived values when trader style changes
+  // ✅ re-render on style changes (same tab) + storage (other tab)
   useEffect(() => {
-    const bump = () => setStyleVersion((v) => v + 1);
+    const bump = () => setStyleTick((t) => t + 1);
 
     window.addEventListener(TRADER_STYLE_EVENT, bump);
     window.addEventListener("storage", bump);
@@ -82,14 +78,14 @@ export function useWatchlist() {
   const isInWatchlist = useCallback((symbol: string) => watchlist.includes(symbol), [watchlist]);
 
   const watchlistAssets = useMemo((): Asset[] => {
-    // styleVersion forces refresh when trader style changes
-    return watchlist.map((symbol) => getAssetBySymbol(symbol)).filter((asset): asset is Asset => asset !== undefined);
-  }, [watchlist, styleVersion]);
+    void styleTick; // force refresh of bias/timeframes
+    return watchlist.map((symbol) => getAssetBySymbol(symbol)).filter((a): a is Asset => !!a);
+  }, [watchlist, styleTick]);
 
   const watchlistCurrencies = useMemo(() => {
-    // styleVersion forces refresh when trader style changes
+    void styleTick;
     return getCurrenciesFromWatchlist(watchlist);
-  }, [watchlist, styleVersion]);
+  }, [watchlist, styleTick]);
 
   return {
     watchlist,
@@ -102,10 +98,24 @@ export function useWatchlist() {
   };
 }
 
-/**
- * Asset access helper (no hooks inside on purpose).
- */
 export function useAssets() {
+  // ✅ tick to force any page using getAssetBySymbol() to re-render when style changes
+  const [styleTick, setStyleTick] = useState(0);
+
+  useEffect(() => {
+    const bump = () => setStyleTick((t) => t + 1);
+
+    window.addEventListener(TRADER_STYLE_EVENT, bump);
+    window.addEventListener("storage", bump);
+
+    return () => {
+      window.removeEventListener(TRADER_STYLE_EVENT, bump);
+      window.removeEventListener("storage", bump);
+    };
+  }, []);
+
+  void styleTick;
+
   return {
     assets: assetsData,
     getAssetBySymbol,
