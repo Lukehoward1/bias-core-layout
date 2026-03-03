@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
+import { Routes, Route, useLocation, useNavigate, type Location } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { SessionLockProvider } from "@/hooks/use-session-lock";
 import { AlertsProvider } from "@/contexts/AlertsContext";
@@ -37,25 +37,21 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-/**
- * Modal routing:
- * - When navigating to /asset/:symbol from inside the app,
- *   we pass: navigate(`/asset/${symbol}`, { state: { backgroundLocation: location } })
- * - App renders background routes normally
- * - Then renders asset route again on top as modal
- */
+type ModalState = {
+  backgroundLocation?: Location;
+};
+
 function AppRoutes() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const state = location.state as { backgroundLocation?: Location } | null;
+  const state = (location.state as ModalState | null) ?? null;
   const backgroundLocation = state?.backgroundLocation;
 
   return (
     <>
       <GlobalNotifications />
 
-      {/* Normal app routes */}
       <Routes location={backgroundLocation || location}>
         <Route element={<AppLayout />}>
           <Route path="/" element={<Dashboard />} />
@@ -76,13 +72,11 @@ function AppRoutes() {
           <Route path="/billing" element={<Billing />} />
         </Route>
 
-        {/* Direct asset route (full page) */}
         <Route path="/asset/:symbol" element={<AssetDetail />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
 
-      {/* Asset modal overlay */}
       {backgroundLocation && (
         <Routes>
           <Route
@@ -123,7 +117,6 @@ export default function App() {
         <TooltipProvider>
           <AlertsProvider>
             <SessionLockProvider>
-              {/* ✅ Global preferences shared across the entire app */}
               <TraderStyleProvider>
                 <ActiveTradingAccountProvider>
                   <Toaster />
