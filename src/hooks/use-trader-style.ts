@@ -23,6 +23,7 @@ export function getBiasTimeframesForStyle(style: TraderStyle): BiasTimeframe[] {
 }
 
 export function useTraderBiasMode() {
+  // ✅ MUST match the import name exactly
   const { traderStyle, setTraderStyle } = useTraderStyle();
 
   const biasTimeframes = useMemo(() => getBiasTimeframesForStyle(traderStyle), [traderStyle]);
