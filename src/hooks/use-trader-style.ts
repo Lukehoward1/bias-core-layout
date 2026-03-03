@@ -1,8 +1,19 @@
 // src/hooks/use-trader-style.ts
 import { useMemo } from "react";
-import { useTraderStyle, type TraderStyle } from "@/context/TraderStyleProvider";
+import * as TraderStyleModule from "@/context/TraderStyleProvider";
 
+export type TraderStyle = "scalper" | "intraday" | "swing";
 export type BiasTimeframe = "5m" | "15m" | "1h" | "4h" | "1d" | "1w";
+
+function getUseTraderStyleHook(): () => { traderStyle: TraderStyle; setTraderStyle: (s: TraderStyle) => void } {
+  const hook = (TraderStyleModule as any).useTraderStyle;
+  if (typeof hook !== "function") {
+    throw new Error(
+      "TraderStyleProvider export mismatch: expected `useTraderStyle` to be exported from '@/context/TraderStyleProvider'.",
+    );
+  }
+  return hook;
+}
 
 /**
  * Locked mapping (authoritative):
@@ -11,33 +22,21 @@ export type BiasTimeframe = "5m" | "15m" | "1h" | "4h" | "1d" | "1w";
  * Swing: 4h / 1d / 1w
  */
 export function getBiasTimeframesForStyle(style: TraderStyle): BiasTimeframe[] {
-  switch (style) {
-    case "scalper":
-      return ["5m", "15m", "1h"];
-    case "intraday":
-      return ["15m", "1h", "4h"];
-    case "swing":
-    default:
-      return ["4h", "1d", "1w"];
-  }
+  if (style === "scalper") return ["5m", "15m", "1h"];
+  if (style === "intraday") return ["15m", "1h", "4h"];
+  return ["4h", "1d", "1w"];
 }
 
 export function useTraderBiasMode() {
-  // ✅ MUST match the import name exactly
+  const useTraderStyle = getUseTraderStyleHook();
   const { traderStyle, setTraderStyle } = useTraderStyle();
 
   const biasTimeframes = useMemo(() => getBiasTimeframesForStyle(traderStyle), [traderStyle]);
 
   const traderStyleLabel = useMemo(() => {
-    switch (traderStyle) {
-      case "scalper":
-        return "Scalper";
-      case "intraday":
-        return "Intraday";
-      case "swing":
-      default:
-        return "Swing";
-    }
+    if (traderStyle === "scalper") return "Scalper";
+    if (traderStyle === "intraday") return "Intraday";
+    return "Swing";
   }, [traderStyle]);
 
   return {
