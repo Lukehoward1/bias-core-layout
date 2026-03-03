@@ -17,6 +17,8 @@ import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 import { useActiveTradingAccount, ACTIVE_ACCOUNT_ALL } from "@/hooks/use-active-trading-account";
 import { useTraderBiasMode } from "@/hooks/use-trader-style";
 
+type TraderStyle = "scalper" | "intraday" | "swing";
+
 export default function Settings() {
   const { plan, setPlan } = useSubscription();
   const { pinEnabled, setPinEnabled, pinSet, setPin, clearPin } = useSessionLock();
@@ -38,37 +40,21 @@ export default function Settings() {
 
   const handleToggleLockOverlay = (disabled: boolean) => {
     setLockOverlayDisabled(disabled);
-    if (disabled) {
-      localStorage.setItem("dev-disable-lock-overlay", "true");
-    } else {
-      localStorage.removeItem("dev-disable-lock-overlay");
-    }
+    if (disabled) localStorage.setItem("dev-disable-lock-overlay", "true");
+    else localStorage.removeItem("dev-disable-lock-overlay");
   };
 
-  const handleForceReload = () => {
-    window.location.reload();
-  };
+  const handleForceReload = () => window.location.reload();
 
   const handleTogglePinEnabled = (enabled: boolean) => {
     setPinEnabled(enabled);
-    if (enabled && !pinSet) {
-      setShowPinSetup(true);
-    }
+    if (enabled && !pinSet) setShowPinSetup(true);
   };
 
   const handleSetPin = () => {
-    if (newPin.length !== 4) {
-      setPinSetupError("PIN must be 4 digits");
-      return;
-    }
-    if (!/^\d{4}$/.test(newPin)) {
-      setPinSetupError("PIN must contain only numbers");
-      return;
-    }
-    if (newPin !== confirmPin) {
-      setPinSetupError("PINs do not match");
-      return;
-    }
+    if (newPin.length !== 4) return setPinSetupError("PIN must be 4 digits");
+    if (!/^\d{4}$/.test(newPin)) return setPinSetupError("PIN must contain only numbers");
+    if (newPin !== confirmPin) return setPinSetupError("PINs do not match");
 
     setPin(newPin);
     setShowPinSetup(false);
@@ -87,9 +73,7 @@ export default function Settings() {
     setNewPin("");
     setConfirmPin("");
     setPinSetupError("");
-    if (!pinSet) {
-      setPinEnabled(false);
-    }
+    if (!pinSet) setPinEnabled(false);
   };
 
   const planOptions: { value: SubscriptionPlan; label: string; color: string }[] = [
@@ -109,6 +93,7 @@ export default function Settings() {
   return (
     <div className="flex flex-col min-h-full bg-background">
       <AppHeader title="Settings" />
+
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* ✅ Trading Preferences */}
@@ -137,13 +122,15 @@ export default function Settings() {
                   <SelectTrigger>
                     <SelectValue placeholder="Select viewing scope" />
                   </SelectTrigger>
+
                   <SelectContent>
                     <SelectItem value={ACTIVE_ACCOUNT_ALL}>All Accounts</SelectItem>
 
                     {accounts.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
+                      <SelectItem key={a.id} value={a.id} disabled={!a.isConnected}>
                         {a.name}
                         {primaryAccount?.id === a.id ? " (Primary)" : ""}
+                        {!a.isConnected ? " (Disconnected)" : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -158,7 +145,7 @@ export default function Settings() {
               <div className="space-y-2">
                 <Label className="text-sm">Trader Style (bias mode)</Label>
 
-                <Select value={traderStyle} onValueChange={(v: "scalper" | "intraday" | "swing") => setTraderStyle(v)}>
+                <Select value={traderStyle} onValueChange={(v) => setTraderStyle(v as TraderStyle)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select trader style" />
                   </SelectTrigger>
@@ -177,7 +164,7 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          {/* Session Privacy Section */}
+          {/* Session Privacy */}
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
@@ -189,6 +176,7 @@ export default function Settings() {
                 inactivity.
               </CardDescription>
             </CardHeader>
+
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -197,6 +185,7 @@ export default function Settings() {
                     Enable PIN lock
                   </Label>
                 </div>
+
                 {pinSet && (
                   <Badge variant="outline" className="text-xs bg-success/10 text-success border-success/30">
                     PIN Set
@@ -243,6 +232,7 @@ export default function Settings() {
                       placeholder="••••"
                     />
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="confirm-pin" className="text-xs text-muted-foreground">
                       Confirm PIN
@@ -263,7 +253,9 @@ export default function Settings() {
                       placeholder="••••"
                     />
                   </div>
+
                   {pinSetupError && <p className="text-xs text-destructive">{pinSetupError}</p>}
+
                   <div className="flex gap-2 pt-1">
                     <Button size="sm" onClick={handleSetPin}>
                       {pinSet ? "Update PIN" : "Set PIN"}
@@ -277,7 +269,7 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          {/* Dev Safety: Disable Lock Overlay */}
+          {/* Dev Safety */}
           <Card className="border-dashed border-warning/30">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
@@ -291,6 +283,7 @@ export default function Settings() {
                 Disable the session privacy overlay if it's blocking app interaction. Requires page reload.
               </CardDescription>
             </CardHeader>
+
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -304,6 +297,7 @@ export default function Settings() {
                   Reload to apply
                 </Button>
               </div>
+
               {lockOverlayDisabled && (
                 <p className="text-xs text-warning">
                   Lock overlay is disabled. The app will not show the lock screen on inactivity or first load.
@@ -312,7 +306,7 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          {/* Plan Switcher (Development/Testing) */}
+          {/* Plan Switcher */}
           <Card className="border-dashed border-primary/30">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
@@ -326,6 +320,7 @@ export default function Settings() {
                 Test tier gating by switching plans. This will be replaced with real billing integration.
               </CardDescription>
             </CardHeader>
+
             <CardContent>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground mr-2">Current plan:</span>
@@ -346,7 +341,7 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          {/* Connected Accounts Section */}
+          {/* Connected Accounts */}
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -354,6 +349,7 @@ export default function Settings() {
                 <CardTitle>Connected Accounts</CardTitle>
               </div>
             </CardHeader>
+
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
                 To link a broker account, go to{" "}
@@ -365,7 +361,7 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          {/* Account Settings Placeholder */}
+          {/* Placeholder */}
           <Card>
             <CardHeader>
               <CardTitle>Account Settings</CardTitle>
