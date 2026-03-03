@@ -11,6 +11,7 @@ import { GlobalNotifications } from "@/components/alerts/GlobalNotifications";
 import { AppLayout } from "@/layouts/AppLayout";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
+// Global selection providers
 import { ActiveTradingAccountProvider } from "@/context/ActiveTradingAccountProvider";
 import { TraderStyleProvider } from "@/context/TraderStyleProvider";
 
@@ -45,7 +46,6 @@ function AppRoutes() {
 
   return (
     <>
-      {/* Normal app routes */}
       <Routes location={backgroundLocation || location}>
         <Route element={<AppLayout />}>
           <Route path="/" element={<Dashboard />} />
@@ -66,13 +66,11 @@ function AppRoutes() {
           <Route path="/billing" element={<Billing />} />
         </Route>
 
-        {/* Direct asset route (full page) */}
         <Route path="/asset/:symbol" element={<AssetDetail />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
 
-      {/* Asset modal overlay */}
       {backgroundLocation && (
         <Routes>
           <Route
@@ -112,12 +110,11 @@ export default function App() {
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <AlertsProvider>
-            {/* ✅ MUST be inside AlertsProvider */}
-            <GlobalNotifications />
-
             <SessionLockProvider>
               <TraderStyleProvider>
                 <ActiveTradingAccountProvider>
+                  {/* ✅ must be inside AlertsProvider */}
+                  <GlobalNotifications />
                   <Toaster />
                   <Sonner />
                   <AppRoutes />
