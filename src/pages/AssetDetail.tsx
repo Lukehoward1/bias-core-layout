@@ -218,6 +218,13 @@ const isSymbolAffectedByEvent = (symbol: string, ev: { event: string; currency?:
    ✅ REUSABLE CONTENT (NO DIALOG)
 ======================= */
 
+function formatBiasModeLabel(mode?: string) {
+  const m = (mode || "").toLowerCase().trim();
+  if (m === "scalper" || m === "scalping") return "Scalper";
+  if (m === "swing") return "Swing";
+  return "Intraday";
+}
+
 export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string; onRequestClose?: () => void }) {
   const { getAssetBySymbol } = useAssets();
   const { isInWatchlist, toggleWatchlist } = useWatchlist();
@@ -357,6 +364,10 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
       </div>
     );
   }
+
+  const modeLabel = formatBiasModeLabel((asset as any).biasMode);
+  const tfs = Array.isArray((asset as any).biasTimeframes) ? ((asset as any).biasTimeframes as string[]) : [];
+  const tfLabel = tfs.length ? tfs.join(" / ") : "—";
 
   return (
     <>
@@ -521,7 +532,14 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                 </div>
 
                 <div className="flex-1 flex flex-col items-center justify-center pt-2">
-                  <span className="text-sm text-muted-foreground uppercase tracking-wide mb-6">Current Bias</span>
+                  <span className="text-sm text-muted-foreground uppercase tracking-wide mb-2">Current Bias</span>
+
+                  {/* ✅ NEW: show the selected mode + timeframes so you can verify it’s changing */}
+                  <div className="text-xs text-muted-foreground mb-4">
+                    Mode: <span className="font-medium text-foreground">{modeLabel}</span> • Timeframes:{" "}
+                    <span className="font-medium text-foreground">{tfLabel}</span>
+                  </div>
+
                   <div className="relative w-72 h-36">
                     <svg viewBox="0 0 100 50" className="w-full h-full">
                       <path
