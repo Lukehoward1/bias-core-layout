@@ -1,770 +1,305 @@
-import { useMemo, useState, useCallback, useEffect } from "react";
-import { useParams } from "react-router-dom";
+// src/services/marketData.ts
+// ─────────────────────────────────────────────────────────────
+// Shared market-data service for StreamBias.
+// Single source of truth for quotes & candles across the app.
+// Currently serves deterministic demo data; structured for
+// easy Twelve Data (or any REST/WS provider) integration later.
+// ─────────────────────────────────────────────────────────────
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+// ── Types ───────────────────────────────────────────────────
 
-import { Star, TrendingUp, TrendingDown, Minus, Activity, AlertTriangle, Clock, Target, Zap } from "lucide-react";
+/** Direction of move vs reference price. */
+export type MarketDirection = "up" | "down" | "flat";
 
-import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
-import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
-import { calendarEvents } from "@/data/calendarEvents";
-import { toast } from "sonner";
+/** Normalised real-time quote used throughout the UI. */
+export interface MarketQuote {
+  symbol: string; // Internal canonical symbol, e.g. "EURUSD"
+  providerSymbol: string; // Provider format, e.g. "EUR/USD"
+  last: number;
+  bid: number;
+  ask: number;
+  spread: number; // ask − bid, in price units
+  previousClose: number; // reference/previous price
+  change: number; // absolute change vs previousClose
+  changePercent: number; // % change vs previousClose
+  direction: MarketDirection;
+  timestamp: number; // Unix ms
+  source: "mock" | "twelvedata" | "websocket";
+}
 
-import { getEventImpact } from "@/data/eventImpactRules";
-import { getQuote, type MarketQuote } from "@/services/marketData";
+/** Normalised OHLCV candle for charts / replay. */
+export interface MarketCandle {
+  symbol: string;
+  timeframe: string; // e.g. "1m", "5m", "1h", "1d"
+  timestamp: number; // Unix ms (candle open)
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
 
-/* =======================
-   DATA (demo placeholders)
-======================= */
+/** UI-friendly formatted change object for consistent display. */
+export interface FormattedMarketChange {
+  value: string; // e.g. "+0.45%"
+  direction: MarketDirection;
+}
 
-// Asset-specific news events for today (non-calendar / extras)
-const assetNewsEvents: Record<string, { event: string; time: string; impact: "High" | "Medium" | "Low" }[]> = {
-  EURUSD: [
-    { event: "CPI (USD)", time: "13:30 GMT", impact: "High" },
-    { event: "Core CPI (USD)", time: "15:00 GMT", impact: "High" },
-  ],
-  GBPUSD: [
-    { event: "Retail Sales (GBP)", time: "14:00 GMT", impact: "Medium" },
-    { event: "CPI (USD)", time: "13:30 GMT", impact: "High" },
-  ],
-  USDJPY: [],
-  XAUUSD: [
-    { event: "CPI (USD)", time: "13:30 GMT", impact: "High" },
-    { event: "Gold Futures Report", time: "15:30 GMT", impact: "Medium" },
-  ],
-  BTCUSD: [{ event: "BTC ETF Decision", time: "12:00 GMT", impact: "High" }],
-  AUDUSD: [],
-  USDCAD: [
-    { event: "CAD Inflation", time: "16:00 GMT", impact: "High" },
-    { event: "CPI (USD)", time: "13:30 GMT", impact: "High" },
-  ],
-  SPX500: [
-    { event: "US Market Open", time: "14:30 GMT", impact: "Low" },
-    { event: "CPI (USD)", time: "13:30 GMT", impact: "High" },
-  ],
-  ETHUSD: [{ event: "ETH Network Update", time: "18:00 GMT", impact: "Medium" }],
+// ── Symbol mapping ──────────────────────────────────────────
+
+/** Canonical → provider display symbol. */
+const SYMBOL_MAP: Record<string, string> = {
+  EURUSD: "EUR/USD",
+  GBPUSD: "GBP/USD",
+  USDJPY: "USD/JPY",
+  AUDUSD: "AUD/USD",
+  USDCAD: "USD/CAD",
+  NZDUSD: "NZD/USD",
+  USDCHF: "USD/CHF",
+  EURGBP: "EUR/GBP",
+  EURJPY: "EUR/JPY",
+  GBPJPY: "GBP/JPY",
+  XAUUSD: "XAU/USD",
+  XAGUSD: "XAG/USD",
+  BTCUSD: "BTC/USD",
+  ETHUSD: "ETH/USD",
+  SPX500: "SPX500",
+  NAS100: "NAS100",
+  US30: "US30",
+  USOIL: "USOIL",
 };
 
-// Quick insights per asset
-const quickInsights: Record<string, string[]> = {
-  XAUUSD: [
-    "Bias: Bullish → approaching resistance at 2035",
-    "Level: Price near D1 support 2018–2022",
-    "Trend: H4 structure remains bullish",
-    "Volatility: High-impact USD news in 2 hours",
-  ],
-  EURUSD: [
-    "Bias: Bullish → testing 1.0850 resistance",
-    "Level: Price above D1 support 1.0820",
-    "Trend: H4 bullish momentum increasing",
-    "Volatility: CPI data expected today",
-  ],
-  BTCUSD: [
-    "Bias: Bullish → ETF decision pending",
-    "Level: Price consolidating near 37,000",
-    "Trend: Weekly structure bullish",
-    "Volatility: High due to regulatory news",
-  ],
+/** Normalise any input to uppercase, no slashes. */
+export function normalizeSymbol(raw: string): string {
+  return raw.toUpperCase().replace(/[/ ]/g, "").trim();
+}
+
+/** Convert canonical symbol → provider format (e.g. EUR/USD). */
+export function toProviderSymbol(canonical: string): string {
+  const norm = normalizeSymbol(canonical);
+  if (SYMBOL_MAP[norm]) return SYMBOL_MAP[norm];
+
+  if (norm.length === 6 && /^[A-Z]+$/.test(norm)) {
+    return `${norm.slice(0, 3)}/${norm.slice(3)}`;
+  }
+
+  return norm;
+}
+
+/** Convert provider symbol back to canonical. */
+export function fromProviderSymbol(provider: string): string {
+  return normalizeSymbol(provider);
+}
+
+// ── Mock / demo data ────────────────────────────────────────
+
+/** Realistic base prices used for demo mode. */
+const MOCK_PRICES: Record<string, number> = {
+  EURUSD: 1.0845,
+  GBPUSD: 1.2652,
+  USDJPY: 148.25,
+  AUDUSD: 0.6542,
+  USDCAD: 1.3582,
+  NZDUSD: 0.6125,
+  USDCHF: 0.8765,
+  EURGBP: 0.8572,
+  EURJPY: 160.85,
+  GBPJPY: 187.42,
+  XAUUSD: 2025.5,
+  XAGUSD: 23.45,
+  BTCUSD: 37245.0,
+  ETHUSD: 2045.3,
+  SPX500: 4587.2,
+  NAS100: 16245.0,
+  US30: 37580.0,
+  USOIL: 72.85,
 };
 
-const keyLevels = [
-  { type: "Daily Support", price: "2018.5", notes: "Retest zone" },
-  { type: "Daily Resistance", price: "2035.0", notes: "Liquidity overhead" },
-  { type: "Weekly Support", price: "2000.0", notes: "Major level" },
-  { type: "Trendline", price: "—", notes: "Uptrend intact" },
-];
-
-const upcomingNews = [
-  { time: "13:30", event: "USD CPI m/m", impact: "High", forecast: "0.3%", previous: "0.2%", actual: "—" },
-  { time: "15:00", event: "USD Core CPI y/y", impact: "High", forecast: "3.8%", previous: "3.9%", actual: "—" },
-  {
-    time: "15:30",
-    event: "USD Unemployment Claims",
-    impact: "Medium",
-    forecast: "220K",
-    previous: "218K",
-    actual: "—",
-  },
-];
-
-const sessionInsights = [
-  { session: "London Open", volatility: "High", description: "Strong directional moves expected" },
-  { session: "New York Open", volatility: "Medium", description: "Continuation or reversal likely" },
-  { session: "Asia", volatility: "Low", description: "Consolidation phase typical" },
-];
-
-/* =======================
-   NEWS → CALENDAR MATCHING (AUTO)
-======================= */
-
-type CalendarEvent = (typeof calendarEvents)[0];
-
-type NewsPill = {
-  key: string;
-  event: string;
-  time: string;
-  impact: "High" | "Medium" | "Low";
-  calendarEvent?: CalendarEvent;
+/** Typical half-spread in price units per symbol. */
+const MOCK_HALF_SPREADS: Record<string, number> = {
+  EURUSD: 0.00004,
+  GBPUSD: 0.00006,
+  USDJPY: 0.005,
+  XAUUSD: 0.15,
+  XAGUSD: 0.015,
+  BTCUSD: 7.5,
+  ETHUSD: 1.0,
+  SPX500: 0.25,
+  NAS100: 0.75,
+  US30: 1.0,
+  USOIL: 0.02,
 };
 
-const normalize = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/\(.*?\)/g, " ")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-const extractCurrencyFromLabel = (label: string) => {
-  const m = label.match(/\(([A-Z]{3})\)/);
-  return m?.[1] ?? null;
+/** Static baseline % change used to create a stable reference price. */
+const MOCK_CHANGE_PCT: Record<string, number> = {
+  EURUSD: 0.45,
+  GBPUSD: 0.32,
+  USDJPY: -0.28,
+  AUDUSD: 0.05,
+  USDCAD: -0.18,
+  NZDUSD: -0.12,
+  USDCHF: 0.08,
+  EURGBP: 0.11,
+  EURJPY: 0.39,
+  GBPJPY: 0.41,
+  XAUUSD: 1.24,
+  XAGUSD: 0.95,
+  BTCUSD: 2.15,
+  ETHUSD: 0.45,
+  SPX500: 0.85,
+  NAS100: 1.12,
+  US30: 0.62,
+  USOIL: -0.45,
 };
 
-const extractTimeHHMM = (timeStr: string) => {
-  const m = timeStr.match(/(\d{1,2}:\d{2})/);
-  if (!m) return null;
-  const [hh, mm] = m[1].split(":");
-  return `${hh.padStart(2, "0")}:${mm}`;
-};
+function defaultHalfSpread(price: number): number {
+  if (price > 1000) return price * 0.0001;
+  if (price > 10) return 0.005;
+  return 0.00005;
+}
 
-const normalizeEventAlias = (label: string) => {
-  const raw = normalize(label);
-  if (raw === "cpi") return "us cpi";
-  if (raw.includes("core cpi")) return "core cpi";
-  if (raw.includes("interest rate decision")) return "interest rate decision";
-  if (raw.includes("non farm payroll")) return "non farm payrolls";
-  return raw;
-};
+function roundSmart(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Number(value.toPrecision(7));
+}
 
-const scoreCalendarMatch = (args: {
-  pillLabel: string;
-  pillCurrency: string | null;
-  pillTime: string | null;
-  candidate: CalendarEvent;
-}) => {
-  const { pillLabel, pillCurrency, pillTime, candidate } = args;
+function getReferencePrice(base: number, changePercent: number): number {
+  if (!Number.isFinite(base) || base <= 0) return base;
+  const previous = base / (1 + changePercent / 100);
+  return previous > 0 ? previous : base;
+}
 
-  const pillNorm = normalizeEventAlias(pillLabel);
-  const candNorm = normalize(candidate.event);
+function getDirection(change: number): MarketDirection {
+  if (change > 0) return "up";
+  if (change < 0) return "down";
+  return "flat";
+}
 
-  let score = 0;
+/** Build a single mock quote with slight jitter so repeated calls feel alive. */
+function buildMockQuote(symbol: string): MarketQuote {
+  const norm = normalizeSymbol(symbol);
+  const base = MOCK_PRICES[norm] ?? 1.0;
 
-  if (candNorm === pillNorm) score += 6;
-  if (candNorm.includes(pillNorm) || pillNorm.includes(candNorm)) score += 4;
+  // Slight movement each fetch so the UI feels alive.
+  const jitter = (Math.random() - 0.5) * base * 0.0004; // ±0.02%
+  const mid = base + jitter;
 
-  const pillTokens = new Set(pillNorm.split(" ").filter(Boolean));
-  const candTokens = new Set(candNorm.split(" ").filter(Boolean));
-  let overlap = 0;
-  pillTokens.forEach((t) => {
-    if (candTokens.has(t)) overlap += 1;
-  });
-  score += overlap;
+  const hs = MOCK_HALF_SPREADS[norm] ?? defaultHalfSpread(base);
+  const bid = mid - hs;
+  const ask = mid + hs;
 
-  if (pillCurrency && candidate.currency?.toUpperCase() === pillCurrency.toUpperCase()) score += 3;
-  if (pillTime && candidate.time === pillTime) score += 2;
+  const baseChangePct = MOCK_CHANGE_PCT[norm] ?? 0;
+  const previousClose = getReferencePrice(base, baseChangePct);
+  const change = mid - previousClose;
+  const changePercent = previousClose > 0 ? (change / previousClose) * 100 : 0;
 
-  if (candidate.impact === "high") score += 0.5;
+  return {
+    symbol: norm,
+    providerSymbol: toProviderSymbol(norm),
+    last: roundSmart(mid),
+    bid: roundSmart(bid),
+    ask: roundSmart(ask),
+    spread: roundSmart(ask - bid),
+    previousClose: roundSmart(previousClose),
+    change: roundSmart(change),
+    changePercent: Number(changePercent.toFixed(2)),
+    direction: getDirection(change),
+    timestamp: Date.now(),
+    source: "mock",
+  };
+}
 
-  return score;
-};
+// ── Formatting helpers ──────────────────────────────────────
 
-const toPillImpact = (impact: CalendarEvent["impact"]): "High" | "Medium" | "Low" => {
-  if (impact === "high") return "High";
-  if (impact === "medium") return "Medium";
-  return "Low";
-};
+export function formatChangePercent(value: number): string {
+  if (!Number.isFinite(value)) return "0.00%";
+  if (value > 0) return `+${value.toFixed(2)}%`;
+  if (value < 0) return `${value.toFixed(2)}%`;
+  return "0.00%";
+}
 
-/* =======================
-   ✅ IMPACT ENGINE ADAPTER (SAFE)
-======================= */
+export function getFormattedMarketChange(quote: MarketQuote | null | undefined): FormattedMarketChange {
+  if (!quote) {
+    return {
+      value: "0.00%",
+      direction: "flat",
+    };
+  }
 
-type ImpactResult = {
-  affectedPairs?: string[];
-  affectedAssets?: string[];
-  affectedSymbols?: string[];
-  affected?: string[];
-};
+  return {
+    value: formatChangePercent(quote.changePercent),
+    direction: quote.direction,
+  };
+}
 
-const ensureStringArray = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x) => typeof x === "string") : []);
+// ── Twelve Data integration (placeholder) ───────────────────
+//
+// When VITE_TWELVE_API_KEY is set the service will prefer live
+// data and fall back to mock on failure.
+//
+// Usage (future):
+//   const apiKey = import.meta.env.VITE_TWELVE_API_KEY;
+//
+// The fetch helper below is intentionally left as a stub so
+// the file compiles and runs today without any env vars.
 
-const getAffectedSymbols = (res: unknown): string[] => {
-  const r = (res || {}) as ImpactResult;
-  const merged = new Set<string>([
-    ...ensureStringArray(r.affectedPairs),
-    ...ensureStringArray(r.affectedAssets),
-    ...ensureStringArray(r.affectedSymbols),
-    ...ensureStringArray(r.affected),
-  ]);
-  return Array.from(merged).map((s) => s.toUpperCase());
-};
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function fetchTwelveDataQuote(_symbol: string): Promise<MarketQuote | null> {
+  // TODO: implement when VITE_TWELVE_API_KEY is available
+  // const apiKey = import.meta.env.VITE_TWELVE_API_KEY;
+  // if (!apiKey) return null;
+  //
+  // Example future flow:
+  // 1. Fetch provider data
+  // 2. Normalise into StreamBias MarketQuote shape
+  // 3. Include previousClose / change / changePercent / direction
+  //
+  // const url = `https://api.twelvedata.com/price?symbol=${toProviderSymbol(_symbol)}&apikey=${apiKey}`;
+  // const res = await fetch(url);
+  // if (!res.ok) return null;
+  // const json = await res.json();
+  // return { ...normalisedQuote, source: "twelvedata" };
 
-const isSymbolAffectedByEvent = (symbol: string, ev: { event: string; currency?: string; impact?: string }) => {
+  return null;
+}
+
+// ── Public API ──────────────────────────────────────────────
+
+/**
+ * Get a normalised quote for a single symbol.
+ * Returns live data when available, otherwise mock.
+ */
+export async function getQuote(symbol: string): Promise<MarketQuote> {
+  const norm = normalizeSymbol(symbol);
+
   try {
-    const currency = (ev.currency || extractCurrencyFromLabel(ev.event) || "").toUpperCase();
-    const result = getEventImpact({
-      title: ev.event,
-      currency,
-    } as any);
-
-    const affected = getAffectedSymbols(result);
-    return affected.includes(symbol.toUpperCase());
+    const live = await fetchTwelveDataQuote(norm);
+    if (live) return live;
   } catch {
-    return false;
-  }
-};
-
-/* =======================
-   PRICE FORMATTING
-======================= */
-
-const formatPriceNoCommas = (raw: string | number) => {
-  const cleaned = (raw ?? "").toString().trim();
-  if (!cleaned || cleaned === "—") return "—";
-
-  const noCommas = cleaned.replace(/,/g, "");
-  const n = Number(noCommas);
-  if (!Number.isFinite(n)) return noCommas;
-
-  const m = noCommas.match(/^\d+(\.(\d+))?$/);
-  if (m) {
-    const decimals = m[2]?.length ?? 0;
-    if (decimals > 0) return n.toFixed(decimals);
+    // Swallow – fall through to mock
   }
 
-  return String(n);
-};
-
-/* =======================
-   ✅ REUSABLE CONTENT (NO DIALOG)
-======================= */
-
-function formatBiasModeLabel(mode?: string) {
-  const m = (mode || "").toLowerCase().trim();
-  if (m === "scalper" || m === "scalping") return "Scalper";
-  if (m === "swing") return "Swing";
-  return "Intraday";
+  return buildMockQuote(norm);
 }
 
-export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string; onRequestClose?: () => void }) {
-  const { getAssetBySymbol } = useAssets();
-  const { isInWatchlist, toggleWatchlist } = useWatchlist();
-
-  const asset = symbol ? getAssetBySymbol(symbol) : undefined;
-  const isWatchlisted = symbol ? isInWatchlist(symbol) : false;
-
-  const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
-  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
-
-  const [showAllRelevantNews, setShowAllRelevantNews] = useState(false);
-  const [newsExpanded, setNewsExpanded] = useState(false);
-
-  const [quote, setQuote] = useState<MarketQuote | null>(null);
-
-  const handleToggleWatchlist = () => {
-    toggleWatchlist(symbol);
-  };
-
-  const openCalendarEvent = useCallback((ev: CalendarEvent) => {
-    setIsEventModalOpen(false);
-    setSelectedCalendarEvent(null);
-
-    requestAnimationFrame(() => {
-      setSelectedCalendarEvent(ev);
-      setIsEventModalOpen(true);
-    });
-  }, []);
-
-  const closeCalendarOverlay = useCallback(() => {
-    setIsEventModalOpen(false);
-    setSelectedCalendarEvent(null);
-  }, []);
-
-  const openCalendarOverlayFromNewsPill = useCallback(
-    (newsLabel: string, newsTime: string) => {
-      const pillCurrency = extractCurrencyFromLabel(newsLabel);
-      const pillTime = extractTimeHHMM(newsTime);
-
-      let best: { ev: CalendarEvent; score: number } | null = null;
-
-      for (const ev of calendarEvents) {
-        const s = scoreCalendarMatch({
-          pillLabel: newsLabel,
-          pillCurrency,
-          pillTime,
-          candidate: ev,
-        });
-
-        if (!best || s > best.score) best = { ev, score: s };
-      }
-
-      if (!best || best.score < 4) {
-        toast.error("No matching calendar event found for this news item yet.");
-        return;
-      }
-
-      openCalendarEvent(best.ev);
-    },
-    [openCalendarEvent],
-  );
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadQuote = async () => {
-      if (!symbol) {
-        if (isMounted) setQuote(null);
-        return;
-      }
-
-      try {
-        const fetchedQuote = await getQuote(symbol);
-        if (!isMounted) return;
-        setQuote(fetchedQuote);
-      } catch {
-        if (isMounted) setQuote(null);
-      }
-    };
-
-    loadQuote();
-    const intervalId = window.setInterval(loadQuote, 3000);
-
-    return () => {
-      isMounted = false;
-      window.clearInterval(intervalId);
-    };
-  }, [symbol]);
-
-  const getBiasColor = (bias: string) => {
-    if (bias === "Bullish") return "text-success";
-    if (bias === "Bearish") return "text-destructive";
-    return "text-muted-foreground";
-  };
-
-  const getBiasIcon = (bias: string) => {
-    if (bias === "Bullish") return <TrendingUp className="h-6 w-6" />;
-    if (bias === "Bearish") return <TrendingDown className="h-6 w-6" />;
-    return <Minus className="h-6 w-6" />;
-  };
-
-  const insights = useMemo(() => {
-    if (!symbol || !asset) return [];
-    return (
-      quickInsights[symbol] || [
-        `Bias: ${asset.biasDirection} → monitoring key levels`,
-        "Level: Price near significant support/resistance",
-        "Trend: Structure developing on H4",
-        "Volatility: Watch for upcoming news events",
-      ]
-    );
-  }, [symbol, asset]);
-
-  const newsImpactPills: NewsPill[] = useMemo(() => {
-    if (!symbol) return [];
-
-    const fromCalendar: NewsPill[] = calendarEvents
-      .filter((ev) =>
-        isSymbolAffectedByEvent(symbol, {
-          event: ev.event,
-          currency: ev.currency,
-          impact: ev.impact,
-        }),
-      )
-      .map((ev) => ({
-        key: `cal-${ev.id}`,
-        event: ev.event,
-        time: `${ev.time} GMT`,
-        impact: toPillImpact(ev.impact),
-        calendarEvent: ev,
-      }));
-
-    const extrasRaw = assetNewsEvents[symbol] || [];
-    const extras: NewsPill[] = extrasRaw
-      .filter((n) => {
-        const inferredCurrency = extractCurrencyFromLabel(n.event) ?? undefined;
-        return isSymbolAffectedByEvent(symbol, {
-          event: n.event,
-          currency: inferredCurrency,
-          impact: n.impact?.toLowerCase(),
-        });
-      })
-      .map((n, idx) => ({
-        key: `extra-${symbol}-${idx}-${n.event}`,
-        event: n.event,
-        time: n.time,
-        impact: n.impact,
-      }));
-
-    const calNormSet = new Set(fromCalendar.map((p) => normalize(p.event)));
-    const filteredExtras = extras.filter((x) => !calNormSet.has(normalize(x.event)));
-
-    const combined = [...fromCalendar, ...filteredExtras];
-
-    const filtered = showAllRelevantNews ? combined : combined.filter((p) => p.impact === "High");
-    if (!showAllRelevantNews && filtered.length === 0 && combined.length > 0) return combined;
-
-    return filtered;
-  }, [symbol, showAllRelevantNews]);
-
-  if (!asset) {
-    return (
-      <div className="text-center py-10 px-6">
-        <h1 className="text-2xl font-bold text-foreground mb-2">Asset not found</h1>
-        <Button onClick={() => onRequestClose?.()}>Close</Button>
-      </div>
-    );
-  }
-
-  const modeLabel = formatBiasModeLabel((asset as any).biasMode);
-  const tfs = Array.isArray((asset as any).biasTimeframes) ? ((asset as any).biasTimeframes as string[]) : [];
-  const tfLabel = tfs.length ? tfs.join(" / ") : "—";
-
-  const displayPrice = formatPriceNoCommas(quote?.last?.toString() ?? asset.latestPrice);
-
-  return (
-    <>
-      <div className="sticky top-0 z-10 bg-background border-b border-border px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold text-foreground">{asset.symbol}</h2>
-          <Badge variant="outline" className="text-xs">
-            Live Data
-          </Badge>
-        </div>
-
-        {onRequestClose && (
-          <Button variant="outline" size="sm" onClick={onRequestClose}>
-            Close
-          </Button>
-        )}
-      </div>
-
-      <div className="p-6 space-y-6">
-        <Card className="overflow-hidden">
-          <CardContent className="p-8">
-            <div className="grid lg:grid-cols-2 gap-8">
-              <div className="flex flex-col">
-                <div className="flex items-center gap-3 mb-3">
-                  <h1 className="text-4xl font-bold text-foreground">{asset.symbol}</h1>
-                  <Button variant="ghost" size="icon" onClick={handleToggleWatchlist} className="h-10 w-10">
-                    <Star
-                      className={`h-6 w-6 ${
-                        isWatchlisted ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
-                      }`}
-                    />
-                  </Button>
-                </div>
-
-                <div className="flex items-baseline gap-3 mb-6">
-                  <span className="text-3xl font-semibold text-foreground">{displayPrice}</span>
-                  <span
-                    className={`text-lg font-medium ${
-                      asset.priceChange.startsWith("+") ? "text-success" : "text-destructive"
-                    }`}
-                  >
-                    {asset.priceChange}
-                  </span>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
-                    Quick Insights
-                  </h3>
-                  <div className="space-y-2">
-                    {insights.map((insight, index) => {
-                      const colors = ["bg-primary", "bg-success", "bg-warning", "bg-destructive"];
-                      return (
-                        <div key={index} className="flex items-start gap-2">
-                          <div
-                            className={`h-1.5 w-1.5 rounded-full ${colors[index % colors.length]} mt-1.5 flex-shrink-0`}
-                          />
-                          <p className="text-sm text-muted-foreground">{insight}</p>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {newsImpactPills.length > 0 && (
-                    <div className="mt-5">
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                          News Impact
-                        </h3>
-
-                        <button
-                          type="button"
-                          onClick={() => setShowAllRelevantNews((v) => !v)}
-                          className="text-xs text-primary hover:underline"
-                        >
-                          {showAllRelevantNews ? "Show high impact only" : "Show all relevant"}
-                        </button>
-                      </div>
-
-                      <div className="space-y-2">
-                        {(newsExpanded ? newsImpactPills : newsImpactPills.slice(0, 3)).map((pill) => {
-                          const impactColors = {
-                            High: "bg-destructive text-destructive-foreground",
-                            Medium: "bg-warning text-warning-foreground",
-                            Low: "bg-success text-success-foreground",
-                          } as const;
-
-                          return (
-                            <button
-                              key={pill.key}
-                              type="button"
-                              onPointerDown={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                openCalendarOverlayFromNewsPill(pill.event, pill.time);
-                              }}
-                              className="w-full flex items-center gap-2 text-left hover:bg-muted/30 rounded-md px-2 py-1.5 transition-colors group"
-                            >
-                              <span
-                                className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${impactColors[pill.impact]}`}
-                              >
-                                {pill.impact}
-                              </span>
-                              <span className="text-sm text-foreground group-hover:text-primary transition-colors">
-                                {pill.event}
-                              </span>
-                              <span className="text-sm text-muted-foreground">—</span>
-                              <span className="text-sm text-muted-foreground">{pill.time}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {newsImpactPills.length > 3 && (
-                        <button
-                          type="button"
-                          onClick={() => setNewsExpanded((v) => !v)}
-                          className="text-xs text-primary hover:underline mt-1"
-                        >
-                          {newsExpanded ? "Show less" : `+${newsImpactPills.length - 3} more · Show more`}
-                        </button>
-                      )}
-
-                      <p className="text-xs text-muted-foreground mt-2">
-                        If something doesn’t open, it means the event doesn’t exist in calendarEvents yet (or needs a
-                        closer name match).
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex flex-col">
-                <div className="grid grid-cols-4 gap-3 mb-6">
-                  <div className="p-3 bg-muted/30 rounded-lg text-center">
-                    <span className="text-xs text-muted-foreground block mb-1">Volume</span>
-                    <span className="text-sm font-semibold text-foreground">{asset.volume}</span>
-                  </div>
-                  <div className="p-3 bg-muted/30 rounded-lg text-center">
-                    <span className="text-xs text-muted-foreground block mb-1">Spread</span>
-                    <span className="text-sm font-semibold text-foreground">{asset.spread}</span>
-                  </div>
-                  <div className="p-3 bg-muted/30 rounded-lg text-center">
-                    <span className="text-xs text-muted-foreground block mb-1">Confidence</span>
-                    <span className="text-sm font-semibold text-foreground">{asset.biasConfidence}%</span>
-                  </div>
-                  <div className="p-3 bg-muted/30 rounded-lg text-center">
-                    <span className="text-xs text-muted-foreground block mb-1">Sentiment</span>
-                    <span
-                      className={`text-sm font-semibold ${
-                        asset.sentiment > 0
-                          ? "text-success"
-                          : asset.sentiment < 0
-                            ? "text-destructive"
-                            : "text-muted-foreground"
-                      }`}
-                    >
-                      {asset.sentiment > 0 ? "+" : ""}
-                      {asset.sentiment}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex-1 flex flex-col items-center justify-center pt-2">
-                  <span className="text-sm text-muted-foreground uppercase tracking-wide mb-2">Current Bias</span>
-
-                  <div className="text-xs text-muted-foreground mb-4">
-                    Mode: <span className="font-medium text-foreground">{modeLabel}</span> • Timeframes:{" "}
-                    <span className="font-medium text-foreground">{tfLabel}</span>
-                  </div>
-
-                  <div className="relative w-72 h-36">
-                    <svg viewBox="0 0 100 50" className="w-full h-full">
-                      <path
-                        d="M 10 45 A 40 40 0 0 1 90 45"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="8"
-                        className="text-muted"
-                      />
-                      <path
-                        d="M 10 45 A 40 40 0 0 1 90 45"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="8"
-                        strokeDasharray={`${(asset.biasConfidence / 100) * 126} 126`}
-                        className={getBiasColor(asset.biasDirection)}
-                      />
-                      <line
-                        x1="50"
-                        y1="45"
-                        x2={50 + 35 * Math.cos((Math.PI * (180 - asset.biasConfidence * 1.8)) / 180)}
-                        y2={45 - 35 * Math.sin((Math.PI * (180 - asset.biasConfidence * 1.8)) / 180)}
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        className="text-foreground"
-                      />
-                      <circle cx="50" cy="45" r="5" fill="currentColor" className="text-foreground" />
-                    </svg>
-                  </div>
-                  <div className={`flex items-center gap-2 mt-6 ${getBiasColor(asset.biasDirection)}`}>
-                    {getBiasIcon(asset.biasDirection)}
-                    <span className="text-3xl font-bold">{asset.biasDirection}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-primary" />
-              AI Market Overview
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <p className="text-muted-foreground leading-relaxed">
-                <strong className="text-foreground">{asset.symbol}</strong> is currently showing a{" "}
-                <strong className={getBiasColor(asset.biasDirection)}>{asset.biasDirection.toLowerCase()}</strong> bias
-                with {asset.biasConfidence}% confidence based on our multi-timeframe analysis.
-              </p>
-
-              <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-destructive">
-                    <strong>Warning:</strong> High-impact news events scheduled within the next 4 hours.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid lg:grid-cols-3 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Target className="h-4 w-4 text-primary" />
-                Key Levels
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {keyLevels.map((level, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
-                    <div>
-                      <span className="text-sm font-medium text-foreground">{level.type}</span>
-                      <p className="text-xs text-muted-foreground">{level.notes}</p>
-                    </div>
-                    <span className="text-sm font-semibold text-foreground">{level.price}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Clock className="h-4 w-4 text-primary" />
-                Session Insights
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {sessionInsights.map((session, index) => (
-                  <div key={index} className="p-2 bg-muted/30 rounded-lg">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-foreground">{session.session}</span>
-                      <Badge
-                        variant={
-                          session.volatility === "High"
-                            ? "destructive"
-                            : session.volatility === "Medium"
-                              ? "default"
-                              : "secondary"
-                        }
-                        className="text-[10px]"
-                      >
-                        {session.volatility}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{session.description}</p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Zap className="h-4 w-4 text-primary" />
-                Upcoming News
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {upcomingNews.map((news, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      openCalendarOverlayFromNewsPill(news.event, `${news.time} GMT`);
-                    }}
-                    className="w-full text-left p-2 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-muted-foreground">{news.time}</span>
-                      <Badge variant={news.impact === "High" ? "destructive" : "default"} className="text-[10px]">
-                        {news.impact}
-                      </Badge>
-                    </div>
-                    <p className="text-sm font-medium text-foreground mb-1">{news.event}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>F: {news.forecast}</span>
-                      <span>P: {news.previous}</span>
-                      <span>A: {news.actual}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      <EventDetailsModal
-        event={selectedCalendarEvent as any}
-        isOpen={isEventModalOpen}
-        onClose={closeCalendarOverlay}
-      />
-    </>
-  );
+/**
+ * Get normalised quotes for multiple symbols in one call.
+ */
+export async function getQuotes(symbols: string[]): Promise<MarketQuote[]> {
+  return Promise.all(symbols.map((s) => getQuote(s)));
 }
 
-export default function AssetDetail() {
-  const { symbol } = useParams<{ symbol: string }>();
-  if (!symbol) return null;
-  return <AssetDetailContent symbol={symbol} />;
+/**
+ * Synchronous mock quote – useful when you need data immediately
+ * without awaiting (e.g. initial render, fallback).
+ */
+export function getMockQuote(symbol: string): MarketQuote {
+  return buildMockQuote(normalizeSymbol(symbol));
+}
+
+/**
+ * List all symbols that have demo pricing available.
+ */
+export function getAvailableMockSymbols(): string[] {
+  return Object.keys(MOCK_PRICES);
 }
