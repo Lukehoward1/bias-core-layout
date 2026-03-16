@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { toast } from "sonner";
 import { calendarEvents } from "@/data/calendarEvents";
+import { getQuotes, type MarketQuote } from "@/services/marketData";
 
 type MarketType = "Watchlist" | "All" | "FX" | "Crypto" | "Indices" | "Commodities" | "ETFs" | "Futures";
 
@@ -205,6 +206,9 @@ export default function Markets() {
   // per-card toggle: show all relevant news vs high impact only
   const [expandedNews, setExpandedNews] = useState<Record<string, boolean>>({});
 
+  // shared market quotes keyed by symbol
+  const [quotes, setQuotes] = useState<Record<string, MarketQuote>>({});
+
   const marketTypes: MarketType[] = ["Watchlist", "All", "FX", "Crypto", "Indices", "Commodities", "ETFs", "Futures"];
 
   const handleToggleWatchlist = (symbol: string, e: React.MouseEvent) => {
@@ -233,6 +237,37 @@ export default function Markets() {
 
     return filtered;
   }, [selectedType, watchlistAssets, searchQuery, assets]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadQuotes = async () => {
+      if (filteredPairs.length === 0) {
+        if (isMounted) setQuotes({});
+        return;
+      }
+
+      try {
+        const fetchedQuotes = await getQuotes(filteredPairs.map((asset) => asset.symbol));
+        if (!isMounted) return;
+
+        const quoteMap = fetchedQuotes.reduce<Record<string, MarketQuote>>((acc, quote) => {
+          acc[quote.symbol] = quote;
+          return acc;
+        }, {});
+
+        setQuotes(quoteMap);
+      } catch {
+        if (isMounted) setQuotes({});
+      }
+    };
+
+    loadQuotes();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [filteredPairs]);
 
   const getBiasIcon = (bias: string) => {
     if (bias === "Bullish") return <TrendingUp className="h-4 w-4" />;
@@ -426,7 +461,7 @@ export default function Markets() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xl font-bold text-foreground">
-                        {formatPriceNoCommas(asset.latestPrice)}
+                        {formatPriceNoCommas(quotes[asset.symbol]?.last?.toString() ?? asset.latestPrice)}
                       </span>
                       <span
                         className={`text-sm font-medium ${
