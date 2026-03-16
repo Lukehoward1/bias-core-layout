@@ -264,8 +264,11 @@ export default function Markets() {
 
     loadQuotes();
 
+    const intervalId = window.setInterval(loadQuotes, 3000);
+
     return () => {
       isMounted = false;
+      window.clearInterval(intervalId);
     };
   }, [filteredPairs]);
 
