@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { useParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { calendarEvents } from "@/data/calendarEvents";
 import { toast } from "sonner";
 
 import { getEventImpact } from "@/data/eventImpactRules";
+import { getQuote, type MarketQuote } from "@/services/marketData";
 
 /* =======================
    DATA (demo placeholders)
@@ -215,6 +216,27 @@ const isSymbolAffectedByEvent = (symbol: string, ev: { event: string; currency?:
 };
 
 /* =======================
+   PRICE FORMATTING
+======================= */
+
+const formatPriceNoCommas = (raw: string | number) => {
+  const cleaned = (raw ?? "").toString().trim();
+  if (!cleaned || cleaned === "—") return "—";
+
+  const noCommas = cleaned.replace(/,/g, "");
+  const n = Number(noCommas);
+  if (!Number.isFinite(n)) return noCommas;
+
+  const m = noCommas.match(/^\d+(\.(\d+))?$/);
+  if (m) {
+    const decimals = m[2]?.length ?? 0;
+    if (decimals > 0) return n.toFixed(decimals);
+  }
+
+  return String(n);
+};
+
+/* =======================
    ✅ REUSABLE CONTENT (NO DIALOG)
 ======================= */
 
@@ -237,6 +259,8 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
   const [showAllRelevantNews, setShowAllRelevantNews] = useState(false);
   const [newsExpanded, setNewsExpanded] = useState(false);
+
+  const [quote, setQuote] = useState<MarketQuote | null>(null);
 
   const handleToggleWatchlist = () => {
     toggleWatchlist(symbol);
@@ -284,6 +308,33 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
     },
     [openCalendarEvent],
   );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadQuote = async () => {
+      if (!symbol) {
+        if (isMounted) setQuote(null);
+        return;
+      }
+
+      try {
+        const fetchedQuote = await getQuote(symbol);
+        if (!isMounted) return;
+        setQuote(fetchedQuote);
+      } catch {
+        if (isMounted) setQuote(null);
+      }
+    };
+
+    loadQuote();
+    const intervalId = window.setInterval(loadQuote, 3000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
+  }, [symbol]);
 
   const getBiasColor = (bias: string) => {
     if (bias === "Bullish") return "text-success";
@@ -369,6 +420,8 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
   const tfs = Array.isArray((asset as any).biasTimeframes) ? ((asset as any).biasTimeframes as string[]) : [];
   const tfLabel = tfs.length ? tfs.join(" / ") : "—";
 
+  const displayPrice = formatPriceNoCommas(quote?.last?.toString() ?? asset.latestPrice);
+
   return (
     <>
       <div className="sticky top-0 z-10 bg-background border-b border-border px-6 py-4 flex items-center justify-between">
@@ -403,7 +456,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                 </div>
 
                 <div className="flex items-baseline gap-3 mb-6">
-                  <span className="text-3xl font-semibold text-foreground">{asset.latestPrice}</span>
+                  <span className="text-3xl font-semibold text-foreground">{displayPrice}</span>
                   <span
                     className={`text-lg font-medium ${
                       asset.priceChange.startsWith("+") ? "text-success" : "text-destructive"
@@ -492,8 +545,8 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                       )}
 
                       <p className="text-xs text-muted-foreground mt-2">
-                        If something doesn’t open, it means the event doesn’t exist in <code>calendarEvents</code> yet
-                        (or needs a closer name match).
+                        If something doesn’t open, it means the event doesn’t exist in calendarEvents yet (or needs a
+                        closer name match).
                       </p>
                     </div>
                   )}
@@ -534,7 +587,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                 <div className="flex-1 flex flex-col items-center justify-center pt-2">
                   <span className="text-sm text-muted-foreground uppercase tracking-wide mb-2">Current Bias</span>
 
-                  {/* ✅ NEW: show the selected mode + timeframes so you can verify it’s changing */}
                   <div className="text-xs text-muted-foreground mb-4">
                     Mode: <span className="font-medium text-foreground">{modeLabel}</span> • Timeframes:{" "}
                     <span className="font-medium text-foreground">{tfLabel}</span>
