@@ -1,17 +1,73 @@
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Minus, ChevronRight, Star } from "lucide-react";
 import { useWatchlist } from "@/hooks/use-watchlist";
+import { getQuotes, type MarketQuote } from "@/services/marketData";
 
 interface WatchlistOverviewCardProps {
   isEditMode?: boolean;
   slotType?: "wide" | "narrow" | "equal" | "hero" | "kpi";
 }
 
+const formatPriceNoCommas = (raw: string | number) => {
+  const cleaned = (raw ?? "").toString().trim();
+  if (!cleaned || cleaned === "—") return "—";
+
+  const noCommas = cleaned.replace(/,/g, "");
+  const n = Number(noCommas);
+  if (!Number.isFinite(n)) return noCommas;
+
+  const m = noCommas.match(/^\d+(\.(\d+))?$/);
+  if (m) {
+    const decimals = m[2]?.length ?? 0;
+    if (decimals > 0) return n.toFixed(decimals);
+  }
+
+  return String(n);
+};
+
 export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps) {
   const { watchlistAssets } = useWatchlist();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const [quotes, setQuotes] = useState<Record<string, MarketQuote>>({});
+
+  const displayAssets = useMemo(() => watchlistAssets.slice(0, 5), [watchlistAssets]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadQuotes = async () => {
+      if (displayAssets.length === 0) {
+        if (isMounted) setQuotes({});
+        return;
+      }
+
+      try {
+        const fetchedQuotes = await getQuotes(displayAssets.map((asset) => asset.symbol));
+        if (!isMounted) return;
+
+        const quoteMap = fetchedQuotes.reduce<Record<string, MarketQuote>>((acc, quote) => {
+          acc[quote.symbol] = quote;
+          return acc;
+        }, {});
+
+        setQuotes(quoteMap);
+      } catch {
+        if (isMounted) setQuotes({});
+      }
+    };
+
+    loadQuotes();
+    const intervalId = window.setInterval(loadQuotes, 3000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
+  }, [displayAssets]);
 
   const openAsset = (symbol: string) => {
     if (isEditMode) return;
@@ -32,8 +88,6 @@ export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps
     if (bias === "Bearish") return "text-destructive";
     return "text-muted-foreground";
   };
-
-  const displayAssets = watchlistAssets.slice(0, 5);
 
   if (displayAssets.length === 0) {
     return (
@@ -90,7 +144,9 @@ export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps
 
               <div className="flex items-center gap-2">
                 <div className="text-right">
-                  <div className="text-sm font-medium text-foreground">{asset.latestPrice}</div>
+                  <div className="text-sm font-medium text-foreground">
+                    {formatPriceNoCommas(quotes[asset.symbol]?.last?.toString() ?? asset.latestPrice)}
+                  </div>
                   <div
                     className={`text-xs ${
                       asset.priceChange?.startsWith("+")
