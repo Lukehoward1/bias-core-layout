@@ -31,7 +31,7 @@ export function AlertToast({ alerts, onDismiss, onMarkRead, quietHours }: AlertT
 
   // Auto-dismiss after 6-8 seconds unless hovered
   useEffect(() => {
-    const timers: NodeJS.Timeout[] = [];
+    const timers: ReturnType<typeof setTimeout>[] = [];
     
     visibleAlerts.forEach(alert => {
       if (hoveredId !== alert.id && !quietHours) {
