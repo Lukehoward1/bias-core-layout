@@ -11,7 +11,7 @@ import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { toast } from "sonner";
 import { calendarEvents } from "@/data/calendarEvents";
-import { getQuotes, type MarketQuote } from "@/services/marketData";
+import { getQuotes, getFormattedMarketChange, type MarketQuote } from "@/services/marketData";
 
 type MarketType = "Watchlist" | "All" | "FX" | "Crypto" | "Indices" | "Commodities" | "ETFs" | "Futures";
 
@@ -24,7 +24,7 @@ type CalendarEvent = (typeof calendarEvents)[0];
 const normalize = (s: string) =>
   s
     .toLowerCase()
-    .replace(/\(.*?\)/g, " ") // remove bracketed currency like (USD)
+    .replace(/\(.*?\)/g, " ")
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -41,11 +41,9 @@ const extractTimeHHMM = (timeStr: string) => {
   return `${hh.padStart(2, "0")}:${mm}`;
 };
 
-// Alias layer for common variations so it matches Calendar table names
 const normalizeEventAlias = (label: string) => {
   const raw = normalize(label);
 
-  // "CPI (USD)" should match "US CPI"
   if (raw === "cpi") return "us cpi";
   if (raw.includes("cpi") && raw.includes("core")) return "core cpi";
   if (raw.includes("interest rate decision")) return "interest rate decision";
@@ -67,11 +65,9 @@ const scoreCalendarMatch = (args: {
 
   let score = 0;
 
-  // Exact / contains match
   if (candNorm === pillNorm) score += 6;
   if (candNorm.includes(pillNorm) || pillNorm.includes(candNorm)) score += 4;
 
-  // Token overlap
   const pillTokens = new Set(pillNorm.split(" ").filter(Boolean));
   const candTokens = new Set(candNorm.split(" ").filter(Boolean));
   let overlap = 0;
@@ -80,13 +76,9 @@ const scoreCalendarMatch = (args: {
   });
   score += overlap;
 
-  // Currency match
   if (pillCurrency && candidate.currency?.toUpperCase() === pillCurrency.toUpperCase()) score += 3;
-
-  // Time match
   if (pillTime && candidate.time === pillTime) score += 2;
 
-  // Slightly prefer higher impact if close
   if (candidate.impact === "high") score += 0.5;
 
   return score;
@@ -113,51 +105,38 @@ const matchCalendarEventId = (label: string, time: string) => {
   return best.ev.id;
 };
 
-// Very light “relevance” filter so cards only show events likely to matter for that symbol
 const isEventRelevantToSymbol = (symbol: string, ev: CalendarEvent) => {
-  // FX pairs: show events where event currency matches either base or quote currency
-  // EURUSD -> EUR or USD
   const base = symbol.slice(0, 3).toUpperCase();
   const quote = symbol.slice(3, 6).toUpperCase();
   const cur = ev.currency?.toUpperCase?.() ?? "";
 
-  // If it's a 6-char FX symbol, do the FX relevance check
   if (symbol.length === 6 && /^[A-Z]{6}$/.test(symbol.toUpperCase())) {
     return cur === base || cur === quote;
   }
 
-  // Non-FX assets: for now show all USD events as "relevant"
-  // (You can refine later by asset type)
   if (cur === "USD") return true;
 
   return false;
 };
 
 /* =======================
-   PRICE FORMATTING (CONSISTENT)
-   - No commas
-   - Keeps decimals where present
+   PRICE FORMATTING
 ======================= */
 
-const formatPriceNoCommas = (raw: string) => {
+const formatPriceNoCommas = (raw: string | number) => {
   const cleaned = (raw ?? "").toString().trim();
   if (!cleaned || cleaned === "—") return "—";
 
-  // Remove commas if any came in from demo data
   const noCommas = cleaned.replace(/,/g, "");
-
-  // If it's not a number-ish string, return as-is
   const n = Number(noCommas);
   if (!Number.isFinite(n)) return noCommas;
 
-  // Preserve existing decimals count from the original string (after comma removal)
   const m = noCommas.match(/^\d+(\.(\d+))?$/);
   if (m) {
     const decimals = m[2]?.length ?? 0;
     if (decimals > 0) return n.toFixed(decimals);
   }
 
-  // If no explicit decimals, still avoid commas
   return String(n);
 };
 
@@ -202,11 +181,7 @@ export default function Markets() {
   });
 
   const [searchQuery, setSearchQuery] = useState("");
-
-  // per-card toggle: show all relevant news vs high impact only
   const [expandedNews, setExpandedNews] = useState<Record<string, boolean>>({});
-
-  // shared market quotes keyed by symbol
   const [quotes, setQuotes] = useState<Record<string, MarketQuote>>({});
 
   const marketTypes: MarketType[] = ["Watchlist", "All", "FX", "Crypto", "Indices", "Commodities", "ETFs", "Futures"];
@@ -263,7 +238,6 @@ export default function Markets() {
     };
 
     loadQuotes();
-
     const intervalId = window.setInterval(loadQuotes, 3000);
 
     return () => {
@@ -284,14 +258,30 @@ export default function Markets() {
     return "text-muted-foreground";
   };
 
-  // Keep your modal overlay routing
+  const getChangeColor = (quote: MarketQuote | undefined, fallbackChange?: string) => {
+    if (quote) {
+      const formatted = getFormattedMarketChange(quote);
+      if (formatted.direction === "up") return "text-success";
+      if (formatted.direction === "down") return "text-destructive";
+      return "text-muted-foreground";
+    }
+
+    if (fallbackChange?.startsWith("+")) return "text-success";
+    if (fallbackChange?.startsWith("-")) return "text-destructive";
+    return "text-muted-foreground";
+  };
+
+  const getDisplayedChange = (quote: MarketQuote | undefined, fallbackChange?: string) => {
+    if (quote) return getFormattedMarketChange(quote).value;
+    return fallbackChange || "0.00%";
+  };
+
   const openAssetDetail = (symbol: string) => {
     navigate(`/asset/${symbol}?from=${selectedType}`, {
       state: { backgroundLocation: location },
     });
   };
 
-  // When clicking a news pill: open the calendar modal via querystring
   const openCalendarEventByPill = (e: React.MouseEvent, label: string, time: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -311,7 +301,6 @@ export default function Markets() {
 
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          {/* Search Bar */}
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -322,11 +311,10 @@ export default function Markets() {
             />
           </div>
           <Badge variant="outline" className="text-xs">
-            Updated 2 mins ago
+            Live demo pricing
           </Badge>
         </div>
 
-        {/* Market Type Filters */}
         <div className="flex flex-wrap gap-2">
           {marketTypes.map((type) => (
             <Button
@@ -347,7 +335,6 @@ export default function Markets() {
           ))}
         </div>
 
-        {/* Watchlist Overview Bar */}
         {(selectedType === "Watchlist" || selectedType === "All") && watchlistAssets.length > 0 && (
           <Card>
             <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
@@ -363,38 +350,49 @@ export default function Markets() {
             </CardHeader>
             <CardContent className="pt-0">
               <div className="space-y-2">
-                {watchlistAssets.map((asset) => (
-                  <div
-                    key={asset.symbol}
-                    onClick={() => openAssetDetail(asset.symbol)}
-                    className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/40 cursor-pointer transition-colors group"
-                  >
-                    <span className="font-semibold text-foreground min-w-[80px]">{asset.symbol}</span>
-                    <div className={`flex items-center gap-1 min-w-[80px] ${getBiasColor(asset.biasDirection)}`}>
-                      {getBiasIcon(asset.biasDirection)}
-                      <span className="text-sm">{asset.biasDirection}</span>
-                    </div>
-                    <span className="text-sm text-muted-foreground flex-1 truncate">{asset.insight}</span>
-                    <div className="flex items-center gap-3">
-                      <div className="text-xs text-muted-foreground hidden md:block">
-                        <span className="mr-3">Vol: {asset.volume}</span>
-                        <span>Spread: {asset.spread}</span>
+                {watchlistAssets.map((asset) => {
+                  const quote = quotes[asset.symbol];
+
+                  return (
+                    <div
+                      key={asset.symbol}
+                      onClick={() => openAssetDetail(asset.symbol)}
+                      className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/40 cursor-pointer transition-colors group"
+                    >
+                      <span className="font-semibold text-foreground min-w-[80px]">{asset.symbol}</span>
+                      <div className={`flex items-center gap-1 min-w-[80px] ${getBiasColor(asset.biasDirection)}`}>
+                        {getBiasIcon(asset.biasDirection)}
+                        <span className="text-sm">{asset.biasDirection}</span>
                       </div>
-                      {asset.news && (
-                        <Badge variant="destructive" className="text-[10px] hidden lg:inline-flex">
-                          News
-                        </Badge>
-                      )}
-                      <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                      <span className="text-sm text-muted-foreground flex-1 truncate">{asset.insight}</span>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right hidden md:block">
+                          <div className="text-sm font-medium text-foreground">
+                            {formatPriceNoCommas(quote?.last?.toString() ?? asset.latestPrice)}
+                          </div>
+                          <div className={`text-xs ${getChangeColor(quote, asset.priceChange)}`}>
+                            {getDisplayedChange(quote, asset.priceChange)}
+                          </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground hidden lg:block">
+                          <span className="mr-3">Vol: {asset.volume}</span>
+                          <span>Spread: {asset.spread}</span>
+                        </div>
+                        {asset.news && (
+                          <Badge variant="destructive" className="text-[10px] hidden lg:inline-flex">
+                            News
+                          </Badge>
+                        )}
+                        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Empty Watchlist State */}
         {selectedType === "Watchlist" && watchlistAssets.length === 0 && (
           <Card>
             <CardContent className="py-12 text-center">
@@ -410,7 +408,6 @@ export default function Markets() {
           </Card>
         )}
 
-        {/* No Search Results */}
         {searchQuery && filteredPairs.length === 0 && (
           <Card>
             <CardContent className="py-12 text-center">
@@ -421,15 +418,13 @@ export default function Markets() {
           </Card>
         )}
 
-        {/* Asset Cards Grid */}
         {(selectedType !== "Watchlist" || watchlistAssets.length > 0) && filteredPairs.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {filteredPairs.map((asset) => {
+              const quote = quotes[asset.symbol];
               const relevantEvents = calendarEvents.filter((ev) => isEventRelevantToSymbol(asset.symbol, ev));
               const highImpactRelevant = relevantEvents.filter((ev) => ev.impact === "high");
               const isExpanded = !!expandedNews[asset.symbol];
-
-              // Default view: high only
               const eventsToShow = isExpanded ? relevantEvents : highImpactRelevant;
 
               return (
@@ -438,7 +433,6 @@ export default function Markets() {
                   onClick={() => openAssetDetail(asset.symbol)}
                   className="hover:shadow-lg transition-shadow cursor-pointer group relative"
                 >
-                  {/* Watchlist Star */}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -464,14 +458,10 @@ export default function Markets() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xl font-bold text-foreground">
-                        {formatPriceNoCommas(quotes[asset.symbol]?.last?.toString() ?? asset.latestPrice)}
+                        {formatPriceNoCommas(quote?.last?.toString() ?? asset.latestPrice)}
                       </span>
-                      <span
-                        className={`text-sm font-medium ${
-                          asset.priceChange.startsWith("+") ? "text-success" : "text-destructive"
-                        }`}
-                      >
-                        {asset.priceChange}
+                      <span className={`text-sm font-medium ${getChangeColor(quote, asset.priceChange)}`}>
+                        {getDisplayedChange(quote, asset.priceChange)}
                       </span>
                     </div>
                   </CardHeader>
@@ -488,7 +478,6 @@ export default function Markets() {
                       </div>
                     </div>
 
-                    {/* Mini Sentiment Gauge */}
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="text-xs text-muted-foreground">Sentiment</span>
@@ -517,7 +506,6 @@ export default function Markets() {
                       </div>
                     </div>
 
-                    {/* News (High only by default, with toggle to see all relevant) */}
                     <div className="pt-3 border-t border-border">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
