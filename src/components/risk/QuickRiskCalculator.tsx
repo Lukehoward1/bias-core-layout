@@ -15,6 +15,7 @@ import {
   getInstrumentBySymbol,
   calculatePositionSize,
 } from "@/data/tradingInstruments";
+import { getQuote, type MarketQuote } from "@/services/marketData";
 import { cn } from "@/lib/utils";
 
 interface QuickRiskCalculatorProps {
@@ -34,60 +35,71 @@ const toNumberOrZero = (v: string) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+const formatPriceNoCommas = (raw: string | number) => {
+  const cleaned = (raw ?? "").toString().trim();
+  if (!cleaned || cleaned === "—") return "—";
+
+  const noCommas = cleaned.replace(/,/g, "");
+  const n = Number(noCommas);
+  if (!Number.isFinite(n)) return noCommas;
+
+  const m = noCommas.match(/^\d+(\.(\d+))?$/);
+  if (m) {
+    const decimals = m[2]?.length ?? 0;
+    if (decimals > 0) return n.toFixed(decimals);
+  }
+
+  return String(n);
+};
+
 export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false }: QuickRiskCalculatorProps) {
   const navigate = useNavigate();
 
-  // Account linking - use multi-account hook
   const { accounts, primaryAccount, isLoading: isAccountLoading, refreshAccount } = useLinkedAccounts();
 
-  // Derived state
   const hasLinkedAccounts = accounts.length > 0;
   const activeAccount = primaryAccount;
   const isConnected = hasLinkedAccounts && activeAccount?.isConnected;
   const balance = activeAccount?.balance ?? null;
   const currency = activeAccount?.currency ?? "GBP";
 
-  // ✅ INPUT STATES (STRING) so user can clear the field without it snapping to "0"
   const [manualBalanceInput, setManualBalanceInput] = useState<string>("10000");
   const [stopDistanceInput, setStopDistanceInput] = useState<string>("30");
 
-  // ✅ Spread handling: MANUAL INPUT ONLY (no auto-pull)
   const [includeSpread, setIncludeSpread] = useState<boolean>(false);
-  const [spreadInput, setSpreadInput] = useState<string>(""); // pips/ticks (same unit as stop distance)
+  const [spreadInput, setSpreadInput] = useState<string>("");
 
-  // Other state
   const [riskPercent, setRiskPercent] = useState<number>(1);
+  const [customRiskInput, setCustomRiskInput] = useState<string>("");
+  const [isCustomRisk, setIsCustomRisk] = useState<boolean>(false);
+
   const [assetCategory, setAssetCategory] = useState<"FX" | "Futures">("FX");
   const [selectedInstrument, setSelectedInstrument] = useState<string>("EURUSD");
+  const [quote, setQuote] = useState<MarketQuote | null>(null);
 
-  // Mode indicator
   const mode = isConnected ? "Linked" : "Manual";
 
-  // Get instruments based on category
   const instruments = useMemo(() => {
     return assetCategory === "FX" ? getFXInstruments() : getFuturesInstruments();
   }, [assetCategory]);
 
-  // Current instrument
   const currentInstrument = useMemo(() => {
     return getInstrumentBySymbol(selectedInstrument);
   }, [selectedInstrument]);
 
-  // Numeric values used for calculations (empty => 0)
   const manualBalance = useMemo(() => toNumberOrZero(manualBalanceInput), [manualBalanceInput]);
   const stopDistance = useMemo(() => toNumberOrZero(stopDistanceInput), [stopDistanceInput]);
   const spread = useMemo(() => toNumberOrZero(spreadInput), [spreadInput]);
+  const customRisk = useMemo(() => toNumberOrZero(customRiskInput), [customRiskInput]);
 
-  // Effective balance (linked or manual)
   const effectiveBalance = isConnected && balance !== null ? balance : manualBalance;
+  const effectiveRiskPercent = isCustomRisk ? customRisk : riskPercent;
 
-  // ✅ If connected, default to including spread (manual input)
   useEffect(() => {
     if (isConnected) setIncludeSpread(true);
     if (!isConnected) setIncludeSpread(false);
   }, [isConnected]);
 
-  // Load saved risk preset
   useEffect(() => {
     const saved = localStorage.getItem(RISK_STORAGE_KEY);
     if (saved) {
@@ -98,7 +110,6 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
     }
   }, []);
 
-  // Update instrument when category changes
   useEffect(() => {
     const availableInstruments = assetCategory === "FX" ? getFXInstruments() : getFuturesInstruments();
 
@@ -106,36 +117,61 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
       setSelectedInstrument(availableInstruments[0].symbol);
     }
 
-    // Reset stop distance to sensible default (as TEXT so it can later be cleared)
     setStopDistanceInput(assetCategory === "FX" ? "30" : "10");
-  }, [assetCategory]); // intentionally only assetCategory
+  }, [assetCategory, selectedInstrument]);
 
-  // Save risk preset
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadQuote = async () => {
+      if (!selectedInstrument) {
+        if (isMounted) setQuote(null);
+        return;
+      }
+
+      try {
+        const fetchedQuote = await getQuote(selectedInstrument);
+        if (!isMounted) return;
+        setQuote(fetchedQuote);
+      } catch {
+        if (isMounted) setQuote(null);
+      }
+    };
+
+    loadQuote();
+    const intervalId = window.setInterval(loadQuote, 3000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
+  }, [selectedInstrument]);
+
   const handleRiskPresetChange = (value: number) => {
+    setIsCustomRisk(false);
     setRiskPercent(value);
     localStorage.setItem(RISK_STORAGE_KEY, value.toString());
   };
 
-  // ✅ Stop distance used in maths (optionally includes MANUAL spread)
   const effectiveStopDistance = useMemo(() => {
     if (!includeSpread) return stopDistance;
     return stopDistance + spread;
   }, [stopDistance, spread, includeSpread]);
 
-  // Calculate results
   const results = useMemo(() => {
-    if (!currentInstrument || effectiveStopDistance <= 0 || effectiveBalance <= 0 || riskPercent <= 0) {
+    if (!currentInstrument || effectiveStopDistance <= 0 || effectiveBalance <= 0 || effectiveRiskPercent <= 0) {
       return {
         riskAmount: 0,
         positionSize: 0,
-        formattedSize: "0.00 lots",
+        formattedSize: currentInstrument?.type === "Futures" ? "0 contracts" : "0.00 lots",
       };
     }
 
-    return calculatePositionSize(effectiveBalance, riskPercent, effectiveStopDistance, currentInstrument);
-  }, [effectiveBalance, riskPercent, effectiveStopDistance, currentInstrument]);
+    return calculatePositionSize(effectiveBalance, effectiveRiskPercent, effectiveStopDistance, currentInstrument);
+  }, [effectiveBalance, effectiveRiskPercent, effectiveStopDistance, currentInstrument]);
 
-  // Compact dashboard view
+  const displayPrice = formatPriceNoCommas(quote?.last?.toString() ?? "—");
+
   if (compact) {
     return (
       <Card className="h-full">
@@ -159,7 +195,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
             </div>
             <div>
               <Label className="text-xs text-muted-foreground">Risk</Label>
-              <p className="text-sm font-medium">{riskPercent}%</p>
+              <p className="text-sm font-medium">{effectiveRiskPercent}%</p>
             </div>
           </div>
           <div className="p-3 rounded-lg bg-muted/50 border border-border">
@@ -197,9 +233,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
 
       <CardContent>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column - Inputs */}
           <div className="space-y-5">
-            {/* Account Balance Section */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">Account Balance</Label>
@@ -212,7 +246,6 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
               </div>
 
               {isConnected && balance !== null && activeAccount ? (
-                // Connected account display
                 <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
@@ -250,7 +283,6 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                   </div>
                 </div>
               ) : (
-                // No linked account - prompt to link + manual input
                 <div className="space-y-3">
                   <div className="p-4 rounded-lg bg-muted/50 border border-border">
                     <div className="flex items-start gap-3">
@@ -295,7 +327,6 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
               )}
             </div>
 
-            {/* Global Risk Preset */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Risk Preset (%)</Label>
               <div className="grid grid-cols-4 gap-2">
@@ -305,7 +336,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                     onClick={() => handleRiskPresetChange(preset)}
                     className={cn(
                       "py-2 px-3 text-sm font-medium rounded-md border transition-all",
-                      riskPercent === preset
+                      !isCustomRisk && riskPercent === preset
                         ? "bg-primary text-primary-foreground border-primary shadow-sm"
                         : "bg-muted/50 border-border hover:bg-muted hover:border-muted-foreground/20",
                     )}
@@ -314,10 +345,37 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                   </button>
                 ))}
               </div>
+
+              <div className="pt-1 space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="custom-risk" className="text-xs text-muted-foreground">
+                    Custom Risk %
+                  </Label>
+                  {isCustomRisk && (
+                    <Badge variant="outline" className="text-[10px]">
+                      Custom
+                    </Badge>
+                  )}
+                </div>
+                <Input
+                  id="custom-risk"
+                  type="number"
+                  value={customRiskInput}
+                  onChange={(e) => {
+                    setCustomRiskInput(e.target.value);
+                    setIsCustomRisk(true);
+                  }}
+                  className="h-9"
+                  placeholder="e.g. 0.75"
+                  min={0}
+                  max={100}
+                  step={0.01}
+                />
+              </div>
+
               <p className="text-xs text-muted-foreground">Saved globally and used across all risk calculations</p>
             </div>
 
-            {/* Asset Category Toggle */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Asset Type</Label>
               <div className="grid grid-cols-2 gap-2">
@@ -346,7 +404,6 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
               </div>
             </div>
 
-            {/* Instrument Selection */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Instrument</Label>
               <Select value={selectedInstrument} onValueChange={setSelectedInstrument}>
@@ -372,9 +429,13 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                   <span>{currentInstrument.type === "Futures" ? "Per contract" : "Per standard lot"}</span>
                 </div>
               )}
+
+              <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+                <span>Current Price</span>
+                <span className="font-medium text-foreground">{displayPrice}</span>
+              </div>
             </div>
 
-            {/* Stop Distance */}
             <div className="space-y-2">
               <Label htmlFor="stop-distance" className="text-sm font-medium">
                 Stop Distance ({currentInstrument?.unitLabel || "pips"})
@@ -391,7 +452,6 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                 placeholder={assetCategory === "FX" ? "30" : "10"}
               />
 
-              {/* ✅ Manual spread input (only if broker connected) */}
               {isConnected && (
                 <div className="flex items-center justify-between gap-3 pt-1">
                   <label className="flex items-center gap-2 text-xs text-muted-foreground select-none">
@@ -429,13 +489,11 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
             </div>
           </div>
 
-          {/* Right Column - Results */}
           <div className="space-y-4">
             <div className="p-6 bg-muted/50 rounded-xl border border-border">
               <h3 className="text-sm font-medium text-muted-foreground mb-5">Calculation Results</h3>
 
               <div className="space-y-5">
-                {/* Account Balance Display */}
                 <div className="flex justify-between items-center pb-4 border-b border-border">
                   <div className="flex items-center gap-2">
                     <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
@@ -449,15 +507,13 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                   </span>
                 </div>
 
-                {/* Risk % */}
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Risk %</span>
                   <Badge variant="secondary" className="text-sm font-medium">
-                    {riskPercent}%
+                    {effectiveRiskPercent}%
                   </Badge>
                 </div>
 
-                {/* Risk Amount */}
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">£ Risked</span>
                   <span className="text-xl font-bold text-destructive">
@@ -466,7 +522,6 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                   </span>
                 </div>
 
-                {/* Position Size */}
                 <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
@@ -481,7 +536,6 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
               </div>
             </div>
 
-            {/* Info Note */}
             <div className="p-4 bg-muted/30 border border-border rounded-lg">
               <p className="text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">Note:</span> Calculations update instantly as you adjust
@@ -489,7 +543,6 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
               </p>
             </div>
 
-            {/* Instrument Metadata */}
             {currentInstrument && (
               <div className="p-4 bg-muted/30 border border-border rounded-lg">
                 <h4 className="text-xs font-medium text-muted-foreground mb-3">Instrument Details</h4>
