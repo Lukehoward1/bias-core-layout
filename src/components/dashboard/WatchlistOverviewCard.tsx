@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Minus, ChevronRight, Star } from "lucide-react";
 import { useWatchlist } from "@/hooks/use-watchlist";
-import { getQuotes, type MarketQuote } from "@/services/marketData";
+import { getQuotes, getFormattedMarketChange, type MarketQuote } from "@/services/marketData";
 
 interface WatchlistOverviewCardProps {
   isEditMode?: boolean;
@@ -89,6 +89,24 @@ export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps
     return "text-muted-foreground";
   };
 
+  const getChangeColor = (quote: MarketQuote | undefined, fallbackChange?: string) => {
+    if (quote) {
+      const formatted = getFormattedMarketChange(quote);
+      if (formatted.direction === "up") return "text-success";
+      if (formatted.direction === "down") return "text-destructive";
+      return "text-muted-foreground";
+    }
+
+    if (fallbackChange?.startsWith("+")) return "text-success";
+    if (fallbackChange?.startsWith("-")) return "text-destructive";
+    return "text-muted-foreground";
+  };
+
+  const getDisplayedChange = (quote: MarketQuote | undefined, fallbackChange?: string) => {
+    if (quote) return getFormattedMarketChange(quote).value;
+    return fallbackChange || "0.00%";
+  };
+
   if (displayAssets.length === 0) {
     return (
       <Card className="h-full">
@@ -120,50 +138,46 @@ export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps
 
       <CardContent>
         <div className="space-y-3">
-          {displayAssets.map((asset) => (
-            <button
-              key={asset.symbol}
-              type="button"
-              onClick={() => openAsset(asset.symbol)}
-              className="w-full text-left flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors group"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-semibold text-foreground">{asset.symbol}</span>
-                  <div className={`flex items-center gap-1 text-xs font-medium ${getBiasColor(asset.biasDirection)}`}>
-                    {getBiasIcon(asset.biasDirection)}
-                    {asset.biasDirection}
+          {displayAssets.map((asset) => {
+            const quote = quotes[asset.symbol];
+
+            return (
+              <button
+                key={asset.symbol}
+                type="button"
+                onClick={() => openAsset(asset.symbol)}
+                className="w-full text-left flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors group"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-foreground">{asset.symbol}</span>
+                    <div className={`flex items-center gap-1 text-xs font-medium ${getBiasColor(asset.biasDirection)}`}>
+                      {getBiasIcon(asset.biasDirection)}
+                      {asset.biasDirection}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>Confidence: {asset.biasConfidence}%</span>
+                    <span>Spread: {asset.spread}</span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  <span>Confidence: {asset.biasConfidence}%</span>
-                  <span>Spread: {asset.spread}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="text-right">
-                  <div className="text-sm font-medium text-foreground">
-                    {formatPriceNoCommas(quotes[asset.symbol]?.last?.toString() ?? asset.latestPrice)}
+                <div className="flex items-center gap-2">
+                  <div className="text-right">
+                    <div className="text-sm font-medium text-foreground">
+                      {formatPriceNoCommas(quote?.last?.toString() ?? asset.latestPrice)}
+                    </div>
+                    <div className={`text-xs ${getChangeColor(quote, asset.priceChange)}`}>
+                      {getDisplayedChange(quote, asset.priceChange)}
+                    </div>
                   </div>
-                  <div
-                    className={`text-xs ${
-                      asset.priceChange?.startsWith("+")
-                        ? "text-success"
-                        : asset.priceChange?.startsWith("-")
-                          ? "text-destructive"
-                          : "text-muted-foreground"
-                    }`}
-                  >
-                    {asset.priceChange || "0.00%"}
-                  </div>
-                </div>
 
-                <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              </div>
-            </button>
-          ))}
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                </div>
+              </button>
+            );
+          })}
         </div>
 
         {watchlistAssets.length > 5 && (
