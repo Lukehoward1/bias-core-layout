@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -8,12 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Star, TrendingUp, TrendingDown, Minus, Activity, AlertTriangle, Clock, Target, Zap } from "lucide-react";
 
 import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
+import { useMarketQuote } from "@/hooks/use-market-quotes";
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { calendarEvents } from "@/data/calendarEvents";
 import { toast } from "sonner";
 
 import { getEventImpact } from "@/data/eventImpactRules";
-import { getQuote, getFormattedMarketChange, type MarketQuote } from "@/services/marketData";
+import { getFormattedMarketChange } from "@/services/marketData";
 
 /* =======================
    DATA (demo placeholders)
@@ -258,7 +259,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
   const [showAllRelevantNews, setShowAllRelevantNews] = useState(false);
   const [newsExpanded, setNewsExpanded] = useState(false);
 
-  const [quote, setQuote] = useState<MarketQuote | null>(null);
+  const quote = useMarketQuote(symbol);
 
   const handleToggleWatchlist = () => {
     toggleWatchlist(symbol);
@@ -306,33 +307,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
     },
     [openCalendarEvent],
   );
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadQuote = async () => {
-      if (!symbol) {
-        if (isMounted) setQuote(null);
-        return;
-      }
-
-      try {
-        const fetchedQuote = await getQuote(symbol);
-        if (!isMounted) return;
-        setQuote(fetchedQuote);
-      } catch {
-        if (isMounted) setQuote(null);
-      }
-    };
-
-    loadQuote();
-    const intervalId = window.setInterval(loadQuote, 3000);
-
-    return () => {
-      isMounted = false;
-      window.clearInterval(intervalId);
-    };
-  }, [symbol]);
 
   const getBiasColor = (bias: string) => {
     if (bias === "Bullish") return "text-success";
