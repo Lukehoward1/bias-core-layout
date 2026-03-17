@@ -13,25 +13,25 @@ export type MarketDirection = "up" | "down" | "flat";
 
 /** Normalised real-time quote used throughout the UI. */
 export interface MarketQuote {
-  symbol: string; // Internal canonical symbol, e.g. "EURUSD"
-  providerSymbol: string; // Provider format, e.g. "EUR/USD"
+  symbol: string;
+  providerSymbol: string;
   last: number;
   bid: number;
   ask: number;
-  spread: number; // ask − bid, in price units
-  previousClose: number; // reference/previous price
-  change: number; // absolute change vs previousClose
-  changePercent: number; // % change vs previousClose
+  spread: number;
+  previousClose: number;
+  change: number;
+  changePercent: number;
   direction: MarketDirection;
-  timestamp: number; // Unix ms
+  timestamp: number;
   source: "mock" | "twelvedata" | "websocket";
 }
 
 /** Normalised OHLCV candle for charts / replay. */
 export interface MarketCandle {
   symbol: string;
-  timeframe: string; // e.g. "1m", "5m", "1h", "1d"
-  timestamp: number; // Unix ms (candle open)
+  timeframe: string;
+  timestamp: number;
   open: number;
   high: number;
   low: number;
@@ -41,7 +41,7 @@ export interface MarketCandle {
 
 /** UI-friendly formatted change object for consistent display. */
 export interface FormattedMarketChange {
-  value: string; // e.g. "+0.45%"
+  value: string;
   direction: MarketDirection;
 }
 
@@ -63,10 +63,20 @@ const SYMBOL_MAP: Record<string, string> = {
   XAGUSD: "XAG/USD",
   BTCUSD: "BTC/USD",
   ETHUSD: "ETH/USD",
+
   SPX500: "SPX500",
-  NAS100: "NAS100",
-  US30: "US30",
-  USOIL: "USOIL",
+  NAS100: "NASDAQ",
+  US30: "DJI",
+  USOIL: "WTI",
+
+  ES: "ES",
+  NQ: "NQ",
+  MES: "MES",
+  MNQ: "MNQ",
+  YM: "YM",
+  RTY: "RTY",
+  CL: "CL",
+  GC: "GC",
 };
 
 /** Normalise any input to uppercase, no slashes. */
@@ -74,7 +84,7 @@ export function normalizeSymbol(raw: string): string {
   return raw.toUpperCase().replace(/[/ ]/g, "").trim();
 }
 
-/** Convert canonical symbol → provider format (e.g. EUR/USD). */
+/** Convert canonical symbol → provider format. */
 export function toProviderSymbol(canonical: string): string {
   const norm = normalizeSymbol(canonical);
   if (SYMBOL_MAP[norm]) return SYMBOL_MAP[norm];
@@ -105,14 +115,25 @@ const MOCK_PRICES: Record<string, number> = {
   EURGBP: 0.8572,
   EURJPY: 160.85,
   GBPJPY: 187.42,
+
   XAUUSD: 2025.5,
   XAGUSD: 23.45,
   BTCUSD: 37245.0,
   ETHUSD: 2045.3,
+
   SPX500: 4587.2,
   NAS100: 16245.0,
   US30: 37580.0,
   USOIL: 72.85,
+
+  ES: 5215.25,
+  NQ: 18342.75,
+  MES: 5215.25,
+  MNQ: 18342.75,
+  YM: 39125.0,
+  RTY: 2084.6,
+  CL: 78.42,
+  GC: 2186.3,
 };
 
 /** Typical half-spread in price units per symbol. */
@@ -124,10 +145,20 @@ const MOCK_HALF_SPREADS: Record<string, number> = {
   XAGUSD: 0.015,
   BTCUSD: 7.5,
   ETHUSD: 1.0,
+
   SPX500: 0.25,
   NAS100: 0.75,
   US30: 1.0,
   USOIL: 0.02,
+
+  ES: 0.25,
+  NQ: 0.25,
+  MES: 0.25,
+  MNQ: 0.25,
+  YM: 1,
+  RTY: 0.1,
+  CL: 0.01,
+  GC: 0.1,
 };
 
 /** Static baseline % change used to create a stable reference price. */
@@ -142,17 +173,29 @@ const MOCK_CHANGE_PCT: Record<string, number> = {
   EURGBP: 0.11,
   EURJPY: 0.39,
   GBPJPY: 0.41,
+
   XAUUSD: 1.24,
   XAGUSD: 0.95,
   BTCUSD: 2.15,
   ETHUSD: 0.45,
+
   SPX500: 0.85,
   NAS100: 1.12,
   US30: 0.62,
   USOIL: -0.45,
+
+  ES: 0.48,
+  NQ: 0.73,
+  MES: 0.48,
+  MNQ: 0.73,
+  YM: 0.36,
+  RTY: -0.22,
+  CL: -0.58,
+  GC: 0.67,
 };
 
 function defaultHalfSpread(price: number): number {
+  if (price > 10000) return price * 0.00002;
   if (price > 1000) return price * 0.0001;
   if (price > 10) return 0.005;
   return 0.00005;
@@ -180,8 +223,7 @@ function buildMockQuote(symbol: string): MarketQuote {
   const norm = normalizeSymbol(symbol);
   const base = MOCK_PRICES[norm] ?? 1.0;
 
-  // Slight movement each fetch so the UI feels alive.
-  const jitter = (Math.random() - 0.5) * base * 0.0004; // ±0.02%
+  const jitter = (Math.random() - 0.5) * base * 0.0004;
   const mid = base + jitter;
 
   const hs = MOCK_HALF_SPREADS[norm] ?? defaultHalfSpread(base);
@@ -233,15 +275,6 @@ export function getFormattedMarketChange(quote: MarketQuote | null | undefined):
 }
 
 // ── Twelve Data integration (placeholder) ───────────────────
-//
-// When VITE_TWELVE_API_KEY is set the service will prefer live
-// data and fall back to mock on failure.
-//
-// Usage (future):
-//   const apiKey = import.meta.env.VITE_TWELVE_API_KEY;
-//
-// The fetch helper below is intentionally left as a stub so
-// the file compiles and runs today without any env vars.
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function fetchTwelveDataQuote(_symbol: string): Promise<MarketQuote | null> {
@@ -265,10 +298,6 @@ async function fetchTwelveDataQuote(_symbol: string): Promise<MarketQuote | null
 
 // ── Public API ──────────────────────────────────────────────
 
-/**
- * Get a normalised quote for a single symbol.
- * Returns live data when available, otherwise mock.
- */
 export async function getQuote(symbol: string): Promise<MarketQuote> {
   const norm = normalizeSymbol(symbol);
 
@@ -276,30 +305,20 @@ export async function getQuote(symbol: string): Promise<MarketQuote> {
     const live = await fetchTwelveDataQuote(norm);
     if (live) return live;
   } catch {
-    // Swallow – fall through to mock
+    // fall through to mock
   }
 
   return buildMockQuote(norm);
 }
 
-/**
- * Get normalised quotes for multiple symbols in one call.
- */
 export async function getQuotes(symbols: string[]): Promise<MarketQuote[]> {
   return Promise.all(symbols.map((s) => getQuote(s)));
 }
 
-/**
- * Synchronous mock quote – useful when you need data immediately
- * without awaiting (e.g. initial render, fallback).
- */
 export function getMockQuote(symbol: string): MarketQuote {
   return buildMockQuote(normalizeSymbol(symbol));
 }
 
-/**
- * List all symbols that have demo pricing available.
- */
 export function getAvailableMockSymbols(): string[] {
   return Object.keys(MOCK_PRICES);
 }
