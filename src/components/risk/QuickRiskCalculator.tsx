@@ -9,13 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Calculator, DollarSign, TrendingUp, LinkIcon, RefreshCw, ArrowRight } from "lucide-react";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
+import { useMarketQuote } from "@/hooks/use-market-quotes";
 import {
   getFXInstruments,
   getFuturesInstruments,
   getInstrumentBySymbol,
   calculatePositionSize,
 } from "@/data/tradingInstruments";
-import { getQuote, type MarketQuote } from "@/services/marketData";
 import { cn } from "@/lib/utils";
 
 interface QuickRiskCalculatorProps {
@@ -28,7 +28,6 @@ interface QuickRiskCalculatorProps {
 const RISK_PRESETS = [0.5, 1, 1.5, 2];
 const RISK_STORAGE_KEY = "globalRiskPreset";
 
-/** Allow empty inputs visually, but treat empty as 0 for maths */
 const toNumberOrZero = (v: string) => {
   if (v.trim() === "") return 0;
   const n = Number(v);
@@ -75,7 +74,8 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
 
   const [assetCategory, setAssetCategory] = useState<"FX" | "Futures">("FX");
   const [selectedInstrument, setSelectedInstrument] = useState<string>("EURUSD");
-  const [quote, setQuote] = useState<MarketQuote | null>(null);
+
+  const quote = useMarketQuote(selectedInstrument);
 
   const mode = isConnected ? "Linked" : "Manual";
 
@@ -119,33 +119,6 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
 
     setStopDistanceInput(assetCategory === "FX" ? "30" : "10");
   }, [assetCategory, selectedInstrument]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadQuote = async () => {
-      if (!selectedInstrument) {
-        if (isMounted) setQuote(null);
-        return;
-      }
-
-      try {
-        const fetchedQuote = await getQuote(selectedInstrument);
-        if (!isMounted) return;
-        setQuote(fetchedQuote);
-      } catch {
-        if (isMounted) setQuote(null);
-      }
-    };
-
-    loadQuote();
-    const intervalId = window.setInterval(loadQuote, 3000);
-
-    return () => {
-      isMounted = false;
-      window.clearInterval(intervalId);
-    };
-  }, [selectedInstrument]);
 
   const handleRiskPresetChange = (value: number) => {
     setIsCustomRisk(false);
