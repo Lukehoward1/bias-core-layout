@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,11 +7,12 @@ import { Input } from "@/components/ui/input";
 import { TrendingUp, TrendingDown, Minus, Calendar, Star, ChevronRight, Activity, Search } from "lucide-react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
+import { useMarketQuotes } from "@/hooks/use-market-quotes";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { toast } from "sonner";
 import { calendarEvents } from "@/data/calendarEvents";
-import { getQuotes, getFormattedMarketChange, type MarketQuote } from "@/services/marketData";
+import { getFormattedMarketChange, type MarketQuote } from "@/services/marketData";
 
 type MarketType = "Watchlist" | "All" | "FX" | "Crypto" | "Indices" | "Commodities" | "ETFs" | "Futures";
 
@@ -182,7 +183,6 @@ export default function Markets() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedNews, setExpandedNews] = useState<Record<string, boolean>>({});
-  const [quotes, setQuotes] = useState<Record<string, MarketQuote>>({});
 
   const marketTypes: MarketType[] = ["Watchlist", "All", "FX", "Crypto", "Indices", "Commodities", "ETFs", "Futures"];
 
@@ -213,38 +213,7 @@ export default function Markets() {
     return filtered;
   }, [selectedType, watchlistAssets, searchQuery, assets]);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadQuotes = async () => {
-      if (filteredPairs.length === 0) {
-        if (isMounted) setQuotes({});
-        return;
-      }
-
-      try {
-        const fetchedQuotes = await getQuotes(filteredPairs.map((asset) => asset.symbol));
-        if (!isMounted) return;
-
-        const quoteMap = fetchedQuotes.reduce<Record<string, MarketQuote>>((acc, quote) => {
-          acc[quote.symbol] = quote;
-          return acc;
-        }, {});
-
-        setQuotes(quoteMap);
-      } catch {
-        if (isMounted) setQuotes({});
-      }
-    };
-
-    loadQuotes();
-    const intervalId = window.setInterval(loadQuotes, 3000);
-
-    return () => {
-      isMounted = false;
-      window.clearInterval(intervalId);
-    };
-  }, [filteredPairs]);
+  const quotes = useMarketQuotes(filteredPairs.map((asset) => asset.symbol));
 
   const getBiasIcon = (bias: string) => {
     if (bias === "Bullish") return <TrendingUp className="h-4 w-4" />;
