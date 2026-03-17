@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Minus, ChevronRight, Star } from "lucide-react";
 import { useWatchlist } from "@/hooks/use-watchlist";
-import { getQuotes, getFormattedMarketChange, type MarketQuote } from "@/services/marketData";
+import { useMarketQuotes } from "@/hooks/use-market-quotes";
+import { getFormattedMarketChange, type MarketQuote } from "@/services/marketData";
 
 interface WatchlistOverviewCardProps {
   isEditMode?: boolean;
@@ -32,42 +33,8 @@ export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [quotes, setQuotes] = useState<Record<string, MarketQuote>>({});
-
   const displayAssets = useMemo(() => watchlistAssets.slice(0, 5), [watchlistAssets]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadQuotes = async () => {
-      if (displayAssets.length === 0) {
-        if (isMounted) setQuotes({});
-        return;
-      }
-
-      try {
-        const fetchedQuotes = await getQuotes(displayAssets.map((asset) => asset.symbol));
-        if (!isMounted) return;
-
-        const quoteMap = fetchedQuotes.reduce<Record<string, MarketQuote>>((acc, quote) => {
-          acc[quote.symbol] = quote;
-          return acc;
-        }, {});
-
-        setQuotes(quoteMap);
-      } catch {
-        if (isMounted) setQuotes({});
-      }
-    };
-
-    loadQuotes();
-    const intervalId = window.setInterval(loadQuotes, 3000);
-
-    return () => {
-      isMounted = false;
-      window.clearInterval(intervalId);
-    };
-  }, [displayAssets]);
+  const quotes = useMarketQuotes(displayAssets.map((asset) => asset.symbol));
 
   const openAsset = (symbol: string) => {
     if (isEditMode) return;
