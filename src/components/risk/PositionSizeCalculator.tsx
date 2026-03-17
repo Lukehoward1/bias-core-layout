@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Ruler } from "lucide-react";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { getFXInstruments, getFuturesInstruments, getInstrumentBySymbol } from "@/data/tradingInstruments";
-import { getQuote, type MarketQuote } from "@/services/marketData";
+import { useMarketQuote } from "@/hooks/use-market-quotes";
 
 interface PositionSizeCalculatorProps {
   isAdded?: boolean;
@@ -54,7 +54,6 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
   const [stopLossInput, setStopLossInput] = useState<string>("1.0820");
   const [takeProfitInput, setTakeProfitInput] = useState<string>("1.0910");
 
-  const [quote, setQuote] = useState<MarketQuote | null>(null);
   const [hasManualEntryEdit, setHasManualEntryEdit] = useState<boolean>(false);
 
   const instruments = useMemo(() => {
@@ -64,6 +63,8 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
   const currentInstrument = useMemo(() => {
     return getInstrumentBySymbol(instrument);
   }, [instrument]);
+
+  const quote = useMarketQuote(instrument);
 
   const accountBalance = useMemo(() => toNumberOrZero(accountBalanceInput), [accountBalanceInput]);
   const riskPercent = useMemo(() => toNumberOrZero(riskPercentInput), [riskPercentInput]);
@@ -92,33 +93,6 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
       setTakeProfitInput("5220.00");
     }
   }, [assetCategory]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadQuote = async () => {
-      if (!instrument) {
-        if (isMounted) setQuote(null);
-        return;
-      }
-
-      try {
-        const fetchedQuote = await getQuote(instrument);
-        if (!isMounted) return;
-        setQuote(fetchedQuote);
-      } catch {
-        if (isMounted) setQuote(null);
-      }
-    };
-
-    loadQuote();
-    const intervalId = window.setInterval(loadQuote, 3000);
-
-    return () => {
-      isMounted = false;
-      window.clearInterval(intervalId);
-    };
-  }, [instrument]);
 
   useEffect(() => {
     if (!currentInstrument || !quote || hasManualEntryEdit) return;
