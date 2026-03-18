@@ -1,80 +1,39 @@
-import { useEffect, useState } from "react";
-import {
-  getQuote,
-  getQuotes,
-  normalizeSymbol,
-  type MarketQuote,
-} from "@/services/marketData";
-
-const POLL_INTERVAL = 3000;
+import { useEffect, useMemo } from "react";
+import { normalizeSymbol, type MarketQuote } from "@/services/marketData";
+import { useMarketData } from "@/context/MarketDataProvider";
 
 export function useMarketQuote(symbol: string): MarketQuote | null {
-  const [quote, setQuote] = useState<MarketQuote | null>(null);
+  const { quotes, subscribeSymbols } = useMarketData();
+
+  const norm = symbol ? normalizeSymbol(symbol) : "";
 
   useEffect(() => {
-    const norm = symbol ? normalizeSymbol(symbol) : "";
-    if (!norm) {
-      setQuote(null);
-      return;
-    }
+    if (!norm) return;
+    subscribeSymbols([norm]);
+  }, [norm, subscribeSymbols]);
 
-    let mounted = true;
-
-    const fetch = async () => {
-      try {
-        const q = await getQuote(norm);
-        if (mounted) setQuote(q);
-      } catch {
-        if (mounted) setQuote(null);
-      }
-    };
-
-    fetch();
-    const id = window.setInterval(fetch, POLL_INTERVAL);
-
-    return () => {
-      mounted = false;
-      window.clearInterval(id);
-    };
-  }, [symbol]);
-
-  return quote;
+  return norm ? (quotes[norm] ?? null) : null;
 }
 
 export function useMarketQuotes(symbols: string[]): Record<string, MarketQuote> {
-  const [quotes, setQuotes] = useState<Record<string, MarketQuote>>({});
+  const { quotes, subscribeSymbols } = useMarketData();
 
-  const key = symbols.map(normalizeSymbol).sort().join(",");
+  const normalizedSymbols = useMemo(() => symbols.map(normalizeSymbol).filter(Boolean), [symbols]);
+
+  const key = normalizedSymbols.sort().join(",");
 
   useEffect(() => {
-    const normed = key ? key.split(",").filter(Boolean) : [];
-    if (normed.length === 0) {
-      setQuotes({});
-      return;
+    if (normalizedSymbols.length === 0) return;
+    subscribeSymbols(normalizedSymbols);
+  }, [key, subscribeSymbols]);
+
+  const result: Record<string, MarketQuote> = {};
+
+  for (const sym of normalizedSymbols) {
+    if (quotes[sym]) {
+      result[sym] = quotes[sym];
     }
+  }
 
-    let mounted = true;
-
-    const fetch = async () => {
-      try {
-        const results = await getQuotes(normed);
-        if (!mounted) return;
-        const map: Record<string, MarketQuote> = {};
-        for (const q of results) map[q.symbol] = q;
-        setQuotes(map);
-      } catch {
-        if (mounted) setQuotes({});
-      }
-    };
-
-    fetch();
-    const id = window.setInterval(fetch, POLL_INTERVAL);
-
-    return () => {
-      mounted = false;
-      window.clearInterval(id);
-    };
-  }, [key]);
-
-  return quotes;
+  return result;
 }
