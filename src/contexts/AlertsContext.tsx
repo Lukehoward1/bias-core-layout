@@ -2,10 +2,10 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import type { AlertItem, AlertPreferences, PriceAlert } from "@/types/alerts";
 import { defaultAlertPreferences } from "@/types/alerts";
 import { useWatchlist } from "@/hooks/use-watchlist";
-import { assetsData } from "@/data/assets";
+import { useMarketQuotes } from "@/hooks/use-market-quotes";
+import { normalizeSymbol } from "@/services/marketData";
 
 interface AlertsContextValue {
-  // Alerts
   alerts: AlertItem[];
   addAlert: (alert: Omit<AlertItem, "id" | "timestamp" | "read">) => AlertItem | null;
   markRead: (id: string) => void;
@@ -14,22 +14,18 @@ interface AlertsContextValue {
   deleteAlert: (id: string) => void;
   clearAllAlerts: () => void;
 
-  // Price Alerts
   priceAlerts: PriceAlert[];
   addPriceAlert: (alert: Omit<PriceAlert, "id" | "createdAt" | "triggered" | "enabled">) => void;
   updatePriceAlert: (id: string, updates: Partial<PriceAlert>) => void;
   deletePriceAlert: (id: string) => void;
   togglePriceAlert: (id: string) => void;
 
-  // Preferences
   preferences: AlertPreferences;
   updatePreferences: (prefs: AlertPreferences) => void;
 
-  // Status
   isQuietHours: boolean;
   unreadCount: number;
 
-  // Watchlist
   watchlist: string[];
   watchlistCurrencies: string[];
   relevantCurrencies: string[];
@@ -37,7 +33,6 @@ interface AlertsContextValue {
 
 const AlertsContext = createContext<AlertsContextValue | undefined>(undefined);
 
-// Notification sound - subtle text-message style
 const playNotificationSound = () => {
   try {
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -55,50 +50,9 @@ const playNotificationSound = () => {
 
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + 0.3);
-  } catch (e) {
+  } catch {
     console.log("Audio not supported");
   }
-};
-
-// --------------------
-// Demo price simulation helpers
-// --------------------
-const parsePriceNumber = (v: unknown): number | null => {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v !== "string") return null;
-
-  const cleaned = v.replace(/,/g, "").replace(/[^\d.-]/g, "");
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
-};
-
-const getSeedPriceForAsset = (symbol: string): number => {
-  const a = assetsData.find((x: any) => (x.symbol || "").toUpperCase() === symbol.toUpperCase());
-  const n = parsePriceNumber(a?.latestPrice);
-  if (n && n > 0) return n;
-
-  const s = symbol.toUpperCase();
-  if (s.startsWith("BTC")) return 40000;
-  if (s.startsWith("ETH")) return 2500;
-  if (s.startsWith("XAU")) return 2000;
-  if (s.startsWith("SPX")) return 5000;
-  if (s.length === 6) return 1.25;
-  return 100;
-};
-
-const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
-
-const randomWalkNext = (symbol: string, last: number): number => {
-  const s = symbol.toUpperCase();
-
-  let pct = 0.0008;
-  if (s.startsWith("BTC") || s.startsWith("ETH")) pct = 0.0035;
-  if (s.startsWith("XAU")) pct = 0.0015;
-  if (s.startsWith("SPX")) pct = 0.0012;
-
-  const step = last * pct * (Math.random() - 0.5) * 2;
-  const next = last + step;
-  return clamp(next, last * 0.2, last * 5);
 };
 
 const timeframeConfirmTicks: Record<string, number> = {
@@ -114,6 +68,7 @@ const timeframeConfirmTicks: Record<string, number> = {
 
 export function AlertsProvider({ children }: { children: React.ReactNode }) {
   const { watchlist, watchlistCurrencies } = useWatchlist();
+
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
   const [preferences, setPreferences] = useState<AlertPreferences>(() => {
@@ -126,9 +81,15 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
   });
 
   const lastAlertIdRef = useRef<string | null>(null);
-
-  const lastPriceBySymbolRef = useRef<Record<string, number>>({});
   const closeConfirmRef = useRef<Record<string, number>>({});
+
+  const activePriceAlertSymbols = useMemo(() => {
+    return Array.from(
+      new Set(priceAlerts.filter((a) => a.enabled && !a.triggered && a.asset).map((a) => normalizeSymbol(a.asset))),
+    );
+  }, [priceAlerts]);
+
+  const quotes = useMarketQuotes(activePriceAlertSymbols);
 
   const relevantCurrencies = useMemo(() => {
     const combined = new Set([...watchlistCurrencies, ...preferences.relevantCurrencies]);
@@ -141,9 +102,6 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
         return true;
       }
 
-      // Bias alerts are normally watchlist-only.
-      // NOTE: addAlert() now bypasses relevance gating for bias (see below),
-      // so this still applies for any future auto-generated bias alerts you might add.
       if (alert.type === "bias") {
         return alert.relatedAsset ? watchlist.includes(alert.relatedAsset) : false;
       }
@@ -221,9 +179,6 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
 
   const addAlert = useCallback(
     (alert: Omit<AlertItem, "id" | "timestamp" | "read">) => {
-      // ✅ FIX:
-      // Allow "bias" alerts through (same as timer/price),
-      // so Test Alerts always appear even if the symbol isn't in watchlist yet.
       if (alert.type !== "timer" && alert.type !== "price" && alert.type !== "bias" && !isAlertRelevant(alert)) {
         return null;
       }
@@ -306,90 +261,113 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     setPreferences(newPrefs);
   }, []);
 
-  // ✅ DEMO: simulated price feed + alert triggering
   useEffect(() => {
-    const interval = window.setInterval(() => {
-      setPriceAlerts((prev) => {
-        if (!prev || prev.length === 0) return prev;
+    if (priceAlerts.length === 0) return;
 
-        let mutated = false;
-        const nextAlerts = prev.map((a) => {
-          if (!a.enabled || a.triggered) return a;
+    const triggeredNotifications: Array<{
+      title: string;
+      message: string;
+      relatedAsset: string;
+    }> = [];
 
-          const symbol = (a.asset || "").toUpperCase();
-          const last =
-            typeof a.lastCheckedPrice === "number" && Number.isFinite(a.lastCheckedPrice)
-              ? a.lastCheckedPrice
-              : (lastPriceBySymbolRef.current[symbol] ?? getSeedPriceForAsset(symbol));
+    const nextAlerts = priceAlerts.map((alert) => {
+      if (!alert.enabled || alert.triggered || !alert.asset) return alert;
 
-          const nextPrice = randomWalkNext(symbol, last);
-          lastPriceBySymbolRef.current[symbol] = nextPrice;
+      const symbol = normalizeSymbol(alert.asset);
+      const quote = quotes[symbol];
+      const currentPrice = quote?.last;
 
-          const hit =
-            a.direction === "above" ? nextPrice >= a.price : a.direction === "below" ? nextPrice <= a.price : false;
+      if (!Number.isFinite(currentPrice)) {
+        return alert;
+      }
 
-          if (a.triggerType === "close") {
-            const required = timeframeConfirmTicks[a.timeframe || "15m"] ?? 4;
-            const current = closeConfirmRef.current[a.id] ?? 0;
-            const updated = hit ? current + 1 : 0;
-            closeConfirmRef.current[a.id] = updated;
+      const hit =
+        alert.direction === "above"
+          ? currentPrice >= alert.price
+          : alert.direction === "below"
+            ? currentPrice <= alert.price
+            : false;
 
-            const confirmed = updated >= required;
+      if (alert.triggerType === "close") {
+        const required = timeframeConfirmTicks[alert.timeframe || "15m"] ?? 4;
+        const currentCount = closeConfirmRef.current[alert.id] ?? 0;
+        const updatedCount = hit ? currentCount + 1 : 0;
+        closeConfirmRef.current[alert.id] = updatedCount;
 
-            if (confirmed) {
-              mutated = true;
+        const confirmed = updatedCount >= required;
 
-              addAlert({
-                type: "price",
-                title: "Price Alert Triggered",
-                message: `${a.assetDisplayName} closed ${a.direction} ${a.price} (${a.timeframe})`,
-                severity: "high",
-                relatedAsset: a.asset,
-                routeTo: "/alerts",
-              });
+        if (confirmed) {
+          triggeredNotifications.push({
+            title: "Price Alert Triggered",
+            message: `${alert.assetDisplayName} closed ${alert.direction} ${alert.price} (${alert.timeframe})`,
+            relatedAsset: alert.asset,
+          });
 
-              return {
-                ...a,
-                lastCheckedPrice: nextPrice,
-                triggered: true,
-                triggeredAt: new Date(),
-              };
-            }
+          closeConfirmRef.current[alert.id] = 0;
 
-            mutated = true;
-            return { ...a, lastCheckedPrice: nextPrice };
-          }
+          return {
+            ...alert,
+            lastCheckedPrice: currentPrice,
+            triggered: true,
+            triggeredAt: new Date(),
+          };
+        }
 
-          if (hit) {
-            mutated = true;
+        if (alert.lastCheckedPrice !== currentPrice) {
+          return {
+            ...alert,
+            lastCheckedPrice: currentPrice,
+          };
+        }
 
-            addAlert({
-              type: "price",
-              title: "Price Alert Triggered",
-              message: `${a.assetDisplayName} wicked ${a.direction} ${a.price}`,
-              severity: "high",
-              relatedAsset: a.asset,
-              routeTo: "/alerts",
-            });
+        return alert;
+      }
 
-            return {
-              ...a,
-              lastCheckedPrice: nextPrice,
-              triggered: true,
-              triggeredAt: new Date(),
-            };
-          }
-
-          mutated = true;
-          return { ...a, lastCheckedPrice: nextPrice };
+      if (hit) {
+        triggeredNotifications.push({
+          title: "Price Alert Triggered",
+          message: `${alert.assetDisplayName} wicked ${alert.direction} ${alert.price}`,
+          relatedAsset: alert.asset,
         });
 
-        return mutated ? nextAlerts : prev;
-      });
-    }, 1500);
+        return {
+          ...alert,
+          lastCheckedPrice: currentPrice,
+          triggered: true,
+          triggeredAt: new Date(),
+        };
+      }
 
-    return () => window.clearInterval(interval);
-  }, [addAlert]);
+      if (alert.lastCheckedPrice !== currentPrice) {
+        return {
+          ...alert,
+          lastCheckedPrice: currentPrice,
+        };
+      }
+
+      return alert;
+    });
+
+    const changed =
+      nextAlerts.length !== priceAlerts.length || nextAlerts.some((alert, index) => alert !== priceAlerts[index]);
+
+    if (changed) {
+      setPriceAlerts(nextAlerts);
+    }
+
+    if (triggeredNotifications.length > 0) {
+      triggeredNotifications.forEach((item) => {
+        addAlert({
+          type: "price",
+          title: item.title,
+          message: item.message,
+          severity: "high",
+          relatedAsset: item.relatedAsset,
+          routeTo: "/alerts",
+        });
+      });
+    }
+  }, [priceAlerts, quotes, addAlert]);
 
   const value: AlertsContextValue = {
     alerts,
