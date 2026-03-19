@@ -10,6 +10,7 @@ import { Target, ArrowUp, ArrowDown, Info } from "lucide-react";
 import { assetsData } from "@/data/assets";
 import type { PriceAlert, PriceAlertDirection, PriceAlertTriggerType, PriceAlertTimeframe } from "@/types/alerts";
 import { useAlertsContext } from "@/contexts/AlertsContext";
+import { useMarketQuote } from "@/hooks/use-market-quotes";
 import { toast } from "sonner";
 
 interface CreatePriceAlertModalProps {
@@ -29,6 +30,23 @@ interface CreatePriceAlertModalProps {
 
 const timeframes: PriceAlertTimeframe[] = ["1m", "5m", "15m", "30m", "1h", "4h", "1D", "1W"];
 
+const formatPriceNoCommas = (raw: string | number) => {
+  const cleaned = (raw ?? "").toString().trim();
+  if (!cleaned || cleaned === "—") return "—";
+
+  const noCommas = cleaned.replace(/,/g, "");
+  const n = Number(noCommas);
+  if (!Number.isFinite(n)) return noCommas;
+
+  const m = noCommas.match(/^\d+(\.(\d+))?$/);
+  if (m) {
+    const decimals = m[2]?.length ?? 0;
+    if (decimals > 0) return n.toFixed(decimals);
+  }
+
+  return String(n);
+};
+
 export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editingAlert }: CreatePriceAlertModalProps) {
   const { addPriceAlert, updatePriceAlert } = useAlertsContext();
 
@@ -41,6 +59,13 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
   const [timeframe, setTimeframe] = useState<PriceAlertTimeframe>("15m");
 
   const selectedAsset = useMemo(() => assetsData.find((a) => a.symbol === asset), [asset]);
+  const quote = useMarketQuote(asset);
+
+  const livePrice = useMemo(() => {
+    if (quote?.last != null) return formatPriceNoCommas(quote.last);
+    if (selectedAsset?.latestPrice) return formatPriceNoCommas(selectedAsset.latestPrice);
+    return "—";
+  }, [quote, selectedAsset]);
 
   // Prefill when opening
   useEffect(() => {
@@ -110,7 +135,6 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
     toast.success("Price alert created");
     onOpenChange(false);
 
-    // Reset (useEffect also handles next open)
     setAsset(defaultAsset || "");
     setDirection("above");
     setTriggerType("wick");
@@ -130,7 +154,6 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* z-[60] keeps the modal above most app content; SelectContent is z-50+ in select.tsx */}
       <DialogContent className="sm:max-w-md z-[60]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -140,7 +163,6 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Asset Selection */}
           <div className="space-y-2">
             <Label>Instrument</Label>
             <Select value={asset} onValueChange={setAsset}>
@@ -162,7 +184,6 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
             </Select>
           </div>
 
-          {/* Direction */}
           <div className="space-y-2">
             <Label>Direction</Label>
             <RadioGroup
@@ -187,7 +208,6 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
             </RadioGroup>
           </div>
 
-          {/* Trigger Type */}
           <div className="space-y-2">
             <Label>Trigger Type</Label>
             <RadioGroup
@@ -221,7 +241,6 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
             </RadioGroup>
           </div>
 
-          {/* Timeframe (only for close type) */}
           {triggerType === "close" && (
             <div className="space-y-2">
               <Label>Timeframe</Label>
@@ -240,22 +259,18 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
             </div>
           )}
 
-          {/* Price Level */}
           <div className="space-y-2">
             <Label>Price Level</Label>
             <Input
               type="number"
               step="any"
-              placeholder={selectedAsset ? `Current: ${selectedAsset.latestPrice}` : "Enter price level"}
+              placeholder={selectedAsset ? `Current: ${livePrice}` : "Enter price level"}
               value={price}
               onChange={(e) => setPrice(e.target.value)}
             />
-            {selectedAsset && (
-              <p className="text-xs text-muted-foreground">Current price: {selectedAsset.latestPrice}</p>
-            )}
+            {selectedAsset && <p className="text-xs text-muted-foreground">Current price: {livePrice}</p>}
           </div>
 
-          {/* Preview */}
           {previewMessage && (
             <div className="p-3 rounded-lg bg-muted/50 border border-border">
               <div className="flex items-start gap-2">
