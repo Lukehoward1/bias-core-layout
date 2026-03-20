@@ -4,22 +4,27 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Target, Plus, Trash2, ArrowUp, ArrowDown, CheckCircle2, Clock, RotateCcw, Undo2 } from "lucide-react";
+import { Target, Plus, Trash2, ArrowUp, ArrowDown, CheckCircle2, Clock, RotateCcw, Undo2, Pencil } from "lucide-react";
 import { useAlertsContext } from "@/contexts/AlertsContext";
 import { CreatePriceAlertModal } from "./CreatePriceAlertModal";
 import { cn } from "@/lib/utils";
+import type { PriceAlert } from "@/types/alerts";
 
 export function PriceAlertsPanel() {
   const { priceAlerts, togglePriceAlert, deletePriceAlert, updatePriceAlert } = useAlertsContext();
+
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingAlert, setEditingAlert] = useState<PriceAlert | null>(null);
 
   const activeAlerts = useMemo(() => priceAlerts.filter((a) => !a.triggered), [priceAlerts]);
   const triggeredAlerts = useMemo(() => priceAlerts.filter((a) => a.triggered), [priceAlerts]);
 
   const formatTime = (date: Date) => {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "Recently";
+
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
+    const diffMins = Math.max(0, Math.floor(diffMs / 60000));
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
 
@@ -29,7 +34,23 @@ export function PriceAlertsPanel() {
     return `${diffDays}d ago`;
   };
 
-  // ✅ Restore a triggered alert back into Active (demo)
+  const openCreateModal = useCallback(() => {
+    setEditingAlert(null);
+    setShowCreateModal(true);
+  }, []);
+
+  const openEditModal = useCallback((alert: PriceAlert) => {
+    setEditingAlert(alert);
+    setShowCreateModal(true);
+  }, []);
+
+  const handleModalOpenChange = useCallback((open: boolean) => {
+    setShowCreateModal(open);
+    if (!open) {
+      setEditingAlert(null);
+    }
+  }, []);
+
   const restoreAlert = useCallback(
     (id: string) => {
       updatePriceAlert(id, {
@@ -41,10 +62,9 @@ export function PriceAlertsPanel() {
     [updatePriceAlert],
   );
 
-  // ✅ Restore ALL triggered alerts back into Active (demo)
   const resetHistory = useCallback(() => {
-    triggeredAlerts.forEach((a) => {
-      updatePriceAlert(a.id, {
+    triggeredAlerts.forEach((alert) => {
+      updatePriceAlert(alert.id, {
         triggered: false,
         enabled: true,
         triggeredAt: undefined,
@@ -69,7 +89,7 @@ export function PriceAlertsPanel() {
               </Button>
             )}
 
-            <Button size="sm" className="h-8" onClick={() => setShowCreateModal(true)}>
+            <Button size="sm" className="h-8" onClick={openCreateModal}>
               <Plus className="h-4 w-4 mr-1" />
               New Alert
             </Button>
@@ -77,7 +97,6 @@ export function PriceAlertsPanel() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Active Alerts */}
           <div>
             <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
               <Clock className="h-3.5 w-3.5" />
@@ -104,9 +123,9 @@ export function PriceAlertsPanel() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-2 flex-1 min-w-0">
                           {alert.direction === "above" ? (
-                            <ArrowUp className="h-4 w-4 text-green-500 mt-0.5" />
+                            <ArrowUp className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                           ) : (
-                            <ArrowDown className="h-4 w-4 text-red-500 mt-0.5" />
+                            <ArrowDown className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
                           )}
 
                           <div className="flex-1 min-w-0">
@@ -130,8 +149,19 @@ export function PriceAlertsPanel() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 shrink-0">
                           <Switch checked={alert.enabled} onCheckedChange={() => togglePriceAlert(alert.id)} />
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={() => openEditModal(alert)}
+                            aria-label="Edit alert"
+                            title="Edit alert"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
 
                           <Button
                             variant="ghost"
@@ -139,6 +169,7 @@ export function PriceAlertsPanel() {
                             className="h-7 w-7 text-muted-foreground hover:text-destructive"
                             onClick={() => deletePriceAlert(alert.id)}
                             aria-label="Delete alert"
+                            title="Delete alert"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
@@ -151,7 +182,6 @@ export function PriceAlertsPanel() {
             </ScrollArea>
           </div>
 
-          {/* Triggered Alerts (History) */}
           <div>
             <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
               <CheckCircle2 className="h-3.5 w-3.5" />
@@ -169,7 +199,7 @@ export function PriceAlertsPanel() {
                     <div key={alert.id} className="p-2.5 rounded-lg bg-muted/30 border border-border/50">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                          <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />
                           <span className="text-sm truncate">
                             {alert.assetDisplayName} {alert.direction} {alert.price}
                           </span>
@@ -196,6 +226,7 @@ export function PriceAlertsPanel() {
                           className="h-6 w-6 text-muted-foreground hover:text-destructive"
                           onClick={() => deletePriceAlert(alert.id)}
                           aria-label="Delete alert"
+                          title="Delete alert"
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -209,7 +240,7 @@ export function PriceAlertsPanel() {
         </CardContent>
       </Card>
 
-      <CreatePriceAlertModal open={showCreateModal} onOpenChange={setShowCreateModal} />
+      <CreatePriceAlertModal open={showCreateModal} onOpenChange={handleModalOpenChange} editingAlert={editingAlert} />
     </>
   );
 }
