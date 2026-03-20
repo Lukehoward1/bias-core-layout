@@ -33,9 +33,28 @@ interface AlertsContextValue {
 
 const AlertsContext = createContext<AlertsContextValue | undefined>(undefined);
 
+const createId = () => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).slice(2, 11);
+};
+
+const safeJsonParse = <T,>(value: string | null, fallback: T): T => {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+};
+
 const playNotificationSound = () => {
   try {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+
+    const audioContext = new AudioCtx();
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
 
@@ -51,7 +70,7 @@ const playNotificationSound = () => {
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + 0.3);
   } catch {
-    console.log("Audio not supported");
+    // no-op
   }
 };
 
@@ -72,12 +91,8 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
   const [preferences, setPreferences] = useState<AlertPreferences>(() => {
-    const saved = localStorage.getItem("alertPreferences");
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return { ...defaultAlertPreferences, ...parsed };
-    }
-    return defaultAlertPreferences;
+    const parsed = safeJsonParse<Partial<AlertPreferences>>(localStorage.getItem("alertPreferences"), {});
+    return { ...defaultAlertPreferences, ...parsed };
   });
 
   const lastAlertIdRef = useRef<string | null>(null);
@@ -128,39 +143,35 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
 
     const [startH, startM] = preferences.quietHoursStart.split(":").map(Number);
     const [endH, endM] = preferences.quietHoursEnd.split(":").map(Number);
+
     const startTime = startH * 60 + startM;
     const endTime = endH * 60 + endM;
 
     if (startTime < endTime) {
       return currentTime >= startTime && currentTime < endTime;
-    } else {
-      return currentTime >= startTime || currentTime < endTime;
     }
+
+    return currentTime >= startTime || currentTime < endTime;
   }, [preferences.quietHoursEnabled, preferences.quietHoursStart, preferences.quietHoursEnd]);
 
   useEffect(() => {
-    const savedAlerts = localStorage.getItem("alerts");
-    if (savedAlerts) {
-      const parsed = JSON.parse(savedAlerts);
-      setAlerts(
-        parsed.map((a: any) => ({
-          ...a,
-          timestamp: new Date(a.timestamp),
-        })),
-      );
-    }
+    const savedAlerts = safeJsonParse<any[]>(localStorage.getItem("alerts"), []);
+    const savedPriceAlerts = safeJsonParse<any[]>(localStorage.getItem("priceAlerts"), []);
 
-    const savedPriceAlerts = localStorage.getItem("priceAlerts");
-    if (savedPriceAlerts) {
-      const parsed = JSON.parse(savedPriceAlerts);
-      setPriceAlerts(
-        parsed.map((a: any) => ({
-          ...a,
-          createdAt: new Date(a.createdAt),
-          triggeredAt: a.triggeredAt ? new Date(a.triggeredAt) : undefined,
-        })),
-      );
-    }
+    setAlerts(
+      savedAlerts.map((a) => ({
+        ...a,
+        timestamp: new Date(a.timestamp),
+      })),
+    );
+
+    setPriceAlerts(
+      savedPriceAlerts.map((a) => ({
+        ...a,
+        createdAt: new Date(a.createdAt),
+        triggeredAt: a.triggeredAt ? new Date(a.triggeredAt) : undefined,
+      })),
+    );
   }, []);
 
   useEffect(() => {
@@ -185,7 +196,7 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
 
       const newAlert: AlertItem = {
         ...alert,
-        id: Math.random().toString(36).substr(2, 9),
+        id: createId(),
         timestamp: new Date(),
         read: false,
       };
@@ -228,12 +239,13 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
   const addPriceAlert = useCallback((alert: Omit<PriceAlert, "id" | "createdAt" | "triggered" | "enabled">) => {
     const newAlert: PriceAlert = {
       ...alert,
-      id: Math.random().toString(36).substr(2, 9),
+      id: createId(),
       createdAt: new Date(),
       triggered: false,
       enabled: true,
       lastCheckedPrice: alert.lastCheckedPrice,
     };
+
     setPriceAlerts((prev) => [...prev, newAlert]);
   }, []);
 
@@ -250,9 +262,8 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     setPriceAlerts((prev) =>
       prev.map((a) => {
         if (a.id !== id) return a;
-        const nextEnabled = !a.enabled;
         closeConfirmRef.current[id] = 0;
-        return { ...a, enabled: nextEnabled };
+        return { ...a, enabled: !a.enabled };
       }),
     );
   }, []);
@@ -268,6 +279,8 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
       title: string;
       message: string;
       relatedAsset: string;
+      routeTo: string;
+      routeParams: Record<string, string>;
     }> = [];
 
     const nextAlerts = priceAlerts.map((alert) => {
@@ -292,15 +305,16 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
         const required = timeframeConfirmTicks[alert.timeframe || "15m"] ?? 4;
         const currentCount = closeConfirmRef.current[alert.id] ?? 0;
         const updatedCount = hit ? currentCount + 1 : 0;
+
         closeConfirmRef.current[alert.id] = updatedCount;
 
-        const confirmed = updatedCount >= required;
-
-        if (confirmed) {
+        if (updatedCount >= required) {
           triggeredNotifications.push({
             title: "Price Alert Triggered",
             message: `${alert.assetDisplayName} closed ${alert.direction} ${alert.price} (${alert.timeframe})`,
             relatedAsset: alert.asset,
+            routeTo: "/asset/:symbol",
+            routeParams: { symbol: symbol },
           });
 
           closeConfirmRef.current[alert.id] = 0;
@@ -328,7 +342,11 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
           title: "Price Alert Triggered",
           message: `${alert.assetDisplayName} wicked ${alert.direction} ${alert.price}`,
           relatedAsset: alert.asset,
+          routeTo: "/asset/:symbol",
+          routeParams: { symbol: symbol },
         });
+
+        closeConfirmRef.current[alert.id] = 0;
 
         return {
           ...alert,
@@ -348,8 +366,7 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
       return alert;
     });
 
-    const changed =
-      nextAlerts.length !== priceAlerts.length || nextAlerts.some((alert, index) => alert !== priceAlerts[index]);
+    const changed = nextAlerts.some((alert, index) => alert !== priceAlerts[index]);
 
     if (changed) {
       setPriceAlerts(nextAlerts);
@@ -363,7 +380,8 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
           message: item.message,
           severity: "high",
           relatedAsset: item.relatedAsset,
-          routeTo: "/alerts",
+          routeTo: item.routeTo,
+          routeParams: item.routeParams,
         });
       });
     }
