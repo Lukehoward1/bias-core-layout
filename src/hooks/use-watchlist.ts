@@ -4,82 +4,135 @@ import { assetsData, getAssetBySymbol, getCurrenciesFromWatchlist, type Asset } 
 
 const WATCHLIST_STORAGE_KEY = "watchlist";
 const WATCHLIST_CHANGE_EVENT = "watchlist-change";
-
-// ✅ keep these local (no importing provider files)
 const TRADER_STYLE_EVENT = "traderStyleUpdated";
 
+const normalizeSymbol = (symbol: string) => symbol.trim().toUpperCase();
+
+const readStoredWatchlist = (): string[] => {
+  try {
+    const raw = localStorage.getItem(WATCHLIST_STORAGE_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    return Array.from(
+      new Set(
+        parsed
+          .filter((value): value is string => typeof value === "string")
+          .map(normalizeSymbol)
+          .filter(Boolean),
+      ),
+    );
+  } catch {
+    return [];
+  }
+};
+
 function dispatchWatchlistChange(watchlist: string[]) {
-  window.dispatchEvent(new CustomEvent(WATCHLIST_CHANGE_EVENT, { detail: watchlist }));
+  window.dispatchEvent(
+    new CustomEvent<string[]>(WATCHLIST_CHANGE_EVENT, {
+      detail: watchlist,
+    }),
+  );
 }
 
 export function useWatchlist() {
-  const [watchlist, setWatchlist] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(WATCHLIST_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [watchlist, setWatchlist] = useState<string[]>(() => readStoredWatchlist());
 
-  // ✅ tick to force re-render on trader style changes
+  // Used to force recalculation when trader style changes
   const [styleTick, setStyleTick] = useState(0);
 
+  const persistWatchlist = useCallback((nextWatchlist: string[]) => {
+    const cleaned = Array.from(new Set(nextWatchlist.map(normalizeSymbol).filter(Boolean)));
+    setWatchlist(cleaned);
+    localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(cleaned));
+    dispatchWatchlistChange(cleaned);
+  }, []);
+
   useEffect(() => {
-    const handleWatchlistChange = (event: CustomEvent<string[]>) => {
-      setWatchlist(event.detail);
+    const handleWatchlistChange = (event: Event) => {
+      const customEvent = event as CustomEvent<string[]>;
+      const nextWatchlist = Array.isArray(customEvent.detail) ? customEvent.detail : [];
+      setWatchlist(
+        Array.from(
+          new Set(nextWatchlist.filter((value): value is string => typeof value === "string").map(normalizeSymbol)),
+        ),
+      );
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== WATCHLIST_STORAGE_KEY) return;
+      setWatchlist(readStoredWatchlist());
+    };
+
+    const handleTraderStyleUpdate = () => {
+      setStyleTick((tick) => tick + 1);
     };
 
     window.addEventListener(WATCHLIST_CHANGE_EVENT, handleWatchlistChange as EventListener);
-    return () => window.removeEventListener(WATCHLIST_CHANGE_EVENT, handleWatchlistChange as EventListener);
-  }, []);
-
-  // ✅ re-render on style changes (same tab) + storage (other tab)
-  useEffect(() => {
-    const bump = () => setStyleTick((t) => t + 1);
-
-    window.addEventListener(TRADER_STYLE_EVENT, bump);
-    window.addEventListener("storage", bump);
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener(TRADER_STYLE_EVENT, handleTraderStyleUpdate);
 
     return () => {
-      window.removeEventListener(TRADER_STYLE_EVENT, bump);
-      window.removeEventListener("storage", bump);
+      window.removeEventListener(WATCHLIST_CHANGE_EVENT, handleWatchlistChange as EventListener);
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(TRADER_STYLE_EVENT, handleTraderStyleUpdate);
     };
   }, []);
 
-  const updateWatchlist = useCallback((newWatchlist: string[]) => {
-    setWatchlist(newWatchlist);
-    localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(newWatchlist));
-    dispatchWatchlistChange(newWatchlist);
+  const addToWatchlist = useCallback((symbol: string) => {
+    const normalized = normalizeSymbol(symbol);
+    if (!normalized) return;
+
+    setWatchlist((prev) => {
+      if (prev.includes(normalized)) return prev;
+
+      const next = [...prev, normalized];
+      localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(next));
+      dispatchWatchlistChange(next);
+      return next;
+    });
   }, []);
 
-  const addToWatchlist = useCallback(
-    (symbol: string) => {
-      if (!watchlist.includes(symbol)) updateWatchlist([...watchlist, symbol]);
-    },
-    [watchlist, updateWatchlist],
-  );
+  const removeFromWatchlist = useCallback((symbol: string) => {
+    const normalized = normalizeSymbol(symbol);
+    if (!normalized) return;
 
-  const removeFromWatchlist = useCallback(
-    (symbol: string) => {
-      updateWatchlist(watchlist.filter((s) => s !== symbol));
-    },
-    [watchlist, updateWatchlist],
-  );
+    setWatchlist((prev) => {
+      const next = prev.filter((item) => item !== normalized);
+      localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(next));
+      dispatchWatchlistChange(next);
+      return next;
+    });
+  }, []);
 
-  const toggleWatchlist = useCallback(
-    (symbol: string) => {
-      if (watchlist.includes(symbol)) removeFromWatchlist(symbol);
-      else addToWatchlist(symbol);
-    },
-    [watchlist, addToWatchlist, removeFromWatchlist],
-  );
+  const toggleWatchlist = useCallback((symbol: string) => {
+    const normalized = normalizeSymbol(symbol);
+    if (!normalized) return;
 
-  const isInWatchlist = useCallback((symbol: string) => watchlist.includes(symbol), [watchlist]);
+    setWatchlist((prev) => {
+      const exists = prev.includes(normalized);
+      const next = exists ? prev.filter((item) => item !== normalized) : [...prev, normalized];
+
+      localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(next));
+      dispatchWatchlistChange(next);
+      return next;
+    });
+  }, []);
+
+  const isInWatchlist = useCallback(
+    (symbol: string) => {
+      const normalized = normalizeSymbol(symbol);
+      return watchlist.includes(normalized);
+    },
+    [watchlist],
+  );
 
   const watchlistAssets = useMemo((): Asset[] => {
-    void styleTick; // force refresh of bias/timeframes
-    return watchlist.map((symbol) => getAssetBySymbol(symbol)).filter((a): a is Asset => !!a);
+    void styleTick;
+
+    return watchlist.map((symbol) => getAssetBySymbol(symbol)).filter((asset): asset is Asset => Boolean(asset));
   }, [watchlist, styleTick]);
 
   const watchlistCurrencies = useMemo(() => {
@@ -95,29 +148,46 @@ export function useWatchlist() {
     removeFromWatchlist,
     toggleWatchlist,
     isInWatchlist,
+    setWatchlist: persistWatchlist,
   };
 }
 
 export function useAssets() {
-  // ✅ tick to force any page using getAssetBySymbol() to re-render when style changes
   const [styleTick, setStyleTick] = useState(0);
 
   useEffect(() => {
-    const bump = () => setStyleTick((t) => t + 1);
+    const handleTraderStyleUpdate = () => {
+      setStyleTick((tick) => tick + 1);
+    };
 
-    window.addEventListener(TRADER_STYLE_EVENT, bump);
-    window.addEventListener("storage", bump);
+    const handleStorage = () => {
+      setStyleTick((tick) => tick + 1);
+    };
+
+    window.addEventListener(TRADER_STYLE_EVENT, handleTraderStyleUpdate);
+    window.addEventListener("storage", handleStorage);
 
     return () => {
-      window.removeEventListener(TRADER_STYLE_EVENT, bump);
-      window.removeEventListener("storage", bump);
+      window.removeEventListener(TRADER_STYLE_EVENT, handleTraderStyleUpdate);
+      window.removeEventListener("storage", handleStorage);
     };
   }, []);
 
-  void styleTick;
+  const assets = useMemo(() => {
+    void styleTick;
+    return assetsData;
+  }, [styleTick]);
+
+  const getAsset = useCallback(
+    (symbol: string) => {
+      void styleTick;
+      return getAssetBySymbol(normalizeSymbol(symbol));
+    },
+    [styleTick],
+  );
 
   return {
-    assets: assetsData,
-    getAssetBySymbol,
+    assets,
+    getAssetBySymbol: getAsset,
   };
 }
