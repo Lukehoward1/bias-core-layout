@@ -47,22 +47,16 @@ export interface Asset {
 
 // Map registry categories to UI categories
 function mapCategory(cat: RegistryAsset["category"]): AssetCategory {
-  switch (cat) {
-    case "forex":
-      return "FX";
-    case "crypto":
-      return "Crypto";
-    case "index":
-      return "Indices";
-    case "commodity":
-      return "Commodities";
-    case "etf":
-      return "ETFs";
-    case "future":
-      return "Futures";
-    default:
-      return "FX";
-  }
+  const value = String(cat).toLowerCase();
+
+  if (value === "forex") return "FX";
+  if (value === "crypto") return "Crypto";
+  if (value === "index") return "Indices";
+  if (value === "commodity") return "Commodities";
+  if (value === "etf") return "ETFs";
+  if (value === "future") return "Futures";
+
+  return "FX";
 }
 
 // Hand-curated overrides for assets that had specific mock data
@@ -291,11 +285,6 @@ for (const asset of assetsData) {
 
 /* ── Bias mode / timeframe engine ────────────────────────────── */
 
-/**
- * Keys we will tolerate for backwards compatibility.
- * The canonical key you should use is "traderStyle" (from TraderStyleProvider),
- * but this keeps the app resilient if earlier builds used other names.
- */
 const BIAS_MODE_KEYS = [
   "traderStyle",
   "tradingStyle",
@@ -356,13 +345,6 @@ function scoreToDir(score: number): BiasDirection {
   return "Neutral";
 }
 
-/**
- * Demo style-adjusted bias derived from:
- * - asset's overall/base bias (from overrides/placeholder)
- * - deterministic per-timeframe "micro bias" so each style can differ
- *
- * Later, when you add real timeframe analysis, replace ONLY this function internals.
- */
 function computeBiasForMode(args: { symbol: string; overallDir: BiasDirection; overallConf: number; mode: BiasMode }) {
   const { symbol, overallDir, overallConf, mode } = args;
 
