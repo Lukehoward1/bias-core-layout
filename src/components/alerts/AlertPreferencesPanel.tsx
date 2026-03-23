@@ -1,10 +1,9 @@
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Clock, Bell, TrendingUp, AlertTriangle, Calendar, Moon, Volume2 } from "lucide-react";
+import { Clock, Bell, TrendingUp, AlertTriangle, Calendar, Moon } from "lucide-react";
 import type { AlertPreferences } from "@/types/alerts";
 
 interface AlertPreferencesPanelProps {
@@ -12,42 +11,41 @@ interface AlertPreferencesPanelProps {
   onUpdate: (prefs: AlertPreferences) => void;
 }
 
-const currencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD'];
+const currencies = ["USD", "EUR", "GBP", "JPY", "AUD", "CAD", "CHF", "NZD"];
 const offsetOptions = [60, 30, 15, 5];
+const biasTimeframes: Array<"H4" | "Daily"> = ["H4", "Daily"];
 
 export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreferencesPanelProps) {
-  const [prefs, setPrefs] = useState<AlertPreferences>(preferences);
-
   const updatePref = <K extends keyof AlertPreferences>(key: K, value: AlertPreferences[K]) => {
-    const updated = { ...prefs, [key]: value };
-    setPrefs(updated);
-    onUpdate(updated);
+    onUpdate({ ...preferences, [key]: value });
   };
 
   const toggleOffset = (offset: number) => {
-    const offsets = prefs.sessionReminderOffsets.includes(offset)
-      ? prefs.sessionReminderOffsets.filter(o => o !== offset)
-      : [...prefs.sessionReminderOffsets, offset];
-    updatePref('sessionReminderOffsets', offsets);
+    const nextOffsets = preferences.sessionReminderOffsets.includes(offset)
+      ? preferences.sessionReminderOffsets.filter((o) => o !== offset)
+      : [...preferences.sessionReminderOffsets, offset].sort((a, b) => b - a);
+
+    updatePref("sessionReminderOffsets", nextOffsets);
   };
 
   const toggleCurrency = (currency: string) => {
-    const currencies = prefs.relevantCurrencies.includes(currency)
-      ? prefs.relevantCurrencies.filter(c => c !== currency)
-      : [...prefs.relevantCurrencies, currency];
-    updatePref('relevantCurrencies', currencies);
+    const nextCurrencies = preferences.relevantCurrencies.includes(currency)
+      ? preferences.relevantCurrencies.filter((c) => c !== currency)
+      : [...preferences.relevantCurrencies, currency].sort();
+
+    updatePref("relevantCurrencies", nextCurrencies);
   };
 
-  const toggleTimeframe = (tf: 'H4' | 'Daily') => {
-    const timeframes = prefs.biasFlipTimeframes.includes(tf)
-      ? prefs.biasFlipTimeframes.filter(t => t !== tf)
-      : [...prefs.biasFlipTimeframes, tf];
-    updatePref('biasFlipTimeframes', timeframes);
+  const toggleTimeframe = (tf: "H4" | "Daily") => {
+    const nextTimeframes = preferences.biasFlipTimeframes.includes(tf)
+      ? preferences.biasFlipTimeframes.filter((t) => t !== tf)
+      : [...preferences.biasFlipTimeframes, tf];
+
+    updatePref("biasFlipTimeframes", nextTimeframes);
   };
 
   return (
     <div className="space-y-4">
-      {/* Session Alerts */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -57,21 +55,24 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
-            <Label htmlFor="sessionReminders" className="text-sm">Session Open Reminders</Label>
+            <Label htmlFor="sessionReminders" className="text-sm">
+              Session Open Reminders
+            </Label>
             <Switch
               id="sessionReminders"
-              checked={prefs.sessionReminders}
-              onCheckedChange={(v) => updatePref('sessionReminders', v)}
+              checked={preferences.sessionReminders}
+              onCheckedChange={(v) => updatePref("sessionReminders", v)}
             />
           </div>
-          {prefs.sessionReminders && (
+
+          {preferences.sessionReminders && (
             <div className="pl-4 space-y-2">
               <Label className="text-xs text-muted-foreground">Reminder offsets (minutes before)</Label>
               <div className="flex flex-wrap gap-2">
-                {offsetOptions.map(offset => (
+                {offsetOptions.map((offset) => (
                   <Badge
                     key={offset}
-                    variant={prefs.sessionReminderOffsets.includes(offset) ? "default" : "outline"}
+                    variant={preferences.sessionReminderOffsets.includes(offset) ? "default" : "outline"}
                     className="cursor-pointer"
                     onClick={() => toggleOffset(offset)}
                   >
@@ -81,26 +82,31 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
               </div>
             </div>
           )}
+
           <div className="flex items-center justify-between">
-            <Label htmlFor="sessionOverlaps" className="text-sm">Session Overlap Alerts</Label>
+            <Label htmlFor="sessionOverlaps" className="text-sm">
+              Session Overlap Alerts
+            </Label>
             <Switch
               id="sessionOverlaps"
-              checked={prefs.sessionOverlaps}
-              onCheckedChange={(v) => updatePref('sessionOverlaps', v)}
+              checked={preferences.sessionOverlaps}
+              onCheckedChange={(v) => updatePref("sessionOverlaps", v)}
             />
           </div>
+
           <div className="flex items-center justify-between">
-            <Label htmlFor="sessionStatus" className="text-sm">Session Open/Close Status</Label>
+            <Label htmlFor="sessionStatus" className="text-sm">
+              Session Open/Close Status
+            </Label>
             <Switch
               id="sessionStatus"
-              checked={prefs.sessionStatus}
-              onCheckedChange={(v) => updatePref('sessionStatus', v)}
+              checked={preferences.sessionStatus}
+              onCheckedChange={(v) => updatePref("sessionStatus", v)}
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* News Alerts */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -110,33 +116,40 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
-            <Label htmlFor="highImpactNews" className="text-sm">High-Impact (Red) News</Label>
+            <Label htmlFor="highImpactNews" className="text-sm">
+              High-Impact (Red) News
+            </Label>
             <Switch
               id="highImpactNews"
-              checked={prefs.highImpactNews}
-              onCheckedChange={(v) => updatePref('highImpactNews', v)}
+              checked={preferences.highImpactNews}
+              onCheckedChange={(v) => updatePref("highImpactNews", v)}
             />
           </div>
+
           <div className="flex items-center justify-between">
-            <Label htmlFor="breakingNews" className="text-sm">Breaking / Unscheduled News</Label>
+            <Label htmlFor="breakingNews" className="text-sm">
+              Breaking / Unscheduled News
+            </Label>
             <Switch
               id="breakingNews"
-              checked={prefs.breakingNews}
-              onCheckedChange={(v) => updatePref('breakingNews', v)}
+              checked={preferences.breakingNews}
+              onCheckedChange={(v) => updatePref("breakingNews", v)}
             />
           </div>
+
           <div className="flex items-center justify-between">
-            <Label htmlFor="postEventSummaries" className="text-sm">Post-Event Summaries</Label>
+            <Label htmlFor="postEventSummaries" className="text-sm">
+              Post-Event Summaries
+            </Label>
             <Switch
               id="postEventSummaries"
-              checked={prefs.postEventSummaries}
-              onCheckedChange={(v) => updatePref('postEventSummaries', v)}
+              checked={preferences.postEventSummaries}
+              onCheckedChange={(v) => updatePref("postEventSummaries", v)}
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* Bias Alerts */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -146,21 +159,24 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
-            <Label htmlFor="biasFlipAlerts" className="text-sm">Bias Flip Alerts (Watchlist)</Label>
+            <Label htmlFor="biasFlipAlerts" className="text-sm">
+              Bias Flip Alerts (Watchlist)
+            </Label>
             <Switch
               id="biasFlipAlerts"
-              checked={prefs.biasFlipAlerts}
-              onCheckedChange={(v) => updatePref('biasFlipAlerts', v)}
+              checked={preferences.biasFlipAlerts}
+              onCheckedChange={(v) => updatePref("biasFlipAlerts", v)}
             />
           </div>
-          {prefs.biasFlipAlerts && (
+
+          {preferences.biasFlipAlerts && (
             <div className="pl-4 space-y-2">
               <Label className="text-xs text-muted-foreground">Timeframes</Label>
               <div className="flex gap-2">
-                {(['H4', 'Daily'] as const).map(tf => (
+                {biasTimeframes.map((tf) => (
                   <Badge
                     key={tf}
-                    variant={prefs.biasFlipTimeframes.includes(tf) ? "default" : "outline"}
+                    variant={preferences.biasFlipTimeframes.includes(tf) ? "default" : "outline"}
                     className="cursor-pointer"
                     onClick={() => toggleTimeframe(tf)}
                   >
@@ -170,34 +186,42 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
               </div>
             </div>
           )}
+
           <div className="flex items-center justify-between">
-            <Label htmlFor="biasAlignmentAlerts" className="text-sm">Bias Alignment (H4 + Daily)</Label>
+            <Label htmlFor="biasAlignmentAlerts" className="text-sm">
+              Bias Alignment (H4 + Daily)
+            </Label>
             <Switch
               id="biasAlignmentAlerts"
-              checked={prefs.biasAlignmentAlerts}
-              onCheckedChange={(v) => updatePref('biasAlignmentAlerts', v)}
+              checked={preferences.biasAlignmentAlerts}
+              onCheckedChange={(v) => updatePref("biasAlignmentAlerts", v)}
             />
           </div>
+
           <div className="flex items-center justify-between">
-            <Label htmlFor="dailySummary" className="text-sm">Daily Bias Summary</Label>
+            <Label htmlFor="dailySummary" className="text-sm">
+              Daily Bias Summary
+            </Label>
             <Switch
               id="dailySummary"
-              checked={prefs.dailySummary}
-              onCheckedChange={(v) => updatePref('dailySummary', v)}
+              checked={preferences.dailySummary}
+              onCheckedChange={(v) => updatePref("dailySummary", v)}
             />
           </div>
+
           <div className="flex items-center justify-between">
-            <Label htmlFor="weeklySummary" className="text-sm">Weekly Bias Summary</Label>
+            <Label htmlFor="weeklySummary" className="text-sm">
+              Weekly Bias Summary
+            </Label>
             <Switch
               id="weeklySummary"
-              checked={prefs.weeklySummary}
-              onCheckedChange={(v) => updatePref('weeklySummary', v)}
+              checked={preferences.weeklySummary}
+              onCheckedChange={(v) => updatePref("weeklySummary", v)}
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* Risk Alerts */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -207,25 +231,29 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
-            <Label htmlFor="preNewsExposure" className="text-sm">Pre-News Exposure Warnings</Label>
+            <Label htmlFor="preNewsExposure" className="text-sm">
+              Pre-News Exposure Warnings
+            </Label>
             <Switch
               id="preNewsExposure"
-              checked={prefs.preNewsExposure}
-              onCheckedChange={(v) => updatePref('preNewsExposure', v)}
+              checked={preferences.preNewsExposure}
+              onCheckedChange={(v) => updatePref("preNewsExposure", v)}
             />
           </div>
+
           <div className="flex items-center justify-between">
-            <Label htmlFor="lowLiquidity" className="text-sm">Low-Liquidity / No-Trade Alerts</Label>
+            <Label htmlFor="lowLiquidity" className="text-sm">
+              Low-Liquidity / No-Trade Alerts
+            </Label>
             <Switch
               id="lowLiquidity"
-              checked={prefs.lowLiquidity}
-              onCheckedChange={(v) => updatePref('lowLiquidity', v)}
+              checked={preferences.lowLiquidity}
+              onCheckedChange={(v) => updatePref("lowLiquidity", v)}
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* Quiet Hours */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -235,42 +263,52 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
-            <Label htmlFor="quietHoursEnabled" className="text-sm">Enable Quiet Hours</Label>
+            <Label htmlFor="quietHoursEnabled" className="text-sm">
+              Enable Quiet Hours
+            </Label>
             <Switch
               id="quietHoursEnabled"
-              checked={prefs.quietHoursEnabled}
-              onCheckedChange={(v) => updatePref('quietHoursEnabled', v)}
+              checked={preferences.quietHoursEnabled}
+              onCheckedChange={(v) => updatePref("quietHoursEnabled", v)}
             />
           </div>
-          {prefs.quietHoursEnabled && (
+
+          {preferences.quietHoursEnabled && (
             <div className="grid grid-cols-2 gap-4 pl-4">
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Start</Label>
-                <Select value={prefs.quietHoursStart} onValueChange={(v) => updatePref('quietHoursStart', v)}>
+                <Select value={preferences.quietHoursStart} onValueChange={(v) => updatePref("quietHoursStart", v)}>
                   <SelectTrigger className="h-8">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from({ length: 24 }, (_, i) => (
-                      <SelectItem key={i} value={`${i.toString().padStart(2, '0')}:00`}>
-                        {`${i.toString().padStart(2, '0')}:00`}
-                      </SelectItem>
-                    ))}
+                    {Array.from({ length: 24 }, (_, i) => {
+                      const value = `${i.toString().padStart(2, "0")}:00`;
+                      return (
+                        <SelectItem key={value} value={value}>
+                          {value}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">End</Label>
-                <Select value={prefs.quietHoursEnd} onValueChange={(v) => updatePref('quietHoursEnd', v)}>
+                <Select value={preferences.quietHoursEnd} onValueChange={(v) => updatePref("quietHoursEnd", v)}>
                   <SelectTrigger className="h-8">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from({ length: 24 }, (_, i) => (
-                      <SelectItem key={i} value={`${i.toString().padStart(2, '0')}:00`}>
-                        {`${i.toString().padStart(2, '0')}:00`}
-                      </SelectItem>
-                    ))}
+                    {Array.from({ length: 24 }, (_, i) => {
+                      const value = `${i.toString().padStart(2, "0")}:00`;
+                      return (
+                        <SelectItem key={value} value={value}>
+                          {value}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -279,7 +317,6 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
         </CardContent>
       </Card>
 
-      {/* Currency Relevance */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -292,10 +329,10 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
             Select currencies to receive alerts for (additive to watchlist currencies)
           </p>
           <div className="flex flex-wrap gap-2">
-            {currencies.map(currency => (
+            {currencies.map((currency) => (
               <Badge
                 key={currency}
-                variant={prefs.relevantCurrencies.includes(currency) ? "default" : "outline"}
+                variant={preferences.relevantCurrencies.includes(currency) ? "default" : "outline"}
                 className="cursor-pointer"
                 onClick={() => toggleCurrency(currency)}
               >
