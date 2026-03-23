@@ -22,14 +22,6 @@ import { calendarEvents } from "@/data/calendarEvents";
 
 import type { PriceAlert } from "@/types/alerts";
 
-const news = [
-  { title: "Fed Signals Potential Rate Hold", currency: "USD", time: "2h ago", sentiment: "hawkish" },
-  { title: "ECB Minutes Show Divided Opinion", currency: "EUR", time: "4h ago", sentiment: "mixed" },
-  { title: "BOE Governor Speech Hints at Cut", currency: "GBP", time: "5h ago", sentiment: "dovish" },
-  { title: "China GDP Beats Expectations", currency: "CNY", time: "6h ago", sentiment: "positive" },
-  { title: "Oil Prices Surge on Supply Concerns", currency: "USD", time: "7h ago", sentiment: "positive" },
-];
-
 const sessions = [
   { name: "Sydney", status: "closed", time: "Opens in 8:30:00", accent: "#2EC4B6", region: "Asia-Pacific Markets" },
   { name: "Asia", status: "open", time: "Closes in 1:23:45", accent: "#4361EE", region: "Asia-Pacific Markets" },
@@ -39,21 +31,18 @@ const sessions = [
 
 type CalendarEvent = (typeof calendarEvents)[0];
 
-const pickBestEventForCurrency = (currency: string): CalendarEvent | null => {
-  const c = (currency || "").toUpperCase();
-  const matches = calendarEvents.filter((ev) => (ev.currency || "").toUpperCase() === c);
+const impactRank = (impact: string) => {
+  const value = (impact || "").toLowerCase();
+  if (value === "high") return 3;
+  if (value === "medium") return 2;
+  return 1;
+};
 
-  if (matches.length === 0) return null;
-
-  const impactRank = (impact: string) => {
-    const v = (impact || "").toLowerCase();
-    if (v === "high") return 3;
-    if (v === "medium") return 2;
-    return 1;
-  };
-
-  const sorted = [...matches].sort((a, b) => impactRank(b.impact) - impactRank(a.impact));
-  return sorted[0] ?? null;
+const parseEventTimeToday = (time: string) => {
+  const [hours, minutes] = time.split(":").map(Number);
+  const date = new Date();
+  date.setHours(hours || 0, minutes || 0, 0, 0);
+  return date;
 };
 
 export default function Alerts() {
@@ -117,6 +106,34 @@ export default function Alerts() {
 
   const overviewActivePriceAlerts = useMemo(() => priceAlerts.filter((a) => !a.triggered), [priceAlerts]);
 
+  const topNewsEvents = useMemo(() => {
+    const now = new Date();
+
+    return [...calendarEvents]
+      .map((event) => ({
+        ...event,
+        eventDate: parseEventTimeToday(event.time),
+      }))
+      .sort((a, b) => {
+        const aUpcoming = a.eventDate >= now;
+        const bUpcoming = b.eventDate >= now;
+
+        if (aUpcoming !== bUpcoming) {
+          return aUpcoming ? -1 : 1;
+        }
+
+        const impactDiff = impactRank(b.impact) - impactRank(a.impact);
+        if (impactDiff !== 0) {
+          return impactDiff;
+        }
+
+        const aDistance = Math.abs(a.eventDate.getTime() - now.getTime());
+        const bDistance = Math.abs(b.eventDate.getTime() - now.getTime());
+        return aDistance - bDistance;
+      })
+      .slice(0, 5);
+  }, []);
+
   const openCalendarEvent = useCallback((ev: CalendarEvent) => {
     setIsEventModalOpen(false);
     setSelectedCalendarEvent(null);
@@ -133,15 +150,8 @@ export default function Alerts() {
   }, []);
 
   const handleTopNewsClick = useCallback(
-    (item: (typeof news)[0]) => {
-      const ev = pickBestEventForCurrency(item.currency);
-
-      if (!ev) {
-        toast.error("No matching calendar event found for this currency yet.");
-        return;
-      }
-
-      openCalendarEvent(ev);
+    (event: CalendarEvent) => {
+      openCalendarEvent(event);
     },
     [openCalendarEvent],
   );
@@ -244,9 +254,9 @@ export default function Alerts() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {news.map((item, i) => (
+                    {topNewsEvents.map((item) => (
                       <button
-                        key={i}
+                        key={item.id}
                         type="button"
                         onPointerDown={(e) => {
                           e.preventDefault();
@@ -257,20 +267,22 @@ export default function Alerts() {
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-sm text-foreground mb-2">{item.title}</h3>
+                            <h3 className="font-medium text-sm text-foreground mb-2">{item.event}</h3>
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className="text-xs">
                                 {item.currency}
                               </Badge>
                               <Badge
                                 variant={
-                                  item.sentiment === "hawkish" || item.sentiment === "positive"
-                                    ? "default"
-                                    : "secondary"
+                                  item.impact === "high"
+                                    ? "destructive"
+                                    : item.impact === "medium"
+                                      ? "default"
+                                      : "secondary"
                                 }
                                 className="text-xs"
                               >
-                                {item.sentiment}
+                                {item.impact}
                               </Badge>
                               <span className="text-[11px] text-muted-foreground ml-1">• click to view event</span>
                             </div>
