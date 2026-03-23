@@ -13,17 +13,15 @@ interface TestAlertsPanelProps {
 export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
   const { watchlist } = useAlertsContext();
 
-  // ✅ Bias alerts are watchlist-gated in AlertsContext,
-  // so we pick a guaranteed watchlist symbol (fallback EURUSD).
   const biasSymbol = useMemo(() => {
     return (watchlist?.[0] || "EURUSD").toUpperCase();
   }, [watchlist]);
 
-  const testAlerts: {
+  const testAlerts: Array<{
     label: string;
     icon: React.ReactNode;
     alert: Omit<AlertItem, "id" | "timestamp" | "read">;
-  }[] = [
+  }> = [
     {
       label: "Session Open",
       icon: <Clock className="h-3.5 w-3.5" />,
@@ -55,7 +53,7 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         message: "US CPI data releasing in 30 minutes. High volatility expected on USD pairs.",
         severity: "high",
         relatedAsset: "USD",
-        eventId: "us-cpi-2025-01", // ✅ must exist in calendarEvents
+        eventId: "us-cpi-2025-01",
         routeTo: "/calendar",
       },
     },
@@ -68,7 +66,6 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         message: "Unscheduled Federal Reserve announcement incoming. Markets may react sharply.",
         severity: "high",
         relatedAsset: "USD",
-        // ✅ Remove eventId unless you KNOW it exists in calendarEvents
         routeTo: "/calendar",
       },
     },
@@ -81,12 +78,10 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         message: "Actual: 256K vs Forecast: 164K — Better than expected (Bullish USD)",
         severity: "info",
         relatedAsset: "USD",
-        eventId: "nfp-2025-01", // ✅ must exist in calendarEvents
+        eventId: "nfp-2025-01",
         routeTo: "/calendar",
       },
     },
-
-    // ✅ Bias alerts now guaranteed to appear (watchlist symbol)
     {
       label: "Bias Flip",
       icon: <TrendingUp className="h-3.5 w-3.5" />,
@@ -113,7 +108,6 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         routeParams: { symbol: biasSymbol },
       },
     },
-
     {
       label: "Exposure Warning",
       icon: <AlertTriangle className="h-3.5 w-3.5" />,
@@ -137,8 +131,6 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         routeTo: "/risk-tools",
       },
     },
-
-    // ✅ Daily summary should NOT dump you into Calendar
     {
       label: "Daily Summary",
       icon: <Bell className="h-3.5 w-3.5" />,
@@ -150,8 +142,6 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         routeTo: "/alerts",
       },
     },
-
-    // ✅ Price alerts deep-link to asset route (modal routing handled elsewhere)
     {
       label: "Price Alert (Wick)",
       icon: <Target className="h-3.5 w-3.5" />,
@@ -191,14 +181,16 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
           </Badge>
         </CardTitle>
       </CardHeader>
+
       <CardContent>
         <p className="text-xs text-muted-foreground mb-4">
           Click buttons to trigger simulated alerts for testing purposes.
         </p>
+
         <div className="grid grid-cols-2 gap-2">
-          {testAlerts.map((item, i) => (
+          {testAlerts.map((item) => (
             <Button
-              key={i}
+              key={item.label}
               variant="outline"
               size="sm"
               className="justify-start gap-2 h-8 text-xs"
