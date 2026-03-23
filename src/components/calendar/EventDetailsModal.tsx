@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAssets } from "@/hooks/use-watchlist";
+import type { CalendarEvent } from "@/data/calendarEvents";
+
 import {
   TrendingUp,
   Clock,
@@ -20,15 +22,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-interface CalendarEvent {
-  time: string;
-  currency: string;
-  event: string;
-  previous: string;
-  forecast: string;
-  actual: string;
-  impact: string; // "high" | "medium" | "low"
-}
+/* =======================
+   Props
+======================= */
 
 interface EventDetailsModalProps {
   event: CalendarEvent | null;
@@ -43,6 +39,7 @@ interface EventDetailsModalProps {
 const getHistoricalData = (eventName: string) => {
   const baseValues = [185, 225, 165, 253, 281, 209, 187, 227];
   const seed = eventName.length;
+
   return [
     { period: "May", actual: baseValues[0] + seed * 5, forecast: baseValues[0] + seed * 3 },
     { period: "Jun", actual: baseValues[1] - seed * 3, forecast: baseValues[1] - seed * 5 },
@@ -55,80 +52,72 @@ const getHistoricalData = (eventName: string) => {
   ];
 };
 
-const getMarketInterpretation = (eventName: string, currency: string, _isReleased: boolean) => {
+const getMarketInterpretation = (eventName: string, currency: string) => {
   const interpretations: Record<
     string,
     { description: string; impact: string; bias: "bullish" | "bearish" | "neutral"; pairs: string[] }
   > = {
     "Non-Farm Payrolls": {
       description:
-        "Measures monthly change in employment excluding agricultural sector. A key indicator of US labor market health and economic activity.",
+        "Measures monthly change in employment excluding the agricultural sector. It is one of the most important indicators of US labour market strength and economic momentum.",
       impact:
-        "Higher-than-expected NFP is typically bullish for USD, signaling strong job creation and economic momentum. Lower readings are bearish for USD as they may prompt Fed rate cuts.",
+        "A stronger-than-expected NFP print is typically bullish for USD, as it supports growth expectations and can reinforce a more hawkish Federal Reserve outlook. A weaker print is usually bearish for USD.",
       bias: "bullish",
       pairs: ["EURUSD", "GBPUSD", "USDJPY", "USDCHF"],
     },
     "Unemployment Rate": {
       description:
-        "Measures the percentage of the labor force actively seeking employment. A lagging indicator that confirms broader economic trends.",
+        "Measures the percentage of the labour force actively seeking employment. It helps confirm the strength or weakness of the broader economy.",
       impact:
-        "Lower-than-expected unemployment is usually bullish for USD, especially against EUR, GBP and JPY. Higher unemployment is bearish as it suggests economic weakness and potential policy easing.",
+        "Lower-than-expected unemployment is generally bullish for USD, while a higher reading is typically bearish as it may support expectations of looser monetary policy.",
       bias: "bullish",
       pairs: ["EURUSD", "GBPUSD", "USDJPY"],
     },
     "German Factory Orders": {
       description:
-        "Measures the change in value of new orders placed with manufacturers. A leading indicator of production and economic health.",
+        "Measures the change in value of new orders placed with manufacturers. It is a useful leading indicator for production and industrial momentum in the euro area.",
       impact:
-        "Higher-than-expected orders are bullish for EUR, indicating robust manufacturing demand. Lower readings are bearish as they suggest weakening industrial activity.",
+        "Higher-than-expected factory orders are usually supportive for EUR, while weaker readings can weigh on the currency by suggesting softer industrial demand.",
       bias: "neutral",
       pairs: ["EURUSD", "EURGBP", "EURJPY"],
     },
     "ECB Interest Rate Decision": {
       description:
-        "The European Central Bank's decision on benchmark interest rates. One of the most impactful events for EUR pairs.",
+        "The European Central Bank’s interest rate decision is one of the most important scheduled events for EUR markets and broader European risk sentiment.",
       impact:
-        "Rate hikes or hawkish guidance are bullish for EUR as higher rates attract foreign capital. Rate cuts or dovish signals are bearish. Surprises move price most.",
+        "A hike or hawkish guidance is generally bullish for EUR. A cut or dovish guidance is generally bearish. The market often reacts most strongly to surprises in tone and forward guidance.",
       bias: "neutral",
       pairs: ["EURUSD", "EURGBP", "EURJPY", "EURCHF"],
     },
-    "Employment Change": {
-      description:
-        "Measures the change in the number of employed people. A key labor market indicator for economic health.",
-      impact:
-        "Stronger-than-expected job growth is bullish for CAD as it signals economic strength and supports BoC tightening. Weaker readings are bearish.",
-      bias: "bullish",
-      pairs: ["USDCAD", "CADJPY", "EURCAD"],
-    },
     "BOE Interest Rate Decision": {
       description:
-        "The Bank of England's decision on the UK base rate. The primary tool for monetary policy in the UK.",
+        "The Bank of England’s rate decision is the core monetary policy event for GBP and often drives sharp moves in sterling pairs.",
       impact:
-        "Rate hikes or hawkish tone are bullish for GBP, attracting yield-seeking flows. Rate cuts or dovish guidance are bearish. Watch for voting split and MPC commentary.",
+        "A hawkish result or stronger-than-expected guidance is typically bullish for GBP. A dovish message or softer policy stance is generally bearish.",
       bias: "neutral",
       pairs: ["GBPUSD", "EURGBP", "GBPJPY"],
     },
     "US CPI": {
       description:
-        "Measures inflation at the consumer level. One of the most market-moving releases for USD and risk assets.",
+        "Measures consumer inflation in the United States. CPI is one of the most market-moving releases for USD, gold, yields, and US indices.",
       impact:
-        "Higher-than-expected CPI is typically bullish for USD (higher rates for longer). Lower-than-expected CPI is usually bearish for USD and supportive for risk assets.",
+        "A higher-than-expected CPI reading is usually bullish for USD and bearish for gold and rate-sensitive risk assets. A softer reading often has the opposite effect.",
       bias: "neutral",
       pairs: ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD"],
     },
     "US Core CPI": {
       description:
-        "Measures inflation excluding food and energy. Often watched more closely than headline CPI for policy expectations.",
+        "Measures US inflation excluding food and energy. Core CPI is often watched especially closely for central bank policy expectations.",
       impact:
-        "A higher core print usually supports USD (hawkish Fed expectations). A weaker core print tends to weigh on USD and support risk sentiment.",
+        "A stronger core print is usually bullish for USD because it can support higher-for-longer rate expectations. A weaker print is typically bearish for USD and supportive for risk sentiment.",
       bias: "neutral",
       pairs: ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD"],
     },
   };
 
   const defaultInterpretation = {
-    description: `This economic indicator provides insight into ${currency} economic conditions and may influence central bank policy decisions.`,
-    impact: `Better-than-forecast data is typically bullish for ${currency}, while weaker readings tend to be bearish. The magnitude of the surprise often determines market reaction strength.`,
+    description: `This economic indicator provides insight into ${currency} economic conditions and may influence central bank policy expectations.`,
+    impact: `Stronger-than-expected data is often bullish for ${currency}, while weaker-than-expected data is often bearish. The size of the surprise usually determines the strength of the market reaction.`,
     bias: "neutral" as const,
     pairs: [`${currency}USD`, `EUR${currency}`, `${currency}JPY`],
   };
@@ -138,11 +127,11 @@ const getMarketInterpretation = (eventName: string, currency: string, _isRelease
 
 const getInterpretationGuide = (_eventName: string, currency: string) => {
   return [
-    `Strong deviation (>2x consensus range) typically causes immediate price reaction in ${currency} pairs`,
-    "Initial spike may reverse as traders digest the full context of the release",
-    "Consider waiting 5-15 minutes after release for volatility to settle before entering positions",
-    "Compare actual vs forecast AND vs previous reading for full context",
-    "Watch for revisions to prior data which can amplify or dampen the reaction",
+    `Large deviations from forecast often cause the sharpest immediate move in ${currency} pairs.`,
+    "Initial spikes can reverse once traders digest the full details of the release.",
+    "Consider waiting a few minutes after release if volatility is extreme.",
+    "Compare actual vs forecast and also vs previous for fuller context.",
+    "Watch for revisions to prior data because they can change the market read.",
   ];
 };
 
@@ -150,28 +139,33 @@ const getEventNarrative = (event: CalendarEvent) => {
   if (event.actual === "—") return null;
 
   const narratives: Record<string, string> = {
-    "Non-Farm Payrolls": `The US economy added ${event.actual} jobs in the latest reporting period, compared to expectations of ${event.forecast}.`,
-    "Unemployment Rate": `Unemployment came in at ${event.actual}, against forecasts of ${event.forecast}.`,
-    "ECB Interest Rate Decision": `The ECB has set rates at ${event.actual}, compared to expectations of ${event.forecast}.`,
-    "US CPI": `US CPI printed at ${event.actual} versus ${event.forecast} forecast.`,
-    "US Core CPI": `US Core CPI printed at ${event.actual} versus ${event.forecast} forecast.`,
+    "Non-Farm Payrolls": `The US economy added ${event.actual} jobs in the latest report, versus expectations of ${event.forecast}.`,
+    "Unemployment Rate": `Unemployment came in at ${event.actual}, compared with a forecast of ${event.forecast}.`,
+    "ECB Interest Rate Decision": `The ECB set rates at ${event.actual}, matching against an expected ${event.forecast}.`,
+    "BOE Interest Rate Decision": `The BOE decision came in at ${event.actual}, versus a forecast of ${event.forecast}.`,
+    "US CPI": `US CPI printed at ${event.actual}, versus a forecast of ${event.forecast}.`,
+    "US Core CPI": `US Core CPI printed at ${event.actual}, versus a forecast of ${event.forecast}.`,
   };
 
   return (
     narratives[event.event] ||
-    `The ${event.event} data was released at ${event.actual}, compared to the forecast of ${event.forecast}.`
+    `The ${event.event} release came in at ${event.actual}, compared with a forecast of ${event.forecast}.`
   );
 };
+
+/* =======================
+   Component
+======================= */
 
 export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { getAssetBySymbol } = useAssets();
 
-  // ✅ keep hooks stable even when event is null
-  const safeEvent: CalendarEvent = useMemo(
+  const safeEvent = useMemo<CalendarEvent>(
     () =>
       event ?? {
+        id: "placeholder",
         time: "00:00",
         currency: "—",
         event: "—",
@@ -186,23 +180,26 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
   const isReleased = safeEvent.actual !== "—";
 
   const historicalData = useMemo(() => getHistoricalData(safeEvent.event), [safeEvent.event]);
-  const maxValue = useMemo(() => Math.max(...historicalData.map((d) => d.actual || d.forecast || 0)), [historicalData]);
+
+  const maxValue = useMemo(() => {
+    return Math.max(...historicalData.map((item) => item.actual || item.forecast || 0), 1);
+  }, [historicalData]);
 
   const interpretation = useMemo(
-    () => getMarketInterpretation(safeEvent.event, safeEvent.currency, isReleased),
-    [safeEvent.event, safeEvent.currency, isReleased],
+    () => getMarketInterpretation(safeEvent.event, safeEvent.currency),
+    [safeEvent.event, safeEvent.currency],
   );
 
   const narrative = useMemo(() => getEventNarrative(safeEvent), [safeEvent]);
+
   const interpretationGuide = useMemo(
     () => getInterpretationGuide(safeEvent.event, safeEvent.currency),
     [safeEvent.event, safeEvent.currency],
   );
 
-  const getImpactColor = (impact: string) => {
-    const v = (impact || "").toLowerCase();
-    if (v === "high") return "bg-destructive text-destructive-foreground";
-    if (v === "medium") return "bg-warning text-warning-foreground";
+  const getImpactColor = (impact: CalendarEvent["impact"]) => {
+    if (impact === "high") return "bg-destructive text-destructive-foreground";
+    if (impact === "medium") return "bg-warning text-warning-foreground";
     return "bg-muted text-muted-foreground";
   };
 
@@ -236,7 +233,6 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     return "text-warning";
   };
 
-  // ✅ close event modal, then open asset route-modal next frame
   const goToAsset = useCallback(
     (symbol: string) => {
       onClose();
@@ -253,13 +249,11 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     [navigate, location, onClose],
   );
 
-  // ✅ if no event, render nothing (but hooks already ran safely)
   if (!event) return null;
 
   return (
     <DialogPrimitive.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogPrimitive.Portal>
-        {/* Overlay (ABOVE Asset modal) */}
         <DialogPrimitive.Overlay
           className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[10000]"
           onPointerDown={(e) => {
@@ -269,7 +263,6 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
           }}
         />
 
-        {/* Content (ABOVE Asset modal) */}
         <DialogPrimitive.Content
           className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 max-w-6xl w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border border-border p-0 rounded-lg z-[10001]"
           onPointerDown={(e) => e.stopPropagation()}
@@ -280,9 +273,11 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                 <Badge variant="outline" className="text-sm font-bold px-3 py-1.5 bg-muted/50">
                   {safeEvent.currency}
                 </Badge>
+
                 <Badge className={`text-xs font-semibold ${getImpactColor(safeEvent.impact)}`}>
-                  {(safeEvent.impact || "").toUpperCase()} IMPACT
+                  {safeEvent.impact.toUpperCase()} IMPACT
                 </Badge>
+
                 <h2 className="text-2xl font-bold text-foreground">{safeEvent.event}</h2>
               </div>
 
@@ -297,6 +292,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                     <Star className="h-3.5 w-3.5" />
                     Watchlist
                   </Button>
+
                   <Button variant="outline" size="sm" className="gap-1.5" onClick={handleSetAlert}>
                     <Bell className="h-3.5 w-3.5" />
                     Set Alert
@@ -331,6 +327,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                     >
                       {getBiasIcon(interpretation.bias)}
                     </div>
+
                     <div className="flex-1">
                       <div className="text-xs text-muted-foreground mb-0.5">Typical Market Reaction</div>
                       <div className={`text-sm font-semibold ${getBiasColor(interpretation.bias)}`}>
@@ -345,6 +342,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                     <div className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">
                       Most Impacted Pairs
                     </div>
+
                     <div className="flex flex-wrap gap-2">
                       {interpretation.pairs.map((pair) => {
                         const exists = !!getAssetBySymbol(pair);
@@ -394,16 +392,19 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                       <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Previous</div>
                       <div className="text-2xl font-bold text-foreground">{safeEvent.previous}</div>
                     </div>
+
                     <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
                       <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Forecast</div>
                       <div className="text-2xl font-bold text-foreground">{safeEvent.forecast}</div>
                     </div>
+
                     <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
                       <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Actual</div>
                       <div className={`text-2xl font-bold ${isReleased ? "text-primary" : "text-muted-foreground"}`}>
                         {safeEvent.actual}
                       </div>
                     </div>
+
                     <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
                       <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Deviation</div>
                       <div className="text-2xl font-bold text-muted-foreground">{isReleased ? "—" : "Pending"}</div>
@@ -417,12 +418,13 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                         Release Commentary
                       </span>
                     </div>
+
                     {narrative ? (
                       <p className="text-sm text-muted-foreground leading-relaxed">{narrative}</p>
                     ) : (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-lg p-4 border border-border/50">
                         <Clock className="h-4 w-4 flex-shrink-0" />
-                        <span>Awaiting release – commentary will appear after publication.</span>
+                        <span>Awaiting release — commentary will appear after publication.</span>
                       </div>
                     )}
                   </div>
@@ -453,6 +455,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                               title={`Actual: ${item.actual}`}
                             />
                           )}
+
                           <div
                             className={`w-full max-w-[24px] rounded-t transition-all duration-300 ${
                               isForecastOnly
@@ -463,6 +466,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                             title={`Forecast: ${item.forecast}`}
                           />
                         </div>
+
                         <span className="text-xs text-muted-foreground">{item.period}</span>
                       </div>
                     );
@@ -487,6 +491,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                       <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
                         <span className="text-xs font-semibold text-primary">{index + 1}</span>
                       </div>
+
                       <p className="text-sm text-muted-foreground leading-relaxed">{tip}</p>
                     </div>
                   ))}
