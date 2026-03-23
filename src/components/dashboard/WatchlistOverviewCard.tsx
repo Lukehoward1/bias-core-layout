@@ -1,10 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Minus, ChevronRight, Star } from "lucide-react";
 import { useWatchlist } from "@/hooks/use-watchlist";
 import { useMarketQuotes } from "@/hooks/use-market-quotes";
-import { getFormattedMarketChange, type MarketQuote } from "@/services/marketData";
+import { getFormattedMarketChange, normalizeSymbol, type MarketQuote } from "@/services/marketData";
 
 interface WatchlistOverviewCardProps {
   isEditMode?: boolean;
@@ -28,21 +28,26 @@ const formatPriceNoCommas = (raw: string | number) => {
   return String(n);
 };
 
-export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps) {
+export function WatchlistOverviewCard({ isEditMode = false }: WatchlistOverviewCardProps) {
   const { watchlistAssets } = useWatchlist();
   const navigate = useNavigate();
   const location = useLocation();
 
   const displayAssets = useMemo(() => watchlistAssets.slice(0, 5), [watchlistAssets]);
-  const quotes = useMarketQuotes(displayAssets.map((asset) => asset.symbol));
 
-  const openAsset = (symbol: string) => {
-    if (isEditMode) return;
+  const symbols = useMemo(() => displayAssets.map((asset) => asset.symbol), [displayAssets]);
+  const quotes = useMarketQuotes(symbols);
 
-    navigate(`/asset/${symbol}`, {
-      state: { backgroundLocation: location },
-    });
-  };
+  const openAsset = useCallback(
+    (symbol: string) => {
+      if (isEditMode) return;
+
+      navigate(`/asset/${symbol}`, {
+        state: { backgroundLocation: location },
+      });
+    },
+    [isEditMode, navigate, location],
+  );
 
   const getBiasIcon = (bias: string) => {
     if (bias === "Bullish") return <TrendingUp className="h-4 w-4" />;
@@ -54,6 +59,10 @@ export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps
     if (bias === "Bullish") return "text-success";
     if (bias === "Bearish") return "text-destructive";
     return "text-muted-foreground";
+  };
+
+  const getQuoteForAsset = (symbol: string): MarketQuote | undefined => {
+    return quotes[normalizeSymbol(symbol)];
   };
 
   const getChangeColor = (quote: MarketQuote | undefined, fallbackChange?: string) => {
@@ -106,31 +115,32 @@ export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps
       <CardContent>
         <div className="space-y-3">
           {displayAssets.map((asset) => {
-            const quote = quotes[asset.symbol];
+            const quote = getQuoteForAsset(asset.symbol);
 
             return (
               <button
                 key={asset.symbol}
                 type="button"
                 onClick={() => openAsset(asset.symbol)}
-                className="w-full text-left flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors group"
+                disabled={isEditMode}
+                className="w-full text-left flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors group disabled:cursor-default disabled:hover:bg-muted/50"
               >
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className="font-semibold text-foreground">{asset.symbol}</span>
                     <div className={`flex items-center gap-1 text-xs font-medium ${getBiasColor(asset.biasDirection)}`}>
                       {getBiasIcon(asset.biasDirection)}
-                      {asset.biasDirection}
+                      <span>{asset.biasDirection}</span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                     <span>Confidence: {asset.biasConfidence}%</span>
                     <span>Spread: {asset.spread}</span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <div className="text-right">
                     <div className="text-sm font-medium text-foreground">
                       {formatPriceNoCommas(quote?.last?.toString() ?? asset.latestPrice)}
@@ -140,7 +150,9 @@ export function WatchlistOverviewCard({ isEditMode }: WatchlistOverviewCardProps
                     </div>
                   </div>
 
-                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  {!isEditMode && (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  )}
                 </div>
               </button>
             );
