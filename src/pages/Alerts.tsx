@@ -47,10 +47,8 @@ const parseEventTimeToday = (time: string) => {
 
 export default function Alerts() {
   const [activeTab, setActiveTab] = useState("overview");
-
   const [showCreatePriceAlert, setShowCreatePriceAlert] = useState(false);
   const [editingPriceAlert, setEditingPriceAlert] = useState<PriceAlert | null>(null);
-
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
@@ -100,11 +98,11 @@ export default function Alerts() {
   };
 
   const activePriceAlertsCount = useMemo(
-    () => priceAlerts.filter((a) => !a.triggered && a.enabled).length,
+    () => priceAlerts.filter((alert) => !alert.triggered && alert.enabled).length,
     [priceAlerts],
   );
 
-  const overviewActivePriceAlerts = useMemo(() => priceAlerts.filter((a) => !a.triggered), [priceAlerts]);
+  const overviewActivePriceAlerts = useMemo(() => priceAlerts.filter((alert) => !alert.triggered), [priceAlerts]);
 
   const topNewsEvents = useMemo(() => {
     const now = new Date();
@@ -134,12 +132,12 @@ export default function Alerts() {
       .slice(0, 5);
   }, []);
 
-  const openCalendarEvent = useCallback((ev: CalendarEvent) => {
+  const openCalendarEvent = useCallback((event: CalendarEvent) => {
     setIsEventModalOpen(false);
     setSelectedCalendarEvent(null);
 
     requestAnimationFrame(() => {
-      setSelectedCalendarEvent(ev);
+      setSelectedCalendarEvent(event);
       setIsEventModalOpen(true);
     });
   }, []);
@@ -258,9 +256,9 @@ export default function Alerts() {
                       <button
                         key={item.id}
                         type="button"
-                        onPointerDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
+                        onPointerDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
                           handleTopNewsClick(item);
                         }}
                         className="w-full text-left p-4 bg-muted/50 rounded-lg border border-border hover:bg-muted transition-colors"
@@ -428,7 +426,7 @@ export default function Alerts() {
                     </div>
                     <div className="p-4 bg-muted/50 rounded-lg border border-border">
                       <p className="text-2xl font-bold text-foreground">
-                        {priceAlerts.filter((a) => a.triggered).length}
+                        {priceAlerts.filter((alert) => alert.triggered).length}
                       </p>
                       <p className="text-xs text-muted-foreground">Triggered Today</p>
                     </div>
