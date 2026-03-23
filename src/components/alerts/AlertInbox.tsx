@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,12 +35,13 @@ interface AlertInboxProps {
 
 export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClearAll }: AlertInboxProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [filter, setFilter] = useState<"all" | "unread">("all");
 
-  const unreadCount = useMemo(() => alerts.filter((a) => !a.read).length, [alerts]);
+  const unreadCount = useMemo(() => alerts.filter((alert) => !alert.read).length, [alerts]);
 
   const filteredAlerts = useMemo(() => {
-    return filter === "unread" ? alerts.filter((a) => !a.read) : alerts;
+    return filter === "unread" ? alerts.filter((alert) => !alert.read) : alerts;
   }, [alerts, filter]);
 
   const getIcon = (type: AlertType) => {
@@ -68,6 +69,7 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
 
   const getSeverityStyles = (severity: AlertItem["severity"], read: boolean) => {
     if (read) return "bg-muted/30 border-border/50";
+
     switch (severity) {
       case "high":
         return "bg-destructive/5 border-destructive/30";
@@ -79,9 +81,11 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
   };
 
   const formatTime = (date: Date) => {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "Recently";
+
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
+    const diffMins = Math.max(0, Math.floor(diffMs / 60000));
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
 
@@ -93,20 +97,20 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
 
   const applyRouteParams = useCallback((route: string, params?: Record<string, string>) => {
     if (!params) return route;
-    let out = route;
-    for (const [k, v] of Object.entries(params)) {
-      out = out.replace(`:${k}`, encodeURIComponent(v));
+
+    let resolved = route;
+    for (const [key, value] of Object.entries(params)) {
+      resolved = resolved.replace(`:${key}`, encodeURIComponent(value));
     }
-    return out;
+
+    return resolved;
   }, []);
 
   const buildNavigateTarget = useCallback(
     (alert: AlertItem) => {
-      // If routeTo exists, use it (with params + optional calendar deep-link)
       if (alert.routeTo) {
         let target = applyRouteParams(alert.routeTo, alert.routeParams);
 
-        // ✅ Only append eventId when going to calendar
         if (alert.eventId && target.startsWith("/calendar")) {
           const joiner = target.includes("?") ? "&" : "?";
           target = `${target}${joiner}eventId=${encodeURIComponent(alert.eventId)}`;
@@ -115,18 +119,21 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
         return target;
       }
 
-      // Otherwise, fall back to sensible defaults (same logic as GlobalNotifications)
       switch (alert.type) {
         case "bias":
         case "price":
         case "level":
-          if (alert.relatedAsset) return `/asset/${encodeURIComponent(alert.relatedAsset)}`;
+          if (alert.relatedAsset) {
+            return `/asset/${encodeURIComponent(alert.relatedAsset)}`;
+          }
           return "/markets";
 
         case "news":
         case "summary":
         case "breaking":
-          if (alert.eventId) return `/calendar?eventId=${encodeURIComponent(alert.eventId)}`;
+          if (alert.eventId) {
+            return `/calendar?eventId=${encodeURIComponent(alert.eventId)}`;
+          }
           return "/calendar";
 
         case "risk":
@@ -143,14 +150,28 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
     [applyRouteParams],
   );
 
+  const navigateWithModalSupport = useCallback(
+    (target: string) => {
+      if (target.startsWith("/asset/")) {
+        navigate(target, { state: { backgroundLocation: location } });
+        return;
+      }
+
+      navigate(target);
+    },
+    [navigate, location],
+  );
+
   const handleAlertClick = useCallback(
     (alert: AlertItem) => {
       onMarkRead(alert.id);
 
       const target = buildNavigateTarget(alert);
-      if (target) navigate(target);
+      if (target) {
+        navigateWithModalSupport(target);
+      }
     },
-    [onMarkRead, buildNavigateTarget, navigate],
+    [onMarkRead, buildNavigateTarget, navigateWithModalSupport],
   );
 
   return (
@@ -186,7 +207,7 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
       </CardHeader>
 
       <CardContent>
-        <Tabs value={filter} onValueChange={(v) => setFilter(v as "all" | "unread")}>
+        <Tabs value={filter} onValueChange={(value) => setFilter(value as "all" | "unread")}>
           <TabsList className="h-8 mb-3">
             <TabsTrigger value="all" className="text-xs">
               All ({alerts.length})
@@ -218,14 +239,17 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
                           getSeverityStyles(alert.severity, alert.read),
                         )}
                         onClick={() => handleAlertClick(alert)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") handleAlertClick(alert);
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            handleAlertClick(alert);
+                          }
                         }}
                       >
                         <div className="flex items-start gap-3">
                           <div
                             className={cn(
-                              "p-1.5 rounded-md mt-0.5",
+                              "p-1.5 rounded-md mt-0.5 shrink-0",
                               alert.severity === "high"
                                 ? "bg-destructive/20 text-destructive"
                                 : alert.severity === "warning"
@@ -272,18 +296,20 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            {!alert.read && <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-2" />}
+                          <div className="flex items-center gap-2 shrink-0">
+                            {!alert.read && <div className="w-2 h-2 rounded-full bg-primary mt-2" />}
 
                             <Button
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
                                 onDelete(alert.id);
                               }}
+                              aria-label="Delete alert"
+                              title="Delete alert"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
