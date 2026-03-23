@@ -16,8 +16,8 @@ export function PriceAlertsPanel() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingAlert, setEditingAlert] = useState<PriceAlert | null>(null);
 
-  const activeAlerts = useMemo(() => priceAlerts.filter((a) => !a.triggered), [priceAlerts]);
-  const triggeredAlerts = useMemo(() => priceAlerts.filter((a) => a.triggered), [priceAlerts]);
+  const activeAlerts = useMemo(() => priceAlerts.filter((alert) => !alert.triggered), [priceAlerts]);
+  const triggeredAlerts = useMemo(() => priceAlerts.filter((alert) => alert.triggered), [priceAlerts]);
 
   const formatTime = (date: Date) => {
     if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "Recently";
