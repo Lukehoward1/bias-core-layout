@@ -56,6 +56,10 @@ function mapCategory(cat: RegistryAsset["category"]): AssetCategory {
       return "Indices";
     case "commodity":
       return "Commodities";
+    case "etf":
+      return "ETFs";
+    case "future":
+      return "Futures";
     default:
       return "FX";
   }
@@ -239,26 +243,36 @@ function generatePlaceholder(reg: RegistryAsset): Partial<Asset> {
     spread: "—",
     volume: "—",
     news: "No scheduled events",
+    insight: "Awaiting market context",
   };
 }
 
 // Build the master asset list from the registry
 export const assetsData: Asset[] = ASSETS.map((reg) => {
-  const overrides = manualOverrides[reg.symbol];
+  const overrides = manualOverrides[reg.symbol] || {};
   const placeholder = generatePlaceholder(reg);
+
   return {
     symbol: reg.symbol,
     displayName: reg.name,
     category: mapCategory(reg.category),
-    ...placeholder,
+    latestPrice: placeholder.latestPrice ?? "—",
+    priceChange: placeholder.priceChange ?? "0.00%",
+    biasDirection: placeholder.biasDirection ?? "Neutral",
+    biasConfidence: placeholder.biasConfidence ?? 50,
+    sentiment: placeholder.sentiment ?? 0,
+    spread: placeholder.spread ?? "—",
+    volume: placeholder.volume ?? "—",
+    news: placeholder.news ?? "No scheduled events",
+    insight: placeholder.insight,
     ...overrides,
-  } as Asset;
+  };
 });
 
 // ── Normalisation & lookup helpers ──────────────────────────────
 
 /** Uppercase, strip slashes, trim */
-function normalizeSymbol(input: string): string {
+export function normalizeSymbol(input: string): string {
   return input.toUpperCase().replace(/\//g, "").trim();
 }
 
@@ -271,7 +285,9 @@ function resolveAlias(normalized: string): string | undefined {
 
 // Build a fast lookup map
 const assetMap = new Map<string, Asset>();
-for (const asset of assetsData) assetMap.set(asset.symbol, asset);
+for (const asset of assetsData) {
+  assetMap.set(asset.symbol, asset);
+}
 
 /* ── Bias mode / timeframe engine ────────────────────────────── */
 
@@ -281,7 +297,7 @@ for (const asset of assetsData) assetMap.set(asset.symbol, asset);
  * but this keeps the app resilient if earlier builds used other names.
  */
 const BIAS_MODE_KEYS = [
-  "traderStyle", // ✅ canonical (recommended)
+  "traderStyle",
   "tradingStyle",
   "trading-style",
   "bias-mode",
@@ -293,24 +309,24 @@ const BIAS_MODE_KEYS = [
 
 function readBiasMode(): BiasMode {
   try {
-    for (const k of BIAS_MODE_KEYS) {
-      const raw = localStorage.getItem(k);
+    for (const key of BIAS_MODE_KEYS) {
+      const raw = localStorage.getItem(key);
       if (!raw) continue;
-      const v = raw.toLowerCase().trim();
 
-      // Accept a few synonyms safely
-      if (v === "scalper" || v === "scalping") return "scalper";
-      if (v === "intraday") return "intraday";
-      if (v === "swing") return "swing";
+      const value = raw.toLowerCase().trim();
+
+      if (value === "scalper" || value === "scalping") return "scalper";
+      if (value === "intraday") return "intraday";
+      if (value === "swing") return "swing";
     }
   } catch {
     // ignore
   }
+
   return "intraday";
 }
 
 function getTimeframesForMode(mode: BiasMode): string[] {
-  // ✅ Locked mapping
   if (mode === "scalper") return ["5m", "15m", "1h"];
   if (mode === "intraday") return ["15m", "1h", "4h"];
   return ["4h", "1d", "1w"];
@@ -322,7 +338,9 @@ function clamp(n: number, min: number, max: number) {
 
 function hashString(s: string): number {
   let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < s.length; i++) {
+    h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  }
   return h;
 }
 
@@ -348,58 +366,58 @@ function scoreToDir(score: number): BiasDirection {
 function computeBiasForMode(args: { symbol: string; overallDir: BiasDirection; overallConf: number; mode: BiasMode }) {
   const { symbol, overallDir, overallConf, mode } = args;
 
-  const tfs = getTimeframesForMode(mode);
+  const timeframes = getTimeframesForMode(mode);
 
-  // weights per mode
-  const weights = mode === "scalper" ? [0.45, 0.35, 0.2] : mode === "swing" ? [0.2, 0.35, 0.45] : [0.25, 0.35, 0.4]; // intraday
+  const weights = mode === "scalper" ? [0.45, 0.35, 0.2] : mode === "swing" ? [0.2, 0.35, 0.45] : [0.25, 0.35, 0.4];
 
-  // anchor with overall bias
   const baseScore = dirToScore(overallDir) * 0.55;
 
-  const symbolH = hashString(symbol);
+  const symbolHash = hashString(symbol);
 
   let weightedScore = baseScore;
-  let weightedConf = clamp(overallConf, 40, 95) * 0.55;
+  let weightedConfidence = clamp(overallConf, 40, 95) * 0.55;
 
-  for (let i = 0; i < tfs.length; i++) {
-    const tf = tfs[i];
-    const w = weights[i] ?? 1 / tfs.length;
+  for (let i = 0; i < timeframes.length; i++) {
+    const timeframe = timeframes[i];
+    const weight = weights[i] ?? 1 / timeframes.length;
 
-    const tfH = hashString(`${symbolH}:${tf}:${mode}`);
-    const tfScoreRaw = ((tfH % 200) - 100) / 100; // -1..+1
-    const tfScore = clamp(tfScoreRaw, -1, 1);
+    const timeframeHash = hashString(`${symbolHash}:${timeframe}:${mode}`);
+    const timeframeScoreRaw = ((timeframeHash % 200) - 100) / 100;
+    const timeframeScore = clamp(timeframeScoreRaw, -1, 1);
 
-    const tfConf = 35 + (tfH % 56); // 35..90
+    const timeframeConfidence = 35 + (timeframeHash % 56);
 
-    weightedScore += tfScore * w * 0.45;
-    weightedConf += tfConf * w * 0.45;
+    weightedScore += timeframeScore * weight * 0.45;
+    weightedConfidence += timeframeConfidence * weight * 0.45;
   }
 
-  const dir = scoreToDir(weightedScore);
-  const conf = Math.round(clamp(weightedConf, 35, 95));
+  const biasDirection = scoreToDir(weightedScore);
+  const biasConfidence = Math.round(clamp(weightedConfidence, 35, 95));
 
-  return { biasDirection: dir, biasConfidence: conf, biasTimeframes: tfs };
+  return {
+    biasDirection,
+    biasConfidence,
+    biasTimeframes: timeframes,
+  };
 }
 
 /** Get asset by symbol — supports EURUSD, EUR/USD, lowercase, and aliases */
 export function getAssetBySymbol(symbol: string): Asset | undefined {
-  const norm = normalizeSymbol(symbol);
+  const normalized = normalizeSymbol(symbol);
 
-  const direct = assetMap.get(norm);
+  const direct = assetMap.get(normalized);
   const base =
     direct ??
     (() => {
-      const canonical = resolveAlias(norm);
+      const canonical = resolveAlias(normalized);
       return canonical ? assetMap.get(canonical) : undefined;
     })();
 
   if (!base) return undefined;
 
-  // overall/base bias (immutable reference)
   const overallDir = base.biasDirection;
   const overallConf = base.biasConfidence;
 
-  // style-adjust bias (what UI shows)
   const mode = readBiasMode();
   const styled = computeBiasForMode({
     symbol: base.symbol,
@@ -408,14 +426,12 @@ export function getAssetBySymbol(symbol: string): Asset | undefined {
     mode,
   });
 
-  // Return a COPY so we never mutate assetMap records
   return {
     ...base,
     biasMode: mode,
     biasTimeframes: styled.biasTimeframes,
     overallBiasDirection: overallDir,
     overallBiasConfidence: overallConf,
-
     biasDirection: styled.biasDirection,
     biasConfidence: styled.biasConfidence,
   };
@@ -423,7 +439,10 @@ export function getAssetBySymbol(symbol: string): Asset | undefined {
 
 // Helper to get assets by category
 export function getAssetsByCategory(category: AssetCategory): Asset[] {
-  return assetsData.filter((asset) => asset.category === category);
+  return assetsData
+    .map((asset) => getAssetBySymbol(asset.symbol))
+    .filter((asset): asset is Asset => !!asset)
+    .filter((asset) => asset.category === category);
 }
 
 // Helper to get all asset symbols
@@ -436,17 +455,19 @@ export const defaultDashboardAssets = ["EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "
 
 // Extract currencies from asset symbols for alert relevance
 export function extractCurrenciesFromSymbol(symbol: string): string[] {
-  const reg = ASSET_BY_SYMBOL[normalizeSymbol(symbol)];
-  if (reg?.base && reg?.quote) return [reg.base, reg.quote];
-  if (reg) return ["USD"]; // indices/commodities default
+  const registryAsset = ASSET_BY_SYMBOL[normalizeSymbol(symbol)];
+  if (registryAsset?.base && registryAsset?.quote) return [registryAsset.base, registryAsset.quote];
+  if (registryAsset) return ["USD"];
   return [];
 }
 
 // Get unique currencies from a list of asset symbols
 export function getCurrenciesFromWatchlist(watchlist: string[]): string[] {
   const currencies = new Set<string>();
-  watchlist.forEach((sym) => {
-    extractCurrenciesFromSymbol(sym).forEach((c) => currencies.add(c));
+
+  watchlist.forEach((symbol) => {
+    extractCurrenciesFromSymbol(symbol).forEach((currency) => currencies.add(currency));
   });
+
   return Array.from(currencies);
 }
