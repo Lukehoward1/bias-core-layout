@@ -22,7 +22,7 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
 
   const toggleOffset = (offset: number) => {
     const nextOffsets = preferences.sessionReminderOffsets.includes(offset)
-      ? preferences.sessionReminderOffsets.filter((o) => o !== offset)
+      ? preferences.sessionReminderOffsets.filter((value) => value !== offset)
       : [...preferences.sessionReminderOffsets, offset].sort((a, b) => b - a);
 
     updatePref("sessionReminderOffsets", nextOffsets);
@@ -30,16 +30,16 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
 
   const toggleCurrency = (currency: string) => {
     const nextCurrencies = preferences.relevantCurrencies.includes(currency)
-      ? preferences.relevantCurrencies.filter((c) => c !== currency)
+      ? preferences.relevantCurrencies.filter((value) => value !== currency)
       : [...preferences.relevantCurrencies, currency].sort();
 
     updatePref("relevantCurrencies", nextCurrencies);
   };
 
-  const toggleTimeframe = (tf: "H4" | "Daily") => {
-    const nextTimeframes = preferences.biasFlipTimeframes.includes(tf)
-      ? preferences.biasFlipTimeframes.filter((t) => t !== tf)
-      : [...preferences.biasFlipTimeframes, tf];
+  const toggleTimeframe = (timeframe: "H4" | "Daily") => {
+    const nextTimeframes = preferences.biasFlipTimeframes.includes(timeframe)
+      ? preferences.biasFlipTimeframes.filter((value) => value !== timeframe)
+      : [...preferences.biasFlipTimeframes, timeframe];
 
     updatePref("biasFlipTimeframes", nextTimeframes);
   };
@@ -61,7 +61,7 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
             <Switch
               id="sessionReminders"
               checked={preferences.sessionReminders}
-              onCheckedChange={(v) => updatePref("sessionReminders", v)}
+              onCheckedChange={(value) => updatePref("sessionReminders", value)}
             />
           </div>
 
@@ -90,7 +90,7 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
             <Switch
               id="sessionOverlaps"
               checked={preferences.sessionOverlaps}
-              onCheckedChange={(v) => updatePref("sessionOverlaps", v)}
+              onCheckedChange={(value) => updatePref("sessionOverlaps", value)}
             />
           </div>
 
@@ -101,7 +101,7 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
             <Switch
               id="sessionStatus"
               checked={preferences.sessionStatus}
-              onCheckedChange={(v) => updatePref("sessionStatus", v)}
+              onCheckedChange={(value) => updatePref("sessionStatus", value)}
             />
           </div>
         </CardContent>
@@ -122,7 +122,7 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
             <Switch
               id="highImpactNews"
               checked={preferences.highImpactNews}
-              onCheckedChange={(v) => updatePref("highImpactNews", v)}
+              onCheckedChange={(value) => updatePref("highImpactNews", value)}
             />
           </div>
 
@@ -133,7 +133,7 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
             <Switch
               id="breakingNews"
               checked={preferences.breakingNews}
-              onCheckedChange={(v) => updatePref("breakingNews", v)}
+              onCheckedChange={(value) => updatePref("breakingNews", value)}
             />
           </div>
 
@@ -144,7 +144,7 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
             <Switch
               id="postEventSummaries"
               checked={preferences.postEventSummaries}
-              onCheckedChange={(v) => updatePref("postEventSummaries", v)}
+              onCheckedChange={(value) => updatePref("postEventSummaries", value)}
             />
           </div>
         </CardContent>
@@ -165,7 +165,7 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
             <Switch
               id="biasFlipAlerts"
               checked={preferences.biasFlipAlerts}
-              onCheckedChange={(v) => updatePref("biasFlipAlerts", v)}
+              onCheckedChange={(value) => updatePref("biasFlipAlerts", value)}
             />
           </div>
 
@@ -173,14 +173,14 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
             <div className="pl-4 space-y-2">
               <Label className="text-xs text-muted-foreground">Timeframes</Label>
               <div className="flex gap-2">
-                {biasTimeframes.map((tf) => (
+                {biasTimeframes.map((timeframe) => (
                   <Badge
-                    key={tf}
-                    variant={preferences.biasFlipTimeframes.includes(tf) ? "default" : "outline"}
+                    key={timeframe}
+                    variant={preferences.biasFlipTimeframes.includes(timeframe) ? "default" : "outline"}
                     className="cursor-pointer"
-                    onClick={() => toggleTimeframe(tf)}
+                    onClick={() => toggleTimeframe(timeframe)}
                   >
-                    {tf}
+                    {timeframe}
                   </Badge>
                 ))}
               </div>
@@ -194,7 +194,7 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
             <Switch
               id="biasAlignmentAlerts"
               checked={preferences.biasAlignmentAlerts}
-              onCheckedChange={(v) => updatePref("biasAlignmentAlerts", v)}
+              onCheckedChange={(value) => updatePref("biasAlignmentAlerts", value)}
             />
           </div>
 
@@ -205,7 +205,7 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
             <Switch
               id="dailySummary"
               checked={preferences.dailySummary}
-              onCheckedChange={(v) => updatePref("dailySummary", v)}
+              onCheckedChange={(value) => updatePref("dailySummary", value)}
             />
           </div>
 
@@ -216,7 +216,7 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
             <Switch
               id="weeklySummary"
               checked={preferences.weeklySummary}
-              onCheckedChange={(v) => updatePref("weeklySummary", v)}
+              onCheckedChange={(value) => updatePref("weeklySummary", value)}
             />
           </div>
         </CardContent>
@@ -237,7 +237,7 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
             <Switch
               id="preNewsExposure"
               checked={preferences.preNewsExposure}
-              onCheckedChange={(v) => updatePref("preNewsExposure", v)}
+              onCheckedChange={(value) => updatePref("preNewsExposure", value)}
             />
           </div>
 
@@ -248,7 +248,7 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
             <Switch
               id="lowLiquidity"
               checked={preferences.lowLiquidity}
-              onCheckedChange={(v) => updatePref("lowLiquidity", v)}
+              onCheckedChange={(value) => updatePref("lowLiquidity", value)}
             />
           </div>
         </CardContent>
@@ -269,7 +269,7 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
             <Switch
               id="quietHoursEnabled"
               checked={preferences.quietHoursEnabled}
-              onCheckedChange={(v) => updatePref("quietHoursEnabled", v)}
+              onCheckedChange={(value) => updatePref("quietHoursEnabled", value)}
             />
           </div>
 
@@ -277,13 +277,16 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
             <div className="grid grid-cols-2 gap-4 pl-4">
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Start</Label>
-                <Select value={preferences.quietHoursStart} onValueChange={(v) => updatePref("quietHoursStart", v)}>
+                <Select
+                  value={preferences.quietHoursStart}
+                  onValueChange={(value) => updatePref("quietHoursStart", value)}
+                >
                   <SelectTrigger className="h-8">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from({ length: 24 }, (_, i) => {
-                      const value = `${i.toString().padStart(2, "0")}:00`;
+                    {Array.from({ length: 24 }, (_, index) => {
+                      const value = `${index.toString().padStart(2, "0")}:00`;
                       return (
                         <SelectItem key={value} value={value}>
                           {value}
@@ -296,13 +299,13 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
 
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">End</Label>
-                <Select value={preferences.quietHoursEnd} onValueChange={(v) => updatePref("quietHoursEnd", v)}>
+                <Select value={preferences.quietHoursEnd} onValueChange={(value) => updatePref("quietHoursEnd", value)}>
                   <SelectTrigger className="h-8">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from({ length: 24 }, (_, i) => {
-                      const value = `${i.toString().padStart(2, "0")}:00`;
+                    {Array.from({ length: 24 }, (_, index) => {
+                      const value = `${index.toString().padStart(2, "0")}:00`;
                       return (
                         <SelectItem key={value} value={value}>
                           {value}
