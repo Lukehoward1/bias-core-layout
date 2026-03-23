@@ -22,6 +22,7 @@ import { PositionSizeCalculator } from "@/components/risk/PositionSizeCalculator
 import { RiskRewardCalculator } from "@/components/risk/RiskRewardCalculator";
 import { DailyRiskLimitTracker } from "@/components/risk/DailyRiskLimitTracker";
 import { MaxDrawdownGuard } from "@/components/risk/MaxDrawdownGuard";
+import { WatchlistOverviewCard } from "@/components/dashboard/cards/WatchlistOverviewCard";
 
 // Sample equity data for charts
 const getSampleEquityData = () => {
@@ -35,13 +36,15 @@ const getSampleEquityData = () => {
     { date: "2025-01-14", pnl: 1350 },
     { date: "2025-01-15", pnl: 600 },
   ];
+
   let cumulative = 0;
-  return sampleTrades.map((t) => {
-    cumulative += t.pnl;
+
+  return sampleTrades.map((trade) => {
+    cumulative += trade.pnl;
     return {
-      date: t.date,
+      date: trade.date,
       equity: cumulative,
-      formattedDate: t.date.split("-").slice(1).join("/"),
+      formattedDate: trade.date.split("-").slice(1).join("/"),
     };
   });
 };
@@ -53,8 +56,188 @@ export interface CardRenderContext {
 }
 
 export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.ReactNode> = {
+  "todays-bias": () => (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Today's Bias</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-2xl font-bold text-success">Bullish</p>
+            <p className="text-xs text-muted-foreground mt-1">H4 + Daily aligned</p>
+          </div>
+          <TrendingUp className="h-6 w-6 text-success" />
+        </div>
+      </CardContent>
+    </Card>
+  ),
+
+  "active-trades": () => (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Active Trades</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-2xl font-bold text-foreground">3</p>
+        <p className="text-xs text-muted-foreground mt-1">2 long · 1 short</p>
+      </CardContent>
+    </Card>
+  ),
+
+  "next-session": () => (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Next Session</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-lg font-bold text-foreground">London</p>
+            <p className="text-xs text-muted-foreground mt-1">Opens in 2:15:30</p>
+          </div>
+          <Clock className="h-5 w-5 text-primary" />
+        </div>
+      </CardContent>
+    </Card>
+  ),
+
+  "watchlist-overview": ({ slotType }) => <WatchlistOverviewCard slotType={slotType} />,
+
+  "performance-overview": ({ slotType }) => {
+    const chartHeight = slotType === "hero" ? "h-64" : "h-40";
+
+    return (
+      <Card className="h-full">
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">Performance Overview</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className={chartHeight}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={equityData}>
+                <defs>
+                  <linearGradient id="performanceOverviewGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="formattedDate" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `£${v}`} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "8px",
+                  }}
+                  formatter={(value: number) => [`£${value.toLocaleString()}`, "Equity"]}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="equity"
+                  stroke="hsl(var(--primary))"
+                  fill="url(#performanceOverviewGradient)"
+                  strokeWidth={2}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="p-3 rounded-lg bg-muted/50 border border-border">
+              <p className="text-xs text-muted-foreground">Win Rate</p>
+              <p className="text-lg font-bold text-foreground">66.7%</p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50 border border-border">
+              <p className="text-xs text-muted-foreground">Total P&amp;L</p>
+              <p className="text-lg font-bold text-success">+£2,307</p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50 border border-border">
+              <p className="text-xs text-muted-foreground">Avg R:R</p>
+              <p className="text-lg font-bold text-foreground">1.85</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  },
+
+  "risk-snapshot": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Shield className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Risk Snapshot</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-muted-foreground">Daily Risk Used</span>
+            <span className="text-xs font-medium text-foreground">42%</span>
+          </div>
+          <Progress value={42} />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-muted-foreground">Drawdown Buffer</span>
+            <span className="text-xs font-medium text-foreground">68%</span>
+          </div>
+          <Progress value={68} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+            <p className="text-xs text-muted-foreground">Open Risk</p>
+            <p className="text-lg font-bold text-foreground">1.2%</p>
+          </div>
+          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+            <p className="text-xs text-muted-foreground">Max Daily</p>
+            <p className="text-lg font-bold text-foreground">3.0%</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  ),
+
+  "calendar-events": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <CalendarIcon className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Week Ahead</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {[
+            { event: "US CPI", currency: "USD", date: "Tue 14:30", impact: "high" },
+            { event: "BOE Rate Decision", currency: "GBP", date: "Thu 12:00", impact: "high" },
+            { event: "ECB Press Conference", currency: "EUR", date: "Thu 13:45", impact: "high" },
+            { event: "NFP", currency: "USD", date: "Fri 13:30", impact: "high" },
+          ].map((item, i) => (
+            <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-1.5 h-1.5 rounded-full ${item.impact === "high" ? "bg-destructive" : "bg-warning"}`}
+                />
+                <div>
+                  <p className="text-xs font-medium text-foreground">{item.event}</p>
+                  <span className="text-[10px] text-muted-foreground">{item.currency}</span>
+                </div>
+              </div>
+              <span className="text-[10px] text-muted-foreground">{item.date}</span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  ),
+
   "pinned-journal-equity": ({ slotType }) => {
     const chartHeight = slotType === "hero" ? "h-64" : "h-40";
+
     return (
       <Card className="h-full">
         <CardHeader>
@@ -171,6 +354,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
 
   "reports-overview-equity": ({ slotType }) => {
     const chartHeight = slotType === "hero" ? "h-64" : "h-40";
+
     return (
       <Card className="h-full">
         <CardHeader>
@@ -213,6 +397,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
 
   "reports-overview-rolling30": ({ slotType }) => {
     const chartHeight = slotType === "hero" ? "h-64" : "h-40";
+
     return (
       <Card className="h-full">
         <CardHeader>
@@ -504,13 +689,14 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
 
   "reports-risk-distribution": ({ slotType }) => {
     const chartHeight = slotType === "hero" ? "h-64" : "h-40";
+
     return (
       <Card className="h-full">
         <CardHeader>
           <CardTitle className="text-sm font-medium">Risk Distribution</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className={chartHeight + " flex items-center justify-center"}>
+          <div className={`${chartHeight} flex items-center justify-center`}>
             <div className="grid grid-cols-4 gap-2 w-full">
               {["0-1%", "1-2%", "2-3%", "3%+"].map((range, i) => (
                 <div key={range} className="text-center">
@@ -643,7 +829,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
       <CardContent>
         <div className="space-y-2">
           {[
-            { type: "Price Alert", what: "EURUSD &gt; 1.0850", status: "active" },
+            { type: "Price Alert", what: "EURUSD > 1.0850", status: "active" },
             { type: "News Alert", what: "USD High Impact", status: "pending" },
             { type: "Session Timer", what: "London Open", status: "active" },
           ].map((alert, i) => (
@@ -994,6 +1180,7 @@ export const hasCardRenderer = (cardId: string): boolean => {
 
 export const warnMissingRenderers = (registryCardIds: string[]): void => {
   const missing = registryCardIds.filter((id) => !hasCardRenderer(id));
+
   if (missing.length > 0) {
     console.warn(
       "[Dashboard] The following registered cards have no render function:\n" +
