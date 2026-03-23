@@ -8,7 +8,7 @@ import { getFormattedMarketChange, normalizeSymbol, type MarketQuote } from "@/s
 
 interface WatchlistOverviewCardProps {
   isEditMode?: boolean;
-  slotType?: "wide" | "narrow" | "equal" | "hero" | "kpi";
+  slotType?: "wide" | "narrow" | "equal" | "hero" | "kpi" | "wide-narrow" | "three-equal" | "four-equal";
 }
 
 const formatPriceNoCommas = (raw: string | number) => {
@@ -34,7 +34,6 @@ export function WatchlistOverviewCard({ isEditMode = false }: WatchlistOverviewC
   const location = useLocation();
 
   const displayAssets = useMemo(() => watchlistAssets.slice(0, 5), [watchlistAssets]);
-
   const symbols = useMemo(() => displayAssets.map((asset) => asset.symbol), [displayAssets]);
   const quotes = useMarketQuotes(symbols);
 
