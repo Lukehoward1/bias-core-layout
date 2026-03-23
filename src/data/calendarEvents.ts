@@ -135,8 +135,7 @@ export const keyEvents: Array<Pick<CalendarEvent, "id" | "time" | "currency" | "
 ];
 
 /**
- * Optional helpers for shared ranking / filtering logic.
- * These are useful for Alerts, Calendar, Markets, and AssetDetail.
+ * Shared helpers
  */
 export const impactRank: Record<CalendarImpact, number> = {
   high: 3,
@@ -145,8 +144,8 @@ export const impactRank: Record<CalendarImpact, number> = {
 };
 
 export function getEventsByCurrency(currency: string): CalendarEvent[] {
-  const norm = currency.trim().toUpperCase();
-  return calendarEvents.filter((event) => event.currency.toUpperCase() === norm);
+  const normalized = currency.trim().toUpperCase();
+  return calendarEvents.filter((event) => event.currency.toUpperCase() === normalized);
 }
 
 export function getKeyEvents(): CalendarEvent[] {
