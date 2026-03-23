@@ -1,3 +1,5 @@
+export type CalendarImpact = "high" | "medium" | "low";
+
 export type CalendarEvent = {
   id: string;
   time: string;
@@ -6,25 +8,16 @@ export type CalendarEvent = {
   previous: string;
   forecast: string;
   actual: string;
-  impact: "high" | "medium" | "low";
+  impact: CalendarImpact;
 };
 
 /**
- * Key Events (cards at the top of Calendar)
- * Keep this as a lightweight subset of calendarEvents by ID.
- */
-export const keyEvents: Array<Pick<CalendarEvent, "id" | "time" | "currency" | "event" | "impact">> = [
-  { id: "nfp-2025-01", time: "08:30", currency: "USD", event: "Non-Farm Payrolls", impact: "high" },
-  { id: "ecb-rate-2025-01", time: "10:00", currency: "EUR", event: "ECB Interest Rate Decision", impact: "high" },
-  { id: "boe-rate-2025-01", time: "14:00", currency: "GBP", event: "BOE Interest Rate Decision", impact: "high" },
-  { id: "us-cpi-2025-01", time: "14:30", currency: "USD", event: "US CPI", impact: "high" },
-
-  // Optional but recommended – used by AssetDetail → Calendar matching
-  { id: "us-core-cpi-2025-01", time: "15:00", currency: "USD", event: "US Core CPI", impact: "high" },
-];
-
-/**
- * Full Calendar Events (table + modal)
+ * Full calendar event source of truth.
+ * Used by:
+ * - Calendar page table
+ * - EventDetailsModal
+ * - AssetDetail event matching
+ * - Alerts / Top News ranking
  */
 export const calendarEvents: CalendarEvent[] = [
   {
@@ -87,11 +80,6 @@ export const calendarEvents: CalendarEvent[] = [
     actual: "—",
     impact: "high",
   },
-
-  /**
-   * Used by AssetDetail matching for "Core CPI (USD)"
-   * Event label intentionally excludes currency — currency lives in its own column
-   */
   {
     id: "us-core-cpi-2025-01",
     time: "15:00",
@@ -103,3 +91,73 @@ export const calendarEvents: CalendarEvent[] = [
     impact: "high",
   },
 ];
+
+/**
+ * Lightweight subset for key event cards / highlight areas.
+ * Keep these IDs aligned with calendarEvents above.
+ */
+export const keyEvents: Array<Pick<CalendarEvent, "id" | "time" | "currency" | "event" | "impact">> = [
+  {
+    id: "nfp-2025-01",
+    time: "08:30",
+    currency: "USD",
+    event: "Non-Farm Payrolls",
+    impact: "high",
+  },
+  {
+    id: "ecb-rate-2025-01",
+    time: "10:00",
+    currency: "EUR",
+    event: "ECB Interest Rate Decision",
+    impact: "high",
+  },
+  {
+    id: "boe-rate-2025-01",
+    time: "14:00",
+    currency: "GBP",
+    event: "BOE Interest Rate Decision",
+    impact: "high",
+  },
+  {
+    id: "us-cpi-2025-01",
+    time: "14:30",
+    currency: "USD",
+    event: "US CPI",
+    impact: "high",
+  },
+  {
+    id: "us-core-cpi-2025-01",
+    time: "15:00",
+    currency: "USD",
+    event: "US Core CPI",
+    impact: "high",
+  },
+];
+
+/**
+ * Optional helpers for shared ranking / filtering logic.
+ * These are useful for Alerts, Calendar, Markets, and AssetDetail.
+ */
+export const impactRank: Record<CalendarImpact, number> = {
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+
+export function getEventsByCurrency(currency: string): CalendarEvent[] {
+  const norm = currency.trim().toUpperCase();
+  return calendarEvents.filter((event) => event.currency.toUpperCase() === norm);
+}
+
+export function getKeyEvents(): CalendarEvent[] {
+  const keyIds = new Set(keyEvents.map((event) => event.id));
+  return calendarEvents.filter((event) => keyIds.has(event.id));
+}
+
+export function getCalendarEventById(id: string): CalendarEvent | undefined {
+  return calendarEvents.find((event) => event.id === id);
+}
+
+export function sortCalendarEventsByImpact(events: CalendarEvent[]): CalendarEvent[] {
+  return [...events].sort((a, b) => impactRank[b.impact] - impactRank[a.impact]);
+}
