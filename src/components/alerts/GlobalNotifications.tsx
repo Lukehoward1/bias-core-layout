@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   X,
@@ -24,35 +24,67 @@ export function GlobalNotifications() {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
 
-  const visibleAlerts = alerts.filter((a) => !a.read && !dismissedIds.has(a.id)).slice(0, 3);
+  const visibleAlerts = useMemo(() => {
+    return alerts.filter((alert) => !alert.read && !dismissedIds.has(alert.id)).slice(0, 3);
+  }, [alerts, dismissedIds]);
 
   const applyRouteParams = useCallback((route: string, params?: Record<string, string>) => {
     if (!params) return route;
-    let out = route;
-    for (const [k, v] of Object.entries(params)) {
-      out = out.replace(`:${k}`, encodeURIComponent(v));
+
+    let resolved = route;
+    for (const [key, value] of Object.entries(params)) {
+      resolved = resolved.replace(`:${key}`, encodeURIComponent(value));
     }
-    return out;
+
+    return resolved;
   }, []);
 
   const buildNavigateTarget = useCallback(
     (alert: AlertItem) => {
-      if (!alert.routeTo) return null;
-      let target = applyRouteParams(alert.routeTo, alert.routeParams);
+      if (alert.routeTo) {
+        let target = applyRouteParams(alert.routeTo, alert.routeParams);
 
-      if (alert.eventId && target.startsWith("/calendar")) {
-        const joiner = target.includes("?") ? "&" : "?";
-        target = `${target}${joiner}eventId=${encodeURIComponent(alert.eventId)}`;
+        if (alert.eventId && target.startsWith("/calendar")) {
+          const joiner = target.includes("?") ? "&" : "?";
+          target = `${target}${joiner}eventId=${encodeURIComponent(alert.eventId)}`;
+        }
+
+        return target;
       }
 
-      return target;
+      switch (alert.type) {
+        case "bias":
+        case "price":
+        case "level":
+          if (alert.relatedAsset) {
+            return `/asset/${encodeURIComponent(alert.relatedAsset)}`;
+          }
+          return "/markets";
+
+        case "news":
+        case "summary":
+        case "breaking":
+          if (alert.eventId) {
+            return `/calendar?eventId=${encodeURIComponent(alert.eventId)}`;
+          }
+          return "/calendar";
+
+        case "risk":
+        case "exposure":
+          return "/risk-tools";
+
+        case "session":
+          return "/alerts";
+
+        default:
+          return "/alerts";
+      }
     },
     [applyRouteParams],
   );
 
   const navigateWithModalSupport = useCallback(
     (target: string) => {
-      // ✅ If it's an asset route, navigate with backgroundLocation so App.tsx renders it as a modal overlay
       if (target.startsWith("/asset/")) {
         navigate(target, { state: { backgroundLocation: location } });
         return;
@@ -71,36 +103,6 @@ export function GlobalNotifications() {
       const target = buildNavigateTarget(alert);
       if (target) {
         navigateWithModalSupport(target);
-        return;
-      }
-
-      switch (alert.type) {
-        case "bias":
-        case "price":
-        case "level":
-          if (alert.relatedAsset) navigateWithModalSupport(`/asset/${alert.relatedAsset}`);
-          else navigateWithModalSupport("/markets");
-          return;
-
-        case "news":
-        case "summary":
-        case "breaking":
-          if (alert.eventId) navigateWithModalSupport(`/calendar?eventId=${encodeURIComponent(alert.eventId)}`);
-          else navigateWithModalSupport("/calendar");
-          return;
-
-        case "risk":
-        case "exposure":
-          navigateWithModalSupport("/risk-tools");
-          return;
-
-        case "session":
-          navigateWithModalSupport("/alerts");
-          return;
-
-        default:
-          navigateWithModalSupport("/alerts");
-          return;
       }
     },
     [markRead, buildNavigateTarget, navigateWithModalSupport],
@@ -116,19 +118,24 @@ export function GlobalNotifications() {
 
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
+
     visibleAlerts.forEach((alert) => {
       if (hoveredId !== alert.id && !isQuietHours) {
         const timer = setTimeout(
-          () => setDismissedIds((prev) => new Set([...prev, alert.id])),
+          () => {
+            setDismissedIds((prev) => new Set([...prev, alert.id]));
+          },
           6000 + Math.random() * 2000,
         );
+
         timers.push(timer);
       }
     });
-    return () => timers.forEach((t) => clearTimeout(t));
-  }, [visibleAlerts, hoveredId, isQuietHours]);
 
-  if (isQuietHours || visibleAlerts.length === 0) return null;
+    return () => {
+      timers.forEach((timer) => clearTimeout(timer));
+    };
+  }, [visibleAlerts, hoveredId, isQuietHours]);
 
   const getIcon = (type: AlertType) => {
     switch (type) {
@@ -164,6 +171,8 @@ export function GlobalNotifications() {
     }
   };
 
+  if (isQuietHours || visibleAlerts.length === 0) return null;
+
   return (
     <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm pointer-events-auto">
       {visibleAlerts.map((alert, index) => (
@@ -182,7 +191,7 @@ export function GlobalNotifications() {
           <div className="flex items-start gap-3">
             <div
               className={cn(
-                "p-1.5 rounded-md",
+                "p-1.5 rounded-md shrink-0",
                 alert.severity === "high"
                   ? "bg-destructive/20 text-destructive"
                   : alert.severity === "warning"
@@ -203,12 +212,14 @@ export function GlobalNotifications() {
             </div>
 
             <button
-              onClick={(e) => {
-                e.stopPropagation();
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
                 handleDismiss(alert.id);
               }}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-              type="button"
+              className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+              aria-label="Dismiss notification"
+              title="Dismiss"
             >
               <X className="h-4 w-4" />
             </button>
