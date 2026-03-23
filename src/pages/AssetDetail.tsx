@@ -10,7 +10,7 @@ import { Star, TrendingUp, TrendingDown, Minus, Activity, AlertTriangle, Clock, 
 import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
 import { useMarketQuote } from "@/hooks/use-market-quotes";
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
-import { calendarEvents } from "@/data/calendarEvents";
+import { calendarEvents, sortCalendarEventsByImpact, type CalendarEvent } from "@/data/calendarEvents";
 import { toast } from "sonner";
 
 import { getEventImpact } from "@/data/eventImpactRules";
@@ -95,10 +95,8 @@ const sessionInsights = [
 ];
 
 /* =======================
-   NEWS → CALENDAR MATCHING (AUTO)
+   HELPERS
 ======================= */
-
-type CalendarEvent = (typeof calendarEvents)[0];
 
 type NewsPill = {
   key: string;
@@ -108,65 +106,14 @@ type NewsPill = {
   calendarEvent?: CalendarEvent;
 };
 
-const normalize = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/\(.*?\)/g, " ")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+const normalizeMarketSymbol = (symbol: string) => symbol.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
-const extractCurrencyFromLabel = (label: string) => {
-  const m = label.match(/\(([A-Z]{3})\)/);
-  return m?.[1] ?? null;
-};
+const isFxPairSymbol = (symbol: string) => /^[A-Z]{6}$/.test(symbol);
 
-const extractTimeHHMM = (timeStr: string) => {
-  const m = timeStr.match(/(\d{1,2}:\d{2})/);
-  if (!m) return null;
-  const [hh, mm] = m[1].split(":");
-  return `${hh.padStart(2, "0")}:${mm}`;
-};
-
-const normalizeEventAlias = (label: string) => {
-  const raw = normalize(label);
-  if (raw === "cpi") return "us cpi";
-  if (raw.includes("core cpi")) return "core cpi";
-  if (raw.includes("interest rate decision")) return "interest rate decision";
-  if (raw.includes("non farm payroll")) return "non farm payrolls";
-  return raw;
-};
-
-const scoreCalendarMatch = (args: {
-  pillLabel: string;
-  pillCurrency: string | null;
-  pillTime: string | null;
-  candidate: CalendarEvent;
-}) => {
-  const { pillLabel, pillCurrency, pillTime, candidate } = args;
-
-  const pillNorm = normalizeEventAlias(pillLabel);
-  const candNorm = normalize(candidate.event);
-
-  let score = 0;
-
-  if (candNorm === pillNorm) score += 6;
-  if (candNorm.includes(pillNorm) || pillNorm.includes(candNorm)) score += 4;
-
-  const pillTokens = new Set(pillNorm.split(" ").filter(Boolean));
-  const candTokens = new Set(candNorm.split(" ").filter(Boolean));
-  let overlap = 0;
-  pillTokens.forEach((t) => {
-    if (candTokens.has(t)) overlap += 1;
-  });
-  score += overlap;
-
-  if (pillCurrency && candidate.currency?.toUpperCase() === pillCurrency.toUpperCase()) score += 3;
-  if (pillTime && candidate.time === pillTime) score += 2;
-
-  if (candidate.impact === "high") score += 0.5;
-
-  return score;
+const getFxCurrencies = (symbol: string) => {
+  const normalized = normalizeMarketSymbol(symbol);
+  if (!isFxPairSymbol(normalized)) return [];
+  return [normalized.slice(0, 3), normalized.slice(3, 6)];
 };
 
 const toPillImpact = (impact: CalendarEvent["impact"]): "High" | "Medium" | "Low" => {
@@ -175,48 +122,37 @@ const toPillImpact = (impact: CalendarEvent["impact"]): "High" | "Medium" | "Low
   return "Low";
 };
 
-/* =======================
-   IMPACT ENGINE ADAPTER
-======================= */
-
-type ImpactResult = {
-  affectedPairs?: string[];
-  affectedAssets?: string[];
-  affectedSymbols?: string[];
-  affected?: string[];
+const sortRelevantEvents = (events: CalendarEvent[]) => {
+  return sortCalendarEventsByImpact(events).sort((a, b) => {
+    if (a.impact !== b.impact) return 0;
+    return a.time.localeCompare(b.time);
+  });
 };
 
-const ensureStringArray = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x) => typeof x === "string") : []);
+const isEventRelevantToSymbol = (symbol: string, event: CalendarEvent) => {
+  const normalizedSymbol = normalizeMarketSymbol(symbol);
+  const impact = getEventImpact({
+    title: event.event,
+    currency: event.currency,
+  });
 
-const getAffectedSymbols = (res: unknown): string[] => {
-  const r = (res || {}) as ImpactResult;
-  const merged = new Set<string>([
-    ...ensureStringArray(r.affectedPairs),
-    ...ensureStringArray(r.affectedAssets),
-    ...ensureStringArray(r.affectedSymbols),
-    ...ensureStringArray(r.affected),
-  ]);
-  return Array.from(merged).map((s) => s.toUpperCase());
-};
+  if (impact.affectedPairs.includes(normalizedSymbol)) return true;
+  if (impact.affectedAssets.includes(normalizedSymbol)) return true;
 
-const isSymbolAffectedByEvent = (symbol: string, ev: { event: string; currency?: string; impact?: string }) => {
-  try {
-    const currency = (ev.currency || extractCurrencyFromLabel(ev.event) || "").toUpperCase();
-    const result = getEventImpact({
-      title: ev.event,
-      currency,
-    } as any);
-
-    const affected = getAffectedSymbols(result);
-    return affected.includes(symbol.toUpperCase());
-  } catch {
-    return false;
+  if (isFxPairSymbol(normalizedSymbol)) {
+    const pairCurrencies = getFxCurrencies(normalizedSymbol);
+    return pairCurrencies.some((currency) => impact.affectedCurrencies.includes(currency));
   }
+
+  return false;
 };
 
-/* =======================
-   PRICE FORMATTING
-======================= */
+const parseNewsTimeToHHMM = (timeStr: string) => {
+  const match = timeStr.match(/(\d{1,2}:\d{2})/);
+  if (!match) return null;
+  const [hh, mm] = match[1].split(":");
+  return `${hh.padStart(2, "0")}:${mm}`;
+};
 
 const formatPriceNoCommas = (raw: string | number) => {
   const cleaned = (raw ?? "").toString().trim();
@@ -235,16 +171,16 @@ const formatPriceNoCommas = (raw: string | number) => {
   return String(n);
 };
 
-/* =======================
-   REUSABLE CONTENT
-======================= */
-
 function formatBiasModeLabel(mode?: string) {
   const m = (mode || "").toLowerCase().trim();
   if (m === "scalper" || m === "scalping") return "Scalper";
   if (m === "swing") return "Swing";
   return "Intraday";
 }
+
+/* =======================
+   REUSABLE CONTENT
+======================= */
 
 export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string; onRequestClose?: () => void }) {
   const { getAssetBySymbol } = useAssets();
@@ -265,12 +201,12 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
     toggleWatchlist(symbol);
   };
 
-  const openCalendarEvent = useCallback((ev: CalendarEvent) => {
+  const openCalendarEvent = useCallback((event: CalendarEvent) => {
     setIsEventModalOpen(false);
     setSelectedCalendarEvent(null);
 
     requestAnimationFrame(() => {
-      setSelectedCalendarEvent(ev);
+      setSelectedCalendarEvent(event);
       setIsEventModalOpen(true);
     });
   }, []);
@@ -280,32 +216,72 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
     setSelectedCalendarEvent(null);
   }, []);
 
+  const relevantCalendarEvents = useMemo(() => {
+    if (!symbol) return [];
+    return sortRelevantEvents(calendarEvents.filter((event) => isEventRelevantToSymbol(symbol, event)));
+  }, [symbol]);
+
+  const newsImpactPills: NewsPill[] = useMemo(() => {
+    if (!symbol) return [];
+
+    const fromCalendar: NewsPill[] = relevantCalendarEvents.map((event) => ({
+      key: `cal-${event.id}`,
+      event: event.event,
+      time: `${event.time} GMT`,
+      impact: toPillImpact(event.impact),
+      calendarEvent: event,
+    }));
+
+    const calendarKeys = new Set(
+      fromCalendar.map((item) => `${item.event.toLowerCase()}|${parseNewsTimeToHHMM(item.time) || item.time}`),
+    );
+
+    const extrasRaw = assetNewsEvents[symbol] || [];
+    const extras: NewsPill[] = extrasRaw
+      .filter((item) => {
+        const timeKey = parseNewsTimeToHHMM(item.time) || item.time;
+        const key = `${item.event.toLowerCase()}|${timeKey}`;
+        return !calendarKeys.has(key);
+      })
+      .map((item, index) => ({
+        key: `extra-${symbol}-${index}-${item.event}`,
+        event: item.event,
+        time: item.time,
+        impact: item.impact,
+      }));
+
+    const combined = [...fromCalendar, ...extras];
+    const filtered = showAllRelevantNews ? combined : combined.filter((item) => item.impact === "High");
+
+    if (!showAllRelevantNews && filtered.length === 0 && combined.length > 0) {
+      return combined;
+    }
+
+    return filtered;
+  }, [symbol, relevantCalendarEvents, showAllRelevantNews]);
+
   const openCalendarOverlayFromNewsPill = useCallback(
-    (newsLabel: string, newsTime: string) => {
-      const pillCurrency = extractCurrencyFromLabel(newsLabel);
-      const pillTime = extractTimeHHMM(newsTime);
-
-      let best: { ev: CalendarEvent; score: number } | null = null;
-
-      for (const ev of calendarEvents) {
-        const s = scoreCalendarMatch({
-          pillLabel: newsLabel,
-          pillCurrency,
-          pillTime,
-          candidate: ev,
-        });
-
-        if (!best || s > best.score) best = { ev, score: s };
-      }
-
-      if (!best || best.score < 4) {
-        toast.error("No matching calendar event found for this news item yet.");
+    (pill: NewsPill) => {
+      if (pill.calendarEvent) {
+        openCalendarEvent(pill.calendarEvent);
         return;
       }
 
-      openCalendarEvent(best.ev);
+      const pillTime = parseNewsTimeToHHMM(pill.time);
+      const matched = relevantCalendarEvents.find((event) => {
+        const sameName = event.event.toLowerCase() === pill.event.toLowerCase();
+        const sameTime = pillTime ? event.time === pillTime : true;
+        return sameName && sameTime;
+      });
+
+      if (matched) {
+        openCalendarEvent(matched);
+        return;
+      }
+
+      toast.error("No matching calendar event found for this news item yet.");
     },
-    [openCalendarEvent],
+    [openCalendarEvent, relevantCalendarEvents],
   );
 
   const getBiasColor = (bias: string) => {
@@ -349,53 +325,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
       ]
     );
   }, [symbol, asset]);
-
-  const newsImpactPills: NewsPill[] = useMemo(() => {
-    if (!symbol) return [];
-
-    const fromCalendar: NewsPill[] = calendarEvents
-      .filter((ev) =>
-        isSymbolAffectedByEvent(symbol, {
-          event: ev.event,
-          currency: ev.currency,
-          impact: ev.impact,
-        }),
-      )
-      .map((ev) => ({
-        key: `cal-${ev.id}`,
-        event: ev.event,
-        time: `${ev.time} GMT`,
-        impact: toPillImpact(ev.impact),
-        calendarEvent: ev,
-      }));
-
-    const extrasRaw = assetNewsEvents[symbol] || [];
-    const extras: NewsPill[] = extrasRaw
-      .filter((n) => {
-        const inferredCurrency = extractCurrencyFromLabel(n.event) ?? undefined;
-        return isSymbolAffectedByEvent(symbol, {
-          event: n.event,
-          currency: inferredCurrency,
-          impact: n.impact?.toLowerCase(),
-        });
-      })
-      .map((n, idx) => ({
-        key: `extra-${symbol}-${idx}-${n.event}`,
-        event: n.event,
-        time: n.time,
-        impact: n.impact,
-      }));
-
-    const calNormSet = new Set(fromCalendar.map((p) => normalize(p.event)));
-    const filteredExtras = extras.filter((x) => !calNormSet.has(normalize(x.event)));
-
-    const combined = [...fromCalendar, ...filteredExtras];
-
-    const filtered = showAllRelevantNews ? combined : combined.filter((p) => p.impact === "High");
-    if (!showAllRelevantNews && filtered.length === 0 && combined.length > 0) return combined;
-
-    return filtered;
-  }, [symbol, showAllRelevantNews]);
 
   if (!asset) {
     return (
@@ -499,7 +428,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                               onPointerDown={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                openCalendarOverlayFromNewsPill(pill.event, pill.time);
+                                openCalendarOverlayFromNewsPill(pill);
                               }}
                               className="w-full flex items-center gap-2 text-left hover:bg-muted/30 rounded-md px-2 py-1.5 transition-colors group"
                             >
@@ -527,11 +456,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                           {newsExpanded ? "Show less" : `+${newsImpactPills.length - 3} more · Show more`}
                         </button>
                       )}
-
-                      <p className="text-xs text-muted-foreground mt-2">
-                        If something doesn’t open, it means the event doesn’t exist in calendarEvents yet (or needs a
-                        closer name match).
-                      </p>
                     </div>
                   )}
                 </div>
@@ -605,6 +529,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                       <circle cx="50" cy="45" r="5" fill="currentColor" className="text-foreground" />
                     </svg>
                   </div>
+
                   <div className={`flex items-center gap-2 mt-6 ${getBiasColor(asset.biasDirection)}`}>
                     {getBiasIcon(asset.biasDirection)}
                     <span className="text-3xl font-bold">{asset.biasDirection}</span>
@@ -714,7 +639,24 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                     onPointerDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      openCalendarOverlayFromNewsPill(news.event, `${news.time} GMT`);
+
+                      const matched = relevantCalendarEvents.find((event) => {
+                        const sameTime = event.time === news.time;
+                        const sameImpact = toPillImpact(event.impact) === news.impact;
+                        const titleA = event.event.toLowerCase();
+                        const titleB = news.event.toLowerCase();
+                        return (
+                          sameTime &&
+                          (titleA === titleB || titleA.includes(titleB) || titleB.includes(titleA) || sameImpact)
+                        );
+                      });
+
+                      if (!matched) {
+                        toast.error("No matching calendar event found for this news item yet.");
+                        return;
+                      }
+
+                      openCalendarEvent(matched);
                     }}
                     className="w-full text-left p-2 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
                   >
