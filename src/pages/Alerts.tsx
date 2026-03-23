@@ -17,11 +17,9 @@ import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { toast } from "sonner";
 
-// Calendar modal wiring
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { calendarEvents } from "@/data/calendarEvents";
 
-// Types
 import type { PriceAlert } from "@/types/alerts";
 
 const news = [
@@ -44,6 +42,7 @@ type CalendarEvent = (typeof calendarEvents)[0];
 const pickBestEventForCurrency = (currency: string): CalendarEvent | null => {
   const c = (currency || "").toUpperCase();
   const matches = calendarEvents.filter((ev) => (ev.currency || "").toUpperCase() === c);
+
   if (matches.length === 0) return null;
 
   const impactRank = (impact: string) => {
@@ -60,11 +59,9 @@ const pickBestEventForCurrency = (currency: string): CalendarEvent | null => {
 export default function Alerts() {
   const [activeTab, setActiveTab] = useState("overview");
 
-  // Create / Edit Price Alert modal state
   const [showCreatePriceAlert, setShowCreatePriceAlert] = useState(false);
   const [editingPriceAlert, setEditingPriceAlert] = useState<PriceAlert | null>(null);
 
-  // Event modal state (Top News click-through)
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
@@ -118,7 +115,8 @@ export default function Alerts() {
     [priceAlerts],
   );
 
-  // Open event modal safely (close then open next frame)
+  const overviewActivePriceAlerts = useMemo(() => priceAlerts.filter((a) => !a.triggered), [priceAlerts]);
+
   const openCalendarEvent = useCallback((ev: CalendarEvent) => {
     setIsEventModalOpen(false);
     setSelectedCalendarEvent(null);
@@ -148,7 +146,6 @@ export default function Alerts() {
     [openCalendarEvent],
   );
 
-  // Always open Create Price Alert "on top"
   const openCreatePriceAlert = useCallback(() => {
     if (isEventModalOpen) {
       closeCalendarOverlay();
@@ -163,7 +160,6 @@ export default function Alerts() {
     setShowCreatePriceAlert(true);
   }, [isEventModalOpen, closeCalendarOverlay]);
 
-  // Edit handler (reuses same modal, pre-filled)
   const openEditPriceAlert = useCallback(
     (alert: PriceAlert) => {
       if (isEventModalOpen) {
@@ -183,7 +179,9 @@ export default function Alerts() {
 
   const handlePriceAlertModalOpenChange = useCallback((open: boolean) => {
     setShowCreatePriceAlert(open);
-    if (!open) setEditingPriceAlert(null);
+    if (!open) {
+      setEditingPriceAlert(null);
+    }
   }, []);
 
   return (
@@ -233,7 +231,6 @@ export default function Alerts() {
             <AlertsSoundToggle />
           </div>
 
-          {/* Overview */}
           <TabsContent value="overview" className="mt-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               <Card className="lg:col-span-2">
@@ -353,40 +350,38 @@ export default function Alerts() {
                       </tr>
                     </thead>
                     <tbody>
-                      {priceAlerts
-                        .filter((a) => !a.triggered)
-                        .map((alert) => (
-                          <tr key={alert.id} className="border-b border-border hover:bg-muted/50 transition-colors">
-                            <td className="py-3 px-5 text-sm text-foreground">
-                              <Badge variant="outline" className="text-xs">
-                                Price
-                              </Badge>
-                            </td>
-                            <td className="py-3 px-4 text-sm text-foreground font-medium">
-                              {alert.assetDisplayName} {alert.direction} {alert.price}
-                            </td>
-                            <td className="py-3 px-4 text-sm text-muted-foreground">
-                              {alert.triggerType === "wick" ? "Touch" : `Close ${alert.timeframe}`}
-                            </td>
-                            <td className="py-3 px-4">
-                              <Badge variant={alert.enabled ? "default" : "secondary"} className="text-xs">
-                                {alert.enabled ? "Active" : "Paused"}
-                              </Badge>
-                            </td>
-                            <td className="py-3 px-5">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 px-2 text-xs"
-                                onClick={() => openEditPriceAlert(alert)}
-                              >
-                                Edit
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
+                      {overviewActivePriceAlerts.map((alert) => (
+                        <tr key={alert.id} className="border-b border-border hover:bg-muted/50 transition-colors">
+                          <td className="py-3 px-5 text-sm text-foreground">
+                            <Badge variant="outline" className="text-xs">
+                              Price
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4 text-sm text-foreground font-medium">
+                            {alert.assetDisplayName} {alert.direction} {alert.price}
+                          </td>
+                          <td className="py-3 px-4 text-sm text-muted-foreground">
+                            {alert.triggerType === "wick" ? "Touch" : `Close ${alert.timeframe}`}
+                          </td>
+                          <td className="py-3 px-4">
+                            <Badge variant={alert.enabled ? "default" : "secondary"} className="text-xs">
+                              {alert.enabled ? "Active" : "Paused"}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-5">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => openEditPriceAlert(alert)}
+                            >
+                              Edit
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
 
-                      {priceAlerts.filter((a) => !a.triggered).length === 0 && (
+                      {overviewActivePriceAlerts.length === 0 && (
                         <tr>
                           <td colSpan={5} className="py-8 text-center text-muted-foreground text-sm">
                             No active alerts. Click "Add Alert" to create one.
@@ -400,7 +395,6 @@ export default function Alerts() {
             </Card>
           </TabsContent>
 
-          {/* Price Alerts */}
           <TabsContent value="price-alerts" className="mt-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <PriceAlertsPanel />
@@ -439,7 +433,6 @@ export default function Alerts() {
             </div>
           </TabsContent>
 
-          {/* Inbox */}
           <TabsContent value="inbox" className="mt-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               <div className="lg:col-span-2">
@@ -457,14 +450,12 @@ export default function Alerts() {
             </div>
           </TabsContent>
 
-          {/* Preferences */}
           <TabsContent value="preferences" className="mt-6">
             <div className="max-w-2xl">
               <AlertPreferencesPanel preferences={preferences} onUpdate={updatePreferences} />
             </div>
           </TabsContent>
 
-          {/* Testing */}
           <TabsContent value="testing" className="mt-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <TestAlertsPanel onTriggerAlert={addAlert} />
@@ -474,14 +465,12 @@ export default function Alerts() {
         </Tabs>
       </div>
 
-      {/* Top News → Calendar Event modal */}
       <EventDetailsModal
         event={selectedCalendarEvent as any}
         isOpen={isEventModalOpen}
         onClose={closeCalendarOverlay}
       />
 
-      {/* Create / Edit Price Alert modal (reused) */}
       <CreatePriceAlertModal
         open={showCreatePriceAlert}
         onOpenChange={handlePriceAlertModalOpenChange}
