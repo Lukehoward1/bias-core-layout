@@ -11,114 +11,11 @@ import { useMarketQuotes } from "@/hooks/use-market-quotes";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { toast } from "sonner";
-import { calendarEvents } from "@/data/calendarEvents";
+import { calendarEvents, sortCalendarEventsByImpact, type CalendarEvent } from "@/data/calendarEvents";
+import { getEventImpact } from "@/data/eventImpactRules";
 import { getFormattedMarketChange, type MarketQuote } from "@/services/marketData";
 
 type MarketType = "Watchlist" | "All" | "FX" | "Crypto" | "Indices" | "Commodities" | "ETFs" | "Futures";
-
-/* =======================
-   NEWS MATCHING (AUTO)
-======================= */
-
-type CalendarEvent = (typeof calendarEvents)[0];
-
-const normalize = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/\(.*?\)/g, " ")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-const extractCurrencyFromLabel = (label: string) => {
-  const m = label.match(/\(([A-Z]{3})\)/);
-  return m?.[1] ?? null;
-};
-
-const extractTimeHHMM = (timeStr: string) => {
-  const m = timeStr.match(/(\d{1,2}:\d{2})/);
-  if (!m) return null;
-  const [hh, mm] = m[1].split(":");
-  return `${hh.padStart(2, "0")}:${mm}`;
-};
-
-const normalizeEventAlias = (label: string) => {
-  const raw = normalize(label);
-
-  if (raw === "cpi") return "us cpi";
-  if (raw.includes("cpi") && raw.includes("core")) return "core cpi";
-  if (raw.includes("interest rate decision")) return "interest rate decision";
-  if (raw.includes("non farm payroll")) return "non farm payrolls";
-
-  return raw;
-};
-
-const scoreCalendarMatch = (args: {
-  pillLabel: string;
-  pillCurrency: string | null;
-  pillTime: string | null;
-  candidate: CalendarEvent;
-}) => {
-  const { pillLabel, pillCurrency, pillTime, candidate } = args;
-
-  const pillNorm = normalizeEventAlias(pillLabel);
-  const candNorm = normalize(candidate.event);
-
-  let score = 0;
-
-  if (candNorm === pillNorm) score += 6;
-  if (candNorm.includes(pillNorm) || pillNorm.includes(candNorm)) score += 4;
-
-  const pillTokens = new Set(pillNorm.split(" ").filter(Boolean));
-  const candTokens = new Set(candNorm.split(" ").filter(Boolean));
-  let overlap = 0;
-  pillTokens.forEach((t) => {
-    if (candTokens.has(t)) overlap += 1;
-  });
-  score += overlap;
-
-  if (pillCurrency && candidate.currency?.toUpperCase() === pillCurrency.toUpperCase()) score += 3;
-  if (pillTime && candidate.time === pillTime) score += 2;
-
-  if (candidate.impact === "high") score += 0.5;
-
-  return score;
-};
-
-const matchCalendarEventId = (label: string, time: string) => {
-  const pillCurrency = extractCurrencyFromLabel(label);
-  const pillTime = extractTimeHHMM(time);
-
-  let best: { ev: CalendarEvent; score: number } | null = null;
-
-  for (const ev of calendarEvents) {
-    const s = scoreCalendarMatch({
-      pillLabel: label,
-      pillCurrency,
-      pillTime,
-      candidate: ev,
-    });
-
-    if (!best || s > best.score) best = { ev, score: s };
-  }
-
-  if (!best || best.score < 4) return null;
-  return best.ev.id;
-};
-
-const isEventRelevantToSymbol = (symbol: string, ev: CalendarEvent) => {
-  const base = symbol.slice(0, 3).toUpperCase();
-  const quote = symbol.slice(3, 6).toUpperCase();
-  const cur = ev.currency?.toUpperCase?.() ?? "";
-
-  if (symbol.length === 6 && /^[A-Z]{6}$/.test(symbol.toUpperCase())) {
-    return cur === base || cur === quote;
-  }
-
-  if (cur === "USD") return true;
-
-  return false;
-};
 
 /* =======================
    PRICE FORMATTING
@@ -142,6 +39,45 @@ const formatPriceNoCommas = (raw: string | number) => {
 };
 
 /* =======================
+   EVENT ↔ SYMBOL RELEVANCE
+======================= */
+
+const normalizeMarketSymbol = (symbol: string) => symbol.toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+const isFxPairSymbol = (symbol: string) => /^[A-Z]{6}$/.test(symbol);
+
+const getFxCurrencies = (symbol: string) => {
+  const normalized = normalizeMarketSymbol(symbol);
+  if (!isFxPairSymbol(normalized)) return [];
+  return [normalized.slice(0, 3), normalized.slice(3, 6)];
+};
+
+const isEventRelevantToSymbol = (symbol: string, event: CalendarEvent) => {
+  const normalizedSymbol = normalizeMarketSymbol(symbol);
+  const impact = getEventImpact({
+    title: event.event,
+    currency: event.currency,
+  });
+
+  if (impact.affectedPairs.includes(normalizedSymbol)) return true;
+  if (impact.affectedAssets.includes(normalizedSymbol)) return true;
+
+  if (isFxPairSymbol(normalizedSymbol)) {
+    const pairCurrencies = getFxCurrencies(normalizedSymbol);
+    return pairCurrencies.some((currency) => impact.affectedCurrencies.includes(currency));
+  }
+
+  return false;
+};
+
+const sortRelevantEvents = (events: CalendarEvent[]) => {
+  return sortCalendarEventsByImpact(events).sort((a, b) => {
+    if (a.impact !== b.impact) return 0;
+    return a.time.localeCompare(b.time);
+  });
+};
+
+/* =======================
    PAGE
 ======================= */
 
@@ -153,11 +89,28 @@ export default function Markets() {
 
   const { assets } = useAssets();
   const { watchlist, toggleWatchlist, isInWatchlist, watchlistAssets } = useWatchlist();
-
   const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
 
   const watchlistOverviewCardId = "watchlist-overview";
   const isWatchlistOverviewAdded = isCardOnDashboard(watchlistOverviewCardId);
+
+  const [selectedType, setSelectedType] = useState<MarketType>(() => {
+    if (
+      filterParam &&
+      ["Watchlist", "All", "FX", "Crypto", "Indices", "Commodities", "ETFs", "Futures"].includes(filterParam)
+    ) {
+      return filterParam;
+    }
+
+    const saved = localStorage.getItem("watchlist");
+    const parsed = saved ? JSON.parse(saved) : [];
+    return parsed.length > 0 ? "Watchlist" : "All";
+  });
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandedNews, setExpandedNews] = useState<Record<string, boolean>>({});
+
+  const marketTypes: MarketType[] = ["Watchlist", "All", "FX", "Crypto", "Indices", "Commodities", "ETFs", "Futures"];
 
   const handleAddCard = () => {
     addCard(watchlistOverviewCardId);
@@ -168,23 +121,6 @@ export default function Markets() {
     removeCard(watchlistOverviewCardId);
     toast.success("Removed from Dashboard");
   };
-
-  const [selectedType, setSelectedType] = useState<MarketType>(() => {
-    if (
-      filterParam &&
-      ["Watchlist", "All", "FX", "Crypto", "Indices", "Commodities", "ETFs", "Futures"].includes(filterParam)
-    ) {
-      return filterParam;
-    }
-    const saved = localStorage.getItem("watchlist");
-    const parsed = saved ? JSON.parse(saved) : [];
-    return parsed.length > 0 ? "Watchlist" : "All";
-  });
-
-  const [searchQuery, setSearchQuery] = useState("");
-  const [expandedNews, setExpandedNews] = useState<Record<string, boolean>>({});
-
-  const marketTypes: MarketType[] = ["Watchlist", "All", "FX", "Crypto", "Indices", "Commodities", "ETFs", "Futures"];
 
   const handleToggleWatchlist = (symbol: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -251,13 +187,12 @@ export default function Markets() {
     });
   };
 
-  const openCalendarEventByPill = (e: React.MouseEvent, label: string, time: string) => {
+  const openCalendarEvent = (e: React.MouseEvent, eventId: string) => {
     e.preventDefault();
     e.stopPropagation();
 
-    const eventId = matchCalendarEventId(label, time);
     if (!eventId) {
-      toast.error("No matching calendar event found for this news item yet.");
+      toast.error("No matching calendar event found.");
       return;
     }
 
@@ -279,6 +214,7 @@ export default function Markets() {
               className="pl-9 h-9 bg-muted/50"
             />
           </div>
+
           <Badge variant="outline" className="text-xs">
             Live demo pricing
           </Badge>
@@ -317,6 +253,7 @@ export default function Markets() {
                 onRemove={handleRemoveCard}
               />
             </CardHeader>
+
             <CardContent className="pt-0">
               <div className="space-y-2">
                 {watchlistAssets.map((asset) => {
@@ -329,11 +266,14 @@ export default function Markets() {
                       className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/40 cursor-pointer transition-colors group"
                     >
                       <span className="font-semibold text-foreground min-w-[80px]">{asset.symbol}</span>
+
                       <div className={`flex items-center gap-1 min-w-[80px] ${getBiasColor(asset.biasDirection)}`}>
                         {getBiasIcon(asset.biasDirection)}
                         <span className="text-sm">{asset.biasDirection}</span>
                       </div>
+
                       <span className="text-sm text-muted-foreground flex-1 truncate">{asset.insight}</span>
+
                       <div className="flex items-center gap-3">
                         <div className="text-right hidden md:block">
                           <div className="text-sm font-medium text-foreground">
@@ -343,15 +283,18 @@ export default function Markets() {
                             {getDisplayedChange(quote, asset.priceChange)}
                           </div>
                         </div>
+
                         <div className="text-xs text-muted-foreground hidden lg:block">
                           <span className="mr-3">Vol: {asset.volume}</span>
                           <span>Spread: {asset.spread}</span>
                         </div>
+
                         {asset.news && (
                           <Badge variant="destructive" className="text-[10px] hidden lg:inline-flex">
                             News
                           </Badge>
                         )}
+
                         <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                       </div>
                     </div>
@@ -391,8 +334,10 @@ export default function Markets() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {filteredPairs.map((asset) => {
               const quote = quotes[asset.symbol];
-              const relevantEvents = calendarEvents.filter((ev) => isEventRelevantToSymbol(asset.symbol, ev));
-              const highImpactRelevant = relevantEvents.filter((ev) => ev.impact === "high");
+              const relevantEvents = sortRelevantEvents(
+                calendarEvents.filter((event) => isEventRelevantToSymbol(asset.symbol, event)),
+              );
+              const highImpactRelevant = relevantEvents.filter((event) => event.impact === "high");
               const isExpanded = !!expandedNews[asset.symbol];
               const eventsToShow = isExpanded ? relevantEvents : highImpactRelevant;
 
@@ -420,15 +365,18 @@ export default function Markets() {
                   <CardHeader className="pb-3 pr-12">
                     <div className="flex items-center justify-between mb-2">
                       <CardTitle className="text-lg">{asset.symbol}</CardTitle>
+
                       <div className={`flex items-center gap-1.5 ${getBiasColor(asset.biasDirection)}`}>
                         {getBiasIcon(asset.biasDirection)}
                         <span className="text-sm font-medium">{asset.biasDirection}</span>
                       </div>
                     </div>
+
                     <div className="flex items-center justify-between">
                       <span className="text-xl font-bold text-foreground">
                         {formatPriceNoCommas(quote?.last?.toString() ?? asset.latestPrice)}
                       </span>
+
                       <span className={`text-sm font-medium ${getChangeColor(quote, asset.priceChange)}`}>
                         {getDisplayedChange(quote, asset.priceChange)}
                       </span>
@@ -441,6 +389,7 @@ export default function Markets() {
                         <span className="text-muted-foreground">Spread</span>
                         <span className="font-medium text-foreground">{asset.spread}</span>
                       </div>
+
                       <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
                         <span className="text-muted-foreground">Vol</span>
                         <span className="font-medium text-foreground">{asset.volume}</span>
@@ -463,6 +412,7 @@ export default function Markets() {
                           {asset.sentiment}
                         </span>
                       </div>
+
                       <div className="w-full bg-muted rounded-full h-1.5 relative">
                         <div className="absolute left-1/2 top-0 w-px h-1.5 bg-border" />
                         <div
@@ -490,7 +440,10 @@ export default function Markets() {
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              setExpandedNews((prev) => ({ ...prev, [asset.symbol]: !prev[asset.symbol] }));
+                              setExpandedNews((prev) => ({
+                                ...prev,
+                                [asset.symbol]: !prev[asset.symbol],
+                              }));
                             }}
                             className="text-[11px] text-primary hover:underline"
                           >
@@ -503,29 +456,31 @@ export default function Markets() {
                         <p className="text-xs text-muted-foreground">No relevant events found.</p>
                       ) : (
                         <div className="space-y-2">
-                          {eventsToShow.slice(0, 2).map((ev) => (
+                          {eventsToShow.slice(0, 2).map((event) => (
                             <button
-                              key={ev.id}
+                              key={event.id}
                               type="button"
-                              onClick={(e) => openCalendarEventByPill(e, ev.event, ev.time)}
+                              onClick={(e) => openCalendarEvent(e, event.id)}
                               className="w-full flex items-center justify-between gap-3 p-2 rounded-md bg-muted/30 hover:bg-muted/40 transition-colors"
                             >
                               <div className="flex items-center gap-2 min-w-0">
                                 <Badge
                                   variant={
-                                    ev.impact === "high"
+                                    event.impact === "high"
                                       ? "destructive"
-                                      : ev.impact === "medium"
+                                      : event.impact === "medium"
                                         ? "default"
                                         : "secondary"
                                   }
                                   className="text-[10px] shrink-0"
                                 >
-                                  {ev.impact.toUpperCase()}
+                                  {event.impact.toUpperCase()}
                                 </Badge>
-                                <span className="text-xs text-foreground truncate">{ev.event}</span>
+
+                                <span className="text-xs text-foreground truncate">{event.event}</span>
                               </div>
-                              <span className="text-xs text-muted-foreground shrink-0">{ev.time}</span>
+
+                              <span className="text-xs text-muted-foreground shrink-0">{event.time}</span>
                             </button>
                           ))}
 
