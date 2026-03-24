@@ -28,14 +28,10 @@ import { getCardRenderer, warnMissingRenderers } from "@/data/dashboardCardRende
 import { DASHBOARD_CARD_REGISTRY } from "@/data/dashboardCardRegistry";
 import { cn } from "@/lib/utils";
 
-// ✅ Calendar event modal wiring (dashboard → event details)
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { calendarEvents, type CalendarEvent } from "@/data/calendarEvents";
 
-// ✅ Session details modal
 import { SessionDetailsModal } from "@/components/dashboard/SessionDetailsModal";
-
-// ✅ NEW: central trading data (respects active account selection)
 import { useTradingData } from "@/hooks/use-trading-data";
 
 type TradingSessionName = "Sydney" | "Asia" | "London" | "New York";
@@ -45,13 +41,13 @@ type TradingSession = {
   region: string;
   status: "active" | "closed";
   accent: string;
-
-  // Required by SessionDetailsModal typing
   opensAtLabel: string;
   closesAtLabel: string;
   timeRemainingLabel: string;
   timeRemainingSeconds: number;
 };
+
+type DashboardSlotType = "wide" | "narrow" | "equal" | "hero" | "kpi" | "wide-narrow" | "three-equal" | "four-equal";
 
 const buildSessions = (): TradingSession[] => [
   {
@@ -98,8 +94,6 @@ const buildSessions = (): TradingSession[] => [
 
 export default function Dashboard() {
   const navigate = useNavigate();
-
-  // ✅ NEW: real trading stats (used by Performance Overview card)
   const { stats } = useTradingData();
 
   const [showAddCardsModal, setShowAddCardsModal] = useState(false);
@@ -108,11 +102,9 @@ export default function Dashboard() {
   const [dragOverCardId, setDragOverCardId] = useState<string | null>(null);
   const [dragOverRowId, setDragOverRowId] = useState<string | null>(null);
 
-  // ✅ Event modal state
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
-  // ✅ Session modal state
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [selectedSessionName, setSelectedSessionName] = useState<TradingSessionName>("Asia");
 
@@ -122,8 +114,8 @@ export default function Dashboard() {
     return found ?? sessions.find((s) => s.status === "active") ?? sessions[0];
   }, [sessions, selectedSessionName]);
 
-  // tick countdown while modal open (demo)
   const [sessionTick, setSessionTick] = useState(0);
+
   useEffect(() => {
     if (!isSessionModalOpen) return;
     const t = window.setInterval(() => setSessionTick((x) => x + 1), 1000);
@@ -139,6 +131,7 @@ export default function Dashboard() {
   const openCalendarEvent = useCallback((ev: CalendarEvent) => {
     setIsEventModalOpen(false);
     setSelectedCalendarEvent(null);
+
     requestAnimationFrame(() => {
       setSelectedCalendarEvent(ev);
       setIsEventModalOpen(true);
@@ -153,9 +146,11 @@ export default function Dashboard() {
   const openSessionModal = useCallback(
     (name?: TradingSessionName) => {
       setIsSessionModalOpen(false);
+
       requestAnimationFrame(() => {
-        if (name) setSelectedSessionName(name);
-        else {
+        if (name) {
+          setSelectedSessionName(name);
+        } else {
           const active = sessions.find((s) => s.status === "active")?.name ?? "Asia";
           setSelectedSessionName(active);
         }
@@ -167,7 +162,6 @@ export default function Dashboard() {
 
   const closeSessionModal = useCallback(() => setIsSessionModalOpen(false), []);
 
-  // Layout system
   const {
     layout,
     isEditMode,
@@ -193,16 +187,23 @@ export default function Dashboard() {
   const handleDragStart = (cardId: string) => setDraggingCardId(cardId);
 
   const handleDragOver = (cardId: string) => {
-    if (draggingCardId && cardId !== draggingCardId) setDragOverCardId(cardId);
+    if (draggingCardId && cardId !== draggingCardId) {
+      setDragOverCardId(cardId);
+    }
   };
 
   const handleDragOverRow = (rowId: string) => {
-    if (draggingCardId) setDragOverRowId(rowId);
+    if (draggingCardId) {
+      setDragOverRowId(rowId);
+    }
   };
 
   const handleDragEnd = () => {
-    if (draggingCardId && dragOverCardId) moveCard(draggingCardId, dragOverCardId);
-    else if (draggingCardId && dragOverRowId) moveCardToRow(draggingCardId, dragOverRowId);
+    if (draggingCardId && dragOverCardId) {
+      moveCard(draggingCardId, dragOverCardId);
+    } else if (draggingCardId && dragOverRowId) {
+      moveCardToRow(draggingCardId, dragOverRowId);
+    }
 
     setDraggingCardId(null);
     setDragOverCardId(null);
@@ -214,15 +215,9 @@ export default function Dashboard() {
     warnMissingRenderers(registryCardIds);
   }, []);
 
-  const renderCardContent = (
-    cardEntry: DashboardCardEntry,
-    slotType: "wide" | "narrow" | "equal" | "hero" | "kpi",
-  ): React.ReactNode => {
+  const renderCardContent = (cardEntry: DashboardCardEntry, slotType: DashboardSlotType): React.ReactNode => {
     const cardId = cardEntry.id;
 
-    /**
-     * ✅ Force these to render HERE, NOT via dashboardCardRenderers registry.
-     */
     if (cardId === "upcoming-events") {
       const upcoming = calendarEvents
         .slice()
@@ -319,11 +314,11 @@ export default function Dashboard() {
       );
     }
 
-    // Central renderer for everything else
     const renderer = getCardRenderer(cardId);
-    if (renderer) return renderer({ slotType });
+    if (renderer) {
+      return renderer({ slotType });
+    }
 
-    // Legacy fallbacks
     switch (cardId) {
       case "todays-bias":
         return (
@@ -370,7 +365,6 @@ export default function Dashboard() {
       case "watchlist-overview":
         return <WatchlistOverviewCard isEditMode={isEditMode} slotType={slotType} />;
 
-      // ✅ NOW LIVE: pulls from useTradingData()
       case "performance-overview": {
         const weekPnl = stats.weekPnl ?? 0;
         const monthPnl = stats.monthPnl ?? 0;
@@ -555,10 +549,8 @@ export default function Dashboard() {
         onRemoveCard={removeCard}
       />
 
-      {/* ✅ Dashboard → Event Details */}
       <EventDetailsModal event={selectedCalendarEvent} isOpen={isEventModalOpen} onClose={closeCalendarEvent} />
 
-      {/* ✅ Dashboard → Session Details */}
       <SessionDetailsModal isOpen={isSessionModalOpen} onClose={closeSessionModal} session={selectedSessionWithTick} />
     </div>
   );
