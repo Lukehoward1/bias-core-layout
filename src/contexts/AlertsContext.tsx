@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from "react";
-import type { AlertItem, AlertPreferences, PriceAlert } from "@/types/alerts";
+import type { AlertItem, AlertPreferences, PriceAlert, AlertStatus } from "@/types/alerts";
 import { defaultAlertPreferences } from "@/types/alerts";
 import { useWatchlist } from "@/hooks/use-watchlist";
 import { useMarketQuotes } from "@/hooks/use-market-quotes";
@@ -56,6 +56,10 @@ const safeJsonParse = <T,>(value: string | null, fallback: T): T => {
   }
 };
 
+const isAlertStatus = (value: unknown): value is AlertStatus => {
+  return value === "pending" || value === "triggered";
+};
+
 const playNotificationSound = () => {
   try {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -93,25 +97,23 @@ const timeframeConfirmTicks: Record<string, number> = {
 };
 
 const parseStoredAlert = (alert: any): AlertItem => {
-  const createdAt = alert?.timestamp ? new Date(alert.timestamp) : new Date();
+  const timestamp = alert?.timestamp ? new Date(alert.timestamp) : new Date();
   const scheduledFor = alert?.scheduledFor ? new Date(alert.scheduledFor) : undefined;
   const triggeredAt = alert?.triggeredAt ? new Date(alert.triggeredAt) : undefined;
 
+  const status: AlertStatus = isAlertStatus(alert?.status)
+    ? alert.status
+    : scheduledFor && scheduledFor.getTime() > Date.now()
+      ? "pending"
+      : "triggered";
+
   return {
     ...alert,
-    timestamp: createdAt,
+    timestamp,
     scheduledFor,
     triggeredAt,
+    status,
     read: Boolean(alert?.read),
-    status: alert?.status === "pending" ? "pending" : "triggered",
-  };
-};
-
-const parseStoredPriceAlert = (alert: any): PriceAlert => {
-  return {
-    ...alert,
-    createdAt: alert?.createdAt ? new Date(alert.createdAt) : new Date(),
-    triggeredAt: alert?.triggeredAt ? new Date(alert.triggeredAt) : undefined,
   };
 };
 
@@ -189,7 +191,14 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     const savedPriceAlerts = safeJsonParse<any[]>(localStorage.getItem("priceAlerts"), []);
 
     setAlerts(savedAlerts.map(parseStoredAlert));
-    setPriceAlerts(savedPriceAlerts.map(parseStoredPriceAlert));
+
+    setPriceAlerts(
+      savedPriceAlerts.map((a) => ({
+        ...a,
+        createdAt: new Date(a.createdAt),
+        triggeredAt: a.triggeredAt ? new Date(a.triggeredAt) : undefined,
+      })),
+    );
   }, []);
 
   useEffect(() => {
@@ -205,17 +214,6 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
   }, [preferences]);
 
   const unreadCount = useMemo(() => alerts.filter((a) => !a.read).length, [alerts]);
-
-  const maybePlaySoundForAlert = useCallback(
-    (alertId: string) => {
-      if (!preferences.soundEnabled || isQuietHours) return;
-      if (lastAlertIdRef.current === alertId) return;
-
-      lastAlertIdRef.current = alertId;
-      playNotificationSound();
-    },
-    [preferences.soundEnabled, isQuietHours],
-  );
 
   const addAlert = useCallback(
     (alert: ImmediateAlertInput) => {
@@ -234,33 +232,38 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
         triggeredAt: now,
       };
 
-      setAlerts((prev) => [newAlert, ...prev].slice(0, 200));
-      maybePlaySoundForAlert(newAlert.id);
+      setAlerts((prev) => [newAlert, ...prev].slice(0, 100));
+
+      if (preferences.soundEnabled && !isQuietHours && lastAlertIdRef.current !== newAlert.id) {
+        lastAlertIdRef.current = newAlert.id;
+        playNotificationSound();
+      }
 
       return newAlert;
     },
-    [isAlertRelevant, maybePlaySoundForAlert],
+    [isAlertRelevant, preferences.soundEnabled, isQuietHours],
   );
 
-  const scheduleAlert = useCallback((alert: ScheduleAlertInput) => {
-    const scheduledDate = alert.scheduledFor instanceof Date ? alert.scheduledFor : new Date(alert.scheduledFor);
+  const scheduleAlert = useCallback(
+    (alert: ScheduleAlertInput) => {
+      if (!isAlertRelevant(alert)) return null;
 
-    if (Number.isNaN(scheduledDate.getTime())) {
-      return null;
-    }
+      const scheduledDate = alert.scheduledFor instanceof Date ? alert.scheduledFor : new Date(alert.scheduledFor);
 
-    const newAlert: AlertItem = {
-      ...alert,
-      id: createId(),
-      timestamp: new Date(),
-      read: false,
-      status: "pending",
-      scheduledFor: scheduledDate,
-    };
+      const newAlert: AlertItem = {
+        ...alert,
+        id: createId(),
+        timestamp: new Date(),
+        read: false,
+        status: "pending",
+        scheduledFor: scheduledDate,
+      };
 
-    setAlerts((prev) => [newAlert, ...prev].slice(0, 200));
-    return newAlert;
-  }, []);
+      setAlerts((prev) => [newAlert, ...prev].slice(0, 100));
+      return newAlert;
+    },
+    [isAlertRelevant],
+  );
 
   const markRead = useCallback((id: string) => {
     setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, read: true } : a)));
@@ -321,41 +324,39 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     setPreferences(newPrefs);
   }, []);
 
-  /**
-   * Promote pending alerts to triggered when due.
-   * This is what makes scheduled news alerts become live alerts.
-   */
   useEffect(() => {
-    const interval = window.setInterval(() => {
-      const now = new Date();
-      let promotedIds: string[] = [];
+    if (alerts.length === 0) return;
 
-      setAlerts((prev) => {
-        let changed = false;
+    const now = Date.now();
+    const newlyTriggered: AlertItem[] = [];
 
-        const next = prev.map((alert) => {
-          if (alert.status !== "pending" || !alert.scheduledFor) return alert;
-          if (alert.scheduledFor.getTime() > now.getTime()) return alert;
+    const nextAlerts = alerts.map((alert) => {
+      if (alert.status !== "pending" || !alert.scheduledFor) return alert;
+      if (alert.scheduledFor.getTime() > now) return alert;
 
-          changed = true;
-          promotedIds.push(alert.id);
+      const triggeredAlert: AlertItem = {
+        ...alert,
+        status: "triggered",
+        triggeredAt: new Date(),
+      };
 
-          return {
-            ...alert,
-            status: "triggered",
-            triggeredAt: now,
-            read: false,
-          };
-        });
+      newlyTriggered.push(triggeredAlert);
+      return triggeredAlert;
+    });
 
-        return changed ? next : prev;
+    const changed = nextAlerts.some((alert, index) => alert !== alerts[index]);
+
+    if (changed) {
+      setAlerts(nextAlerts);
+
+      newlyTriggered.forEach((alert) => {
+        if (preferences.soundEnabled && !isQuietHours && lastAlertIdRef.current !== alert.id) {
+          lastAlertIdRef.current = alert.id;
+          playNotificationSound();
+        }
       });
-
-      promotedIds.forEach((id) => maybePlaySoundForAlert(id));
-    }, 30000);
-
-    return () => window.clearInterval(interval);
-  }, [maybePlaySoundForAlert]);
+    }
+  }, [alerts, preferences.soundEnabled, isQuietHours]);
 
   useEffect(() => {
     if (priceAlerts.length === 0) return;
