@@ -15,7 +15,6 @@ import {
   PieChart,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { Progress } from "@/components/ui/progress";
 
 import { QuickRiskCalculator } from "@/components/risk/QuickRiskCalculator";
 import { PositionSizeCalculator } from "@/components/risk/PositionSizeCalculator";
@@ -24,7 +23,6 @@ import { DailyRiskLimitTracker } from "@/components/risk/DailyRiskLimitTracker";
 import { MaxDrawdownGuard } from "@/components/risk/MaxDrawdownGuard";
 import { WatchlistOverviewCard } from "@/components/dashboard/WatchlistOverviewCard";
 
-// Sample equity data for charts
 const getSampleEquityData = () => {
   const sampleTrades = [
     { date: "2025-01-03", pnl: 450 },
@@ -36,13 +34,16 @@ const getSampleEquityData = () => {
     { date: "2025-01-14", pnl: 1350 },
     { date: "2025-01-15", pnl: 600 },
   ];
+
   let cumulative = 0;
-  return sampleTrades.map((t) => {
-    cumulative += t.pnl;
+
+  return sampleTrades.map((trade) => {
+    cumulative += trade.pnl;
+
     return {
-      date: t.date,
+      date: trade.date,
       equity: cumulative,
-      formattedDate: t.date.split("-").slice(1).join("/"),
+      formattedDate: trade.date.split("-").slice(1).join("/"),
     };
   });
 };
@@ -53,11 +54,145 @@ export interface CardRenderContext {
   slotType: "wide" | "narrow" | "equal" | "hero" | "kpi" | "wide-narrow" | "three-equal" | "four-equal";
 }
 
+type WatchlistSlotType = "wide" | "narrow" | "equal" | "hero" | "kpi";
+
+const normalizeWatchlistSlotType = (slotType: CardRenderContext["slotType"]): WatchlistSlotType => {
+  if (slotType === "wide-narrow") return "wide";
+  if (slotType === "three-equal" || slotType === "four-equal") return "equal";
+  return slotType;
+};
+
 export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.ReactNode> = {
-  "watchlist-overview": ({ slotType }) => <WatchlistOverviewCard slotType={slotType} />,
+  "todays-bias": () => (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Today&apos;s Bias</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-2xl font-bold text-success">Bullish</p>
+            <p className="text-xs text-muted-foreground mt-1">Multi-timeframe alignment</p>
+          </div>
+          <TrendingUp className="h-6 w-6 text-success" />
+        </div>
+      </CardContent>
+    </Card>
+  ),
+
+  "active-trades": () => (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Active Trades</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-2xl font-bold text-foreground">3</p>
+        <p className="text-xs text-muted-foreground mt-1">2 long · 1 short</p>
+      </CardContent>
+    </Card>
+  ),
+
+  "next-session": () => (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Next Session</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-2xl font-bold text-foreground">London</p>
+        <p className="text-xs text-muted-foreground mt-1">Opens in 2h 15m</p>
+      </CardContent>
+    </Card>
+  ),
+
+  "high-impact-events": () => (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-destructive" />
+          <CardTitle className="text-sm font-medium">High Impact Events</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {[
+            { event: "US CPI", currency: "USD", time: "14:30", impact: "high" },
+            { event: "ECB Rate Decision", currency: "EUR", time: "13:15", impact: "high" },
+            { event: "UK Employment", currency: "GBP", time: "09:00", impact: "medium" },
+          ].map((item, i) => (
+            <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-border">
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                <div>
+                  <p className="text-xs font-medium text-foreground">{item.event}</p>
+                  <span className="text-[10px] text-muted-foreground">{item.currency}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground">{item.time}</span>
+                <span className={`w-2 h-2 rounded-full ${item.impact === "high" ? "bg-destructive" : "bg-warning"}`} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  ),
+
+  "watchlist-overview": ({ slotType }) => <WatchlistOverviewCard slotType={normalizeWatchlistSlotType(slotType)} />,
+
+  "performance-overview": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <PieChart className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Performance Overview</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+            <p className="text-xs text-muted-foreground">Weekly</p>
+            <p className="text-lg font-bold text-success">+£842</p>
+          </div>
+          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+            <p className="text-xs text-muted-foreground">Monthly</p>
+            <p className="text-lg font-bold text-success">+£2,307</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  ),
+
+  "risk-snapshot": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Shield className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Risk Snapshot</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+            <span className="text-sm text-foreground">Daily Risk Used</span>
+            <span className="text-sm font-medium text-foreground">42%</span>
+          </div>
+          <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+            <span className="text-sm text-foreground">Open Exposure</span>
+            <span className="text-sm font-medium text-foreground">1.8%</span>
+          </div>
+          <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+            <span className="text-sm text-foreground">Drawdown</span>
+            <span className="text-sm font-medium text-warning">-2.4%</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  ),
 
   "pinned-journal-equity": ({ slotType }) => {
     const chartHeight = slotType === "hero" ? "h-64" : "h-40";
+
     return (
       <Card className="h-full">
         <CardHeader>
@@ -174,6 +309,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
 
   "reports-overview-equity": ({ slotType }) => {
     const chartHeight = slotType === "hero" ? "h-64" : "h-40";
+
     return (
       <Card className="h-full">
         <CardHeader>
@@ -216,6 +352,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
 
   "reports-overview-rolling30": ({ slotType }) => {
     const chartHeight = slotType === "hero" ? "h-64" : "h-40";
+
     return (
       <Card className="h-full">
         <CardHeader>
@@ -507,6 +644,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
 
   "reports-risk-distribution": ({ slotType }) => {
     const chartHeight = slotType === "hero" ? "h-64" : "h-40";
+
     return (
       <Card className="h-full">
         <CardHeader>
@@ -646,7 +784,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
       <CardContent>
         <div className="space-y-2">
           {[
-            { type: "Price Alert", what: "EURUSD &gt; 1.0850", status: "active" },
+            { type: "Price Alert", what: "EURUSD > 1.0850", status: "active" },
             { type: "News Alert", what: "USD High Impact", status: "pending" },
             { type: "Session Timer", what: "London Open", status: "active" },
           ].map((alert, i) => (
@@ -792,40 +930,6 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
     </Card>
   ),
 
-  "high-impact-events": () => (
-    <Card className="h-full">
-      <CardHeader className="pb-2">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-destructive" />
-          <CardTitle className="text-sm font-medium">High Impact Events</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          {[
-            { event: "US CPI", currency: "USD", time: "14:30", impact: "high" },
-            { event: "ECB Rate Decision", currency: "EUR", time: "13:15", impact: "high" },
-            { event: "UK Employment", currency: "GBP", time: "09:00", impact: "medium" },
-          ].map((item, i) => (
-            <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-border">
-              <div className="flex items-center gap-2">
-                <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                <div>
-                  <p className="text-xs font-medium text-foreground">{item.event}</p>
-                  <span className="text-[10px] text-muted-foreground">{item.currency}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-muted-foreground">{item.time}</span>
-                <span className={`w-2 h-2 rounded-full ${item.impact === "high" ? "bg-destructive" : "bg-warning"}`} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  ),
-
   "upcoming-events": () => (
     <Card className="h-full">
       <CardHeader>
@@ -853,6 +957,35 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
                 </div>
               </div>
               <span className="text-[10px] text-muted-foreground">{item.date}</span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  ),
+
+  "calendar-events": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <CalendarIcon className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Week Ahead</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {[
+            { day: "Mon", event: "Eurogroup Meetings", currency: "EUR" },
+            { day: "Wed", event: "UK CPI", currency: "GBP" },
+            { day: "Thu", event: "US Initial Claims", currency: "USD" },
+            { day: "Fri", event: "Retail Sales", currency: "USD" },
+          ].map((item, i) => (
+            <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-border">
+              <div>
+                <p className="text-xs font-medium text-foreground">{item.event}</p>
+                <p className="text-[10px] text-muted-foreground">{item.currency}</p>
+              </div>
+              <span className="text-[10px] text-muted-foreground">{item.day}</span>
             </div>
           ))}
         </div>
@@ -997,6 +1130,7 @@ export const hasCardRenderer = (cardId: string): boolean => {
 
 export const warnMissingRenderers = (registryCardIds: string[]): void => {
   const missing = registryCardIds.filter((id) => !hasCardRenderer(id));
+
   if (missing.length > 0) {
     console.warn(
       "[Dashboard] The following registered cards have no render function:\n" +
