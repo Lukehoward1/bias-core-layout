@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAssets } from "@/hooks/use-watchlist";
+import { useAlertsContext } from "@/contexts/AlertsContext";
 import type { CalendarEvent } from "@/data/calendarEvents";
 
 import {
@@ -161,6 +162,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
   const navigate = useNavigate();
   const location = useLocation();
   const { getAssetBySymbol } = useAssets();
+  const { scheduleAlert } = useAlertsContext();
 
   const safeEvent = useMemo<CalendarEvent>(
     () =>
@@ -210,8 +212,34 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
   };
 
   const handleSetAlert = () => {
-    toast.success("Release Alert Scheduled (demo)", {
-      description: `You'll be notified when ${safeEvent.event} is released.`,
+    if (!event) return;
+
+    const now = new Date();
+    const [hours, minutes] = safeEvent.time.split(":").map(Number);
+
+    const scheduledFor = new Date();
+    scheduledFor.setHours(Number.isFinite(hours) ? hours : 0);
+    scheduledFor.setMinutes(Number.isFinite(minutes) ? minutes : 0);
+    scheduledFor.setSeconds(0);
+    scheduledFor.setMilliseconds(0);
+
+    if (scheduledFor.getTime() < now.getTime()) {
+      scheduledFor.setDate(scheduledFor.getDate() + 1);
+    }
+
+    scheduleAlert({
+      type: "news",
+      title: `${safeEvent.event} (${safeEvent.currency})`,
+      message: `Scheduled: ${safeEvent.event} at ${safeEvent.time} GMT`,
+      severity: safeEvent.impact === "high" ? "high" : "info",
+      relatedAsset: safeEvent.currency,
+      eventId: safeEvent.id,
+      routeTo: "/calendar",
+      scheduledFor,
+    });
+
+    toast.success("Alert scheduled", {
+      description: `${safeEvent.event} will notify you at ${safeEvent.time} GMT`,
     });
   };
 
