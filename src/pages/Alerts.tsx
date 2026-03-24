@@ -244,6 +244,15 @@ export default function Alerts() {
     });
   }, []);
 
+  const openCalendarEventById = useCallback(
+    (eventId: string) => {
+      const matchedEvent = calendarEvents.find((event) => event.id === eventId);
+      if (!matchedEvent) return;
+      openCalendarEvent(matchedEvent);
+    },
+    [openCalendarEvent],
+  );
+
   const closeCalendarOverlay = useCallback(() => {
     setIsEventModalOpen(false);
     setSelectedCalendarEvent(null);
@@ -297,21 +306,10 @@ export default function Alerts() {
   const openScheduledAlert = useCallback(
     (alert: AlertItem) => {
       if (alert.type === "news" && alert.eventId) {
-        const matchedEvent = calendarEvents.find((event) => event.id === alert.eventId);
-        if (matchedEvent) {
-          openCalendarEvent(matchedEvent);
-          return;
-        }
-      }
-
-      if (alert.type === "news" && alert.routeTo?.startsWith("/calendar") && alert.eventId) {
-        const matchedEvent = calendarEvents.find((event) => event.id === alert.eventId);
-        if (matchedEvent) {
-          openCalendarEvent(matchedEvent);
-        }
+        openCalendarEventById(alert.eventId);
       }
     },
-    [openCalendarEvent],
+    [openCalendarEventById],
   );
 
   return (
@@ -648,6 +646,7 @@ export default function Alerts() {
                   onMarkAllRead={markAllRead}
                   onDelete={deleteAlert}
                   onClearAll={clearAllAlerts}
+                  onOpenCalendarEvent={openCalendarEventById}
                 />
               </div>
 
