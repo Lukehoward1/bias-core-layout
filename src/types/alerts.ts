@@ -31,11 +31,10 @@ export interface AlertItem {
   severity: AlertSeverity;
 
   /**
-   * Lifecycle state:
-   * - pending   = scheduled but not yet fired
-   * - triggered = already fired / active in inbox and notifications
+   * Optional so older/immediate alert creators do not break.
+   * Context will default this automatically.
    */
-  status: AlertStatus;
+  status?: AlertStatus;
 
   /**
    * When this alert is due to trigger.
