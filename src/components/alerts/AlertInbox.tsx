@@ -67,10 +67,11 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
     }
   };
 
-  const getSeverityStyles = (severity: AlertItem["severity"], read: boolean) => {
-    if (read) return "bg-muted/30 border-border/50";
+  const getSeverityStyles = (alert: AlertItem) => {
+    if (alert.status === "pending") return "bg-primary/5 border-primary/20";
+    if (alert.read) return "bg-muted/30 border-border/50";
 
-    switch (severity) {
+    switch (alert.severity) {
       case "high":
         return "bg-destructive/5 border-destructive/30";
       case "warning":
@@ -80,7 +81,7 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
     }
   };
 
-  const formatTime = (date: Date) => {
+  const formatRelativeTime = (date: Date) => {
     if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "Recently";
 
     const now = new Date();
@@ -93,6 +94,34 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     return `${diffDays}d ago`;
+  };
+
+  const formatDueTime = (date?: Date) => {
+    if (!date || !(date instanceof Date) || Number.isNaN(date.getTime())) return "Scheduled";
+
+    const now = new Date();
+    const diffMs = date.getTime() - now.getTime();
+
+    if (diffMs <= 0) return "Due now";
+
+    const diffMins = Math.ceil(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+
+    if (diffHours <= 0) return `Due in ${diffMins}m`;
+    if (diffHours < 24) return `Due in ${diffHours}h ${mins}m`;
+
+    const diffDays = Math.floor(diffHours / 24);
+    const remHours = diffHours % 24;
+    return `Due in ${diffDays}d ${remHours}h`;
+  };
+
+  const getDisplayTime = (alert: AlertItem) => {
+    if (alert.status === "pending") {
+      return formatDueTime(alert.scheduledFor);
+    }
+
+    return formatRelativeTime(alert.triggeredAt ?? alert.timestamp);
   };
 
   const applyRouteParams = useCallback((route: string, params?: Record<string, string>) => {
@@ -236,7 +265,7 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
                         tabIndex={0}
                         className={cn(
                           "p-3 rounded-lg border cursor-pointer transition-colors hover:bg-muted/50",
-                          getSeverityStyles(alert.severity, alert.read),
+                          getSeverityStyles(alert),
                         )}
                         onClick={() => handleAlertClick(alert)}
                         onKeyDown={(event) => {
@@ -250,12 +279,14 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
                           <div
                             className={cn(
                               "p-1.5 rounded-md mt-0.5 shrink-0",
-                              alert.severity === "high"
-                                ? "bg-destructive/20 text-destructive"
-                                : alert.severity === "warning"
-                                  ? "bg-warning/20 text-warning"
-                                  : "bg-primary/20 text-primary",
-                              alert.read && "opacity-50",
+                              alert.status === "pending"
+                                ? "bg-primary/15 text-primary"
+                                : alert.severity === "high"
+                                  ? "bg-destructive/20 text-destructive"
+                                  : alert.severity === "warning"
+                                    ? "bg-warning/20 text-warning"
+                                    : "bg-primary/20 text-primary",
+                              alert.read && alert.status !== "pending" && "opacity-50",
                             )}
                           >
                             {getIcon(alert.type)}
@@ -266,26 +297,41 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
                               <p
                                 className={cn(
                                   "text-sm font-medium truncate",
-                                  alert.read ? "text-muted-foreground" : "text-foreground",
+                                  alert.read && alert.status !== "pending"
+                                    ? "text-muted-foreground"
+                                    : "text-foreground",
                                 )}
                               >
                                 {alert.title}
                               </p>
+
                               <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                                {formatTime(alert.timestamp)}
+                                {getDisplayTime(alert)}
                               </span>
                             </div>
 
                             <p
                               className={cn(
                                 "text-xs line-clamp-2",
-                                alert.read ? "text-muted-foreground/70" : "text-muted-foreground",
+                                alert.read && alert.status !== "pending"
+                                  ? "text-muted-foreground/70"
+                                  : "text-muted-foreground",
                               )}
                             >
                               {alert.message}
                             </p>
 
                             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              {alert.status === "pending" ? (
+                                <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                                  Pending
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-[10px]">
+                                  Live
+                                </Badge>
+                              )}
+
                               {alert.relatedAsset && (
                                 <Badge variant="secondary" className="text-[10px]">
                                   {alert.relatedAsset}
