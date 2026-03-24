@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, Plus, Settings, Inbox, Bell, FlaskConical, Target } from "lucide-react";
+import { Clock, Plus, Settings, Inbox, Bell, FlaskConical, Target, CalendarDays, Radio } from "lucide-react";
 import { AlertPreferencesPanel } from "@/components/alerts/AlertPreferencesPanel";
 import { AlertInbox } from "@/components/alerts/AlertInbox";
 import { TestAlertsPanel } from "@/components/alerts/TestAlertsPanel";
@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { calendarEvents } from "@/data/calendarEvents";
 
-import type { PriceAlert } from "@/types/alerts";
+import type { AlertItem, PriceAlert } from "@/types/alerts";
 
 const sessions = [
   { name: "Sydney", status: "closed", time: "Opens in 8:30:00", accent: "#2EC4B6", region: "Asia-Pacific Markets" },
@@ -43,6 +43,46 @@ const parseEventTimeToday = (time: string) => {
   const date = new Date();
   date.setHours(hours || 0, minutes || 0, 0, 0);
   return date;
+};
+
+const formatWhenLabel = (date?: Date) => {
+  if (!date || Number.isNaN(date.getTime())) return "Scheduled";
+
+  const now = new Date();
+  const diffMs = date.getTime() - now.getTime();
+
+  if (diffMs <= 0) return "Due now";
+
+  const diffMins = Math.ceil(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const mins = diffMins % 60;
+
+  if (diffHours <= 0) return `In ${diffMins}m`;
+  if (diffHours < 24) return `In ${diffHours}h ${mins}m`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  const remHours = diffHours % 24;
+  return `In ${diffDays}d ${remHours}h`;
+};
+
+const formatTriggeredLabel = (date?: Date) => {
+  if (!date || Number.isNaN(date.getTime())) return "Triggered";
+
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.max(0, Math.floor(diffMs / 60000));
+  const diffHours = Math.floor(diffMins / 60);
+
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+
+  return date.toLocaleString([], {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 
 export default function Alerts() {
@@ -102,7 +142,69 @@ export default function Alerts() {
     [priceAlerts],
   );
 
+  const triggeredPriceAlertsCount = useMemo(() => priceAlerts.filter((alert) => alert.triggered).length, [priceAlerts]);
+
   const overviewActivePriceAlerts = useMemo(() => priceAlerts.filter((alert) => !alert.triggered), [priceAlerts]);
+
+  const scheduledSystemAlerts = useMemo(
+    () =>
+      alerts
+        .filter((alert) => alert.status === "pending")
+        .sort((a, b) => {
+          const aTime = a.scheduledFor?.getTime() ?? 0;
+          const bTime = b.scheduledFor?.getTime() ?? 0;
+          return aTime - bTime;
+        }),
+    [alerts],
+  );
+
+  const recentTriggeredSystemAlerts = useMemo(
+    () =>
+      alerts
+        .filter((alert) => alert.status === "triggered")
+        .sort((a, b) => {
+          const aTime = (a.triggeredAt ?? a.timestamp).getTime();
+          const bTime = (b.triggeredAt ?? b.timestamp).getTime();
+          return bTime - aTime;
+        })
+        .slice(0, 6),
+    [alerts],
+  );
+
+  const myAlertsAndTimersRows = useMemo(() => {
+    const priceRows = overviewActivePriceAlerts.map((alert) => ({
+      id: `price-${alert.id}`,
+      kind: "price" as const,
+      typeLabel: "Price",
+      what: `${alert.assetDisplayName} ${alert.direction} ${alert.price}`,
+      when: alert.triggerType === "wick" ? "Touch" : `Close ${alert.timeframe}`,
+      statusLabel: alert.enabled ? "Active" : "Paused",
+      statusVariant: alert.enabled ? ("default" as const) : ("secondary" as const),
+      priceAlert: alert,
+    }));
+
+    const scheduledRows = scheduledSystemAlerts.map((alert) => ({
+      id: `scheduled-${alert.id}`,
+      kind: "scheduled" as const,
+      typeLabel:
+        alert.type === "news"
+          ? "News"
+          : alert.type === "timer"
+            ? "Timer"
+            : alert.type === "session"
+              ? "Session"
+              : alert.type === "bias"
+                ? "Bias"
+                : "Alert",
+      what: alert.title,
+      when: formatWhenLabel(alert.scheduledFor),
+      statusLabel: "Pending",
+      statusVariant: "outline" as const,
+      alertItem: alert,
+    }));
+
+    return [...scheduledRows, ...priceRows];
+  }, [overviewActivePriceAlerts, scheduledSystemAlerts]);
 
   const topNewsEvents = useMemo(() => {
     const now = new Date();
@@ -192,6 +294,26 @@ export default function Alerts() {
     }
   }, []);
 
+  const openScheduledAlert = useCallback(
+    (alert: AlertItem) => {
+      if (alert.type === "news" && alert.eventId) {
+        const matchedEvent = calendarEvents.find((event) => event.id === alert.eventId);
+        if (matchedEvent) {
+          openCalendarEvent(matchedEvent);
+          return;
+        }
+      }
+
+      if (alert.type === "news" && alert.routeTo?.startsWith("/calendar") && alert.eventId) {
+        const matchedEvent = calendarEvents.find((event) => event.id === alert.eventId);
+        if (matchedEvent) {
+          openCalendarEvent(matchedEvent);
+        }
+      }
+    },
+    [openCalendarEvent],
+  );
+
   return (
     <div className="p-6 space-y-6">
       <AppHeader title="Alerts" />
@@ -266,7 +388,7 @@ export default function Alerts() {
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <h3 className="font-medium text-sm text-foreground mb-2">{item.event}</h3>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <Badge variant="outline" className="text-xs">
                                 {item.currency}
                               </Badge>
@@ -331,78 +453,154 @@ export default function Alerts() {
               </Card>
             </div>
 
-            <Card className="mt-5">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                <CardTitle>My Alerts & Timers</CardTitle>
-                <div className="flex items-center gap-2">
-                  <AddToDashboardButton
-                    isAdded={isMyAlertsTimersAdded}
-                    onAdd={() => handleAddCard(myAlertsTimersCardId)}
-                    onRemove={() => handleRemoveCard(myAlertsTimersCardId)}
-                  />
-                  <Button size="sm" className="h-8" onClick={openCreatePriceAlert}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Alert
-                  </Button>
-                </div>
-              </CardHeader>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mt-5">
+              <Card className="lg:col-span-2">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                  <CardTitle>My Alerts & Timers</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <AddToDashboardButton
+                      isAdded={isMyAlertsTimersAdded}
+                      onAdd={() => handleAddCard(myAlertsTimersCardId)}
+                      onRemove={() => handleRemoveCard(myAlertsTimersCardId)}
+                    />
+                    <Button size="sm" className="h-8" onClick={openCreatePriceAlert}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Alert
+                    </Button>
+                  </div>
+                </CardHeader>
 
-              <CardContent>
-                <div className="overflow-x-auto -mx-5">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-3 px-5 text-xs font-medium text-muted-foreground">Type</th>
-                        <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">What</th>
-                        <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">When</th>
-                        <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Status</th>
-                        <th className="text-left py-3 px-5 text-xs font-medium text-muted-foreground">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {overviewActivePriceAlerts.map((alert) => (
-                        <tr key={alert.id} className="border-b border-border hover:bg-muted/50 transition-colors">
-                          <td className="py-3 px-5 text-sm text-foreground">
-                            <Badge variant="outline" className="text-xs">
-                              Price
-                            </Badge>
-                          </td>
-                          <td className="py-3 px-4 text-sm text-foreground font-medium">
-                            {alert.assetDisplayName} {alert.direction} {alert.price}
-                          </td>
-                          <td className="py-3 px-4 text-sm text-muted-foreground">
-                            {alert.triggerType === "wick" ? "Touch" : `Close ${alert.timeframe}`}
-                          </td>
-                          <td className="py-3 px-4">
-                            <Badge variant={alert.enabled ? "default" : "secondary"} className="text-xs">
-                              {alert.enabled ? "Active" : "Paused"}
-                            </Badge>
-                          </td>
-                          <td className="py-3 px-5">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2 text-xs"
-                              onClick={() => openEditPriceAlert(alert)}
-                            >
-                              Edit
-                            </Button>
-                          </td>
+                <CardContent>
+                  <div className="overflow-x-auto -mx-5">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-3 px-5 text-xs font-medium text-muted-foreground">Type</th>
+                          <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">What</th>
+                          <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">When</th>
+                          <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Status</th>
+                          <th className="text-left py-3 px-5 text-xs font-medium text-muted-foreground">Actions</th>
                         </tr>
-                      ))}
+                      </thead>
+                      <tbody>
+                        {myAlertsAndTimersRows.map((row) => (
+                          <tr key={row.id} className="border-b border-border hover:bg-muted/50 transition-colors">
+                            <td className="py-3 px-5 text-sm text-foreground">
+                              <Badge variant="outline" className="text-xs">
+                                {row.typeLabel}
+                              </Badge>
+                            </td>
 
-                      {overviewActivePriceAlerts.length === 0 && (
-                        <tr>
-                          <td colSpan={5} className="py-8 text-center text-muted-foreground text-sm">
-                            No active alerts. Click "Add Alert" to create one.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
+                            <td className="py-3 px-4 text-sm text-foreground font-medium">{row.what}</td>
+
+                            <td className="py-3 px-4 text-sm text-muted-foreground">{row.when}</td>
+
+                            <td className="py-3 px-4">
+                              <Badge variant={row.statusVariant} className="text-xs">
+                                {row.statusLabel}
+                              </Badge>
+                            </td>
+
+                            <td className="py-3 px-5">
+                              {row.kind === "price" ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => openEditPriceAlert(row.priceAlert)}
+                                >
+                                  Edit
+                                </Button>
+                              ) : row.alertItem.type === "news" ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => openScheduledAlert(row.alertItem)}
+                                >
+                                  View
+                                </Button>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Scheduled</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+
+                        {myAlertsAndTimersRows.length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="py-8 text-center text-muted-foreground text-sm">
+                              No active alerts. Click "Add Alert" or schedule one from a calendar event.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Alerts Summary</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-muted/50 rounded-lg border border-border">
+                      <p className="text-2xl font-bold text-foreground">{scheduledSystemAlerts.length}</p>
+                      <p className="text-xs text-muted-foreground">Pending</p>
+                    </div>
+
+                    <div className="p-4 bg-muted/50 rounded-lg border border-border">
+                      <p className="text-2xl font-bold text-foreground">{recentTriggeredSystemAlerts.length}</p>
+                      <p className="text-xs text-muted-foreground">Recent Live</p>
+                    </div>
+
+                    <div className="p-4 bg-muted/50 rounded-lg border border-border">
+                      <p className="text-2xl font-bold text-foreground">{activePriceAlertsCount}</p>
+                      <p className="text-xs text-muted-foreground">Active Price</p>
+                    </div>
+
+                    <div className="p-4 bg-muted/50 rounded-lg border border-border">
+                      <p className="text-2xl font-bold text-foreground">{triggeredPriceAlertsCount}</p>
+                      <p className="text-xs text-muted-foreground">Triggered Price</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <CalendarDays className="h-4 w-4 text-primary" />
+                      Pending News & Timers
+                    </div>
+
+                    {scheduledSystemAlerts.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No pending scheduled alerts.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {scheduledSystemAlerts.slice(0, 4).map((alert) => (
+                          <div key={alert.id} className="p-3 rounded-lg border border-primary/20 bg-primary/5">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-medium text-foreground truncate">{alert.title}</p>
+                              <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                                Pending
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">{formatWhenLabel(alert.scheduledFor)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-5">
+                    <Button className="w-full" onClick={openCreatePriceAlert}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create New Price Alert
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="price-alerts" className="mt-6">
@@ -425,10 +623,8 @@ export default function Alerts() {
                       <p className="text-xs text-muted-foreground">Active Alerts</p>
                     </div>
                     <div className="p-4 bg-muted/50 rounded-lg border border-border">
-                      <p className="text-2xl font-bold text-foreground">
-                        {priceAlerts.filter((alert) => alert.triggered).length}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Triggered Today</p>
+                      <p className="text-2xl font-bold text-foreground">{triggeredPriceAlertsCount}</p>
+                      <p className="text-xs text-muted-foreground">Triggered</p>
                     </div>
                   </div>
 
@@ -454,8 +650,39 @@ export default function Alerts() {
                   onClearAll={clearAllAlerts}
                 />
               </div>
-              <div>
+
+              <div className="space-y-5">
                 <ManualTimerPanel onTimerComplete={handleTimerComplete} />
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Radio className="h-4 w-4 text-primary" />
+                      Recent Triggered Alerts
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {recentTriggeredSystemAlerts.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No live alerts yet.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {recentTriggeredSystemAlerts.slice(0, 5).map((alert) => (
+                          <div key={alert.id} className="p-3 rounded-lg border border-border bg-muted/40">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-medium text-foreground truncate">{alert.title}</p>
+                              <Badge variant="secondary" className="text-[10px]">
+                                Live
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {formatTriggeredLabel(alert.triggeredAt ?? alert.timestamp)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             </div>
           </TabsContent>
@@ -475,11 +702,7 @@ export default function Alerts() {
         </Tabs>
       </div>
 
-      <EventDetailsModal
-        event={selectedCalendarEvent as any}
-        isOpen={isEventModalOpen}
-        onClose={closeCalendarOverlay}
-      />
+      <EventDetailsModal event={selectedCalendarEvent} isOpen={isEventModalOpen} onClose={closeCalendarOverlay} />
 
       <CreatePriceAlertModal
         open={showCreatePriceAlert}
