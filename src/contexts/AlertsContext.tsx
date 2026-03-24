@@ -127,6 +127,9 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     return { ...defaultAlertPreferences, ...parsed };
   });
 
+  // heartbeat so pending alerts can transition even when nothing else changes
+  const [timeTick, setTimeTick] = useState(() => Date.now());
+
   const lastAlertIdRef = useRef<string | null>(null);
   const closeConfirmRef = useRef<Record<string, number>>({});
 
@@ -184,7 +187,7 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     }
 
     return currentTime >= startTime || currentTime < endTime;
-  }, [preferences.quietHoursEnabled, preferences.quietHoursStart, preferences.quietHoursEnd]);
+  }, [preferences.quietHoursEnabled, preferences.quietHoursStart, preferences.quietHoursEnd, timeTick]);
 
   useEffect(() => {
     const savedAlerts = safeJsonParse<any[]>(localStorage.getItem("alerts"), []);
@@ -212,6 +215,15 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     localStorage.setItem("alertPreferences", JSON.stringify(preferences));
   }, [preferences]);
+
+  // 15-second heartbeat is enough for demo + avoids noisy rerenders
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setTimeTick(Date.now());
+    }, 15000);
+
+    return () => window.clearInterval(interval);
+  }, []);
 
   const unreadCount = useMemo(() => alerts.filter((a) => !a.read).length, [alerts]);
 
@@ -324,6 +336,7 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     setPreferences(newPrefs);
   }, []);
 
+  // pending scheduled alerts → triggered alerts
   useEffect(() => {
     if (alerts.length === 0) return;
 
@@ -338,6 +351,7 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
         ...alert,
         status: "triggered",
         triggeredAt: new Date(),
+        read: false,
       };
 
       newlyTriggered.push(triggeredAlert);
@@ -354,9 +368,11 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
           lastAlertIdRef.current = alert.id;
           playNotificationSound();
         }
+
+        toastTriggeredAlert(alert);
       });
     }
-  }, [alerts, preferences.soundEnabled, isQuietHours]);
+  }, [alerts, preferences.soundEnabled, isQuietHours, timeTick]);
 
   useEffect(() => {
     if (priceAlerts.length === 0) return;
@@ -497,6 +513,16 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
   };
 
   return <AlertsContext.Provider value={value}>{children}</AlertsContext.Provider>;
+}
+
+function toastTriggeredAlert(alert: AlertItem) {
+  // dynamic import avoided to keep provider clean and prevent hook misuse
+  try {
+    const event = new CustomEvent("streambias-alert-triggered", { detail: alert });
+    window.dispatchEvent(event);
+  } catch {
+    // no-op
+  }
 }
 
 export function useAlertsContext() {
