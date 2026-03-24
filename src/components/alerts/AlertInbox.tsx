@@ -31,9 +31,17 @@ interface AlertInboxProps {
   onMarkAllRead: () => void;
   onDelete: (id: string) => void;
   onClearAll: () => void;
+  onOpenCalendarEvent?: (eventId: string) => void;
 }
 
-export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClearAll }: AlertInboxProps) {
+export function AlertInbox({
+  alerts,
+  onMarkRead,
+  onMarkAllRead,
+  onDelete,
+  onClearAll,
+  onOpenCalendarEvent,
+}: AlertInboxProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [filter, setFilter] = useState<"all" | "unread">("all");
@@ -138,14 +146,7 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
   const buildNavigateTarget = useCallback(
     (alert: AlertItem) => {
       if (alert.routeTo) {
-        let target = applyRouteParams(alert.routeTo, alert.routeParams);
-
-        if (alert.eventId && target.startsWith("/calendar")) {
-          const joiner = target.includes("?") ? "&" : "?";
-          target = `${target}${joiner}eventId=${encodeURIComponent(alert.eventId)}`;
-        }
-
-        return target;
+        return applyRouteParams(alert.routeTo, alert.routeParams);
       }
 
       switch (alert.type) {
@@ -156,14 +157,6 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
             return `/asset/${encodeURIComponent(alert.relatedAsset)}`;
           }
           return "/markets";
-
-        case "news":
-        case "summary":
-        case "breaking":
-          if (alert.eventId) {
-            return `/calendar?eventId=${encodeURIComponent(alert.eventId)}`;
-          }
-          return "/calendar";
 
         case "risk":
         case "exposure":
@@ -195,12 +188,32 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
     (alert: AlertItem) => {
       onMarkRead(alert.id);
 
+      if (
+        (alert.type === "news" || alert.type === "summary" || alert.type === "breaking") &&
+        alert.eventId &&
+        onOpenCalendarEvent
+      ) {
+        onOpenCalendarEvent(alert.eventId);
+        return;
+      }
+
       const target = buildNavigateTarget(alert);
       if (target) {
         navigateWithModalSupport(target);
       }
     },
-    [onMarkRead, buildNavigateTarget, navigateWithModalSupport],
+    [onMarkRead, onOpenCalendarEvent, buildNavigateTarget, navigateWithModalSupport],
+  );
+
+  const canOpenInline = useCallback(
+    (alert: AlertItem) => {
+      return Boolean(
+        (alert.type === "news" || alert.type === "summary" || alert.type === "breaking") &&
+        alert.eventId &&
+        onOpenCalendarEvent,
+      );
+    },
+    [onOpenCalendarEvent],
   );
 
   return (
@@ -257,6 +270,7 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
                 <div className="space-y-2">
                   {filteredAlerts.map((alert) => {
                     const target = buildNavigateTarget(alert);
+                    const opensInline = canOpenInline(alert);
 
                     return (
                       <div
@@ -338,7 +352,9 @@ export function AlertInbox({ alerts, onMarkRead, onMarkAllRead, onDelete, onClea
                                 </Badge>
                               )}
 
-                              {target && <span className="text-[11px] text-muted-foreground">• click to open</span>}
+                              {(opensInline || target) && (
+                                <span className="text-[11px] text-muted-foreground">• click to open</span>
+                              )}
                             </div>
                           </div>
 
