@@ -523,7 +523,11 @@ export default function Alerts() {
                                   variant="ghost"
                                   size="sm"
                                   className="h-7 px-2 text-xs"
-                                  onClick={() => openScheduledAlert(row.alertItem)}
+                                  onPointerDown={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    openScheduledAlert(row.alertItem);
+                                  }}
                                 >
                                   View
                                 </Button>
@@ -682,8 +686,10 @@ export default function Alerts() {
                               key={alert.id}
                               type="button"
                               disabled={!isClickable}
-                              onClick={() => {
+                              onPointerDown={(event) => {
                                 if (!isClickable) return;
+                                event.preventDefault();
+                                event.stopPropagation();
                                 openTriggeredAlert(alert);
                               }}
                               className={`w-full text-left p-3 rounded-lg border bg-muted/40 transition-colors ${
