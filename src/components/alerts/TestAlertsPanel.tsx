@@ -5,9 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { FlaskConical, Clock, Calendar, TrendingUp, AlertTriangle, Radio, Bell, Zap, Target } from "lucide-react";
 import type { AlertItem } from "@/types/alerts";
 import { useAlertsContext } from "@/contexts/AlertsContext";
+import { calendarEvents } from "@/data/calendarEvents";
 
 interface TestAlertsPanelProps {
-  onTriggerAlert: (alert: Omit<AlertItem, "id" | "timestamp" | "read">) => void;
+  onTriggerAlert: (alert: Omit<AlertItem, "id" | "timestamp" | "read" | "status" | "triggeredAt">) => void;
 }
 
 export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
@@ -17,10 +18,14 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
     return (watchlist?.[0] || "EURUSD").toUpperCase();
   }, [watchlist]);
 
+  const usCpiEvent = useMemo(() => calendarEvents.find((event) => event.event === "US CPI"), []);
+
+  const nfpEvent = useMemo(() => calendarEvents.find((event) => event.event === "Non-Farm Payrolls"), []);
+
   const testAlerts: Array<{
     label: string;
     icon: React.ReactNode;
-    alert: Omit<AlertItem, "id" | "timestamp" | "read">;
+    alert: Omit<AlertItem, "id" | "timestamp" | "read" | "status" | "triggeredAt">;
   }> = [
     {
       label: "Session Open",
@@ -53,7 +58,7 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         message: "US CPI data releasing in 30 minutes. High volatility expected on USD pairs.",
         severity: "high",
         relatedAsset: "USD",
-        eventId: "us-cpi-2025-01",
+        eventId: usCpiEvent?.id,
         routeTo: "/calendar",
       },
     },
@@ -78,7 +83,7 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         message: "Actual: 256K vs Forecast: 164K — Better than expected (Bullish USD)",
         severity: "info",
         relatedAsset: "USD",
-        eventId: "nfp-2025-01",
+        eventId: nfpEvent?.id,
         routeTo: "/calendar",
       },
     },
