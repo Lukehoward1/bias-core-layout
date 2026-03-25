@@ -199,7 +199,7 @@ export function AlertInbox({
     [navigate, location],
   );
 
-  const handleAlertClick = useCallback(
+  const handleAlertOpen = useCallback(
     (alert: AlertItem) => {
       onMarkRead(alert.id);
 
@@ -273,24 +273,26 @@ export function AlertInbox({
                     const isClickable = Boolean(target || (alert.eventId && onOpenCalendarEvent));
 
                     return (
-                      <div
+                      <button
                         key={alert.id}
-                        role={isClickable ? "button" : undefined}
-                        tabIndex={isClickable ? 0 : -1}
+                        type="button"
+                        disabled={!isClickable}
                         className={cn(
-                          "p-3 rounded-lg border transition-colors",
+                          "w-full text-left p-3 rounded-lg border transition-colors",
                           getSeverityStyles(alert),
                           isClickable ? "cursor-pointer hover:bg-muted/50" : "cursor-default",
                         )}
-                        onClick={() => {
+                        onPointerDown={(event) => {
                           if (!isClickable) return;
-                          handleAlertClick(alert);
+                          event.preventDefault();
+                          event.stopPropagation();
+                          handleAlertOpen(alert);
                         }}
                         onKeyDown={(event) => {
                           if (!isClickable) return;
                           if (event.key === "Enter" || event.key === " ") {
                             event.preventDefault();
-                            handleAlertClick(alert);
+                            handleAlertOpen(alert);
                           }
                         }}
                       >
@@ -370,7 +372,7 @@ export function AlertInbox({
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                              onClick={(event) => {
+                              onPointerDown={(event) => {
                                 event.preventDefault();
                                 event.stopPropagation();
                                 onDelete(alert.id);
@@ -382,7 +384,7 @@ export function AlertInbox({
                             </Button>
                           </div>
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
