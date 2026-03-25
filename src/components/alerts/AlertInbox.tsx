@@ -24,7 +24,6 @@ import {
 
 import type { AlertItem, AlertType } from "@/types/alerts";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 
 interface AlertInboxProps {
   alerts: AlertItem[];
@@ -33,6 +32,7 @@ interface AlertInboxProps {
   onDelete: (id: string) => void;
   onClearAll: () => void;
   onOpenCalendarEvent?: (eventId: string) => void;
+  onOpenAlertItem?: (alert: AlertItem) => void;
 }
 
 export function AlertInbox({
@@ -42,6 +42,7 @@ export function AlertInbox({
   onDelete,
   onClearAll,
   onOpenCalendarEvent,
+  onOpenAlertItem,
 }: AlertInboxProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -204,27 +205,22 @@ export function AlertInbox({
     (alert: AlertItem) => {
       onMarkRead(alert.id);
 
-      toast.message(
-        `Clicked alert | title: ${alert.title} | eventId: ${alert.eventId ?? "NONE"} | hasOpenFn: ${
-          onOpenCalendarEvent ? "YES" : "NO"
-        }`,
-      );
-
       if (alert.eventId && onOpenCalendarEvent) {
         onOpenCalendarEvent(alert.eventId);
         return;
       }
 
-      const target = buildNavigateTarget(alert);
-      if (target) {
-        toast.message(`Fallback route: ${target}`);
-        navigateWithModalSupport(target);
+      if (onOpenAlertItem && (alert.type === "breaking" || alert.type === "summary" || alert.type === "session")) {
+        onOpenAlertItem(alert);
         return;
       }
 
-      toast.error("Alert clicked, but no modal event ID or fallback route was available.");
+      const target = buildNavigateTarget(alert);
+      if (target) {
+        navigateWithModalSupport(target);
+      }
     },
-    [onMarkRead, onOpenCalendarEvent, buildNavigateTarget, navigateWithModalSupport],
+    [onMarkRead, onOpenCalendarEvent, onOpenAlertItem, buildNavigateTarget, navigateWithModalSupport],
   );
 
   return (
@@ -281,7 +277,12 @@ export function AlertInbox({
                 <div className="space-y-2">
                   {filteredAlerts.map((alert) => {
                     const target = buildNavigateTarget(alert);
-                    const isClickable = Boolean(target || (alert.eventId && onOpenCalendarEvent));
+                    const isClickable = Boolean(
+                      target ||
+                      (alert.eventId && onOpenCalendarEvent) ||
+                      ((alert.type === "breaking" || alert.type === "summary" || alert.type === "session") &&
+                        onOpenAlertItem),
+                    );
 
                     return (
                       <div
