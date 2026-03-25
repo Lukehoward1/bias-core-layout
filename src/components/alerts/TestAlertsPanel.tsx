@@ -71,7 +71,7 @@ export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
         message: "Unscheduled Federal Reserve announcement incoming. Markets may react sharply.",
         severity: "high",
         relatedAsset: "USD",
-        routeTo: "/calendar",
+        routeTo: "/alerts",
       },
     },
     {
