@@ -312,6 +312,15 @@ export default function Alerts() {
     [openCalendarEventById],
   );
 
+  const openTriggeredAlert = useCallback(
+    (alert: AlertItem) => {
+      if (alert.eventId) {
+        openCalendarEventById(alert.eventId);
+      }
+    },
+    [openCalendarEventById],
+  );
+
   return (
     <div className="p-6 space-y-6">
       <AppHeader title="Alerts" />
@@ -665,19 +674,39 @@ export default function Alerts() {
                       <p className="text-sm text-muted-foreground">No live alerts yet.</p>
                     ) : (
                       <div className="space-y-3">
-                        {recentTriggeredSystemAlerts.slice(0, 5).map((alert) => (
-                          <div key={alert.id} className="p-3 rounded-lg border border-border bg-muted/40">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-medium text-foreground truncate">{alert.title}</p>
-                              <Badge variant="secondary" className="text-[10px]">
-                                Live
-                              </Badge>
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {formatTriggeredLabel(alert.triggeredAt ?? alert.timestamp)}
-                            </p>
-                          </div>
-                        ))}
+                        {recentTriggeredSystemAlerts.slice(0, 5).map((alert) => {
+                          const isClickable = Boolean(alert.eventId);
+
+                          return (
+                            <button
+                              key={alert.id}
+                              type="button"
+                              disabled={!isClickable}
+                              onClick={() => {
+                                if (!isClickable) return;
+                                openTriggeredAlert(alert);
+                              }}
+                              className={`w-full text-left p-3 rounded-lg border bg-muted/40 transition-colors ${
+                                isClickable
+                                  ? "border-border hover:bg-muted/60 cursor-pointer"
+                                  : "border-border cursor-default opacity-90"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-sm font-medium text-foreground truncate">{alert.title}</p>
+                                <Badge variant="secondary" className="text-[10px]">
+                                  Live
+                                </Badge>
+                              </div>
+
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {formatTriggeredLabel(alert.triggeredAt ?? alert.timestamp)}
+                              </p>
+
+                              {isClickable && <p className="text-[11px] text-muted-foreground mt-1">• click to open</p>}
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                   </CardContent>
