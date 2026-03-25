@@ -1,10 +1,24 @@
 import { useMemo, useState, useCallback } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, Plus, Settings, Inbox, Bell, FlaskConical, Target, CalendarDays, Radio } from "lucide-react";
+import {
+  Clock,
+  Plus,
+  Settings,
+  Inbox,
+  Bell,
+  FlaskConical,
+  Target,
+  CalendarDays,
+  Radio,
+  AlertTriangle,
+  Calendar,
+  TrendingUp,
+} from "lucide-react";
 import { AlertPreferencesPanel } from "@/components/alerts/AlertPreferencesPanel";
 import { AlertInbox } from "@/components/alerts/AlertInbox";
 import { TestAlertsPanel } from "@/components/alerts/TestAlertsPanel";
@@ -85,12 +99,39 @@ const formatTriggeredLabel = (date?: Date) => {
   });
 };
 
+const getAlertTypeLabel = (alert: AlertItem) => {
+  switch (alert.type) {
+    case "breaking":
+      return "Breaking News";
+    case "summary":
+      return "Summary";
+    case "session":
+      return "Session";
+    case "news":
+      return "Calendar News";
+    case "bias":
+      return "Bias";
+    case "price":
+      return "Price Alert";
+    case "risk":
+      return "Risk";
+    case "exposure":
+      return "Exposure";
+    case "timer":
+      return "Timer";
+    default:
+      return "Alert";
+  }
+};
+
 export default function Alerts() {
   const [activeTab, setActiveTab] = useState("overview");
   const [showCreatePriceAlert, setShowCreatePriceAlert] = useState(false);
   const [editingPriceAlert, setEditingPriceAlert] = useState<PriceAlert | null>(null);
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+  const [selectedAlertItem, setSelectedAlertItem] = useState<AlertItem | null>(null);
+  const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
 
   const {
     alerts,
@@ -235,6 +276,8 @@ export default function Alerts() {
   }, []);
 
   const openCalendarEvent = useCallback((event: CalendarEvent) => {
+    setIsAlertModalOpen(false);
+    setSelectedAlertItem(null);
     setIsEventModalOpen(false);
     setSelectedCalendarEvent(null);
 
@@ -253,9 +296,26 @@ export default function Alerts() {
     [openCalendarEvent],
   );
 
+  const openGenericAlert = useCallback((alert: AlertItem) => {
+    setIsEventModalOpen(false);
+    setSelectedCalendarEvent(null);
+    setIsAlertModalOpen(false);
+    setSelectedAlertItem(null);
+
+    requestAnimationFrame(() => {
+      setSelectedAlertItem(alert);
+      setIsAlertModalOpen(true);
+    });
+  }, []);
+
   const closeCalendarOverlay = useCallback(() => {
     setIsEventModalOpen(false);
     setSelectedCalendarEvent(null);
+  }, []);
+
+  const closeAlertOverlay = useCallback(() => {
+    setIsAlertModalOpen(false);
+    setSelectedAlertItem(null);
   }, []);
 
   const handleTopNewsClick = useCallback(
@@ -275,9 +335,18 @@ export default function Alerts() {
       return;
     }
 
+    if (isAlertModalOpen) {
+      closeAlertOverlay();
+      requestAnimationFrame(() => {
+        setEditingPriceAlert(null);
+        setShowCreatePriceAlert(true);
+      });
+      return;
+    }
+
     setEditingPriceAlert(null);
     setShowCreatePriceAlert(true);
-  }, [isEventModalOpen, closeCalendarOverlay]);
+  }, [isEventModalOpen, isAlertModalOpen, closeCalendarOverlay, closeAlertOverlay]);
 
   const openEditPriceAlert = useCallback(
     (alert: PriceAlert) => {
@@ -290,10 +359,19 @@ export default function Alerts() {
         return;
       }
 
+      if (isAlertModalOpen) {
+        closeAlertOverlay();
+        requestAnimationFrame(() => {
+          setEditingPriceAlert(alert);
+          setShowCreatePriceAlert(true);
+        });
+        return;
+      }
+
       setEditingPriceAlert(alert);
       setShowCreatePriceAlert(true);
     },
-    [isEventModalOpen, closeCalendarOverlay],
+    [isEventModalOpen, isAlertModalOpen, closeCalendarOverlay, closeAlertOverlay],
   );
 
   const handlePriceAlertModalOpenChange = useCallback((open: boolean) => {
@@ -307,18 +385,24 @@ export default function Alerts() {
     (alert: AlertItem) => {
       if (alert.type === "news" && alert.eventId) {
         openCalendarEventById(alert.eventId);
+        return;
       }
+
+      openGenericAlert(alert);
     },
-    [openCalendarEventById],
+    [openCalendarEventById, openGenericAlert],
   );
 
   const openTriggeredAlert = useCallback(
     (alert: AlertItem) => {
       if (alert.eventId) {
         openCalendarEventById(alert.eventId);
+        return;
       }
+
+      openGenericAlert(alert);
     },
-    [openCalendarEventById],
+    [openCalendarEventById, openGenericAlert],
   );
 
   return (
@@ -518,7 +602,7 @@ export default function Alerts() {
                                 >
                                   Edit
                                 </Button>
-                              ) : row.alertItem.type === "news" ? (
+                              ) : (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -531,8 +615,6 @@ export default function Alerts() {
                                 >
                                   View
                                 </Button>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">Scheduled</span>
                               )}
                             </td>
                           </tr>
@@ -660,6 +742,7 @@ export default function Alerts() {
                   onDelete={deleteAlert}
                   onClearAll={clearAllAlerts}
                   onOpenCalendarEvent={openCalendarEventById}
+                  onOpenAlertItem={openGenericAlert}
                 />
               </div>
 
@@ -679,7 +762,9 @@ export default function Alerts() {
                     ) : (
                       <div className="space-y-3">
                         {recentTriggeredSystemAlerts.slice(0, 5).map((alert) => {
-                          const isClickable = Boolean(alert.eventId);
+                          const isClickable = Boolean(
+                            alert.eventId || ["breaking", "summary", "session"].includes(alert.type),
+                          );
 
                           return (
                             <button
@@ -737,6 +822,88 @@ export default function Alerts() {
       </div>
 
       <EventDetailsModal event={selectedCalendarEvent} isOpen={isEventModalOpen} onClose={closeCalendarOverlay} />
+
+      <DialogPrimitive.Root open={isAlertModalOpen} onOpenChange={(open) => !open && closeAlertOverlay()}>
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[10000]"
+            onPointerDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              closeAlertOverlay();
+            }}
+          />
+
+          <DialogPrimitive.Content
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[94vw] max-w-2xl bg-background border border-border rounded-lg p-0 z-[10001]"
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            {selectedAlertItem && (
+              <>
+                <div className="border-b border-border px-6 py-5">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Badge variant="outline" className="text-xs">
+                      {getAlertTypeLabel(selectedAlertItem)}
+                    </Badge>
+
+                    <Badge
+                      className={
+                        selectedAlertItem.severity === "high"
+                          ? "bg-destructive text-destructive-foreground"
+                          : selectedAlertItem.severity === "warning"
+                            ? "bg-warning text-warning-foreground"
+                            : "bg-primary text-primary-foreground"
+                      }
+                    >
+                      {selectedAlertItem.severity.toUpperCase()}
+                    </Badge>
+
+                    {selectedAlertItem.relatedAsset && (
+                      <Badge variant="secondary" className="text-xs">
+                        {selectedAlertItem.relatedAsset}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <h2 className="text-xl font-bold text-foreground mt-3">{selectedAlertItem.title}</h2>
+
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {formatTriggeredLabel(selectedAlertItem.triggeredAt ?? selectedAlertItem.timestamp)}
+                  </p>
+                </div>
+
+                <div className="px-6 py-5 space-y-5">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        {selectedAlertItem.type === "breaking" ? (
+                          <Radio className="h-4 w-4 text-destructive" />
+                        ) : selectedAlertItem.type === "session" ? (
+                          <Clock className="h-4 w-4 text-primary" />
+                        ) : selectedAlertItem.type === "summary" ? (
+                          <TrendingUp className="h-4 w-4 text-primary" />
+                        ) : selectedAlertItem.type === "news" ? (
+                          <Calendar className="h-4 w-4 text-primary" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 text-primary" />
+                        )}
+                        Alert Details
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{selectedAlertItem.message}</p>
+                    </CardContent>
+                  </Card>
+
+                  <div className="flex justify-end">
+                    <Button onClick={closeAlertOverlay}>Close</Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
 
       <CreatePriceAlertModal
         open={showCreatePriceAlert}
