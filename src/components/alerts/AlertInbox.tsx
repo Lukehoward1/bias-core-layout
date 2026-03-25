@@ -24,6 +24,7 @@ import {
 
 import type { AlertItem, AlertType } from "@/types/alerts";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface AlertInboxProps {
   alerts: AlertItem[];
@@ -203,6 +204,12 @@ export function AlertInbox({
     (alert: AlertItem) => {
       onMarkRead(alert.id);
 
+      toast.message(
+        `Clicked alert | title: ${alert.title} | eventId: ${alert.eventId ?? "NONE"} | hasOpenFn: ${
+          onOpenCalendarEvent ? "YES" : "NO"
+        }`,
+      );
+
       if (alert.eventId && onOpenCalendarEvent) {
         onOpenCalendarEvent(alert.eventId);
         return;
@@ -210,8 +217,12 @@ export function AlertInbox({
 
       const target = buildNavigateTarget(alert);
       if (target) {
+        toast.message(`Fallback route: ${target}`);
         navigateWithModalSupport(target);
+        return;
       }
+
+      toast.error("Alert clicked, but no modal event ID or fallback route was available.");
     },
     [onMarkRead, onOpenCalendarEvent, buildNavigateTarget, navigateWithModalSupport],
   );
