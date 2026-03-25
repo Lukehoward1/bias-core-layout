@@ -273,19 +273,18 @@ export function AlertInbox({
                     const isClickable = Boolean(target || (alert.eventId && onOpenCalendarEvent));
 
                     return (
-                      <button
+                      <div
                         key={alert.id}
-                        type="button"
-                        disabled={!isClickable}
+                        role={isClickable ? "button" : undefined}
+                        tabIndex={isClickable ? 0 : -1}
                         className={cn(
-                          "w-full text-left p-3 rounded-lg border transition-colors",
+                          "p-3 rounded-lg border transition-colors",
                           getSeverityStyles(alert),
                           isClickable ? "cursor-pointer hover:bg-muted/50" : "cursor-default",
                         )}
                         onPointerDown={(event) => {
                           if (!isClickable) return;
                           event.preventDefault();
-                          event.stopPropagation();
                           handleAlertOpen(alert);
                         }}
                         onKeyDown={(event) => {
@@ -384,7 +383,7 @@ export function AlertInbox({
                             </Button>
                           </div>
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
