@@ -587,6 +587,7 @@ export default function Alerts() {
                           <th className="text-left py-3 px-5 text-xs font-medium text-muted-foreground">Actions</th>
                         </tr>
                       </thead>
+
                       <tbody>
                         {myAlertsAndTimersRows.map((row) => (
                           <tr key={row.id} className="border-b border-border hover:bg-muted/50 transition-colors">
@@ -607,29 +608,46 @@ export default function Alerts() {
                             </td>
 
                             <td className="py-3 px-5">
-                              {row.kind === "price" ? (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 px-2 text-xs"
-                                  onClick={() => openEditPriceAlert(row.priceAlert)}
-                                >
-                                  Edit
-                                </Button>
-                              ) : (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 px-2 text-xs"
-                                  onPointerDown={(event) => {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    openAlertRow(row.alertItem);
-                                  }}
-                                >
-                                  View
-                                </Button>
-                              )}
+                              <div className="flex items-center gap-2">
+                                {row.kind === "price" ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs"
+                                    onClick={() => openEditPriceAlert(row.priceAlert)}
+                                  >
+                                    Edit
+                                  </Button>
+                                ) : (
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 px-2 text-xs"
+                                      onPointerDown={(event) => {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        openAlertRow(row.alertItem);
+                                      }}
+                                    >
+                                      View
+                                    </Button>
+
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                                      onPointerDown={(event) => {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        deleteAlert(row.alertItem.id);
+                                      }}
+                                    >
+                                      {row.kind === "scheduled" ? "Cancel" : "Remove"}
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         ))}
