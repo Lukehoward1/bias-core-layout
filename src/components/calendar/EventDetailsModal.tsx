@@ -162,7 +162,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
   const navigate = useNavigate();
   const location = useLocation();
   const { getAssetBySymbol } = useAssets();
-  const { scheduleAlert } = useAlertsContext();
+  const { alerts, addAlert, scheduleAlert } = useAlertsContext();
 
   const safeEvent = useMemo<CalendarEvent>(
     () =>
@@ -199,6 +199,15 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     [safeEvent.event, safeEvent.currency],
   );
 
+  const hasExistingAlert = useMemo(() => {
+    if (!event) return false;
+
+    return alerts.some((alertItem) => {
+      if (alertItem.eventId !== safeEvent.id) return false;
+      return alertItem.status === "pending" || alertItem.status === "triggered";
+    });
+  }, [alerts, event, safeEvent.id]);
+
   const getImpactColor = (impact: CalendarEvent["impact"]) => {
     if (impact === "high") return "bg-destructive text-destructive-foreground";
     if (impact === "medium") return "bg-warning text-warning-foreground";
@@ -214,6 +223,13 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
   const handleSetAlert = () => {
     if (!event) return;
 
+    if (hasExistingAlert) {
+      toast.message("Alert already exists", {
+        description: `${safeEvent.event} already has an alert set.`,
+      });
+      return;
+    }
+
     const now = new Date();
     const [hours, minutes] = safeEvent.time.split(":").map(Number);
 
@@ -223,8 +239,26 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     scheduledFor.setSeconds(0);
     scheduledFor.setMilliseconds(0);
 
-    if (scheduledFor.getTime() < now.getTime()) {
+    if (scheduledFor.getTime() < now.getTime() && !isReleased) {
       scheduledFor.setDate(scheduledFor.getDate() + 1);
+    }
+
+    if (isReleased) {
+      addAlert({
+        type: "news",
+        title: `${safeEvent.event} (${safeEvent.currency})`,
+        message: `${safeEvent.event} has already been released. Actual: ${safeEvent.actual} vs Forecast: ${safeEvent.forecast}`,
+        severity: safeEvent.impact === "high" ? "high" : "info",
+        relatedAsset: safeEvent.currency,
+        eventId: safeEvent.id,
+        routeTo: "/calendar",
+      });
+
+      toast.success("Released event alert added", {
+        description: `${safeEvent.event} has been added to your alerts.`,
+      });
+
+      return;
     }
 
     scheduleAlert({
@@ -321,9 +355,15 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                     Watchlist
                   </Button>
 
-                  <Button variant="outline" size="sm" className="gap-1.5" onClick={handleSetAlert}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={handleSetAlert}
+                    disabled={hasExistingAlert}
+                  >
                     <Bell className="h-3.5 w-3.5" />
-                    Set Alert
+                    {hasExistingAlert ? "Alert Added" : "Set Alert"}
                   </Button>
                 </div>
               </div>
