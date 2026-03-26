@@ -187,7 +187,7 @@ export default function Alerts() {
 
   const overviewActivePriceAlerts = useMemo(() => priceAlerts.filter((alert) => !alert.triggered), [priceAlerts]);
 
-  const scheduledSystemAlerts = useMemo(
+  const scheduledAlerts = useMemo(
     () =>
       alerts
         .filter((alert) => alert.status === "pending")
@@ -195,6 +195,18 @@ export default function Alerts() {
           const aTime = a.scheduledFor?.getTime() ?? 0;
           const bTime = b.scheduledFor?.getTime() ?? 0;
           return aTime - bTime;
+        }),
+    [alerts],
+  );
+
+  const liveNonPriceAlerts = useMemo(
+    () =>
+      alerts
+        .filter((alert) => alert.status === "triggered" && alert.type !== "price")
+        .sort((a, b) => {
+          const aTime = (a.triggeredAt ?? a.timestamp).getTime();
+          const bTime = (b.triggeredAt ?? b.timestamp).getTime();
+          return bTime - aTime;
         }),
     [alerts],
   );
@@ -213,6 +225,28 @@ export default function Alerts() {
   );
 
   const myAlertsAndTimersRows = useMemo(() => {
+    const scheduledRows = scheduledAlerts.map((alert) => ({
+      id: `scheduled-${alert.id}`,
+      kind: "scheduled" as const,
+      typeLabel: getAlertTypeLabel(alert),
+      what: alert.title,
+      when: formatWhenLabel(alert.scheduledFor),
+      statusLabel: "Pending",
+      statusVariant: "outline" as const,
+      alertItem: alert,
+    }));
+
+    const liveRows = liveNonPriceAlerts.map((alert) => ({
+      id: `live-${alert.id}`,
+      kind: "live" as const,
+      typeLabel: getAlertTypeLabel(alert),
+      what: alert.title,
+      when: formatTriggeredLabel(alert.triggeredAt ?? alert.timestamp),
+      statusLabel: "Live",
+      statusVariant: "secondary" as const,
+      alertItem: alert,
+    }));
+
     const priceRows = overviewActivePriceAlerts.map((alert) => ({
       id: `price-${alert.id}`,
       kind: "price" as const,
@@ -224,28 +258,8 @@ export default function Alerts() {
       priceAlert: alert,
     }));
 
-    const scheduledRows = scheduledSystemAlerts.map((alert) => ({
-      id: `scheduled-${alert.id}`,
-      kind: "scheduled" as const,
-      typeLabel:
-        alert.type === "news"
-          ? "News"
-          : alert.type === "timer"
-            ? "Timer"
-            : alert.type === "session"
-              ? "Session"
-              : alert.type === "bias"
-                ? "Bias"
-                : "Alert",
-      what: alert.title,
-      when: formatWhenLabel(alert.scheduledFor),
-      statusLabel: "Pending",
-      statusVariant: "outline" as const,
-      alertItem: alert,
-    }));
-
-    return [...scheduledRows, ...priceRows];
-  }, [overviewActivePriceAlerts, scheduledSystemAlerts]);
+    return [...scheduledRows, ...liveRows, ...priceRows];
+  }, [scheduledAlerts, liveNonPriceAlerts, overviewActivePriceAlerts]);
 
   const topNewsEvents = useMemo(() => {
     const now = new Date();
@@ -381,9 +395,9 @@ export default function Alerts() {
     }
   }, []);
 
-  const openScheduledAlert = useCallback(
+  const openAlertRow = useCallback(
     (alert: AlertItem) => {
-      if (alert.type === "news" && alert.eventId) {
+      if (alert.eventId) {
         openCalendarEventById(alert.eventId);
         return;
       }
@@ -610,7 +624,7 @@ export default function Alerts() {
                                   onPointerDown={(event) => {
                                     event.preventDefault();
                                     event.stopPropagation();
-                                    openScheduledAlert(row.alertItem);
+                                    openAlertRow(row.alertItem);
                                   }}
                                 >
                                   View
@@ -640,13 +654,13 @@ export default function Alerts() {
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-4 bg-muted/50 rounded-lg border border-border">
-                      <p className="text-2xl font-bold text-foreground">{scheduledSystemAlerts.length}</p>
+                      <p className="text-2xl font-bold text-foreground">{scheduledAlerts.length}</p>
                       <p className="text-xs text-muted-foreground">Pending</p>
                     </div>
 
                     <div className="p-4 bg-muted/50 rounded-lg border border-border">
-                      <p className="text-2xl font-bold text-foreground">{recentTriggeredSystemAlerts.length}</p>
-                      <p className="text-xs text-muted-foreground">Recent Live</p>
+                      <p className="text-2xl font-bold text-foreground">{liveNonPriceAlerts.length}</p>
+                      <p className="text-xs text-muted-foreground">Live Alerts</p>
                     </div>
 
                     <div className="p-4 bg-muted/50 rounded-lg border border-border">
@@ -666,11 +680,11 @@ export default function Alerts() {
                       Pending News & Timers
                     </div>
 
-                    {scheduledSystemAlerts.length === 0 ? (
+                    {scheduledAlerts.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No pending scheduled alerts.</p>
                     ) : (
                       <div className="space-y-2">
-                        {scheduledSystemAlerts.slice(0, 4).map((alert) => (
+                        {scheduledAlerts.slice(0, 4).map((alert) => (
                           <div key={alert.id} className="p-3 rounded-lg border border-primary/20 bg-primary/5">
                             <div className="flex items-center justify-between gap-2">
                               <p className="text-sm font-medium text-foreground truncate">{alert.title}</p>
