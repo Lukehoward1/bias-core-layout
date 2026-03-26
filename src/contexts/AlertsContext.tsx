@@ -4,7 +4,6 @@ import { defaultAlertPreferences } from "@/types/alerts";
 import { useWatchlist } from "@/hooks/use-watchlist";
 import { useMarketQuotes } from "@/hooks/use-market-quotes";
 import { normalizeSymbol } from "@/services/marketData";
-import { calendarEvents } from "@/data/calendarEvents";
 
 interface ScheduleAlertInput extends Omit<AlertItem, "id" | "timestamp" | "read" | "status" | "triggeredAt"> {
   scheduledFor: Date;
@@ -40,9 +39,6 @@ interface AlertsContextValue {
 }
 
 const AlertsContext = createContext<AlertsContextValue | undefined>(undefined);
-
-const SYSTEM_PENDING_PREFIX = "system-news-pending-";
-const SYSTEM_SUMMARY_PREFIX = "system-news-summary-";
 
 const createId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -119,17 +115,6 @@ const parseStoredAlert = (alert: any): AlertItem => {
     status,
     read: Boolean(alert?.read),
   };
-};
-
-const buildEventDateToday = (time: string) => {
-  const [hours, minutes] = time.split(":").map(Number);
-  const date = new Date();
-  date.setHours(hours || 0, minutes || 0, 0, 0);
-  return date;
-};
-
-const isSystemCalendarAlert = (id: string) => {
-  return id.startsWith(SYSTEM_PENDING_PREFIX) || id.startsWith(SYSTEM_SUMMARY_PREFIX);
 };
 
 export function AlertsProvider({ children }: { children: React.ReactNode }) {
@@ -348,92 +333,6 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
   const updatePreferences = useCallback((newPrefs: AlertPreferences) => {
     setPreferences(newPrefs);
   }, []);
-
-  useEffect(() => {
-    if (!preferences.highImpactNews && !preferences.postEventSummaries) return;
-
-    const now = new Date();
-
-    const generatedAlerts: AlertItem[] = [];
-
-    if (preferences.highImpactNews) {
-      calendarEvents.forEach((event) => {
-        if (event.impact !== "high") return;
-
-        const scheduledFor = buildEventDateToday(event.time);
-        if (scheduledFor.getTime() <= now.getTime()) return;
-
-        generatedAlerts.push({
-          id: `${SYSTEM_PENDING_PREFIX}${event.id}`,
-          type: "news",
-          title: `${event.currency} ${event.event} Release`,
-          message: `${event.event} is scheduled for ${event.time}. High volatility expected on ${event.currency} pairs.`,
-          timestamp: now,
-          read: false,
-          severity: "high",
-          status: "pending",
-          scheduledFor,
-          relatedAsset: event.currency,
-          routeTo: "/calendar",
-          eventId: event.id,
-        });
-      });
-    }
-
-    if (preferences.postEventSummaries) {
-      calendarEvents.forEach((event) => {
-        if (event.actual === "—") return;
-
-        const eventTime = buildEventDateToday(event.time);
-        const ageMs = now.getTime() - eventTime.getTime();
-
-        if (ageMs < 0 || ageMs > 90 * 60 * 1000) return;
-
-        generatedAlerts.push({
-          id: `${SYSTEM_SUMMARY_PREFIX}${event.id}`,
-          type: "summary",
-          title: `${event.event} Result`,
-          message: `Actual: ${event.actual} vs Forecast: ${event.forecast} (${event.currency})`,
-          timestamp: eventTime,
-          read: false,
-          severity: event.impact === "high" ? "high" : "info",
-          status: "triggered",
-          triggeredAt: eventTime,
-          relatedAsset: event.currency,
-          routeTo: "/calendar",
-          eventId: event.id,
-        });
-      });
-    }
-
-    setAlerts((prev) => {
-      const nonSystemAlerts = prev.filter((alert) => !isSystemCalendarAlert(alert.id));
-      const prevSystemById = new Map(
-        prev.filter((alert) => isSystemCalendarAlert(alert.id)).map((alert) => [alert.id, alert]),
-      );
-
-      const mergedSystemAlerts = generatedAlerts.map((generated) => {
-        const existing = prevSystemById.get(generated.id);
-        if (!existing) return generated;
-
-        return {
-          ...generated,
-          read: existing.read,
-          status: existing.status ?? generated.status,
-          triggeredAt: existing.triggeredAt ?? generated.triggeredAt,
-          timestamp: existing.timestamp ?? generated.timestamp,
-        };
-      });
-
-      return [...mergedSystemAlerts, ...nonSystemAlerts]
-        .sort((a, b) => {
-          const aTime = (a.triggeredAt ?? a.scheduledFor ?? a.timestamp).getTime();
-          const bTime = (b.triggeredAt ?? b.scheduledFor ?? b.timestamp).getTime();
-          return bTime - aTime;
-        })
-        .slice(0, 100);
-    });
-  }, [preferences.highImpactNews, preferences.postEventSummaries, timeTick]);
 
   useEffect(() => {
     if (alerts.length === 0) return;
