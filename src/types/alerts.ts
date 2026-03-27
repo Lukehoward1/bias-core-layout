@@ -16,6 +16,8 @@ export type AlertSeverity = "info" | "warning" | "high";
 
 export type AlertStatus = "pending" | "triggered";
 
+export type AlertRecurrence = "once" | "event-series";
+
 export interface AlertItem {
   id: string;
   type: AlertType;
@@ -56,6 +58,18 @@ export interface AlertItem {
 
   // Deep-link for calendar events
   eventId?: string;
+
+  /**
+   * Recurrence support for calendar/news alerts
+   * - once = this single event only
+   * - event-series = repeat this same event type whenever it appears again
+   */
+  recurrence?: AlertRecurrence;
+
+  /**
+   * Stable recurrence key, e.g. "US CPI" or "Non-Farm Payrolls"
+   */
+  recurrenceKey?: string;
 }
 
 // Custom Price Alert Types
