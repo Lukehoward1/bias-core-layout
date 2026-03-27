@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 
@@ -23,19 +23,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-/* =======================
-   Props
-======================= */
-
 interface EventDetailsModalProps {
   event: CalendarEvent | null;
   isOpen: boolean;
   onClose: () => void;
 }
-
-/* =======================
-   Demo helpers
-======================= */
 
 const getHistoricalData = (eventName: string) => {
   const baseValues = [185, 225, 165, 253, 281, 209, 187, 227];
@@ -154,15 +146,12 @@ const getEventNarrative = (event: CalendarEvent) => {
   );
 };
 
-/* =======================
-   Component
-======================= */
-
 export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { getAssetBySymbol } = useAssets();
   const { alerts, addAlert, scheduleAlert } = useAlertsContext();
+  const [repeatSeries, setRepeatSeries] = useState(false);
 
   const safeEvent = useMemo<CalendarEvent>(
     () =>
@@ -203,10 +192,13 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     if (!event) return false;
 
     return alerts.some((alertItem) => {
-      if (alertItem.eventId !== safeEvent.id) return false;
-      return alertItem.status === "pending" || alertItem.status === "triggered";
+      if (repeatSeries) {
+        return alertItem.recurrence === "event-series" && alertItem.recurrenceKey === safeEvent.event;
+      }
+
+      return alertItem.eventId === safeEvent.id && (alertItem.status === "pending" || alertItem.status === "triggered");
     });
-  }, [alerts, event, safeEvent.id]);
+  }, [alerts, event, repeatSeries, safeEvent.event, safeEvent.id]);
 
   const getImpactColor = (impact: CalendarEvent["impact"]) => {
     if (impact === "high") return "bg-destructive text-destructive-foreground";
@@ -225,7 +217,9 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
 
     if (hasExistingAlert) {
       toast.message("Alert already exists", {
-        description: `${safeEvent.event} already has an alert set.`,
+        description: repeatSeries
+          ? `${safeEvent.event} recurring alert already exists.`
+          : `${safeEvent.event} already has an alert set.`,
       });
       return;
     }
@@ -243,6 +237,9 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
       scheduledFor.setDate(scheduledFor.getDate() + 1);
     }
 
+    const recurrence = repeatSeries ? "event-series" : "once";
+    const recurrenceKey = safeEvent.event;
+
     if (isReleased) {
       addAlert({
         type: "news",
@@ -252,10 +249,14 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
         relatedAsset: safeEvent.currency,
         eventId: safeEvent.id,
         routeTo: "/calendar",
+        recurrence,
+        recurrenceKey,
       });
 
-      toast.success("Released event alert added", {
-        description: `${safeEvent.event} has been added to your alerts.`,
+      toast.success(repeatSeries ? "Recurring alert added" : "Released event alert added", {
+        description: repeatSeries
+          ? `${safeEvent.event} will now repeat whenever it appears again.`
+          : `${safeEvent.event} has been added to your alerts.`,
       });
 
       return;
@@ -270,10 +271,14 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
       eventId: safeEvent.id,
       routeTo: "/calendar",
       scheduledFor,
+      recurrence,
+      recurrenceKey,
     });
 
-    toast.success("Alert scheduled", {
-      description: `${safeEvent.event} will notify you at ${safeEvent.time} GMT`,
+    toast.success(repeatSeries ? "Recurring alert scheduled" : "Alert scheduled", {
+      description: repeatSeries
+        ? `${safeEvent.event} will repeat whenever it appears again.`
+        : `${safeEvent.event} will notify you at ${safeEvent.time} GMT`,
     });
   };
 
@@ -367,6 +372,26 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                   </Button>
                 </div>
               </div>
+            </div>
+
+            <div className="mt-4 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setRepeatSeries((prev) => !prev)}
+                className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${
+                  repeatSeries
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-muted/40 text-muted-foreground border-border"
+                }`}
+              >
+                {repeatSeries ? "Recurring: Every event type" : "One-time alert"}
+              </button>
+
+              <span className="text-xs text-muted-foreground">
+                {repeatSeries
+                  ? `This will alert you every time "${safeEvent.event}" appears again.`
+                  : "This will alert you only for this specific event."}
+              </span>
             </div>
           </div>
 
