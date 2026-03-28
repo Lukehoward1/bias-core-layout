@@ -124,6 +124,10 @@ const getAlertTypeLabel = (alert: AlertItem) => {
   }
 };
 
+const isRecurringAlert = (alert: AlertItem) => {
+  return (alert as AlertItem & { recurrence?: string }).recurrence === "event-series";
+};
+
 export default function Alerts() {
   const [activeTab, setActiveTab] = useState("overview");
   const [showCreatePriceAlert, setShowCreatePriceAlert] = useState(false);
@@ -187,10 +191,22 @@ export default function Alerts() {
 
   const overviewActivePriceAlerts = useMemo(() => priceAlerts.filter((alert) => !alert.triggered), [priceAlerts]);
 
+  const recurringAlerts = useMemo(
+    () =>
+      alerts
+        .filter((alert) => isRecurringAlert(alert))
+        .sort((a, b) => {
+          const aTime = (a.scheduledFor ?? a.triggeredAt ?? a.timestamp).getTime();
+          const bTime = (b.scheduledFor ?? b.triggeredAt ?? b.timestamp).getTime();
+          return aTime - bTime;
+        }),
+    [alerts],
+  );
+
   const scheduledAlerts = useMemo(
     () =>
       alerts
-        .filter((alert) => alert.status === "pending")
+        .filter((alert) => alert.status === "pending" && !isRecurringAlert(alert))
         .sort((a, b) => {
           const aTime = a.scheduledFor?.getTime() ?? 0;
           const bTime = b.scheduledFor?.getTime() ?? 0;
@@ -202,7 +218,7 @@ export default function Alerts() {
   const liveNonPriceAlerts = useMemo(
     () =>
       alerts
-        .filter((alert) => alert.status === "triggered" && alert.type !== "price")
+        .filter((alert) => alert.status === "triggered" && alert.type !== "price" && !isRecurringAlert(alert))
         .sort((a, b) => {
           const aTime = (a.triggeredAt ?? a.timestamp).getTime();
           const bTime = (b.triggeredAt ?? b.timestamp).getTime();
@@ -225,6 +241,21 @@ export default function Alerts() {
   );
 
   const myAlertsAndTimersRows = useMemo(() => {
+    const recurringRows = recurringAlerts.map((alert) => ({
+      id: `recurring-${alert.id}`,
+      kind: "recurring" as const,
+      typeLabel: getAlertTypeLabel(alert),
+      what: alert.title,
+      when:
+        alert.status === "pending"
+          ? formatWhenLabel(alert.scheduledFor)
+          : formatTriggeredLabel(alert.triggeredAt ?? alert.timestamp),
+      statusLabel: "Recurring",
+      statusVariant: "outline" as const,
+      alertItem: alert,
+      isRecurring: true,
+    }));
+
     const scheduledRows = scheduledAlerts.map((alert) => ({
       id: `scheduled-${alert.id}`,
       kind: "scheduled" as const,
@@ -234,6 +265,7 @@ export default function Alerts() {
       statusLabel: "Pending",
       statusVariant: "outline" as const,
       alertItem: alert,
+      isRecurring: false,
     }));
 
     const liveRows = liveNonPriceAlerts.map((alert) => ({
@@ -245,6 +277,7 @@ export default function Alerts() {
       statusLabel: "Live",
       statusVariant: "secondary" as const,
       alertItem: alert,
+      isRecurring: false,
     }));
 
     const priceRows = overviewActivePriceAlerts.map((alert) => ({
@@ -256,10 +289,11 @@ export default function Alerts() {
       statusLabel: alert.enabled ? "Active" : "Paused",
       statusVariant: alert.enabled ? ("default" as const) : ("secondary" as const),
       priceAlert: alert,
+      isRecurring: false,
     }));
 
-    return [...scheduledRows, ...liveRows, ...priceRows];
-  }, [scheduledAlerts, liveNonPriceAlerts, overviewActivePriceAlerts]);
+    return [...recurringRows, ...scheduledRows, ...liveRows, ...priceRows];
+  }, [recurringAlerts, scheduledAlerts, liveNonPriceAlerts, overviewActivePriceAlerts]);
 
   const topNewsEvents = useMemo(() => {
     const now = new Date();
@@ -592,9 +626,17 @@ export default function Alerts() {
                         {myAlertsAndTimersRows.map((row) => (
                           <tr key={row.id} className="border-b border-border hover:bg-muted/50 transition-colors">
                             <td className="py-3 px-5 text-sm text-foreground">
-                              <Badge variant="outline" className="text-xs">
-                                {row.typeLabel}
-                              </Badge>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge variant="outline" className="text-xs">
+                                  {row.typeLabel}
+                                </Badge>
+
+                                {row.kind !== "price" && row.isRecurring && (
+                                  <Badge variant="outline" className="text-[10px] border-warning/40 text-warning">
+                                    Recurring
+                                  </Badge>
+                                )}
+                              </div>
                             </td>
 
                             <td className="py-3 px-4 text-sm text-foreground font-medium">{row.what}</td>
@@ -643,7 +685,7 @@ export default function Alerts() {
                                         deleteAlert(row.alertItem.id);
                                       }}
                                     >
-                                      {row.kind === "scheduled" ? "Cancel" : "Remove"}
+                                      {row.kind === "scheduled" || row.kind === "recurring" ? "Cancel" : "Remove"}
                                     </Button>
                                   </>
                                 )}
@@ -682,14 +724,43 @@ export default function Alerts() {
                     </div>
 
                     <div className="p-4 bg-muted/50 rounded-lg border border-border">
-                      <p className="text-2xl font-bold text-foreground">{activePriceAlertsCount}</p>
-                      <p className="text-xs text-muted-foreground">Active Price</p>
+                      <p className="text-2xl font-bold text-foreground">{recurringAlerts.length}</p>
+                      <p className="text-xs text-muted-foreground">Recurring</p>
                     </div>
 
                     <div className="p-4 bg-muted/50 rounded-lg border border-border">
-                      <p className="text-2xl font-bold text-foreground">{triggeredPriceAlertsCount}</p>
-                      <p className="text-xs text-muted-foreground">Triggered Price</p>
+                      <p className="text-2xl font-bold text-foreground">{activePriceAlertsCount}</p>
+                      <p className="text-xs text-muted-foreground">Active Price</p>
                     </div>
+                  </div>
+
+                  <div className="mt-5 space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <Bell className="h-4 w-4 text-primary" />
+                      Recurring Alerts
+                    </div>
+
+                    {recurringAlerts.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No recurring alerts set.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {recurringAlerts.slice(0, 4).map((alert) => (
+                          <div key={alert.id} className="p-3 rounded-lg border border-warning/20 bg-warning/5">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-medium text-foreground truncate">{alert.title}</p>
+                              <Badge variant="outline" className="text-[10px] border-warning/40 text-warning">
+                                Recurring
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {alert.status === "pending"
+                                ? formatWhenLabel(alert.scheduledFor)
+                                : formatTriggeredLabel(alert.triggeredAt ?? alert.timestamp)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-5 space-y-3">
@@ -816,7 +887,15 @@ export default function Alerts() {
                               }`}
                             >
                               <div className="flex items-center justify-between gap-2">
-                                <p className="text-sm font-medium text-foreground truncate">{alert.title}</p>
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <p className="text-sm font-medium text-foreground truncate">{alert.title}</p>
+                                  {isRecurringAlert(alert) && (
+                                    <Badge variant="outline" className="text-[10px] border-warning/40 text-warning">
+                                      Recurring
+                                    </Badge>
+                                  )}
+                                </div>
+
                                 <Badge variant="secondary" className="text-[10px]">
                                   Live
                                 </Badge>
@@ -889,6 +968,12 @@ export default function Alerts() {
                     >
                       {selectedAlertItem.severity.toUpperCase()}
                     </Badge>
+
+                    {isRecurringAlert(selectedAlertItem) && (
+                      <Badge variant="outline" className="text-xs border-warning/40 text-warning">
+                        Recurring
+                      </Badge>
+                    )}
 
                     {selectedAlertItem.relatedAsset && (
                       <Badge variant="secondary" className="text-xs">
