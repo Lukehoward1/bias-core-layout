@@ -364,6 +364,12 @@ export function AlertInbox({
                                 </Badge>
                               )}
 
+                              {alert.recurrence === "event-series" && (
+                                <Badge variant="outline" className="text-[10px] border-warning/40 text-warning">
+                                  Recurring
+                                </Badge>
+                              )}
+
                               {alert.relatedAsset && (
                                 <Badge variant="secondary" className="text-[10px]">
                                   {alert.relatedAsset}
