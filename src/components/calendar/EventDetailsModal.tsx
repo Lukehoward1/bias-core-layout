@@ -177,6 +177,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
   const location = useLocation();
   const { getAssetBySymbol } = useAssets();
   const { alerts, recurringSubscriptions, addAlert, scheduleAlert, addRecurringSubscription } = useAlertsContext();
+
   const [alertMode, setAlertMode] = useState<"once" | "event-series">("once");
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
 
@@ -184,6 +185,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     () =>
       event ?? {
         id: "placeholder",
+        eventKey: "placeholder",
         time: "00:00",
         currency: "—",
         event: "—",
