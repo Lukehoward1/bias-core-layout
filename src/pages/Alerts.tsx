@@ -99,6 +99,24 @@ const formatTriggeredLabel = (date?: Date) => {
   });
 };
 
+const formatRecurringNextLabel = (date?: Date) => {
+  if (!date || Number.isNaN(date.getTime())) return "Next release scheduled";
+
+  const now = new Date();
+  const diffMs = date.getTime() - now.getTime();
+
+  if (diffMs <= 0) return "Next release due now";
+
+  const diffMins = Math.ceil(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  const remHours = diffHours % 24;
+
+  if (diffDays > 0) return `Next release in ${diffDays}d ${remHours}h`;
+  if (diffHours > 0) return `Next release in ${diffHours}h ${diffMins % 60}m`;
+  return `Next release in ${diffMins}m`;
+};
+
 const getAlertTypeLabel = (alert: AlertItem) => {
   switch (alert.type) {
     case "breaking":
@@ -125,7 +143,7 @@ const getAlertTypeLabel = (alert: AlertItem) => {
 };
 
 const isRecurringAlert = (alert: AlertItem) => {
-  return (alert as AlertItem & { recurrence?: string }).recurrence === "event-series";
+  return alert.recurrence === "event-series";
 };
 
 export default function Alerts() {
@@ -139,11 +157,13 @@ export default function Alerts() {
 
   const {
     alerts,
+    recurringSubscriptions,
     preferences,
     addAlert,
     markRead,
     markAllRead,
     deleteAlert,
+    removeRecurringSubscription,
     clearAllAlerts,
     updatePreferences,
     unreadCount,
@@ -191,22 +211,10 @@ export default function Alerts() {
 
   const overviewActivePriceAlerts = useMemo(() => priceAlerts.filter((alert) => !alert.triggered), [priceAlerts]);
 
-  const recurringAlerts = useMemo(
+  const oneTimeScheduledAlerts = useMemo(
     () =>
       alerts
-        .filter((alert) => isRecurringAlert(alert))
-        .sort((a, b) => {
-          const aTime = (a.scheduledFor ?? a.triggeredAt ?? a.timestamp).getTime();
-          const bTime = (b.scheduledFor ?? b.triggeredAt ?? b.timestamp).getTime();
-          return aTime - bTime;
-        }),
-    [alerts],
-  );
-
-  const scheduledAlerts = useMemo(
-    () =>
-      alerts
-        .filter((alert) => alert.status === "pending" && !isRecurringAlert(alert))
+        .filter((alert) => alert.status === "pending")
         .sort((a, b) => {
           const aTime = a.scheduledFor?.getTime() ?? 0;
           const bTime = b.scheduledFor?.getTime() ?? 0;
@@ -215,10 +223,41 @@ export default function Alerts() {
     [alerts],
   );
 
+  const recurringOverviewItems = useMemo(() => {
+    return recurringSubscriptions
+      .map((sub) => {
+        const matchedEvent = calendarEvents.find((event) => event.event === sub.key);
+        if (!matchedEvent) return null;
+
+        const eventDateToday = parseEventTimeToday(matchedEvent.time);
+        const nextRelease = new Date(eventDateToday);
+
+        while (nextRelease.getTime() <= Date.now()) {
+          nextRelease.setMonth(nextRelease.getMonth() + 1);
+        }
+
+        return {
+          id: sub.id,
+          title: `${matchedEvent.event} (${matchedEvent.currency})`,
+          currency: matchedEvent.currency,
+          nextRelease,
+          key: sub.key,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a!.nextRelease.getTime() - b!.nextRelease.getTime()) as Array<{
+      id: string;
+      title: string;
+      currency: string;
+      nextRelease: Date;
+      key: string;
+    }>;
+  }, [recurringSubscriptions]);
+
   const liveNonPriceAlerts = useMemo(
     () =>
       alerts
-        .filter((alert) => alert.status === "triggered" && alert.type !== "price" && !isRecurringAlert(alert))
+        .filter((alert) => alert.status === "triggered" && alert.type !== "price")
         .sort((a, b) => {
           const aTime = (a.triggeredAt ?? a.timestamp).getTime();
           const bTime = (b.triggeredAt ?? b.timestamp).getTime();
@@ -241,22 +280,19 @@ export default function Alerts() {
   );
 
   const myAlertsAndTimersRows = useMemo(() => {
-    const recurringRows = recurringAlerts.map((alert) => ({
-      id: `recurring-${alert.id}`,
+    const recurringRows = recurringOverviewItems.map((item) => ({
+      id: `recurring-${item.id}`,
       kind: "recurring" as const,
-      typeLabel: getAlertTypeLabel(alert),
-      what: alert.title,
-      when:
-        alert.status === "pending"
-          ? formatWhenLabel(alert.scheduledFor)
-          : formatTriggeredLabel(alert.triggeredAt ?? alert.timestamp),
+      typeLabel: "Calendar News",
+      what: item.title,
+      when: formatRecurringNextLabel(item.nextRelease),
       statusLabel: "Recurring",
       statusVariant: "outline" as const,
-      alertItem: alert,
+      recurringItem: item,
       isRecurring: true,
     }));
 
-    const scheduledRows = scheduledAlerts.map((alert) => ({
+    const scheduledRows = oneTimeScheduledAlerts.map((alert) => ({
       id: `scheduled-${alert.id}`,
       kind: "scheduled" as const,
       typeLabel: getAlertTypeLabel(alert),
@@ -277,7 +313,7 @@ export default function Alerts() {
       statusLabel: "Live",
       statusVariant: "secondary" as const,
       alertItem: alert,
-      isRecurring: false,
+      isRecurring: isRecurringAlert(alert),
     }));
 
     const priceRows = overviewActivePriceAlerts.map((alert) => ({
@@ -293,7 +329,7 @@ export default function Alerts() {
     }));
 
     return [...recurringRows, ...scheduledRows, ...liveRows, ...priceRows];
-  }, [recurringAlerts, scheduledAlerts, liveNonPriceAlerts, overviewActivePriceAlerts]);
+  }, [recurringOverviewItems, oneTimeScheduledAlerts, liveNonPriceAlerts, overviewActivePriceAlerts]);
 
   const topNewsEvents = useMemo(() => {
     const now = new Date();
@@ -660,6 +696,19 @@ export default function Alerts() {
                                   >
                                     Edit
                                   </Button>
+                                ) : row.kind === "recurring" ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                                    onPointerDown={(event) => {
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      removeRecurringSubscription(row.recurringItem.id);
+                                    }}
+                                  >
+                                    Stop
+                                  </Button>
                                 ) : (
                                   <>
                                     <Button
@@ -685,7 +734,7 @@ export default function Alerts() {
                                         deleteAlert(row.alertItem.id);
                                       }}
                                     >
-                                      {row.kind === "scheduled" || row.kind === "recurring" ? "Cancel" : "Remove"}
+                                      {row.kind === "scheduled" ? "Cancel" : "Remove"}
                                     </Button>
                                   </>
                                 )}
@@ -714,7 +763,7 @@ export default function Alerts() {
                 <CardContent>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-4 bg-muted/50 rounded-lg border border-border">
-                      <p className="text-2xl font-bold text-foreground">{scheduledAlerts.length}</p>
+                      <p className="text-2xl font-bold text-foreground">{oneTimeScheduledAlerts.length}</p>
                       <p className="text-xs text-muted-foreground">Pending</p>
                     </div>
 
@@ -724,7 +773,7 @@ export default function Alerts() {
                     </div>
 
                     <div className="p-4 bg-muted/50 rounded-lg border border-border">
-                      <p className="text-2xl font-bold text-foreground">{recurringAlerts.length}</p>
+                      <p className="text-2xl font-bold text-foreground">{recurringOverviewItems.length}</p>
                       <p className="text-xs text-muted-foreground">Recurring</p>
                     </div>
 
@@ -740,22 +789,20 @@ export default function Alerts() {
                       Recurring Alerts
                     </div>
 
-                    {recurringAlerts.length === 0 ? (
+                    {recurringOverviewItems.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No recurring alerts set.</p>
                     ) : (
                       <div className="space-y-2">
-                        {recurringAlerts.slice(0, 4).map((alert) => (
-                          <div key={alert.id} className="p-3 rounded-lg border border-warning/20 bg-warning/5">
+                        {recurringOverviewItems.slice(0, 4).map((item) => (
+                          <div key={item.id} className="p-3 rounded-lg border border-warning/20 bg-warning/5">
                             <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-medium text-foreground truncate">{alert.title}</p>
+                              <p className="text-sm font-medium text-foreground truncate">{item.title}</p>
                               <Badge variant="outline" className="text-[10px] border-warning/40 text-warning">
                                 Recurring
                               </Badge>
                             </div>
                             <p className="text-xs text-muted-foreground mt-1">
-                              {alert.status === "pending"
-                                ? formatWhenLabel(alert.scheduledFor)
-                                : formatTriggeredLabel(alert.triggeredAt ?? alert.timestamp)}
+                              {formatRecurringNextLabel(item.nextRelease)}
                             </p>
                           </div>
                         ))}
@@ -769,11 +816,11 @@ export default function Alerts() {
                       Pending News & Timers
                     </div>
 
-                    {scheduledAlerts.length === 0 ? (
+                    {oneTimeScheduledAlerts.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No pending scheduled alerts.</p>
                     ) : (
                       <div className="space-y-2">
-                        {scheduledAlerts.slice(0, 4).map((alert) => (
+                        {oneTimeScheduledAlerts.slice(0, 4).map((alert) => (
                           <div key={alert.id} className="p-3 rounded-lg border border-primary/20 bg-primary/5">
                             <div className="flex items-center justify-between gap-2">
                               <p className="text-sm font-medium text-foreground truncate">{alert.title}</p>
