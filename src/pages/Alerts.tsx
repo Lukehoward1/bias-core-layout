@@ -226,7 +226,7 @@ export default function Alerts() {
   const recurringOverviewItems = useMemo(() => {
     return recurringSubscriptions
       .map((sub) => {
-        const matchedEvent = calendarEvents.find((event) => event.event === sub.key);
+        const matchedEvent = calendarEvents.find((event) => event.eventKey === sub.key);
         if (!matchedEvent) return null;
 
         const eventDateToday = parseEventTimeToday(matchedEvent.time);
@@ -242,6 +242,7 @@ export default function Alerts() {
           currency: matchedEvent.currency,
           nextRelease,
           key: sub.key,
+          eventId: matchedEvent.id,
         };
       })
       .filter(Boolean)
@@ -251,6 +252,7 @@ export default function Alerts() {
       currency: string;
       nextRelease: Date;
       key: string;
+      eventId: string;
     }>;
   }, [recurringSubscriptions]);
 
@@ -697,18 +699,33 @@ export default function Alerts() {
                                     Edit
                                   </Button>
                                 ) : row.kind === "recurring" ? (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
-                                    onPointerDown={(event) => {
-                                      event.preventDefault();
-                                      event.stopPropagation();
-                                      removeRecurringSubscription(row.recurringItem.id);
-                                    }}
-                                  >
-                                    Stop
-                                  </Button>
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 px-2 text-xs"
+                                      onPointerDown={(event) => {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        openCalendarEventById(row.recurringItem.eventId);
+                                      }}
+                                    >
+                                      View
+                                    </Button>
+
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                                      onPointerDown={(event) => {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        removeRecurringSubscription(row.recurringItem.id);
+                                      }}
+                                    >
+                                      Stop
+                                    </Button>
+                                  </>
                                 ) : (
                                   <>
                                     <Button
@@ -952,8 +969,7 @@ export default function Alerts() {
                                 {formatTriggeredLabel(alert.triggeredAt ?? alert.timestamp)}
                               </p>
 
-                              {isClickable && <p className="text-[11px] text-muted-foreground mt-1">• click to open</p>}
-                            </button>
+                              {isClickable && <p className="text-[11px] text-muted-foreground mt-1">• click to open</p>}</n                            </button>
                           );
                         })}
                       </div>
