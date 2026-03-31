@@ -41,8 +41,8 @@ type HistoricalDataByYear = Record<number, HistoricalDataPoint[]>;
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-const buildYearData = (eventName: string, year: number): HistoricalDataPoint[] => {
-  const seed = eventName.length + year;
+const buildYearData = (eventKey: string, year: number): HistoricalDataPoint[] => {
+  const seed = eventKey.length + year;
   const baseValues = [185, 225, 165, 253, 281, 209, 187, 227, 246, 212, 198, 238];
 
   return MONTHS.map((month, index) => {
@@ -61,13 +61,13 @@ const buildYearData = (eventName: string, year: number): HistoricalDataPoint[] =
   });
 };
 
-const getHistoricalDataByYear = (eventName: string): HistoricalDataByYear => {
+const getHistoricalDataByYear = (eventKey: string): HistoricalDataByYear => {
   const currentYear = new Date().getFullYear();
 
   return {
-    [currentYear - 2]: buildYearData(eventName, currentYear - 2),
-    [currentYear - 1]: buildYearData(eventName, currentYear - 1),
-    [currentYear]: buildYearData(eventName, currentYear),
+    [currentYear - 2]: buildYearData(eventKey, currentYear - 2),
+    [currentYear - 1]: buildYearData(eventKey, currentYear - 1),
+    [currentYear]: buildYearData(eventKey, currentYear),
   };
 };
 
@@ -199,7 +199,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
 
   const isReleased = safeEvent.actual !== "—";
 
-  const historicalDataByYear = useMemo(() => getHistoricalDataByYear(safeEvent.event), [safeEvent.event]);
+  const historicalDataByYear = useMemo(() => getHistoricalDataByYear(safeEvent.eventKey), [safeEvent.eventKey]);
 
   const availableYears = useMemo(() => {
     return Object.keys(historicalDataByYear)
@@ -214,7 +214,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     }
 
     setSelectedYear(availableYears[availableYears.length - 1]);
-  }, [safeEvent.event, availableYears]);
+  }, [safeEvent.eventKey, availableYears]);
 
   const historicalData = useMemo(() => {
     if (!selectedYear) return [];
@@ -256,8 +256,8 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
 
   const hasExistingRecurringAlert = useMemo(() => {
     if (!event) return false;
-    return recurringSubscriptions.some((item) => item.key === safeEvent.event);
-  }, [recurringSubscriptions, event, safeEvent.event]);
+    return recurringSubscriptions.some((item) => item.key === safeEvent.eventKey);
+  }, [recurringSubscriptions, event, safeEvent.eventKey]);
 
   const getImpactColor = (impact: CalendarEvent["impact"]) => {
     if (impact === "high") return "bg-destructive text-destructive-foreground";
@@ -283,7 +283,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
       }
 
       addRecurringSubscription({
-        key: safeEvent.event,
+        key: safeEvent.eventKey,
         eventName: safeEvent.event,
         currency: safeEvent.currency,
       });
@@ -324,6 +324,8 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
         relatedAsset: safeEvent.currency,
         eventId: safeEvent.id,
         routeTo: "/calendar",
+        recurrence: "once",
+        recurrenceKey: safeEvent.eventKey,
       });
 
       toast.success("Released event alert added", {
@@ -343,7 +345,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
       routeTo: "/calendar",
       scheduledFor,
       recurrence: "once",
-      recurrenceKey: safeEvent.event,
+      recurrenceKey: safeEvent.eventKey,
     });
 
     toast.success("Alert scheduled", {
