@@ -969,7 +969,8 @@ export default function Alerts() {
                                 {formatTriggeredLabel(alert.triggeredAt ?? alert.timestamp)}
                               </p>
 
-                              {isClickable && <p className="text-[11px] text-muted-foreground mt-1">• click to open</p>}</n                            </button>
+                              {isClickable && <p className="text-[11px] text-muted-foreground mt-1">• click to open</p>}
+                            </button>
                           );
                         })}
                       </div>
