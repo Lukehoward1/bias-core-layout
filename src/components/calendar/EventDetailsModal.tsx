@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState } from "react";
+import { useMemo, useCallback, useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 
@@ -20,6 +20,8 @@ import {
   Lightbulb,
   MessageSquare,
   Minus,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -29,20 +31,44 @@ interface EventDetailsModalProps {
   onClose: () => void;
 }
 
-const getHistoricalData = (eventName: string) => {
-  const baseValues = [185, 225, 165, 253, 281, 209, 187, 227];
-  const seed = eventName.length;
+type HistoricalDataPoint = {
+  month: string;
+  actual: number | null;
+  forecast: number;
+};
 
-  return [
-    { period: "May", actual: baseValues[0] + seed * 5, forecast: baseValues[0] + seed * 3 },
-    { period: "Jun", actual: baseValues[1] - seed * 3, forecast: baseValues[1] - seed * 5 },
-    { period: "Jul", actual: baseValues[2] + seed * 7, forecast: baseValues[2] + seed * 4 },
-    { period: "Aug", actual: baseValues[3] - seed * 2, forecast: baseValues[3] + seed * 1 },
-    { period: "Sep", actual: baseValues[4] + seed * 4, forecast: baseValues[4] + seed * 2 },
-    { period: "Oct", actual: baseValues[5] - seed * 6, forecast: baseValues[5] - seed * 3 },
-    { period: "Nov", actual: baseValues[6] + seed * 3, forecast: baseValues[6] + seed * 5 },
-    { period: "Dec", actual: null, forecast: baseValues[7] + seed },
-  ];
+type HistoricalDataByYear = Record<number, HistoricalDataPoint[]>;
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+const buildYearData = (eventName: string, year: number): HistoricalDataPoint[] => {
+  const seed = eventName.length + year;
+  const baseValues = [185, 225, 165, 253, 281, 209, 187, 227, 246, 212, 198, 238];
+
+  return MONTHS.map((month, index) => {
+    const base = baseValues[index] ?? 200;
+    const forecast = base + ((seed + index) % 9) - 4;
+    const actual =
+      index === new Date().getMonth() && year === new Date().getFullYear()
+        ? null
+        : base + ((seed + index * 2) % 13) - 6;
+
+    return {
+      month,
+      actual,
+      forecast,
+    };
+  });
+};
+
+const getHistoricalDataByYear = (eventName: string): HistoricalDataByYear => {
+  const currentYear = new Date().getFullYear();
+
+  return {
+    [currentYear - 2]: buildYearData(eventName, currentYear - 2),
+    [currentYear - 1]: buildYearData(eventName, currentYear - 1),
+    [currentYear]: buildYearData(eventName, currentYear),
+  };
 };
 
 const getMarketInterpretation = (eventName: string, currency: string) => {
@@ -152,6 +178,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
   const { getAssetBySymbol } = useAssets();
   const { alerts, recurringSubscriptions, addAlert, scheduleAlert, addRecurringSubscription } = useAlertsContext();
   const [alertMode, setAlertMode] = useState<"once" | "event-series">("once");
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
 
   const safeEvent = useMemo<CalendarEvent>(
     () =>
@@ -170,11 +197,39 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
 
   const isReleased = safeEvent.actual !== "—";
 
-  const historicalData = useMemo(() => getHistoricalData(safeEvent.event), [safeEvent.event]);
+  const historicalDataByYear = useMemo(() => getHistoricalDataByYear(safeEvent.event), [safeEvent.event]);
+
+  const availableYears = useMemo(() => {
+    return Object.keys(historicalDataByYear)
+      .map(Number)
+      .sort((a, b) => a - b);
+  }, [historicalDataByYear]);
+
+  useEffect(() => {
+    if (availableYears.length === 0) {
+      setSelectedYear(null);
+      return;
+    }
+
+    setSelectedYear(availableYears[availableYears.length - 1]);
+  }, [safeEvent.event, availableYears]);
+
+  const historicalData = useMemo(() => {
+    if (!selectedYear) return [];
+    return historicalDataByYear[selectedYear] ?? [];
+  }, [historicalDataByYear, selectedYear]);
 
   const maxValue = useMemo(() => {
     return Math.max(...historicalData.map((item) => item.actual || item.forecast || 0), 1);
   }, [historicalData]);
+
+  const currentYearIndex = useMemo(() => {
+    if (!selectedYear) return -1;
+    return availableYears.findIndex((year) => year === selectedYear);
+  }, [availableYears, selectedYear]);
+
+  const canGoPrevYear = currentYearIndex > 0;
+  const canGoNextYear = currentYearIndex >= 0 && currentYearIndex < availableYears.length - 1;
 
   const interpretation = useMemo(
     () => getMarketInterpretation(safeEvent.event, safeEvent.currency),
@@ -310,6 +365,16 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     if (bias === "bullish") return "text-success";
     if (bias === "bearish") return "text-destructive";
     return "text-warning";
+  };
+
+  const goToPrevYear = () => {
+    if (!canGoPrevYear || currentYearIndex <= 0) return;
+    setSelectedYear(availableYears[currentYearIndex - 1]);
+  };
+
+  const goToNextYear = () => {
+    if (!canGoNextYear || currentYearIndex < 0) return;
+    setSelectedYear(availableYears[currentYearIndex + 1]);
   };
 
   const goToAsset = useCallback(
@@ -543,9 +608,37 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
 
             <Card className="bg-card border-border">
               <CardContent className="p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <TrendingUp className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">Historical Trend</h3>
+                <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">Historical Trend</h3>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={goToPrevYear}
+                      disabled={!canGoPrevYear}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+
+                    <div className="min-w-[88px] text-center text-sm font-semibold text-foreground">
+                      {selectedYear ?? "—"}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={goToNextYear}
+                      disabled={!canGoNextYear}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="h-48 flex items-end justify-between gap-3 px-2">
@@ -555,7 +648,10 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                     const isForecastOnly = item.actual === null;
 
                     return (
-                      <div key={index} className="flex-1 flex flex-col items-center gap-2">
+                      <div
+                        key={`${selectedYear}-${item.month}-${index}`}
+                        className="flex-1 flex flex-col items-center gap-2"
+                      >
                         <div className="w-full h-40 flex items-end justify-center gap-1">
                           {!isForecastOnly && (
                             <div
@@ -576,10 +672,14 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                           />
                         </div>
 
-                        <span className="text-xs text-muted-foreground">{item.period}</span>
+                        <span className="text-xs text-muted-foreground">{item.month}</span>
                       </div>
                     );
                   })}
+                </div>
+
+                <div className="mt-4 text-center">
+                  <span className="text-sm font-medium text-muted-foreground">{selectedYear ?? "—"}</span>
                 </div>
               </CardContent>
             </Card>
