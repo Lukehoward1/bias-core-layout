@@ -656,46 +656,61 @@ export default function Alerts() {
 
                 <CardContent>
                   <div className="overflow-x-auto -mx-5">
-                    <table className="w-full">
+                    <table className="w-full table-fixed">
                       <thead>
                         <tr className="border-b border-border">
-                          <th className="text-left py-3 px-5 text-xs font-medium text-muted-foreground">Type</th>
+                          <th className="w-[180px] text-left py-3 px-5 text-xs font-medium text-muted-foreground">
+                            Type
+                          </th>
                           <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">What</th>
-                          <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">When</th>
-                          <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">Status</th>
-                          <th className="text-left py-3 px-5 text-xs font-medium text-muted-foreground">Actions</th>
+                          <th className="w-[180px] text-left py-3 px-4 text-xs font-medium text-muted-foreground">
+                            When
+                          </th>
+                          <th className="w-[110px] text-left py-3 px-4 text-xs font-medium text-muted-foreground">
+                            Status
+                          </th>
+                          <th className="w-[150px] text-left py-3 px-5 text-xs font-medium text-muted-foreground">
+                            Actions
+                          </th>
                         </tr>
                       </thead>
 
                       <tbody>
                         {myAlertsAndTimersRows.map((row) => (
                           <tr key={row.id} className="border-b border-border hover:bg-muted/50 transition-colors">
-                            <td className="py-3 px-5 text-sm text-foreground">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <Badge variant="outline" className="text-xs">
+                            <td className="py-3 px-5 align-top text-sm text-foreground">
+                              <div className="flex items-start gap-2 flex-wrap">
+                                <Badge variant="outline" className="text-xs whitespace-nowrap">
                                   {row.typeLabel}
                                 </Badge>
 
                                 {row.kind !== "price" && row.isRecurring && (
-                                  <Badge variant="outline" className="text-[10px] border-warning/40 text-warning">
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] border-warning/40 text-warning whitespace-nowrap"
+                                  >
                                     Recurring
                                   </Badge>
                                 )}
                               </div>
                             </td>
 
-                            <td className="py-3 px-4 text-sm text-foreground font-medium">{row.what}</td>
+                            <td className="py-3 px-4 align-top text-sm text-foreground font-medium">
+                              <div className="break-words leading-5">{row.what}</div>
+                            </td>
 
-                            <td className="py-3 px-4 text-sm text-muted-foreground">{row.when}</td>
+                            <td className="py-3 px-4 align-top text-sm text-muted-foreground">
+                              <span className="block whitespace-normal break-words leading-5">{row.when}</span>
+                            </td>
 
-                            <td className="py-3 px-4">
-                              <Badge variant={row.statusVariant} className="text-xs">
+                            <td className="py-3 px-4 align-top">
+                              <Badge variant={row.statusVariant} className="text-xs whitespace-nowrap">
                                 {row.statusLabel}
                               </Badge>
                             </td>
 
-                            <td className="py-3 px-5">
-                              <div className="flex items-center gap-2">
+                            <td className="py-3 px-5 align-top">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 {row.kind === "price" ? (
                                   <Button
                                     variant="ghost"
@@ -821,7 +836,10 @@ export default function Alerts() {
                           <div key={item.id} className="p-3 rounded-lg border border-warning/20 bg-warning/5">
                             <div className="flex items-center justify-between gap-2">
                               <p className="text-sm font-medium text-foreground truncate">{item.title}</p>
-                              <Badge variant="outline" className="text-[10px] border-warning/40 text-warning">
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] border-warning/40 text-warning whitespace-nowrap"
+                              >
                                 Recurring
                               </Badge>
                             </div>
@@ -848,7 +866,10 @@ export default function Alerts() {
                           <div key={alert.id} className="p-3 rounded-lg border border-primary/20 bg-primary/5">
                             <div className="flex items-center justify-between gap-2">
                               <p className="text-sm font-medium text-foreground truncate">{alert.title}</p>
-                              <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] border-primary/30 text-primary whitespace-nowrap"
+                              >
                                 Pending
                               </Badge>
                             </div>
@@ -961,13 +982,16 @@ export default function Alerts() {
                                 <div className="flex items-center gap-2 min-w-0">
                                   <p className="text-sm font-medium text-foreground truncate">{alert.title}</p>
                                   {isRecurringAlert(alert) && (
-                                    <Badge variant="outline" className="text-[10px] border-warning/40 text-warning">
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] border-warning/40 text-warning whitespace-nowrap"
+                                    >
                                       Recurring
                                     </Badge>
                                   )}
                                 </div>
 
-                                <Badge variant="secondary" className="text-[10px]">
+                                <Badge variant="secondary" className="text-[10px] whitespace-nowrap">
                                   Live
                                 </Badge>
                               </div>
