@@ -216,6 +216,10 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     setSelectedYear(availableYears[availableYears.length - 1]);
   }, [safeEvent.eventKey, availableYears]);
 
+  useEffect(() => {
+    setAlertMode("once");
+  }, [safeEvent.id]);
+
   const historicalData = useMemo(() => {
     if (!selectedYear) return [];
     return historicalDataByYear[selectedYear] ?? [];
@@ -386,7 +390,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
       onClose();
 
       requestAnimationFrame(() => {
-        const state = location.state as { backgroundLocation?: Location } | null;
+        const state = location.state as { backgroundLocation?: unknown } | null;
         const backgroundLocation = state?.backgroundLocation ?? location;
 
         navigate(`/asset/${symbol}`, {
