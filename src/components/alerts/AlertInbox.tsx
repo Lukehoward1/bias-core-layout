@@ -191,11 +191,6 @@ export function AlertInbox({
 
   const navigateWithModalSupport = useCallback(
     (target: string) => {
-      if (target.startsWith("/asset/")) {
-        navigate(target, { state: { backgroundLocation: location } });
-        return;
-      }
-
       navigate(target, { state: { backgroundLocation: location } });
     },
     [navigate, location],
