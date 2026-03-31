@@ -12,10 +12,24 @@ interface ScheduleAlertInput extends Omit<AlertItem, "id" | "timestamp" | "read"
 
 interface ImmediateAlertInput extends Omit<AlertItem, "id" | "timestamp" | "read" | "status" | "triggeredAt"> {}
 
+interface RecurringSubscription {
+  id: string;
+  key: string;
+  eventName: string;
+  currency: string;
+  createdAt: Date;
+}
+
 interface AlertsContextValue {
   alerts: AlertItem[];
+  recurringSubscriptions: RecurringSubscription[];
+
   addAlert: (alert: ImmediateAlertInput) => AlertItem | null;
   scheduleAlert: (alert: ScheduleAlertInput) => AlertItem | null;
+
+  addRecurringSubscription: (input: { key: string; eventName: string; currency: string }) => void;
+  removeRecurringSubscription: (id: string) => void;
+
   markRead: (id: string) => void;
   markAllRead: () => void;
   dismissAlert: (id: string) => void;
@@ -40,6 +54,8 @@ interface AlertsContextValue {
 }
 
 const AlertsContext = createContext<AlertsContextValue | undefined>(undefined);
+
+const RECURRING_SUBSCRIPTIONS_STORAGE_KEY = "recurringSubscriptions";
 
 const createId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -118,6 +134,13 @@ const parseStoredAlert = (alert: any): AlertItem => {
   };
 };
 
+const parseStoredRecurringSubscription = (item: any): RecurringSubscription => {
+  return {
+    ...item,
+    createdAt: item?.createdAt ? new Date(item.createdAt) : new Date(),
+  };
+};
+
 const buildEventDateToday = (time: string) => {
   const [hours, minutes] = time.split(":").map(Number);
   const date = new Date();
@@ -125,10 +148,21 @@ const buildEventDateToday = (time: string) => {
   return date;
 };
 
+const getNextMonthlyOccurrence = (seedDate: Date, now = new Date()) => {
+  const next = new Date(seedDate);
+
+  while (next.getTime() <= now.getTime()) {
+    next.setMonth(next.getMonth() + 1);
+  }
+
+  return next;
+};
+
 export function AlertsProvider({ children }: { children: React.ReactNode }) {
   const { watchlist, watchlistCurrencies } = useWatchlist();
 
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const [recurringSubscriptions, setRecurringSubscriptions] = useState<RecurringSubscription[]>([]);
   const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
   const [preferences, setPreferences] = useState<AlertPreferences>(() => {
     const parsed = safeJsonParse<Partial<AlertPreferences>>(localStorage.getItem("alertPreferences"), {});
@@ -198,9 +232,14 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const savedAlerts = safeJsonParse<any[]>(localStorage.getItem("alerts"), []);
+    const savedRecurringSubscriptions = safeJsonParse<any[]>(
+      localStorage.getItem(RECURRING_SUBSCRIPTIONS_STORAGE_KEY),
+      [],
+    );
     const savedPriceAlerts = safeJsonParse<any[]>(localStorage.getItem("priceAlerts"), []);
 
     setAlerts(savedAlerts.map(parseStoredAlert));
+    setRecurringSubscriptions(savedRecurringSubscriptions.map(parseStoredRecurringSubscription));
 
     setPriceAlerts(
       savedPriceAlerts.map((a) => ({
@@ -214,6 +253,10 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     localStorage.setItem("alerts", JSON.stringify(alerts));
   }, [alerts]);
+
+  useEffect(() => {
+    localStorage.setItem(RECURRING_SUBSCRIPTIONS_STORAGE_KEY, JSON.stringify(recurringSubscriptions));
+  }, [recurringSubscriptions]);
 
   useEffect(() => {
     localStorage.setItem("priceAlerts", JSON.stringify(priceAlerts));
@@ -283,6 +326,28 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     [isAlertRelevant],
   );
 
+  const addRecurringSubscription = useCallback((input: { key: string; eventName: string; currency: string }) => {
+    setRecurringSubscriptions((prev) => {
+      const exists = prev.some((item) => item.key === input.key);
+      if (exists) return prev;
+
+      return [
+        {
+          id: createId(),
+          key: input.key,
+          eventName: input.eventName,
+          currency: input.currency,
+          createdAt: new Date(),
+        },
+        ...prev,
+      ];
+    });
+  }, []);
+
+  const removeRecurringSubscription = useCallback((id: string) => {
+    setRecurringSubscriptions((prev) => prev.filter((item) => item.id !== id));
+  }, []);
+
   const markRead = useCallback((id: string) => {
     setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, read: true } : a)));
   }, []);
@@ -347,9 +412,6 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
 
     const now = Date.now();
     const newlyTriggered: AlertItem[] = [];
-    const alertsToCreateFromRecurring: Array<
-      Omit<AlertItem, "id" | "timestamp" | "read" | "status" | "triggeredAt"> & { scheduledFor: Date }
-    > = [];
 
     const nextAlerts = alerts.map((alert) => {
       if (alert.status !== "pending" || !alert.scheduledFor) return alert;
@@ -363,63 +425,13 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
       };
 
       newlyTriggered.push(triggeredAlert);
-
-      if (alert.recurrence === "event-series" && alert.recurrenceKey) {
-        const nextMatchingEvent = calendarEvents.find(
-          (calendarEvent) => calendarEvent.event === alert.recurrenceKey && calendarEvent.id !== alert.eventId,
-        );
-
-        if (nextMatchingEvent) {
-          const nextScheduledFor = buildEventDateToday(nextMatchingEvent.time);
-
-          if (nextScheduledFor.getTime() > now) {
-            const alreadyExists = alerts.some(
-              (existingAlert) =>
-                existingAlert.status === "pending" &&
-                existingAlert.eventId === nextMatchingEvent.id &&
-                existingAlert.recurrence === "event-series" &&
-                existingAlert.recurrenceKey === alert.recurrenceKey,
-            );
-
-            if (!alreadyExists) {
-              alertsToCreateFromRecurring.push({
-                type: "news",
-                title: `${nextMatchingEvent.event} (${nextMatchingEvent.currency})`,
-                message: `Scheduled: ${nextMatchingEvent.event} at ${nextMatchingEvent.time} GMT`,
-                severity: nextMatchingEvent.impact === "high" ? "high" : "info",
-                relatedAsset: nextMatchingEvent.currency,
-                eventId: nextMatchingEvent.id,
-                routeTo: "/calendar",
-                scheduledFor: nextScheduledFor,
-                recurrence: "event-series",
-                recurrenceKey: alert.recurrenceKey,
-              });
-            }
-          }
-        }
-      }
-
       return triggeredAlert;
     });
 
     const changed = nextAlerts.some((alert, index) => alert !== alerts[index]);
 
-    if (changed || alertsToCreateFromRecurring.length > 0) {
-      let mergedAlerts = nextAlerts;
-
-      if (alertsToCreateFromRecurring.length > 0) {
-        const createdRecurringAlerts: AlertItem[] = alertsToCreateFromRecurring.map((alertInput) => ({
-          ...alertInput,
-          id: createId(),
-          timestamp: new Date(),
-          read: false,
-          status: "pending",
-        }));
-
-        mergedAlerts = [...createdRecurringAlerts, ...nextAlerts].slice(0, 100);
-      }
-
-      setAlerts(mergedAlerts);
+    if (changed) {
+      setAlerts(nextAlerts);
 
       newlyTriggered.forEach((alert) => {
         if (preferences.soundEnabled && !isQuietHours && lastAlertIdRef.current !== alert.id) {
@@ -431,6 +443,60 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
       });
     }
   }, [alerts, preferences.soundEnabled, isQuietHours, timeTick]);
+
+  useEffect(() => {
+    if (recurringSubscriptions.length === 0) return;
+
+    const now = new Date();
+    const newAlerts: AlertItem[] = [];
+
+    recurringSubscriptions.forEach((sub) => {
+      const matchingEvent = calendarEvents.find((event) => event.event === sub.key);
+      if (!matchingEvent) return;
+
+      const todayEventTime = buildEventDateToday(matchingEvent.time);
+
+      const alreadyTriggeredForCurrentCycle = alerts.some(
+        (alert) =>
+          alert.recurrence === "event-series" &&
+          alert.recurrenceKey === sub.key &&
+          alert.eventId === matchingEvent.id &&
+          alert.status === "triggered",
+      );
+
+      if (todayEventTime.getTime() <= now.getTime() && !alreadyTriggeredForCurrentCycle) {
+        newAlerts.push({
+          id: createId(),
+          type: "news",
+          title: `${matchingEvent.event} (${matchingEvent.currency})`,
+          message: `${matchingEvent.event} is due now.`,
+          timestamp: new Date(),
+          read: false,
+          severity: matchingEvent.impact === "high" ? "high" : "info",
+          status: "triggered",
+          triggeredAt: new Date(),
+          relatedAsset: matchingEvent.currency,
+          routeTo: "/calendar",
+          eventId: matchingEvent.id,
+          recurrence: "event-series",
+          recurrenceKey: sub.key,
+        });
+      }
+    });
+
+    if (newAlerts.length > 0) {
+      setAlerts((prev) => [...newAlerts, ...prev].slice(0, 100));
+
+      newAlerts.forEach((alert) => {
+        if (preferences.soundEnabled && !isQuietHours && lastAlertIdRef.current !== alert.id) {
+          lastAlertIdRef.current = alert.id;
+          playNotificationSound();
+        }
+
+        toastTriggeredAlert(alert);
+      });
+    }
+  }, [recurringSubscriptions, alerts, preferences.soundEnabled, isQuietHours, timeTick]);
 
   useEffect(() => {
     if (priceAlerts.length === 0) return;
@@ -549,8 +615,11 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
 
   const value: AlertsContextValue = {
     alerts,
+    recurringSubscriptions,
     addAlert,
     scheduleAlert,
+    addRecurringSubscription,
+    removeRecurringSubscription,
     markRead,
     markAllRead,
     dismissAlert,
