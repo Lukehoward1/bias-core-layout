@@ -150,8 +150,8 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
   const navigate = useNavigate();
   const location = useLocation();
   const { getAssetBySymbol } = useAssets();
-  const { alerts, addAlert, scheduleAlert } = useAlertsContext();
-  const [repeatSeries, setRepeatSeries] = useState(false);
+  const { alerts, recurringSubscriptions, addAlert, scheduleAlert, addRecurringSubscription } = useAlertsContext();
+  const [alertMode, setAlertMode] = useState<"once" | "event-series">("once");
 
   const safeEvent = useMemo<CalendarEvent>(
     () =>
@@ -188,17 +188,19 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     [safeEvent.event, safeEvent.currency],
   );
 
-  const hasExistingAlert = useMemo(() => {
+  const hasExistingOneTimeAlert = useMemo(() => {
     if (!event) return false;
 
     return alerts.some((alertItem) => {
-      if (repeatSeries) {
-        return alertItem.recurrence === "event-series" && alertItem.recurrenceKey === safeEvent.event;
-      }
-
-      return alertItem.eventId === safeEvent.id && (alertItem.status === "pending" || alertItem.status === "triggered");
+      if (alertItem.eventId !== safeEvent.id) return false;
+      return alertItem.status === "pending" || alertItem.status === "triggered";
     });
-  }, [alerts, event, repeatSeries, safeEvent.event, safeEvent.id]);
+  }, [alerts, event, safeEvent.id]);
+
+  const hasExistingRecurringAlert = useMemo(() => {
+    if (!event) return false;
+    return recurringSubscriptions.some((item) => item.key === safeEvent.event);
+  }, [recurringSubscriptions, event, safeEvent.event]);
 
   const getImpactColor = (impact: CalendarEvent["impact"]) => {
     if (impact === "high") return "bg-destructive text-destructive-foreground";
@@ -215,11 +217,30 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
   const handleSetAlert = () => {
     if (!event) return;
 
-    if (hasExistingAlert) {
+    if (alertMode === "event-series") {
+      if (hasExistingRecurringAlert) {
+        toast.message("Recurring alert already exists", {
+          description: `${safeEvent.event} is already set to recur.`,
+        });
+        return;
+      }
+
+      addRecurringSubscription({
+        key: safeEvent.event,
+        eventName: safeEvent.event,
+        currency: safeEvent.currency,
+      });
+
+      toast.success("Recurring alert enabled", {
+        description: `You will be alerted every time ${safeEvent.event} appears again.`,
+      });
+
+      return;
+    }
+
+    if (hasExistingOneTimeAlert) {
       toast.message("Alert already exists", {
-        description: repeatSeries
-          ? `${safeEvent.event} recurring alert already exists.`
-          : `${safeEvent.event} already has an alert set.`,
+        description: `${safeEvent.event} already has an alert set.`,
       });
       return;
     }
@@ -237,9 +258,6 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
       scheduledFor.setDate(scheduledFor.getDate() + 1);
     }
 
-    const recurrence = repeatSeries ? "event-series" : "once";
-    const recurrenceKey = safeEvent.event;
-
     if (isReleased) {
       addAlert({
         type: "news",
@@ -249,14 +267,10 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
         relatedAsset: safeEvent.currency,
         eventId: safeEvent.id,
         routeTo: "/calendar",
-        recurrence,
-        recurrenceKey,
       });
 
-      toast.success(repeatSeries ? "Recurring alert added" : "Released event alert added", {
-        description: repeatSeries
-          ? `${safeEvent.event} will now repeat whenever it appears again.`
-          : `${safeEvent.event} has been added to your alerts.`,
+      toast.success("Released event alert added", {
+        description: `${safeEvent.event} has been added to your alerts.`,
       });
 
       return;
@@ -271,14 +285,12 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
       eventId: safeEvent.id,
       routeTo: "/calendar",
       scheduledFor,
-      recurrence,
-      recurrenceKey,
+      recurrence: "once",
+      recurrenceKey: safeEvent.event,
     });
 
-    toast.success(repeatSeries ? "Recurring alert scheduled" : "Alert scheduled", {
-      description: repeatSeries
-        ? `${safeEvent.event} will repeat whenever it appears again.`
-        : `${safeEvent.event} will notify you at ${safeEvent.time} GMT`,
+    toast.success("Alert scheduled", {
+      description: `${safeEvent.event} will notify you at ${safeEvent.time} GMT`,
     });
   };
 
@@ -360,37 +372,41 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                     Watchlist
                   </Button>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                    onClick={handleSetAlert}
-                    disabled={hasExistingAlert}
-                  >
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={handleSetAlert}>
                     <Bell className="h-3.5 w-3.5" />
-                    {hasExistingAlert ? "Alert Added" : "Set Alert"}
+                    {alertMode === "event-series"
+                      ? hasExistingRecurringAlert
+                        ? "Recurring Added"
+                        : "Set Recurring"
+                      : hasExistingOneTimeAlert
+                        ? "Alert Added"
+                        : "Set Alert"}
                   </Button>
                 </div>
               </div>
             </div>
 
-            <div className="mt-4 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setRepeatSeries((prev) => !prev)}
-                className={`px-3 py-1.5 rounded-md text-xs border transition-colors ${
-                  repeatSeries
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-muted/40 text-muted-foreground border-border"
-                }`}
+            <div className="mt-4 flex items-center gap-2 flex-wrap">
+              <Button
+                variant={alertMode === "once" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAlertMode("once")}
               >
-                {repeatSeries ? "Recurring: Every event type" : "One-time alert"}
-              </button>
+                One-time alert
+              </Button>
+
+              <Button
+                variant={alertMode === "event-series" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAlertMode("event-series")}
+              >
+                Recurring
+              </Button>
 
               <span className="text-xs text-muted-foreground">
-                {repeatSeries
-                  ? `This will alert you every time "${safeEvent.event}" appears again.`
-                  : "This will alert you only for this specific event."}
+                {alertMode === "event-series"
+                  ? `This will alert you every time ${safeEvent.event} appears again.`
+                  : "This will alert you for this event only."}
               </span>
             </div>
           </div>
