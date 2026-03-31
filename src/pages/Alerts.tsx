@@ -214,7 +214,7 @@ export default function Alerts() {
   const oneTimeScheduledAlerts = useMemo(
     () =>
       alerts
-        .filter((alert) => alert.status === "pending")
+        .filter((alert) => alert.status === "pending" && alert.recurrence !== "event-series")
         .sort((a, b) => {
           const aTime = a.scheduledFor?.getTime() ?? 0;
           const bTime = b.scheduledFor?.getTime() ?? 0;
@@ -324,7 +324,7 @@ export default function Alerts() {
       typeLabel: "Price",
       what: `${alert.assetDisplayName} ${alert.direction} ${alert.price}`,
       when: alert.triggerType === "wick" ? "Touch" : `Close ${alert.timeframe}`,
-      statusLabel: alert.enabled ? "Active" : "Paused",
+      statusLabel: alert.enabled ? ("Active" as const) : ("Paused" as const),
       statusVariant: alert.enabled ? ("default" as const) : ("secondary" as const),
       priceAlert: alert,
       isRecurring: false,
@@ -477,6 +477,13 @@ export default function Alerts() {
       openGenericAlert(alert);
     },
     [openCalendarEventById, openGenericAlert],
+  );
+
+  const openRecurringRow = useCallback(
+    (eventId: string) => {
+      openCalendarEventById(eventId);
+    },
+    [openCalendarEventById],
   );
 
   const openTriggeredAlert = useCallback(
@@ -707,7 +714,7 @@ export default function Alerts() {
                                       onPointerDown={(event) => {
                                         event.preventDefault();
                                         event.stopPropagation();
-                                        openCalendarEventById(row.recurringItem.eventId);
+                                        openRecurringRow(row.recurringItem.eventId);
                                       }}
                                     >
                                       View
