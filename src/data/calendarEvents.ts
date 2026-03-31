@@ -2,6 +2,7 @@ export type CalendarImpact = "high" | "medium" | "low";
 
 export type CalendarEvent = {
   id: string;
+  eventKey: string;
   time: string;
   currency: string;
   event: string;
@@ -12,7 +13,7 @@ export type CalendarEvent = {
 };
 
 type CalendarEventTemplate = {
-  id: string;
+  eventKey: string;
   time: string;
   currency: string;
   event: string;
@@ -27,15 +28,14 @@ const CALENDAR_ROTATION_DAYS = 30;
 /**
  * Stable rotating demo calendar source.
  *
- * Goals:
- * - Keeps the SAME event shape your app already uses
- * - Produces realistic changing values
- * - Stays stable for the current day/session
- * - Can later be swapped behind a real API with minimal UI changes
+ * Important architecture note:
+ * - eventKey is the permanent internal identifier
+ * - id is the unique release row identifier for the current rendered dataset
+ * - UI should prefer eventKey for recurring logic / history matching
  */
 const CALENDAR_EVENT_TEMPLATES: CalendarEventTemplate[] = [
   {
-    id: "nfp",
+    eventKey: "nfp",
     time: "08:30",
     currency: "USD",
     event: "Non-Farm Payrolls",
@@ -45,7 +45,7 @@ const CALENDAR_EVENT_TEMPLATES: CalendarEventTemplate[] = [
     actualValues: ["184K", "202K", "191K", "178K", "214K", "197K"],
   },
   {
-    id: "unemployment",
+    eventKey: "unemployment",
     time: "08:30",
     currency: "USD",
     event: "Unemployment Rate",
@@ -55,7 +55,7 @@ const CALENDAR_EVENT_TEMPLATES: CalendarEventTemplate[] = [
     actualValues: ["3.8%", "4.0%", "3.9%", "3.8%", "3.7%", "3.9%"],
   },
   {
-    id: "german-factory",
+    eventKey: "german-factory-orders",
     time: "09:00",
     currency: "EUR",
     event: "German Factory Orders",
@@ -65,7 +65,7 @@ const CALENDAR_EVENT_TEMPLATES: CalendarEventTemplate[] = [
     actualValues: ["0.4%", "0.2%", "-0.1%", "0.6%", "0.0%", "0.3%"],
   },
   {
-    id: "ecb-rate",
+    eventKey: "ecb-rate",
     time: "10:00",
     currency: "EUR",
     event: "ECB Interest Rate Decision",
@@ -75,7 +75,7 @@ const CALENDAR_EVENT_TEMPLATES: CalendarEventTemplate[] = [
     actualValues: ["4.50%", "4.25%", "4.25%", "4.00%", "4.00%", "3.75%"],
   },
   {
-    id: "boe-rate",
+    eventKey: "boe-rate",
     time: "14:00",
     currency: "GBP",
     event: "BOE Interest Rate Decision",
@@ -85,7 +85,7 @@ const CALENDAR_EVENT_TEMPLATES: CalendarEventTemplate[] = [
     actualValues: ["5.25%", "5.00%", "5.00%", "4.75%", "4.75%", "4.50%"],
   },
   {
-    id: "us-cpi",
+    eventKey: "us-cpi",
     time: "14:30",
     currency: "USD",
     event: "US CPI",
@@ -95,7 +95,7 @@ const CALENDAR_EVENT_TEMPLATES: CalendarEventTemplate[] = [
     actualValues: ["3.2%", "3.0%", "3.1%", "2.8%", "2.9%", "3.3%"],
   },
   {
-    id: "us-core-cpi",
+    eventKey: "us-core-cpi",
     time: "15:00",
     currency: "USD",
     event: "US Core CPI",
@@ -105,7 +105,7 @@ const CALENDAR_EVENT_TEMPLATES: CalendarEventTemplate[] = [
     actualValues: ["3.9%", "3.6%", "3.8%", "3.5%", "3.4%", "3.6%"],
   },
   {
-    id: "retail-sales-uk",
+    eventKey: "uk-retail-sales",
     time: "07:00",
     currency: "GBP",
     event: "UK Retail Sales",
@@ -115,7 +115,7 @@ const CALENDAR_EVENT_TEMPLATES: CalendarEventTemplate[] = [
     actualValues: ["0.4%", "-0.2%", "0.6%", "0.1%", "0.1%", "0.3%"],
   },
   {
-    id: "jobless-claims",
+    eventKey: "jobless-claims",
     time: "13:30",
     currency: "USD",
     event: "Initial Jobless Claims",
@@ -125,7 +125,7 @@ const CALENDAR_EVENT_TEMPLATES: CalendarEventTemplate[] = [
     actualValues: ["216K", "226K", "221K", "218K", "224K", "220K"],
   },
   {
-    id: "services-pmi-us",
+    eventKey: "us-services-pmi",
     time: "14:45",
     currency: "USD",
     event: "US Services PMI",
@@ -135,7 +135,7 @@ const CALENDAR_EVENT_TEMPLATES: CalendarEventTemplate[] = [
     actualValues: ["53.4", "52.5", "52.8", "51.8", "52.7", "53.1"],
   },
   {
-    id: "eia-crude",
+    eventKey: "eia-crude",
     time: "15:30",
     currency: "USD",
     event: "EIA Crude Oil Inventories",
@@ -145,7 +145,7 @@ const CALENDAR_EVENT_TEMPLATES: CalendarEventTemplate[] = [
     actualValues: ["-0.7M", "1.8M", "-1.1M", "0.6M", "-1.4M", "0.4M"],
   },
   {
-    id: "boj-rate",
+    eventKey: "boj-rate",
     time: "03:00",
     currency: "JPY",
     event: "BOJ Interest Rate Decision",
@@ -171,7 +171,8 @@ function buildCalendarEvents(): CalendarEvent[] {
   const rotationIndex = getRotationIndex();
 
   return CALENDAR_EVENT_TEMPLATES.map((template, idx) => ({
-    id: `${template.id}-demo-${rotationIndex}`,
+    id: `${template.eventKey}-demo-${rotationIndex}`,
+    eventKey: template.eventKey,
     time: template.time,
     currency: template.currency,
     event: template.event,
@@ -194,21 +195,21 @@ export const calendarEvents: CalendarEvent[] = buildCalendarEvents();
 
 /**
  * Lightweight subset for key event cards / highlight areas.
- * Keep these IDs aligned with calendarEvents above.
+ * Keep these eventKeys aligned with calendarEvents above.
  */
-export const keyEvents: Array<Pick<CalendarEvent, "id" | "time" | "currency" | "event" | "impact">> = calendarEvents
-  .filter((event) =>
-    ["Non-Farm Payrolls", "ECB Interest Rate Decision", "BOE Interest Rate Decision", "US CPI", "US Core CPI"].includes(
-      event.event,
-    ),
-  )
-  .map((event) => ({
-    id: event.id,
-    time: event.time,
-    currency: event.currency,
-    event: event.event,
-    impact: event.impact,
-  }));
+const KEY_EVENT_KEYS = new Set(["nfp", "ecb-rate", "boe-rate", "us-cpi", "us-core-cpi"]);
+
+export const keyEvents: Array<Pick<CalendarEvent, "id" | "eventKey" | "time" | "currency" | "event" | "impact">> =
+  calendarEvents
+    .filter((event) => KEY_EVENT_KEYS.has(event.eventKey))
+    .map((event) => ({
+      id: event.id,
+      eventKey: event.eventKey,
+      time: event.time,
+      currency: event.currency,
+      event: event.event,
+      impact: event.impact,
+    }));
 
 /**
  * Shared helpers
@@ -231,6 +232,14 @@ export function getKeyEvents(): CalendarEvent[] {
 
 export function getCalendarEventById(id: string): CalendarEvent | undefined {
   return calendarEvents.find((event) => event.id === id);
+}
+
+export function getCalendarEventByKey(eventKey: string): CalendarEvent | undefined {
+  return calendarEvents.find((event) => event.eventKey === eventKey);
+}
+
+export function getCalendarEventsByEventKey(eventKey: string): CalendarEvent[] {
+  return calendarEvents.filter((event) => event.eventKey === eventKey);
 }
 
 export function sortCalendarEventsByImpact(events: CalendarEvent[]): CalendarEvent[] {
