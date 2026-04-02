@@ -186,6 +186,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
       event ?? {
         id: "placeholder",
         eventKey: "placeholder",
+        date: new Date(),
         time: "00:00",
         currency: "—",
         event: "—",
