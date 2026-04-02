@@ -186,8 +186,9 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
       event ?? {
         id: "placeholder",
         eventKey: "placeholder",
-        date: new Date(),
+        date: "1970-01-01",
         time: "00:00",
+        scheduledAt: new Date("1970-01-01T00:00:00.000Z").toISOString(),
         currency: "—",
         event: "—",
         previous: "—",
@@ -216,10 +217,6 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
 
     setSelectedYear(availableYears[availableYears.length - 1]);
   }, [safeEvent.eventKey, availableYears]);
-
-  useEffect(() => {
-    setAlertMode("once");
-  }, [safeEvent.id]);
 
   const historicalData = useMemo(() => {
     if (!selectedYear) return [];
@@ -307,18 +304,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
       return;
     }
 
-    const now = new Date();
-    const [hours, minutes] = safeEvent.time.split(":").map(Number);
-
-    const scheduledFor = new Date();
-    scheduledFor.setHours(Number.isFinite(hours) ? hours : 0);
-    scheduledFor.setMinutes(Number.isFinite(minutes) ? minutes : 0);
-    scheduledFor.setSeconds(0);
-    scheduledFor.setMilliseconds(0);
-
-    if (scheduledFor.getTime() < now.getTime() && !isReleased) {
-      scheduledFor.setDate(scheduledFor.getDate() + 1);
-    }
+    const scheduledFor = new Date(safeEvent.scheduledAt);
 
     if (isReleased) {
       addAlert({
@@ -343,7 +329,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     scheduleAlert({
       type: "news",
       title: `${safeEvent.event} (${safeEvent.currency})`,
-      message: `Scheduled: ${safeEvent.event} at ${safeEvent.time} GMT`,
+      message: `Scheduled: ${safeEvent.event} at ${safeEvent.time}`,
       severity: safeEvent.impact === "high" ? "high" : "info",
       relatedAsset: safeEvent.currency,
       eventId: safeEvent.id,
@@ -354,7 +340,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     });
 
     toast.success("Alert scheduled", {
-      description: `${safeEvent.event} will notify you at ${safeEvent.time} GMT`,
+      description: `${safeEvent.event} will notify you at ${safeEvent.time}`,
     });
   };
 
@@ -391,7 +377,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
       onClose();
 
       requestAnimationFrame(() => {
-        const state = location.state as { backgroundLocation?: unknown } | null;
+        const state = location.state as { backgroundLocation?: Location } | null;
         const backgroundLocation = state?.backgroundLocation ?? location;
 
         navigate(`/asset/${symbol}`, {
@@ -437,7 +423,13 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <Clock className="h-4 w-4" />
-                  <span>Today at {safeEvent.time} GMT</span>
+                  <span>
+                    {new Date(safeEvent.scheduledAt).toLocaleDateString([], {
+                      day: "2-digit",
+                      month: "short",
+                    })}{" "}
+                    at {safeEvent.time}
+                  </span>
                 </div>
 
                 <div className="flex gap-2 shrink-0">
