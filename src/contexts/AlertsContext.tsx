@@ -141,22 +141,22 @@ const parseStoredRecurringSubscription = (item: any): RecurringSubscription => {
   };
 };
 
-const buildEventDateToday = (time: string) => {
-  const [hours, minutes] = time.split(":").map(Number);
-  const date = new Date();
-  date.setHours(hours || 0, minutes || 0, 0, 0);
-  return date;
-};
+function formatEventScheduleLabel(scheduledAt: string, fallbackTime: string) {
+  const date = new Date(scheduledAt);
 
-const getNextMonthlyOccurrence = (seedDate: Date, now = new Date()) => {
-  const next = new Date(seedDate);
-
-  while (next.getTime() <= now.getTime()) {
-    next.setMonth(next.getMonth() + 1);
+  if (Number.isNaN(date.getTime())) {
+    return fallbackTime;
   }
 
-  return next;
-};
+  return `${date.toLocaleDateString([], {
+    day: "2-digit",
+    month: "short",
+  })} at ${date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })}`;
+}
 
 export function AlertsProvider({ children }: { children: React.ReactNode }) {
   const { watchlist, watchlistCurrencies } = useWatchlist();
@@ -447,41 +447,43 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (recurringSubscriptions.length === 0) return;
 
-    const now = new Date();
+    const now = Date.now();
     const newAlerts: AlertItem[] = [];
 
     recurringSubscriptions.forEach((sub) => {
-      const matchingEvent = calendarEvents.find((event) => event.event === sub.key);
-      if (!matchingEvent) return;
+      const nextMatchingEvent = calendarEvents
+        .filter((event) => event.eventKey === sub.key)
+        .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
+        .find((event) => new Date(event.scheduledAt).getTime() <= now);
 
-      const todayEventTime = buildEventDateToday(matchingEvent.time);
+      if (!nextMatchingEvent) return;
 
-      const alreadyTriggeredForCurrentCycle = alerts.some(
+      const alreadyTriggeredForEvent = alerts.some(
         (alert) =>
           alert.recurrence === "event-series" &&
           alert.recurrenceKey === sub.key &&
-          alert.eventId === matchingEvent.id &&
+          alert.eventId === nextMatchingEvent.id &&
           alert.status === "triggered",
       );
 
-      if (todayEventTime.getTime() <= now.getTime() && !alreadyTriggeredForCurrentCycle) {
-        newAlerts.push({
-          id: createId(),
-          type: "news",
-          title: `${matchingEvent.event} (${matchingEvent.currency})`,
-          message: `${matchingEvent.event} is due now.`,
-          timestamp: new Date(),
-          read: false,
-          severity: matchingEvent.impact === "high" ? "high" : "info",
-          status: "triggered",
-          triggeredAt: new Date(),
-          relatedAsset: matchingEvent.currency,
-          routeTo: "/calendar",
-          eventId: matchingEvent.id,
-          recurrence: "event-series",
-          recurrenceKey: sub.key,
-        });
-      }
+      if (alreadyTriggeredForEvent) return;
+
+      newAlerts.push({
+        id: createId(),
+        type: "news",
+        title: `${nextMatchingEvent.event} (${nextMatchingEvent.currency})`,
+        message: `${nextMatchingEvent.event} is due now.`,
+        timestamp: new Date(),
+        read: false,
+        severity: nextMatchingEvent.impact === "high" ? "high" : "info",
+        status: "triggered",
+        triggeredAt: new Date(),
+        relatedAsset: nextMatchingEvent.currency,
+        routeTo: "/calendar",
+        eventId: nextMatchingEvent.id,
+        recurrence: "event-series",
+        recurrenceKey: sub.key,
+      });
     });
 
     if (newAlerts.length > 0) {
