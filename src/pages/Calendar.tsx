@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Filter, CalendarDays, ChevronDown, ChevronUp } from "lucide-react";
+import { Filter, ChevronDown, ChevronUp } from "lucide-react";
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
@@ -316,14 +316,12 @@ function Calendar() {
                       highlightedEventId === event.id && "ring-2 ring-primary",
                     )}
                   >
-                    <div className="flex items-center justify-between gap-3 mb-3">
+                    <div className="flex justify-between mb-2">
                       <Badge variant={getImpactVariant(event.impact)}>{event.impact.toUpperCase()}</Badge>
                       <span className="text-sm text-muted-foreground">{event.time}</span>
                     </div>
-
-                    <div className="text-sm font-semibold text-foreground">{event.event}</div>
-
-                    <div className="mt-2 flex items-center gap-2">
+                    <div className="font-semibold text-sm">{event.event}</div>
+                    <div className="mt-3 flex items-center gap-2">
                       <Badge variant="outline" className="text-xs">
                         {event.currency}
                       </Badge>
@@ -340,12 +338,10 @@ function Calendar() {
           <CardHeader className="flex flex-row items-center justify-between gap-3">
             <div>
               <CardTitle>Calendar Feed</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Cleaner default view with progressive reveal for the full dataset.
-              </p>
+              <p className="text-sm text-muted-foreground mt-1">Compact calendar view with reduced default volume.</p>
             </div>
 
-            {filteredEvents.length > (visibleCount === 999 ? filteredEvents.length : visibleCount) && (
+            {filteredEvents.length > visibleEvents.length && (
               <Button
                 variant="outline"
                 size="sm"
@@ -367,68 +363,70 @@ function Calendar() {
             )}
           </CardHeader>
 
-          <CardContent className="space-y-4">
-            {visibleEvents.length === 0 ? (
-              <div className="py-10 text-center text-sm text-muted-foreground">
-                No calendar events match the selected filters.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {visibleEvents.map((event) => (
-                  <button
-                    key={event.id}
-                    ref={(el) => setEventRef(event.id, el)}
-                    type="button"
-                    onClick={() => openEvent(event)}
-                    className={cn(
-                      "w-full text-left p-4 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors",
-                      highlightedEventId === event.id && "ring-2 ring-primary bg-primary/10",
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-2">
-                          <Badge variant="outline" className="text-xs">
-                            {event.currency}
-                          </Badge>
-                          <Badge variant={getImpactVariant(event.impact)} className="text-xs">
-                            {event.impact}
-                          </Badge>
-                          <span className="text-[11px] text-muted-foreground">• click to view event</span>
-                        </div>
+          <CardContent className="overflow-x-auto">
+            <table className="w-full min-w-[760px]">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Time</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Currency</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Event</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Previous</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Forecast</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Actual</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Impact</th>
+                </tr>
+              </thead>
 
-                        <div className="text-sm font-semibold text-foreground">{event.event}</div>
+              <tbody>
+                {visibleEvents.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                      No calendar events match the selected filters.
+                    </td>
+                  </tr>
+                ) : (
+                  visibleEvents.map((event) => (
+                    <tr
+                      key={event.id}
+                      ref={(el) => setEventRef(event.id, el)}
+                      onClick={() => openEvent(event)}
+                      className={cn(
+                        "border-b border-border cursor-pointer hover:bg-muted/40 transition-colors",
+                        highlightedEventId === event.id && "bg-primary/10",
+                      )}
+                    >
+                      <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.time}</td>
 
-                        <div className="mt-2 grid grid-cols-3 md:grid-cols-3 gap-3 text-xs">
-                          <div>
-                            <div className="text-muted-foreground">Previous</div>
-                            <div className="font-medium text-foreground mt-0.5">{event.previous}</div>
-                          </div>
-                          <div>
-                            <div className="text-muted-foreground">Forecast</div>
-                            <div className="font-medium text-foreground mt-0.5">{event.forecast}</div>
-                          </div>
-                          <div>
-                            <div className="text-muted-foreground">Actual</div>
-                            <div className="font-medium text-foreground mt-0.5">{event.actual}</div>
-                          </div>
-                        </div>
-                      </div>
+                      <td className="px-4 py-3">
+                        <Badge variant="outline" className="text-xs">
+                          {event.currency}
+                        </Badge>
+                      </td>
 
-                      <div className="shrink-0 text-right">
-                        <div className="text-sm font-medium text-foreground">{event.time}</div>
-                        <div className="text-[11px] text-muted-foreground mt-1">Today</div>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-sm text-foreground">{event.event}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">click to view event</div>
+                      </td>
+
+                      <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.previous}</td>
+                      <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.forecast}</td>
+                      <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.actual}</td>
+
+                      <td className="px-4 py-3">
+                        <Badge variant={getImpactVariant(event.impact)} className="text-xs">
+                          {event.impact.toUpperCase()}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
 
             {filteredEvents.length > visibleEvents.length && !showAllEvents && visibleCount !== 999 && (
-              <div className="flex justify-center pt-2">
+              <div className="flex justify-center pt-4">
                 <Button variant="outline" onClick={() => setShowAllEvents(true)}>
-                  <CalendarDays className="h-4 w-4 mr-2" />
+                  <ChevronDown className="h-4 w-4 mr-2" />
                   Show all {filteredEvents.length} events
                 </Button>
               </div>
