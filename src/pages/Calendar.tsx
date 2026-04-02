@@ -20,6 +20,10 @@ type CurrencyFilter = "all" | string;
 type SortMode = "time" | "impact";
 type VisibleCount = 6 | 10 | 20 | 999;
 
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
 function Calendar() {
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -88,17 +92,46 @@ function Calendar() {
     return 1;
   };
 
-  const parseTimeToMinutes = (time: string) => {
-    const [hours, minutes] = time.split(":").map(Number);
-    return (hours || 0) * 60 + (minutes || 0);
-  };
-
   const availableCurrencies = useMemo(() => {
     return Array.from(new Set(calendarEvents.map((event) => event.currency))).sort();
   }, []);
 
   const filteredEvents = useMemo(() => {
+    const now = new Date();
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const endOfToday = new Date(startOfToday);
+    endOfToday.setDate(endOfToday.getDate() + 1);
+
+    const endOfWeek = new Date(startOfToday);
+    endOfWeek.setDate(endOfWeek.getDate() + 7);
+
+    const endOfMonth = new Date(startOfToday);
+    endOfMonth.setDate(endOfMonth.getDate() + 30);
+
     let events = [...calendarEvents];
+
+    if (dateRange === "today") {
+      events = events.filter((event) => {
+        const eventDate = new Date(event.scheduledAt);
+        return eventDate >= startOfToday && eventDate < endOfToday;
+      });
+    }
+
+    if (dateRange === "week") {
+      events = events.filter((event) => {
+        const eventDate = new Date(event.scheduledAt);
+        return eventDate >= startOfToday && eventDate < endOfWeek;
+      });
+    }
+
+    if (dateRange === "month") {
+      events = events.filter((event) => {
+        const eventDate = new Date(event.scheduledAt);
+        return eventDate >= startOfToday && eventDate < endOfMonth;
+      });
+    }
 
     if (impactFilter !== "all") {
       events = events.filter((event) => event.impact === impactFilter);
@@ -108,40 +141,49 @@ function Calendar() {
       events = events.filter((event) => event.currency === currencyFilter);
     }
 
-    if (dateRange === "today") {
-      events = events;
-    } else if (dateRange === "week") {
-      events = events;
-    } else if (dateRange === "month") {
-      events = events;
-    }
-
     events.sort((a, b) => {
+      const aDate = new Date(a.scheduledAt).getTime();
+      const bDate = new Date(b.scheduledAt).getTime();
+
       if (sortMode === "impact") {
         const impactDiff = getImpactWeight(b.impact) - getImpactWeight(a.impact);
         if (impactDiff !== 0) return impactDiff;
       }
 
-      return parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time);
+      return aDate - bDate;
     });
 
     return events;
   }, [impactFilter, currencyFilter, dateRange, sortMode]);
 
   const filteredKeyEvents = useMemo(() => {
+    const now = new Date();
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const endOfMonth = new Date(startOfToday);
+    endOfMonth.setDate(endOfMonth.getDate() + 30);
+
     const items = keyEvents.filter((keyEvent) => {
+      const eventDate = new Date(keyEvent.scheduledAt);
+
+      if (eventDate < startOfToday || eventDate >= endOfMonth) return false;
       if (impactFilter !== "all" && keyEvent.impact !== impactFilter) return false;
       if (currencyFilter !== "all" && keyEvent.currency !== currencyFilter) return false;
+
       return true;
     });
 
     return items.sort((a, b) => {
+      const aDate = new Date(a.scheduledAt).getTime();
+      const bDate = new Date(b.scheduledAt).getTime();
+
       if (sortMode === "impact") {
         const impactDiff = getImpactWeight(b.impact) - getImpactWeight(a.impact);
         if (impactDiff !== 0) return impactDiff;
       }
 
-      return parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time);
+      return aDate - bDate;
     });
   }, [impactFilter, currencyFilter, sortMode]);
 
@@ -379,9 +421,10 @@ function Calendar() {
           </CardHeader>
 
           <CardContent className="overflow-x-auto">
-            <table className="w-full min-w-[760px]">
+            <table className="w-full min-w-[820px]">
               <thead>
                 <tr className="border-b border-border">
+                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Date</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Time</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Currency</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Event</th>
@@ -395,44 +438,55 @@ function Calendar() {
               <tbody>
                 {visibleEvents.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                    <td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
                       No calendar events match the selected filters.
                     </td>
                   </tr>
                 ) : (
-                  visibleEvents.map((event) => (
-                    <tr
-                      key={event.id}
-                      ref={(el) => setEventRef(event.id, el)}
-                      onClick={() => openEvent(event)}
-                      className={cn(
-                        "border-b border-border cursor-pointer hover:bg-muted/40 transition-colors",
-                        highlightedEventId === event.id && "bg-primary/10",
-                      )}
-                    >
-                      <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.time}</td>
+                  visibleEvents.map((event) => {
+                    const eventDate = new Date(event.scheduledAt);
 
-                      <td className="px-4 py-3">
-                        <Badge variant="outline" className="text-xs">
-                          {event.currency}
-                        </Badge>
-                      </td>
+                    return (
+                      <tr
+                        key={event.id}
+                        ref={(el) => setEventRef(event.id, el)}
+                        onClick={() => openEvent(event)}
+                        className={cn(
+                          "border-b border-border cursor-pointer hover:bg-muted/40 transition-colors",
+                          highlightedEventId === event.id && "bg-primary/10",
+                        )}
+                      >
+                        <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">
+                          {eventDate.toLocaleDateString([], {
+                            day: "2-digit",
+                            month: "short",
+                          })}
+                        </td>
 
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-sm text-foreground">{event.event}</div>
-                      </td>
+                        <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.time}</td>
 
-                      <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.previous}</td>
-                      <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.forecast}</td>
-                      <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.actual}</td>
+                        <td className="px-4 py-3">
+                          <Badge variant="outline" className="text-xs">
+                            {event.currency}
+                          </Badge>
+                        </td>
 
-                      <td className="px-4 py-3">
-                        <Badge variant={getImpactVariant(event.impact)} className="text-xs">
-                          {event.impact.toUpperCase()}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-sm text-foreground">{event.event}</div>
+                        </td>
+
+                        <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.previous}</td>
+                        <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.forecast}</td>
+                        <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.actual}</td>
+
+                        <td className="px-4 py-3">
+                          <Badge variant={getImpactVariant(event.impact)} className="text-xs">
+                            {event.impact.toUpperCase()}
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
