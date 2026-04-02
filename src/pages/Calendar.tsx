@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Filter, ChevronDown, ChevronUp } from "lucide-react";
+import { Filter, ChevronDown, ChevronUp, CalendarDays, Sparkles, BarChart3 } from "lucide-react";
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
@@ -162,6 +162,9 @@ function Calendar() {
     };
   }, [filteredEvents]);
 
+  const hasActiveFilters =
+    impactFilter !== "all" || currencyFilter !== "all" || dateRange !== "today" || sortMode !== "impact";
+
   useEffect(() => {
     const eventId = searchParams.get("eventId");
     if (!eventId) return;
@@ -195,9 +198,14 @@ function Calendar() {
       <div className="max-w-7xl mx-auto space-y-6">
         <Card>
           <CardContent className="py-4 space-y-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <CalendarDays className="h-4 w-4 text-primary" />
+              <span>Calendar Filters</span>
+            </div>
+
             <div className="flex flex-wrap gap-3">
               <Select value={dateRange} onValueChange={(value) => setDateRange(value as DateRangeFilter)}>
-                <SelectTrigger className="w-[150px] h-9">
+                <SelectTrigger className="w-[160px] h-10">
                   <SelectValue placeholder="Date Range" />
                 </SelectTrigger>
                 <SelectContent>
@@ -208,7 +216,7 @@ function Calendar() {
               </Select>
 
               <Select value={impactFilter} onValueChange={(value) => setImpactFilter(value as ImpactFilter)}>
-                <SelectTrigger className="w-[150px] h-9">
+                <SelectTrigger className="w-[160px] h-10">
                   <SelectValue placeholder="Impact" />
                 </SelectTrigger>
                 <SelectContent>
@@ -220,7 +228,7 @@ function Calendar() {
               </Select>
 
               <Select value={currencyFilter} onValueChange={(value) => setCurrencyFilter(value as CurrencyFilter)}>
-                <SelectTrigger className="w-[150px] h-9">
+                <SelectTrigger className="w-[160px] h-10">
                   <SelectValue placeholder="Currency" />
                 </SelectTrigger>
                 <SelectContent>
@@ -234,7 +242,7 @@ function Calendar() {
               </Select>
 
               <Select value={sortMode} onValueChange={(value) => setSortMode(value as SortMode)}>
-                <SelectTrigger className="w-[150px] h-9">
+                <SelectTrigger className="w-[160px] h-10">
                   <SelectValue placeholder="Sort By" />
                 </SelectTrigger>
                 <SelectContent>
@@ -247,10 +255,12 @@ function Calendar() {
                 value={String(visibleCount)}
                 onValueChange={(value) => {
                   setVisibleCount(Number(value) as VisibleCount);
-                  if (value !== "999") setShowAllEvents(false);
+                  if (value !== "999") {
+                    setShowAllEvents(false);
+                  }
                 }}
               >
-                <SelectTrigger className="w-[150px] h-9">
+                <SelectTrigger className="w-[140px] h-10">
                   <SelectValue placeholder="Show" />
                 </SelectTrigger>
                 <SelectContent>
@@ -261,32 +271,43 @@ function Calendar() {
                 </SelectContent>
               </Select>
 
-              <Button variant="outline" size="sm" className="h-9" disabled>
+              <Button variant="outline" size="sm" className="h-10" disabled>
                 <Filter className="h-4 w-4 mr-2" />
-                Filters Active
+                {hasActiveFilters ? "Filters Active" : "Default View"}
               </Button>
             </div>
 
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground border-t border-border pt-3">
-              <span>
-                <span className="text-foreground font-semibold">{counts.total}</span> visible
-              </span>
-              <span>
-                <span className="text-foreground font-semibold">{counts.high}</span> high
-              </span>
-              <span>
-                <span className="text-foreground font-semibold">{counts.medium}</span> medium
-              </span>
-              <span>
-                <span className="text-foreground font-semibold">{counts.low}</span> low
-              </span>
+            <div className="flex flex-wrap gap-2">
+              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/30 px-3 py-2">
+                <span className="text-sm font-semibold text-foreground">{counts.total}</span>
+                <span className="text-xs text-muted-foreground">Visible Events</span>
+              </div>
+
+              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/30 px-3 py-2">
+                <span className="text-sm font-semibold text-foreground">{counts.high}</span>
+                <span className="text-xs text-muted-foreground">High Impact</span>
+              </div>
+
+              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/30 px-3 py-2">
+                <span className="text-sm font-semibold text-foreground">{counts.medium}</span>
+                <span className="text-xs text-muted-foreground">Medium Impact</span>
+              </div>
+
+              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/30 px-3 py-2">
+                <span className="text-sm font-semibold text-foreground">{counts.low}</span>
+                <span className="text-xs text-muted-foreground">Low Impact</span>
+              </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Key Events</CardTitle>
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <CardTitle>Key Events</CardTitle>
+            </div>
+
             <AddToDashboardButton isAdded={isUpcomingEventsAdded} onAdd={handleAddCard} onRemove={handleRemoveCard} />
           </CardHeader>
 
@@ -314,7 +335,7 @@ function Calendar() {
                       <span className="text-sm text-muted-foreground">{event.time}</span>
                     </div>
 
-                    <div className="font-semibold text-sm">{event.event}</div>
+                    <div className="font-semibold text-sm text-foreground">{event.event}</div>
 
                     <div className="mt-3">
                       <Badge variant="outline" className="text-xs">
@@ -330,9 +351,12 @@ function Calendar() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-3">
-            <CardTitle>Calendar</CardTitle>
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-primary" />
+              <CardTitle>Calendar</CardTitle>
+            </div>
 
-            {filteredEvents.length > visibleEvents.length && (
+            {filteredEvents.length > visibleCount && visibleCount !== 999 && (
               <Button
                 variant="outline"
                 size="sm"
@@ -394,7 +418,10 @@ function Calendar() {
                         </Badge>
                       </td>
 
-                      <td className="px-4 py-3 text-sm font-medium text-foreground">{event.event}</td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-sm text-foreground">{event.event}</div>
+                      </td>
+
                       <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.previous}</td>
                       <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.forecast}</td>
                       <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.actual}</td>
@@ -410,11 +437,20 @@ function Calendar() {
               </tbody>
             </table>
 
-            {filteredEvents.length > visibleEvents.length && !showAllEvents && visibleCount !== 999 && (
+            {filteredEvents.length > visibleCount && visibleCount !== 999 && (
               <div className="flex justify-center pt-4">
-                <Button variant="outline" onClick={() => setShowAllEvents(true)}>
-                  <ChevronDown className="h-4 w-4 mr-2" />
-                  Show all {filteredEvents.length} events
+                <Button variant="outline" onClick={() => setShowAllEvents((prev) => !prev)}>
+                  {showAllEvents ? (
+                    <>
+                      <ChevronUp className="h-4 w-4 mr-2" />
+                      Show Less
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-4 w-4 mr-2" />
+                      Show all {filteredEvents.length} events
+                    </>
+                  )}
                 </Button>
               </div>
             )}
