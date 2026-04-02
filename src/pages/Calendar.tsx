@@ -28,6 +28,17 @@ function isSameDay(dateA: Date, dateB: Date) {
   );
 }
 
+function startOfDay(date: Date) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function parseTimeToMinutes(time: string) {
+  const [hours, minutes] = time.split(":").map(Number);
+  return (hours || 0) * 60 + (minutes || 0);
+}
+
 function Calendar() {
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -96,14 +107,52 @@ function Calendar() {
     return 1;
   };
 
-  const parseTimeToMinutes = (time: string) => {
-    const [hours, minutes] = time.split(":").map(Number);
-    return (hours || 0) * 60 + (minutes || 0);
-  };
-
   const availableCurrencies = useMemo(() => {
     return Array.from(new Set(calendarEvents.map((event) => event.currency))).sort();
   }, []);
+
+  const eventMatchesDateRange = useCallback(
+    (event: CalendarEvent) => {
+      const scheduledDate = new Date(event.scheduledAt);
+      const now = new Date();
+
+      if (dateRange === "today") {
+        return isSameDay(scheduledDate, now);
+      }
+
+      const dayStart = startOfDay(now);
+
+      if (dateRange === "week") {
+        const end = new Date(dayStart);
+        end.setDate(end.getDate() + 7);
+        return scheduledDate >= dayStart && scheduledDate < end;
+      }
+
+      const end = new Date(dayStart);
+      end.setDate(end.getDate() + 30);
+      return scheduledDate >= dayStart && scheduledDate < end;
+    },
+    [dateRange],
+  );
+
+  const sortEvents = useCallback(
+    (events: CalendarEvent[]) => {
+      return [...events].sort((a, b) => {
+        if (sortMode === "impact") {
+          const impactDiff = getImpactWeight(b.impact) - getImpactWeight(a.impact);
+          if (impactDiff !== 0) return impactDiff;
+        }
+
+        const aScheduled = new Date(a.scheduledAt).getTime();
+        const bScheduled = new Date(b.scheduledAt).getTime();
+        const dayDiff = aScheduled - bScheduled;
+        if (dayDiff !== 0) return dayDiff;
+
+        return parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time);
+      });
+    },
+    [sortMode],
+  );
 
   const filteredEvents = useMemo(() => {
     let events = [...calendarEvents];
@@ -116,94 +165,23 @@ function Calendar() {
       events = events.filter((event) => event.currency === currencyFilter);
     }
 
-    const now = new Date();
-    const startOfToday = new Date(now);
-    startOfToday.setHours(0, 0, 0, 0);
+    events = events.filter(eventMatchesDateRange);
 
-    const endOfToday = new Date(startOfToday);
-    endOfToday.setDate(endOfToday.getDate() + 1);
-
-    const endOfWeek = new Date(startOfToday);
-    endOfWeek.setDate(endOfWeek.getDate() + 7);
-
-    const endOfMonth = new Date(startOfToday);
-    endOfMonth.setMonth(endOfMonth.getMonth() + 1);
-
-    if (dateRange === "today") {
-      events = events.filter((event) => {
-        const scheduledDate = new Date(event.scheduledAt);
-        return isSameDay(scheduledDate, now);
-      });
-    } else if (dateRange === "week") {
-      events = events.filter((event) => {
-        const scheduledDate = new Date(event.scheduledAt);
-        return scheduledDate >= startOfToday && scheduledDate < endOfWeek;
-      });
-    } else if (dateRange === "month") {
-      events = events.filter((event) => {
-        const scheduledDate = new Date(event.scheduledAt);
-        return scheduledDate >= startOfToday && scheduledDate < endOfMonth;
-      });
-    }
-
-    events.sort((a, b) => {
-      if (sortMode === "impact") {
-        const impactDiff = getImpactWeight(b.impact) - getImpactWeight(a.impact);
-        if (impactDiff !== 0) return impactDiff;
-      }
-
-      const dayDiff = new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime();
-      if (dayDiff !== 0) return dayDiff;
-
-      return parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time);
-    });
-
-    return events;
-  }, [impactFilter, currencyFilter, dateRange, sortMode]);
+    return sortEvents(events);
+  }, [impactFilter, currencyFilter, eventMatchesDateRange, sortEvents]);
 
   const filteredKeyEvents = useMemo(() => {
-    const items = keyEvents.filter((keyEvent) => {
-      if (impactFilter !== "all" && keyEvent.impact !== impactFilter) return false;
-      if (currencyFilter !== "all" && keyEvent.currency !== currencyFilter) return false;
+    const items = keyEvents
+      .map((keyEvent) => getCalendarEventById(keyEvent.id))
+      .filter((event): event is CalendarEvent => Boolean(event))
+      .filter((event) => {
+        if (impactFilter !== "all" && event.impact !== impactFilter) return false;
+        if (currencyFilter !== "all" && event.currency !== currencyFilter) return false;
+        return eventMatchesDateRange(event);
+      });
 
-      const fullEvent = getCalendarEventById(keyEvent.id);
-      if (!fullEvent) return false;
-
-      const now = new Date();
-      const scheduledDate = new Date(fullEvent.scheduledAt);
-      const startOfToday = new Date(now);
-      startOfToday.setHours(0, 0, 0, 0);
-
-      const endOfWeek = new Date(startOfToday);
-      endOfWeek.setDate(endOfWeek.getDate() + 7);
-
-      const endOfMonth = new Date(startOfToday);
-      endOfMonth.setMonth(endOfMonth.getMonth() + 1);
-
-      if (dateRange === "today") {
-        return isSameDay(scheduledDate, now);
-      }
-
-      if (dateRange === "week") {
-        return scheduledDate >= startOfToday && scheduledDate < endOfWeek;
-      }
-
-      if (dateRange === "month") {
-        return scheduledDate >= startOfToday && scheduledDate < endOfMonth;
-      }
-
-      return true;
-    });
-
-    return items.sort((a, b) => {
-      if (sortMode === "impact") {
-        const impactDiff = getImpactWeight(b.impact) - getImpactWeight(a.impact);
-        if (impactDiff !== 0) return impactDiff;
-      }
-
-      return parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time);
-    });
-  }, [impactFilter, currencyFilter, dateRange, sortMode]);
+    return sortEvents(items).slice(0, 4);
+  }, [impactFilter, currencyFilter, eventMatchesDateRange, sortEvents]);
 
   const visibleEvents = useMemo(() => {
     if (showAllEvents || visibleCount === 999) {
@@ -261,7 +239,13 @@ function Calendar() {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Select value={dateRange} onValueChange={(value) => setDateRange(value as DateRangeFilter)}>
+              <Select
+                value={dateRange}
+                onValueChange={(value) => {
+                  setDateRange(value as DateRangeFilter);
+                  setShowAllEvents(false);
+                }}
+              >
                 <SelectTrigger className="w-[160px] h-9">
                   <SelectValue placeholder="Date Range" />
                 </SelectTrigger>
@@ -272,7 +256,13 @@ function Calendar() {
                 </SelectContent>
               </Select>
 
-              <Select value={impactFilter} onValueChange={(value) => setImpactFilter(value as ImpactFilter)}>
+              <Select
+                value={impactFilter}
+                onValueChange={(value) => {
+                  setImpactFilter(value as ImpactFilter);
+                  setShowAllEvents(false);
+                }}
+              >
                 <SelectTrigger className="w-[160px] h-9">
                   <SelectValue placeholder="Impact" />
                 </SelectTrigger>
@@ -284,7 +274,13 @@ function Calendar() {
                 </SelectContent>
               </Select>
 
-              <Select value={currencyFilter} onValueChange={(value) => setCurrencyFilter(value as CurrencyFilter)}>
+              <Select
+                value={currencyFilter}
+                onValueChange={(value) => {
+                  setCurrencyFilter(value as CurrencyFilter);
+                  setShowAllEvents(false);
+                }}
+              >
                 <SelectTrigger className="w-[160px] h-9">
                   <SelectValue placeholder="Currency" />
                 </SelectTrigger>
@@ -312,7 +308,9 @@ function Calendar() {
                 value={String(visibleCount)}
                 onValueChange={(value) => {
                   setVisibleCount(Number(value) as VisibleCount);
-                  if (value !== "999") setShowAllEvents(false);
+                  if (value !== "999") {
+                    setShowAllEvents(false);
+                  }
                 }}
               >
                 <SelectTrigger className="w-[120px] h-9">
@@ -380,34 +378,30 @@ function Calendar() {
                 No key events match the selected filters.
               </div>
             ) : (
-              filteredKeyEvents.slice(0, 4).map((event) => {
-                const fullEvent = getCalendarEventById(event.id) ?? null;
+              filteredKeyEvents.map((event) => (
+                <button
+                  key={event.id}
+                  type="button"
+                  onClick={() => openEvent(event)}
+                  className={cn(
+                    "text-left p-4 rounded-lg border bg-muted/50 hover:bg-muted/70 transition-colors",
+                    highlightedEventId === event.id && "ring-2 ring-primary",
+                  )}
+                >
+                  <div className="flex justify-between mb-2">
+                    <Badge variant={getImpactVariant(event.impact)}>{event.impact.toUpperCase()}</Badge>
+                    <span className="text-sm text-muted-foreground">{event.time}</span>
+                  </div>
 
-                return (
-                  <button
-                    key={event.id}
-                    type="button"
-                    onClick={() => openEvent(fullEvent)}
-                    className={cn(
-                      "text-left p-4 rounded-lg border bg-muted/50 hover:bg-muted/70 transition-colors",
-                      highlightedEventId === event.id && "ring-2 ring-primary",
-                    )}
-                  >
-                    <div className="flex justify-between mb-2">
-                      <Badge variant={getImpactVariant(event.impact)}>{event.impact.toUpperCase()}</Badge>
-                      <span className="text-sm text-muted-foreground">{event.time}</span>
-                    </div>
+                  <div className="font-semibold text-sm">{event.event}</div>
 
-                    <div className="font-semibold text-sm">{event.event}</div>
-
-                    <div className="mt-3 flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs">
-                        {event.currency}
-                      </Badge>
-                    </div>
-                  </button>
-                );
-              })
+                  <div className="mt-3 flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      {event.currency}
+                    </Badge>
+                  </div>
+                </button>
+              ))
             )}
           </CardContent>
         </Card>
@@ -419,11 +413,17 @@ function Calendar() {
               <CardTitle>Calendar</CardTitle>
             </div>
 
-            {filteredEvents.length > visibleEvents.length && (
+            {(showAllEvents || (filteredEvents.length > visibleEvents.length && visibleCount !== 999)) && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setShowAllEvents((prev) => !prev)}
+                onClick={() => {
+                  if (showAllEvents) {
+                    setShowAllEvents(false);
+                  } else {
+                    setShowAllEvents(true);
+                  }
+                }}
                 className="shrink-0"
               >
                 {showAllEvents ? (
@@ -516,6 +516,17 @@ function Calendar() {
                 </Button>
               </div>
             )}
+
+            {showAllEvents &&
+              filteredEvents.length > (visibleCount === 999 ? 0 : visibleCount) &&
+              visibleCount !== 999 && (
+                <div className="flex justify-center pt-4">
+                  <Button variant="outline" onClick={() => setShowAllEvents(false)}>
+                    <ChevronUp className="h-4 w-4 mr-2" />
+                    Show less
+                  </Button>
+                </div>
+              )}
           </CardContent>
         </Card>
       </div>
