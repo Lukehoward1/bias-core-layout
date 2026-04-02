@@ -20,8 +20,12 @@ type CurrencyFilter = "all" | string;
 type SortMode = "time" | "impact";
 type VisibleCount = 6 | 10 | 20 | 999;
 
-function isSameDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+function isSameDay(dateA: Date, dateB: Date) {
+  return (
+    dateA.getFullYear() === dateB.getFullYear() &&
+    dateA.getMonth() === dateB.getMonth() &&
+    dateA.getDate() === dateB.getDate()
+  );
 }
 
 function Calendar() {
@@ -92,11 +96,26 @@ function Calendar() {
     return 1;
   };
 
+  const parseTimeToMinutes = (time: string) => {
+    const [hours, minutes] = time.split(":").map(Number);
+    return (hours || 0) * 60 + (minutes || 0);
+  };
+
   const availableCurrencies = useMemo(() => {
     return Array.from(new Set(calendarEvents.map((event) => event.currency))).sort();
   }, []);
 
   const filteredEvents = useMemo(() => {
+    let events = [...calendarEvents];
+
+    if (impactFilter !== "all") {
+      events = events.filter((event) => event.impact === impactFilter);
+    }
+
+    if (currencyFilter !== "all") {
+      events = events.filter((event) => event.currency === currencyFilter);
+    }
+
     const now = new Date();
     const startOfToday = new Date(now);
     startOfToday.setHours(0, 0, 0, 0);
@@ -108,84 +127,83 @@ function Calendar() {
     endOfWeek.setDate(endOfWeek.getDate() + 7);
 
     const endOfMonth = new Date(startOfToday);
-    endOfMonth.setDate(endOfMonth.getDate() + 30);
-
-    let events = [...calendarEvents];
+    endOfMonth.setMonth(endOfMonth.getMonth() + 1);
 
     if (dateRange === "today") {
       events = events.filter((event) => {
-        const eventDate = new Date(event.scheduledAt);
-        return eventDate >= startOfToday && eventDate < endOfToday;
+        const scheduledDate = new Date(event.scheduledAt);
+        return isSameDay(scheduledDate, now);
       });
-    }
-
-    if (dateRange === "week") {
+    } else if (dateRange === "week") {
       events = events.filter((event) => {
-        const eventDate = new Date(event.scheduledAt);
-        return eventDate >= startOfToday && eventDate < endOfWeek;
+        const scheduledDate = new Date(event.scheduledAt);
+        return scheduledDate >= startOfToday && scheduledDate < endOfWeek;
       });
-    }
-
-    if (dateRange === "month") {
+    } else if (dateRange === "month") {
       events = events.filter((event) => {
-        const eventDate = new Date(event.scheduledAt);
-        return eventDate >= startOfToday && eventDate < endOfMonth;
+        const scheduledDate = new Date(event.scheduledAt);
+        return scheduledDate >= startOfToday && scheduledDate < endOfMonth;
       });
-    }
-
-    if (impactFilter !== "all") {
-      events = events.filter((event) => event.impact === impactFilter);
-    }
-
-    if (currencyFilter !== "all") {
-      events = events.filter((event) => event.currency === currencyFilter);
     }
 
     events.sort((a, b) => {
-      const aDate = new Date(a.scheduledAt).getTime();
-      const bDate = new Date(b.scheduledAt).getTime();
-
       if (sortMode === "impact") {
         const impactDiff = getImpactWeight(b.impact) - getImpactWeight(a.impact);
         if (impactDiff !== 0) return impactDiff;
       }
 
-      return aDate - bDate;
+      const dayDiff = new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime();
+      if (dayDiff !== 0) return dayDiff;
+
+      return parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time);
     });
 
     return events;
   }, [impactFilter, currencyFilter, dateRange, sortMode]);
 
   const filteredKeyEvents = useMemo(() => {
-    const now = new Date();
-    const startOfToday = new Date(now);
-    startOfToday.setHours(0, 0, 0, 0);
-
-    const endOfMonth = new Date(startOfToday);
-    endOfMonth.setDate(endOfMonth.getDate() + 30);
-
     const items = keyEvents.filter((keyEvent) => {
-      const eventDate = new Date(keyEvent.scheduledAt);
-
-      if (eventDate < startOfToday || eventDate >= endOfMonth) return false;
       if (impactFilter !== "all" && keyEvent.impact !== impactFilter) return false;
       if (currencyFilter !== "all" && keyEvent.currency !== currencyFilter) return false;
+
+      const fullEvent = getCalendarEventById(keyEvent.id);
+      if (!fullEvent) return false;
+
+      const now = new Date();
+      const scheduledDate = new Date(fullEvent.scheduledAt);
+      const startOfToday = new Date(now);
+      startOfToday.setHours(0, 0, 0, 0);
+
+      const endOfWeek = new Date(startOfToday);
+      endOfWeek.setDate(endOfWeek.getDate() + 7);
+
+      const endOfMonth = new Date(startOfToday);
+      endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+
+      if (dateRange === "today") {
+        return isSameDay(scheduledDate, now);
+      }
+
+      if (dateRange === "week") {
+        return scheduledDate >= startOfToday && scheduledDate < endOfWeek;
+      }
+
+      if (dateRange === "month") {
+        return scheduledDate >= startOfToday && scheduledDate < endOfMonth;
+      }
 
       return true;
     });
 
     return items.sort((a, b) => {
-      const aDate = new Date(a.scheduledAt).getTime();
-      const bDate = new Date(b.scheduledAt).getTime();
-
       if (sortMode === "impact") {
         const impactDiff = getImpactWeight(b.impact) - getImpactWeight(a.impact);
         if (impactDiff !== 0) return impactDiff;
       }
 
-      return aDate - bDate;
+      return parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time);
     });
-  }, [impactFilter, currencyFilter, sortMode]);
+  }, [impactFilter, currencyFilter, dateRange, sortMode]);
 
   const visibleEvents = useMemo(() => {
     if (showAllEvents || visibleCount === 999) {
@@ -203,9 +221,6 @@ function Calendar() {
       low: filteredEvents.filter((event) => event.impact === "low").length,
     };
   }, [filteredEvents]);
-
-  const hasActiveFilters =
-    impactFilter !== "all" || currencyFilter !== "all" || dateRange !== "today" || sortMode !== "impact";
 
   useEffect(() => {
     const eventId = searchParams.get("eventId");
@@ -242,12 +257,12 @@ function Calendar() {
           <CardContent className="py-4 space-y-4">
             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
               <CalendarDays className="h-4 w-4 text-primary" />
-              <span>Calendar Filters</span>
+              Calendar Filters
             </div>
 
             <div className="flex flex-wrap gap-3">
               <Select value={dateRange} onValueChange={(value) => setDateRange(value as DateRangeFilter)}>
-                <SelectTrigger className="w-[160px] h-10">
+                <SelectTrigger className="w-[160px] h-9">
                   <SelectValue placeholder="Date Range" />
                 </SelectTrigger>
                 <SelectContent>
@@ -258,7 +273,7 @@ function Calendar() {
               </Select>
 
               <Select value={impactFilter} onValueChange={(value) => setImpactFilter(value as ImpactFilter)}>
-                <SelectTrigger className="w-[160px] h-10">
+                <SelectTrigger className="w-[160px] h-9">
                   <SelectValue placeholder="Impact" />
                 </SelectTrigger>
                 <SelectContent>
@@ -270,7 +285,7 @@ function Calendar() {
               </Select>
 
               <Select value={currencyFilter} onValueChange={(value) => setCurrencyFilter(value as CurrencyFilter)}>
-                <SelectTrigger className="w-[160px] h-10">
+                <SelectTrigger className="w-[160px] h-9">
                   <SelectValue placeholder="Currency" />
                 </SelectTrigger>
                 <SelectContent>
@@ -284,7 +299,7 @@ function Calendar() {
               </Select>
 
               <Select value={sortMode} onValueChange={(value) => setSortMode(value as SortMode)}>
-                <SelectTrigger className="w-[160px] h-10">
+                <SelectTrigger className="w-[160px] h-9">
                   <SelectValue placeholder="Sort By" />
                 </SelectTrigger>
                 <SelectContent>
@@ -297,12 +312,10 @@ function Calendar() {
                 value={String(visibleCount)}
                 onValueChange={(value) => {
                   setVisibleCount(Number(value) as VisibleCount);
-                  if (value !== "999") {
-                    setShowAllEvents(false);
-                  }
+                  if (value !== "999") setShowAllEvents(false);
                 }}
               >
-                <SelectTrigger className="w-[140px] h-10">
+                <SelectTrigger className="w-[120px] h-9">
                   <SelectValue placeholder="Show" />
                 </SelectTrigger>
                 <SelectContent>
@@ -313,31 +326,39 @@ function Calendar() {
                 </SelectContent>
               </Select>
 
-              <Button variant="outline" size="sm" className="h-10" disabled>
+              <Button variant="outline" size="sm" className="h-9" disabled>
                 <Filter className="h-4 w-4 mr-2" />
-                {hasActiveFilters ? "Filters Active" : "Default View"}
+                Filters Active
               </Button>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/30 px-3 py-2">
-                <span className="text-sm font-semibold text-foreground">{counts.total}</span>
-                <span className="text-xs text-muted-foreground">Visible Events</span>
+            <div className="flex flex-wrap gap-3">
+              <div className="px-3 py-2 rounded-full border bg-muted/30 min-w-[108px]">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-semibold">{counts.total}</span>
+                  <span className="text-xs text-muted-foreground">Visible Events</span>
+                </div>
               </div>
 
-              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/30 px-3 py-2">
-                <span className="text-sm font-semibold text-foreground">{counts.high}</span>
-                <span className="text-xs text-muted-foreground">High Impact</span>
+              <div className="px-3 py-2 rounded-full border bg-muted/30 min-w-[108px]">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-semibold">{counts.high}</span>
+                  <span className="text-xs text-muted-foreground">High Impact</span>
+                </div>
               </div>
 
-              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/30 px-3 py-2">
-                <span className="text-sm font-semibold text-foreground">{counts.medium}</span>
-                <span className="text-xs text-muted-foreground">Medium Impact</span>
+              <div className="px-3 py-2 rounded-full border bg-muted/30 min-w-[108px]">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-semibold">{counts.medium}</span>
+                  <span className="text-xs text-muted-foreground">Medium Impact</span>
+                </div>
               </div>
 
-              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/30 px-3 py-2">
-                <span className="text-sm font-semibold text-foreground">{counts.low}</span>
-                <span className="text-xs text-muted-foreground">Low Impact</span>
+              <div className="px-3 py-2 rounded-full border bg-muted/30 min-w-[108px]">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-semibold">{counts.low}</span>
+                  <span className="text-xs text-muted-foreground">Low Impact</span>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -377,9 +398,9 @@ function Calendar() {
                       <span className="text-sm text-muted-foreground">{event.time}</span>
                     </div>
 
-                    <div className="font-semibold text-sm text-foreground">{event.event}</div>
+                    <div className="font-semibold text-sm">{event.event}</div>
 
-                    <div className="mt-3">
+                    <div className="mt-3 flex items-center gap-2">
                       <Badge variant="outline" className="text-xs">
                         {event.currency}
                       </Badge>
@@ -398,7 +419,7 @@ function Calendar() {
               <CardTitle>Calendar</CardTitle>
             </div>
 
-            {filteredEvents.length > visibleCount && visibleCount !== 999 && (
+            {filteredEvents.length > visibleEvents.length && (
               <Button
                 variant="outline"
                 size="sm"
@@ -421,7 +442,7 @@ function Calendar() {
           </CardHeader>
 
           <CardContent className="overflow-x-auto">
-            <table className="w-full min-w-[820px]">
+            <table className="w-full min-w-[860px]">
               <thead>
                 <tr className="border-b border-border">
                   <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Date</th>
@@ -443,68 +464,55 @@ function Calendar() {
                     </td>
                   </tr>
                 ) : (
-                  visibleEvents.map((event) => {
-                    const eventDate = new Date(event.scheduledAt);
+                  visibleEvents.map((event) => (
+                    <tr
+                      key={event.id}
+                      ref={(el) => setEventRef(event.id, el)}
+                      onClick={() => openEvent(event)}
+                      className={cn(
+                        "border-b border-border cursor-pointer hover:bg-muted/40 transition-colors",
+                        highlightedEventId === event.id && "bg-primary/10",
+                      )}
+                    >
+                      <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
+                        {new Date(event.scheduledAt).toLocaleDateString([], {
+                          day: "2-digit",
+                          month: "short",
+                        })}
+                      </td>
 
-                    return (
-                      <tr
-                        key={event.id}
-                        ref={(el) => setEventRef(event.id, el)}
-                        onClick={() => openEvent(event)}
-                        className={cn(
-                          "border-b border-border cursor-pointer hover:bg-muted/40 transition-colors",
-                          highlightedEventId === event.id && "bg-primary/10",
-                        )}
-                      >
-                        <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">
-                          {eventDate.toLocaleDateString([], {
-                            day: "2-digit",
-                            month: "short",
-                          })}
-                        </td>
+                      <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.time}</td>
 
-                        <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.time}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant="outline" className="text-xs">
+                          {event.currency}
+                        </Badge>
+                      </td>
 
-                        <td className="px-4 py-3">
-                          <Badge variant="outline" className="text-xs">
-                            {event.currency}
-                          </Badge>
-                        </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-sm text-foreground">{event.event}</div>
+                      </td>
 
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-sm text-foreground">{event.event}</div>
-                        </td>
+                      <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.previous}</td>
+                      <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.forecast}</td>
+                      <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.actual}</td>
 
-                        <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.previous}</td>
-                        <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.forecast}</td>
-                        <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.actual}</td>
-
-                        <td className="px-4 py-3">
-                          <Badge variant={getImpactVariant(event.impact)} className="text-xs">
-                            {event.impact.toUpperCase()}
-                          </Badge>
-                        </td>
-                      </tr>
-                    );
-                  })
+                      <td className="px-4 py-3">
+                        <Badge variant={getImpactVariant(event.impact)} className="text-xs">
+                          {event.impact.toUpperCase()}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
 
-            {filteredEvents.length > visibleCount && visibleCount !== 999 && (
+            {filteredEvents.length > visibleEvents.length && !showAllEvents && visibleCount !== 999 && (
               <div className="flex justify-center pt-4">
-                <Button variant="outline" onClick={() => setShowAllEvents((prev) => !prev)}>
-                  {showAllEvents ? (
-                    <>
-                      <ChevronUp className="h-4 w-4 mr-2" />
-                      Show Less
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="h-4 w-4 mr-2" />
-                      Show all {filteredEvents.length} events
-                    </>
-                  )}
+                <Button variant="outline" onClick={() => setShowAllEvents(true)}>
+                  <ChevronDown className="h-4 w-4 mr-2" />
+                  Show all {filteredEvents.length} events
                 </Button>
               </div>
             )}
