@@ -337,8 +337,7 @@ function Calendar() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-3">
             <div>
-              <CardTitle>Calendar Feed</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">Compact calendar view with reduced default volume.</p>
+              <CardTitle>Calendar</CardTitle>
             </div>
 
             {filteredEvents.length > visibleEvents.length && (
@@ -405,7 +404,6 @@ function Calendar() {
 
                       <td className="px-4 py-3">
                         <div className="font-medium text-sm text-foreground">{event.event}</div>
-                        <div className="text-[11px] text-muted-foreground mt-1">click to view event</div>
                       </td>
 
                       <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.previous}</td>
