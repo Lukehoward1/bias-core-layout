@@ -197,7 +197,7 @@ function Calendar() {
           <CardContent className="py-4 space-y-4">
             <div className="flex flex-wrap gap-3">
               <Select value={dateRange} onValueChange={(value) => setDateRange(value as DateRangeFilter)}>
-                <SelectTrigger className="w-[160px] h-9">
+                <SelectTrigger className="w-[150px] h-9">
                   <SelectValue placeholder="Date Range" />
                 </SelectTrigger>
                 <SelectContent>
@@ -208,7 +208,7 @@ function Calendar() {
               </Select>
 
               <Select value={impactFilter} onValueChange={(value) => setImpactFilter(value as ImpactFilter)}>
-                <SelectTrigger className="w-[160px] h-9">
+                <SelectTrigger className="w-[150px] h-9">
                   <SelectValue placeholder="Impact" />
                 </SelectTrigger>
                 <SelectContent>
@@ -220,7 +220,7 @@ function Calendar() {
               </Select>
 
               <Select value={currencyFilter} onValueChange={(value) => setCurrencyFilter(value as CurrencyFilter)}>
-                <SelectTrigger className="w-[160px] h-9">
+                <SelectTrigger className="w-[150px] h-9">
                   <SelectValue placeholder="Currency" />
                 </SelectTrigger>
                 <SelectContent>
@@ -234,7 +234,7 @@ function Calendar() {
               </Select>
 
               <Select value={sortMode} onValueChange={(value) => setSortMode(value as SortMode)}>
-                <SelectTrigger className="w-[160px] h-9">
+                <SelectTrigger className="w-[150px] h-9">
                   <SelectValue placeholder="Sort By" />
                 </SelectTrigger>
                 <SelectContent>
@@ -250,7 +250,7 @@ function Calendar() {
                   if (value !== "999") setShowAllEvents(false);
                 }}
               >
-                <SelectTrigger className="w-[160px] h-9">
+                <SelectTrigger className="w-[150px] h-9">
                   <SelectValue placeholder="Show" />
                 </SelectTrigger>
                 <SelectContent>
@@ -267,26 +267,19 @@ function Calendar() {
               </Button>
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <div className="px-3 py-2 rounded-lg border bg-muted/40 min-w-[120px]">
-                <div className="text-lg font-semibold">{counts.total}</div>
-                <div className="text-xs text-muted-foreground">Visible Events</div>
-              </div>
-
-              <div className="px-3 py-2 rounded-lg border bg-muted/40 min-w-[120px]">
-                <div className="text-lg font-semibold">{counts.high}</div>
-                <div className="text-xs text-muted-foreground">High Impact</div>
-              </div>
-
-              <div className="px-3 py-2 rounded-lg border bg-muted/40 min-w-[120px]">
-                <div className="text-lg font-semibold">{counts.medium}</div>
-                <div className="text-xs text-muted-foreground">Medium Impact</div>
-              </div>
-
-              <div className="px-3 py-2 rounded-lg border bg-muted/40 min-w-[120px]">
-                <div className="text-lg font-semibold">{counts.low}</div>
-                <div className="text-xs text-muted-foreground">Low Impact</div>
-              </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground border-t border-border pt-3">
+              <span>
+                <span className="text-foreground font-semibold">{counts.total}</span> visible
+              </span>
+              <span>
+                <span className="text-foreground font-semibold">{counts.high}</span> high
+              </span>
+              <span>
+                <span className="text-foreground font-semibold">{counts.medium}</span> medium
+              </span>
+              <span>
+                <span className="text-foreground font-semibold">{counts.low}</span> low
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -320,12 +313,13 @@ function Calendar() {
                       <Badge variant={getImpactVariant(event.impact)}>{event.impact.toUpperCase()}</Badge>
                       <span className="text-sm text-muted-foreground">{event.time}</span>
                     </div>
+
                     <div className="font-semibold text-sm">{event.event}</div>
-                    <div className="mt-3 flex items-center gap-2">
+
+                    <div className="mt-3">
                       <Badge variant="outline" className="text-xs">
                         {event.currency}
                       </Badge>
-                      <span className="text-[11px] text-muted-foreground">click to view event</span>
                     </div>
                   </button>
                 );
@@ -336,9 +330,7 @@ function Calendar() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-3">
-            <div>
-              <CardTitle>Calendar</CardTitle>
-            </div>
+            <CardTitle>Calendar</CardTitle>
 
             {filteredEvents.length > visibleEvents.length && (
               <Button
@@ -402,10 +394,7 @@ function Calendar() {
                         </Badge>
                       </td>
 
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-sm text-foreground">{event.event}</div>
-                      </td>
-
+                      <td className="px-4 py-3 text-sm font-medium text-foreground">{event.event}</td>
                       <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.previous}</td>
                       <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.forecast}</td>
                       <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.actual}</td>
