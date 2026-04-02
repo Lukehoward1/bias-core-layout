@@ -99,7 +99,7 @@ function formatDate(date: Date) {
 function createEventDate(base: Date, time: string) {
   const [h, m] = time.split(":").map(Number);
   const d = new Date(base);
-  d.setHours(h, m, 0, 0);
+  d.setHours(h || 0, m || 0, 0, 0);
   return d;
 }
 
@@ -108,23 +108,26 @@ function pick(values: string[], i: number) {
 }
 
 /**
- * 🔥 KEY FIX: ALWAYS INCLUDE TODAY EVENTS
+ * ✅ CORE FIXED GENERATOR
+ * Ensures:
+ * - Always events TODAY
+ * - Future events
+ * - Proper scheduledAt values
  */
 function buildCalendarEvents(): CalendarEvent[] {
   const now = new Date();
-
   const events: CalendarEvent[] = [];
 
   CALENDAR_EVENT_TEMPLATES.forEach((template, idx) => {
-    // ✅ TODAY EVENT (CRITICAL FIX)
-    const todayEventDate = createEventDate(now, template.time);
+    // ✅ TODAY EVENT (critical)
+    const today = createEventDate(now, template.time);
 
     events.push({
       id: `${template.eventKey}-today`,
       eventKey: template.eventKey,
-      date: formatDate(todayEventDate),
+      date: formatDate(today),
       time: template.time,
-      scheduledAt: todayEventDate.toISOString(),
+      scheduledAt: today.toISOString(),
       currency: template.currency,
       event: template.event,
       previous: pick(template.previousValues, idx),
@@ -135,15 +138,15 @@ function buildCalendarEvents(): CalendarEvent[] {
 
     // ✅ FUTURE EVENTS
     for (let i = 1; i <= 5; i++) {
-      const futureDate = new Date(now);
+      const future = new Date(now);
 
       if (template.recurrence === "weekly") {
-        futureDate.setDate(now.getDate() + i * 7);
+        future.setDate(now.getDate() + i * 7);
       } else {
-        futureDate.setMonth(now.getMonth() + i);
+        future.setMonth(now.getMonth() + i);
       }
 
-      const scheduled = createEventDate(futureDate, template.time);
+      const scheduled = createEventDate(future, template.time);
 
       events.push({
         id: `${template.eventKey}-${i}`,
@@ -164,10 +167,35 @@ function buildCalendarEvents(): CalendarEvent[] {
   return events.sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
 }
 
-export const calendarEvents = buildCalendarEvents();
+export const calendarEvents: CalendarEvent[] = buildCalendarEvents();
 
-export const keyEvents = calendarEvents.filter((e) => KEY_EVENT_KEYS.has(e.eventKey));
+export const keyEvents = calendarEvents.filter((event) => KEY_EVENT_KEYS.has(event.eventKey));
 
-export function getCalendarEventById(id: string) {
-  return calendarEvents.find((e) => e.id === id);
+export function getCalendarEventById(id: string): CalendarEvent | undefined {
+  return calendarEvents.find((event) => event.id === id);
+}
+
+export function getCalendarEventByKey(eventKey: string): CalendarEvent | undefined {
+  return calendarEvents.find((event) => event.eventKey === eventKey);
+}
+
+export function getCalendarEventsByEventKey(eventKey: string): CalendarEvent[] {
+  return calendarEvents.filter((event) => event.eventKey === eventKey);
+}
+
+export function getEventsByCurrency(currency: string): CalendarEvent[] {
+  const normalized = currency.trim().toUpperCase();
+  return calendarEvents.filter((event) => event.currency.toUpperCase() === normalized);
+}
+
+export function getKeyEvents(): CalendarEvent[] {
+  const keyIds = new Set(keyEvents.map((event) => event.id));
+  return calendarEvents.filter((event) => keyIds.has(event.id));
+}
+
+/**
+ * ✅ RESTORED (FIXES YOUR BUILD ERROR)
+ */
+export function sortCalendarEventsByImpact(events: CalendarEvent[]): CalendarEvent[] {
+  return [...events].sort((a, b) => impactRank[b.impact] - impactRank[a.impact]);
 }
