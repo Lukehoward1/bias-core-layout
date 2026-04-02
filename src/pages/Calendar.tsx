@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Filter } from "lucide-react";
+import { Filter, CalendarDays, ChevronDown, ChevronUp } from "lucide-react";
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
@@ -17,6 +17,8 @@ import { calendarEvents, keyEvents, getCalendarEventById, type CalendarEvent } f
 type ImpactFilter = "all" | "high" | "medium" | "low";
 type DateRangeFilter = "today" | "week" | "month";
 type CurrencyFilter = "all" | string;
+type SortMode = "time" | "impact";
+type VisibleCount = 6 | 10 | 20 | 999;
 
 function Calendar() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -26,8 +28,11 @@ function Calendar() {
   const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
 
   const [dateRange, setDateRange] = useState<DateRangeFilter>("today");
-  const [impactFilter, setImpactFilter] = useState<ImpactFilter>("all");
+  const [impactFilter, setImpactFilter] = useState<ImpactFilter>("high");
   const [currencyFilter, setCurrencyFilter] = useState<CurrencyFilter>("all");
+  const [sortMode, setSortMode] = useState<SortMode>("impact");
+  const [visibleCount, setVisibleCount] = useState<VisibleCount>(10);
+  const [showAllEvents, setShowAllEvents] = useState(false);
 
   const eventRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
 
@@ -77,6 +82,17 @@ function Calendar() {
     return "secondary";
   };
 
+  const getImpactWeight = (impact: CalendarEvent["impact"]) => {
+    if (impact === "high") return 3;
+    if (impact === "medium") return 2;
+    return 1;
+  };
+
+  const parseTimeToMinutes = (time: string) => {
+    const [hours, minutes] = time.split(":").map(Number);
+    return (hours || 0) * 60 + (minutes || 0);
+  };
+
   const availableCurrencies = useMemo(() => {
     return Array.from(new Set(calendarEvents.map((event) => event.currency))).sort();
   }, []);
@@ -92,30 +108,59 @@ function Calendar() {
       events = events.filter((event) => event.currency === currencyFilter);
     }
 
-    // For now all demo events are treated as current-period items,
-    // but this keeps the filter structure ready for future API/date wiring.
     if (dateRange === "today") {
-      return events;
+      events = events;
+    } else if (dateRange === "week") {
+      events = events;
+    } else if (dateRange === "month") {
+      events = events;
     }
 
-    if (dateRange === "week") {
-      return events;
-    }
+    events.sort((a, b) => {
+      if (sortMode === "impact") {
+        const impactDiff = getImpactWeight(b.impact) - getImpactWeight(a.impact);
+        if (impactDiff !== 0) return impactDiff;
+      }
 
-    if (dateRange === "month") {
-      return events;
-    }
+      return parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time);
+    });
 
     return events;
-  }, [impactFilter, currencyFilter, dateRange]);
+  }, [impactFilter, currencyFilter, dateRange, sortMode]);
 
   const filteredKeyEvents = useMemo(() => {
-    return keyEvents.filter((keyEvent) => {
+    const items = keyEvents.filter((keyEvent) => {
       if (impactFilter !== "all" && keyEvent.impact !== impactFilter) return false;
       if (currencyFilter !== "all" && keyEvent.currency !== currencyFilter) return false;
       return true;
     });
-  }, [impactFilter, currencyFilter]);
+
+    return items.sort((a, b) => {
+      if (sortMode === "impact") {
+        const impactDiff = getImpactWeight(b.impact) - getImpactWeight(a.impact);
+        if (impactDiff !== 0) return impactDiff;
+      }
+
+      return parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time);
+    });
+  }, [impactFilter, currencyFilter, sortMode]);
+
+  const visibleEvents = useMemo(() => {
+    if (showAllEvents || visibleCount === 999) {
+      return filteredEvents;
+    }
+
+    return filteredEvents.slice(0, visibleCount);
+  }, [filteredEvents, showAllEvents, visibleCount]);
+
+  const counts = useMemo(() => {
+    return {
+      total: filteredEvents.length,
+      high: filteredEvents.filter((event) => event.impact === "high").length,
+      medium: filteredEvents.filter((event) => event.impact === "medium").length,
+      low: filteredEvents.filter((event) => event.impact === "low").length,
+    };
+  }, [filteredEvents]);
 
   useEffect(() => {
     const eventId = searchParams.get("eventId");
@@ -125,6 +170,7 @@ function Calendar() {
     if (!match) return;
 
     setHighlightedEventId(match.id);
+    setShowAllEvents(true);
 
     setTimeout(() => {
       eventRefs.current.get(match.id)?.scrollIntoView({
@@ -148,64 +194,116 @@ function Calendar() {
 
       <div className="max-w-7xl mx-auto space-y-6">
         <Card>
-          <CardContent className="py-4 flex flex-wrap gap-3">
-            <Select value={dateRange} onValueChange={(value) => setDateRange(value as DateRangeFilter)}>
-              <SelectTrigger className="w-[160px] h-9">
-                <SelectValue placeholder="Date Range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">This Week</SelectItem>
-                <SelectItem value="month">This Month</SelectItem>
-              </SelectContent>
-            </Select>
+          <CardContent className="py-4 space-y-4">
+            <div className="flex flex-wrap gap-3">
+              <Select value={dateRange} onValueChange={(value) => setDateRange(value as DateRangeFilter)}>
+                <SelectTrigger className="w-[160px] h-9">
+                  <SelectValue placeholder="Date Range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="week">This Week</SelectItem>
+                  <SelectItem value="month">This Month</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Select value={impactFilter} onValueChange={(value) => setImpactFilter(value as ImpactFilter)}>
-              <SelectTrigger className="w-[160px] h-9">
-                <SelectValue placeholder="Impact" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Impact</SelectItem>
-                <SelectItem value="high">High Impact</SelectItem>
-                <SelectItem value="medium">Medium Impact</SelectItem>
-                <SelectItem value="low">Low Impact</SelectItem>
-              </SelectContent>
-            </Select>
+              <Select value={impactFilter} onValueChange={(value) => setImpactFilter(value as ImpactFilter)}>
+                <SelectTrigger className="w-[160px] h-9">
+                  <SelectValue placeholder="Impact" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Impact</SelectItem>
+                  <SelectItem value="high">High Impact</SelectItem>
+                  <SelectItem value="medium">Medium Impact</SelectItem>
+                  <SelectItem value="low">Low Impact</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Select value={currencyFilter} onValueChange={(value) => setCurrencyFilter(value as CurrencyFilter)}>
-              <SelectTrigger className="w-[160px] h-9">
-                <SelectValue placeholder="Currency" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Currencies</SelectItem>
-                {availableCurrencies.map((currency) => (
-                  <SelectItem key={currency} value={currency}>
-                    {currency}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select value={currencyFilter} onValueChange={(value) => setCurrencyFilter(value as CurrencyFilter)}>
+                <SelectTrigger className="w-[160px] h-9">
+                  <SelectValue placeholder="Currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Currencies</SelectItem>
+                  {availableCurrencies.map((currency) => (
+                    <SelectItem key={currency} value={currency}>
+                      {currency}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Button variant="outline" size="sm" className="h-9" disabled>
-              <Filter className="h-4 w-4 mr-2" />
-              Filters Active
-            </Button>
+              <Select value={sortMode} onValueChange={(value) => setSortMode(value as SortMode)}>
+                <SelectTrigger className="w-[160px] h-9">
+                  <SelectValue placeholder="Sort By" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="impact">Sort by Impact</SelectItem>
+                  <SelectItem value="time">Sort by Time</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={String(visibleCount)}
+                onValueChange={(value) => {
+                  setVisibleCount(Number(value) as VisibleCount);
+                  if (value !== "999") setShowAllEvents(false);
+                }}
+              >
+                <SelectTrigger className="w-[160px] h-9">
+                  <SelectValue placeholder="Show" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="6">Show 6</SelectItem>
+                  <SelectItem value="10">Show 10</SelectItem>
+                  <SelectItem value="20">Show 20</SelectItem>
+                  <SelectItem value="999">Show All</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Button variant="outline" size="sm" className="h-9" disabled>
+                <Filter className="h-4 w-4 mr-2" />
+                Filters Active
+              </Button>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <div className="px-3 py-2 rounded-lg border bg-muted/40 min-w-[120px]">
+                <div className="text-lg font-semibold">{counts.total}</div>
+                <div className="text-xs text-muted-foreground">Visible Events</div>
+              </div>
+
+              <div className="px-3 py-2 rounded-lg border bg-muted/40 min-w-[120px]">
+                <div className="text-lg font-semibold">{counts.high}</div>
+                <div className="text-xs text-muted-foreground">High Impact</div>
+              </div>
+
+              <div className="px-3 py-2 rounded-lg border bg-muted/40 min-w-[120px]">
+                <div className="text-lg font-semibold">{counts.medium}</div>
+                <div className="text-xs text-muted-foreground">Medium Impact</div>
+              </div>
+
+              <div className="px-3 py-2 rounded-lg border bg-muted/40 min-w-[120px]">
+                <div className="text-lg font-semibold">{counts.low}</div>
+                <div className="text-xs text-muted-foreground">Low Impact</div>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row justify-between">
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Key Events</CardTitle>
             <AddToDashboardButton isAdded={isUpcomingEventsAdded} onAdd={handleAddCard} onRemove={handleRemoveCard} />
           </CardHeader>
 
-          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             {filteredKeyEvents.length === 0 ? (
               <div className="col-span-full text-center py-8 text-muted-foreground text-sm">
                 No key events match the selected filters.
               </div>
             ) : (
-              filteredKeyEvents.map((event) => {
+              filteredKeyEvents.slice(0, 4).map((event) => {
                 const fullEvent = getCalendarEventById(event.id) ?? null;
 
                 return (
@@ -218,12 +316,19 @@ function Calendar() {
                       highlightedEventId === event.id && "ring-2 ring-primary",
                     )}
                   >
-                    <div className="flex justify-between mb-2">
+                    <div className="flex items-center justify-between gap-3 mb-3">
                       <Badge variant={getImpactVariant(event.impact)}>{event.impact.toUpperCase()}</Badge>
                       <span className="text-sm text-muted-foreground">{event.time}</span>
                     </div>
-                    <div className="font-semibold text-sm">{event.currency}</div>
-                    <div className="text-xs text-muted-foreground">{event.event}</div>
+
+                    <div className="text-sm font-semibold text-foreground">{event.event}</div>
+
+                    <div className="mt-2 flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        {event.currency}
+                      </Badge>
+                      <span className="text-[11px] text-muted-foreground">click to view event</span>
+                    </div>
                   </button>
                 );
               })
@@ -232,56 +337,102 @@ function Calendar() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>All Events</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
+            <div>
+              <CardTitle>Calendar Feed</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Cleaner default view with progressive reveal for the full dataset.
+              </p>
+            </div>
+
+            {filteredEvents.length > (visibleCount === 999 ? filteredEvents.length : visibleCount) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAllEvents((prev) => !prev)}
+                className="shrink-0"
+              >
+                {showAllEvents ? (
+                  <>
+                    <ChevronUp className="h-4 w-4 mr-2" />
+                    Show Less
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-4 w-4 mr-2" />
+                    Show More
+                  </>
+                )}
+              </Button>
+            )}
           </CardHeader>
 
-          <CardContent className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  {["Time", "Currency", "Event", "Previous", "Forecast", "Actual", "Impact"].map((heading) => (
-                    <th key={heading} className="text-left px-4 py-2 text-xs text-muted-foreground">
-                      {heading}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
+          <CardContent className="space-y-4">
+            {visibleEvents.length === 0 ? (
+              <div className="py-10 text-center text-sm text-muted-foreground">
+                No calendar events match the selected filters.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {visibleEvents.map((event) => (
+                  <button
+                    key={event.id}
+                    ref={(el) => setEventRef(event.id, el)}
+                    type="button"
+                    onClick={() => openEvent(event)}
+                    className={cn(
+                      "w-full text-left p-4 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors",
+                      highlightedEventId === event.id && "ring-2 ring-primary bg-primary/10",
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-2">
+                          <Badge variant="outline" className="text-xs">
+                            {event.currency}
+                          </Badge>
+                          <Badge variant={getImpactVariant(event.impact)} className="text-xs">
+                            {event.impact}
+                          </Badge>
+                          <span className="text-[11px] text-muted-foreground">• click to view event</span>
+                        </div>
 
-              <tbody>
-                {filteredEvents.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      No calendar events match the selected filters.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredEvents.map((event) => (
-                    <tr
-                      key={event.id}
-                      ref={(el) => setEventRef(event.id, el)}
-                      onClick={() => openEvent(event)}
-                      className={cn(
-                        "border-b cursor-pointer hover:bg-muted/50 transition-colors",
-                        highlightedEventId === event.id && "bg-primary/10",
-                      )}
-                    >
-                      <td className="px-4 py-2">{event.time}</td>
-                      <td className="px-4 py-2">
-                        <Badge variant="outline">{event.currency}</Badge>
-                      </td>
-                      <td className="px-4 py-2 font-medium">{event.event}</td>
-                      <td className="px-4 py-2">{event.previous}</td>
-                      <td className="px-4 py-2">{event.forecast}</td>
-                      <td className="px-4 py-2">{event.actual}</td>
-                      <td className="px-4 py-2">
-                        <Badge variant={getImpactVariant(event.impact)}>{event.impact.toUpperCase()}</Badge>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                        <div className="text-sm font-semibold text-foreground">{event.event}</div>
+
+                        <div className="mt-2 grid grid-cols-3 md:grid-cols-3 gap-3 text-xs">
+                          <div>
+                            <div className="text-muted-foreground">Previous</div>
+                            <div className="font-medium text-foreground mt-0.5">{event.previous}</div>
+                          </div>
+                          <div>
+                            <div className="text-muted-foreground">Forecast</div>
+                            <div className="font-medium text-foreground mt-0.5">{event.forecast}</div>
+                          </div>
+                          <div>
+                            <div className="text-muted-foreground">Actual</div>
+                            <div className="font-medium text-foreground mt-0.5">{event.actual}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 text-right">
+                        <div className="text-sm font-medium text-foreground">{event.time}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">Today</div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {filteredEvents.length > visibleEvents.length && !showAllEvents && visibleCount !== 999 && (
+              <div className="flex justify-center pt-2">
+                <Button variant="outline" onClick={() => setShowAllEvents(true)}>
+                  <CalendarDays className="h-4 w-4 mr-2" />
+                  Show all {filteredEvents.length} events
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
