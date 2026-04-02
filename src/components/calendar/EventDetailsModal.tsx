@@ -172,6 +172,20 @@ const getEventNarrative = (event: CalendarEvent) => {
   );
 };
 
+function formatScheduledLabel(scheduledAt: string, fallbackTime: string) {
+  const date = new Date(scheduledAt);
+  if (Number.isNaN(date.getTime())) return fallbackTime;
+
+  return `${date.toLocaleDateString([], {
+    day: "2-digit",
+    month: "short",
+  })} at ${date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })}`;
+}
+
 export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -199,7 +213,9 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     [event],
   );
 
-  const isReleased = safeEvent.actual !== "—";
+  const scheduledDate = useMemo(() => new Date(safeEvent.scheduledAt), [safeEvent.scheduledAt]);
+  const isScheduledDateValid = !Number.isNaN(scheduledDate.getTime());
+  const isReleased = safeEvent.actual !== "—" || (isScheduledDateValid && scheduledDate.getTime() <= Date.now());
 
   const historicalDataByYear = useMemo(() => getHistoricalDataByYear(safeEvent.eventKey), [safeEvent.eventKey]);
 
@@ -215,7 +231,10 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
       return;
     }
 
-    setSelectedYear(availableYears[availableYears.length - 1]);
+    setSelectedYear((current) => {
+      if (current && availableYears.includes(current)) return current;
+      return availableYears[availableYears.length - 1];
+    });
   }, [safeEvent.eventKey, availableYears]);
 
   const historicalData = useMemo(() => {
@@ -306,7 +325,14 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
 
     const scheduledFor = new Date(safeEvent.scheduledAt);
 
-    if (isReleased) {
+    if (Number.isNaN(scheduledFor.getTime())) {
+      toast.error("Unable to schedule alert", {
+        description: "This event does not currently have a valid scheduled time.",
+      });
+      return;
+    }
+
+    if (scheduledFor.getTime() <= Date.now() || safeEvent.actual !== "—") {
       addAlert({
         type: "news",
         title: `${safeEvent.event} (${safeEvent.currency})`,
@@ -329,7 +355,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     scheduleAlert({
       type: "news",
       title: `${safeEvent.event} (${safeEvent.currency})`,
-      message: `Scheduled: ${safeEvent.event} at ${safeEvent.time}`,
+      message: `Scheduled: ${safeEvent.event} at ${formatScheduledLabel(safeEvent.scheduledAt, safeEvent.time)}`,
       severity: safeEvent.impact === "high" ? "high" : "info",
       relatedAsset: safeEvent.currency,
       eventId: safeEvent.id,
@@ -340,7 +366,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     });
 
     toast.success("Alert scheduled", {
-      description: `${safeEvent.event} will notify you at ${safeEvent.time}`,
+      description: `${safeEvent.event} will notify you at ${formatScheduledLabel(safeEvent.scheduledAt, safeEvent.time)}`,
     });
   };
 
@@ -423,13 +449,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <Clock className="h-4 w-4" />
-                  <span>
-                    {new Date(safeEvent.scheduledAt).toLocaleDateString([], {
-                      day: "2-digit",
-                      month: "short",
-                    })}{" "}
-                    at {safeEvent.time}
-                  </span>
+                  <span>{formatScheduledLabel(safeEvent.scheduledAt, safeEvent.time)}</span>
                 </div>
 
                 <div className="flex gap-2 shrink-0">
@@ -575,14 +595,18 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
 
                     <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
                       <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Actual</div>
-                      <div className={`text-2xl font-bold ${isReleased ? "text-primary" : "text-muted-foreground"}`}>
+                      <div
+                        className={`text-2xl font-bold ${safeEvent.actual !== "—" ? "text-primary" : "text-muted-foreground"}`}
+                      >
                         {safeEvent.actual}
                       </div>
                     </div>
 
                     <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
                       <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Deviation</div>
-                      <div className="text-2xl font-bold text-muted-foreground">{isReleased ? "—" : "Pending"}</div>
+                      <div className="text-2xl font-bold text-muted-foreground">
+                        {safeEvent.actual !== "—" ? "—" : "Pending"}
+                      </div>
                     </div>
                   </div>
 
