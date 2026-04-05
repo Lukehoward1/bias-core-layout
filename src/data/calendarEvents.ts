@@ -21,8 +21,8 @@ type CalendarEventTemplate = {
   impact: CalendarImpact;
   time: string;
   recurrence: "weekly" | "monthly";
-  weekday?: number; // 0=Sun ... 6=Sat, mainly for weekly events
-  monthlyWeek?: 1 | 2 | 3 | 4; // nth week of month
+  weekday?: number; // 0=Sun ... 6=Sat
+  monthlyWeek?: 1 | 2 | 3 | 4;
   monthlyWeekday?: number; // 0=Sun ... 6=Sat
   previousValues: string[];
   forecastValues: string[];
