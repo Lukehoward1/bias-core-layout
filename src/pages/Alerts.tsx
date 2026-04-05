@@ -52,13 +52,6 @@ const impactRank = (impact: string) => {
   return 1;
 };
 
-const parseEventTimeToday = (time: string) => {
-  const [hours, minutes] = time.split(":").map(Number);
-  const date = new Date();
-  date.setHours(hours || 0, minutes || 0, 0, 0);
-  return date;
-};
-
 const formatWhenLabel = (date?: Date) => {
   if (!date || Number.isNaN(date.getTime())) return "Scheduled";
 
@@ -146,6 +139,10 @@ const isRecurringAlert = (alert: AlertItem) => {
   return alert.recurrence === "event-series";
 };
 
+function getEventDate(event: CalendarEvent) {
+  return new Date(event.scheduledAt);
+}
+
 export default function Alerts() {
   const [activeTab, setActiveTab] = useState("overview");
   const [showCreatePriceAlert, setShowCreatePriceAlert] = useState(false);
@@ -224,25 +221,24 @@ export default function Alerts() {
   );
 
   const recurringOverviewItems = useMemo(() => {
+    const now = Date.now();
+
     return recurringSubscriptions
       .map((sub) => {
-        const matchedEvent = calendarEvents.find((event) => event.eventKey === sub.key);
-        if (!matchedEvent) return null;
+        const nextMatchingEvent = calendarEvents
+          .filter((event) => event.eventKey === sub.key)
+          .sort((a, b) => getEventDate(a).getTime() - getEventDate(b).getTime())
+          .find((event) => getEventDate(event).getTime() > now);
 
-        const eventDateToday = parseEventTimeToday(matchedEvent.time);
-        const nextRelease = new Date(eventDateToday);
-
-        while (nextRelease.getTime() <= Date.now()) {
-          nextRelease.setMonth(nextRelease.getMonth() + 1);
-        }
+        if (!nextMatchingEvent) return null;
 
         return {
           id: sub.id,
-          title: `${matchedEvent.event} (${matchedEvent.currency})`,
-          currency: matchedEvent.currency,
-          nextRelease,
+          title: `${nextMatchingEvent.event} (${nextMatchingEvent.currency})`,
+          currency: nextMatchingEvent.currency,
+          nextRelease: getEventDate(nextMatchingEvent),
           key: sub.key,
-          eventId: matchedEvent.id,
+          eventId: nextMatchingEvent.id,
         };
       })
       .filter(Boolean)
@@ -339,7 +335,7 @@ export default function Alerts() {
     return [...calendarEvents]
       .map((event) => ({
         ...event,
-        eventDate: parseEventTimeToday(event.time),
+        eventDate: getEventDate(event),
       }))
       .sort((a, b) => {
         const aUpcoming = a.eventDate >= now;
@@ -591,7 +587,15 @@ export default function Alerts() {
                               <span className="text-[11px] text-muted-foreground ml-1">• click to view event</span>
                             </div>
                           </div>
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">{item.time}</span>
+                          <div className="text-right">
+                            <span className="block text-xs text-muted-foreground whitespace-nowrap">
+                              {item.eventDate.toLocaleDateString([], {
+                                day: "2-digit",
+                                month: "short",
+                              })}
+                            </span>
+                            <span className="block text-xs text-muted-foreground whitespace-nowrap">{item.time}</span>
+                          </div>
                         </div>
                       </button>
                     ))}
