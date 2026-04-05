@@ -12,32 +12,22 @@ import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButto
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-import { calendarEvents, keyEvents, getCalendarEventById, type CalendarEvent } from "@/data/calendarEvents";
+import type { CalendarEvent } from "@/data/calendarEvents";
+import {
+  getAllCalendarEvents,
+  getAvailableCalendarCurrencies,
+  getCalendarCounts,
+  getCalendarEventOrNullById,
+  getEventDateLabel,
+  getFilteredCalendarEvents,
+  getNextKeyEvents,
+  type CalendarDateRange,
+  type CalendarSortMode,
+} from "@/services/calendarData";
 
 type ImpactFilter = "all" | "high" | "medium" | "low";
-type DateRangeFilter = "today" | "week" | "month";
 type CurrencyFilter = "all" | string;
-type SortMode = "time" | "impact";
 type VisibleCount = 6 | 10 | 20 | 999;
-
-function isSameDay(dateA: Date, dateB: Date) {
-  return (
-    dateA.getFullYear() === dateB.getFullYear() &&
-    dateA.getMonth() === dateB.getMonth() &&
-    dateA.getDate() === dateB.getDate()
-  );
-}
-
-function startOfDay(date: Date) {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
-}
-
-function parseTimeToMinutes(time: string) {
-  const [hours, minutes] = time.split(":").map(Number);
-  return (hours || 0) * 60 + (minutes || 0);
-}
 
 function Calendar() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -46,10 +36,10 @@ function Calendar() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
 
-  const [dateRange, setDateRange] = useState<DateRangeFilter>("today");
+  const [dateRange, setDateRange] = useState<CalendarDateRange>("today");
   const [impactFilter, setImpactFilter] = useState<ImpactFilter>("high");
   const [currencyFilter, setCurrencyFilter] = useState<CurrencyFilter>("all");
-  const [sortMode, setSortMode] = useState<SortMode>("impact");
+  const [sortMode, setSortMode] = useState<CalendarSortMode>("impact");
   const [visibleCount, setVisibleCount] = useState<VisibleCount>(10);
   const [showAllEvents, setShowAllEvents] = useState(false);
 
@@ -101,87 +91,36 @@ function Calendar() {
     return "secondary";
   };
 
-  const getImpactWeight = (impact: CalendarEvent["impact"]) => {
-    if (impact === "high") return 3;
-    if (impact === "medium") return 2;
-    return 1;
-  };
-
-  const availableCurrencies = useMemo(() => {
-    return Array.from(new Set(calendarEvents.map((event) => event.currency))).sort();
-  }, []);
-
-  const eventMatchesDateRange = useCallback(
-    (event: CalendarEvent) => {
-      const scheduledDate = new Date(event.scheduledAt);
-      const now = new Date();
-
-      if (dateRange === "today") {
-        return isSameDay(scheduledDate, now);
-      }
-
-      const dayStart = startOfDay(now);
-
-      if (dateRange === "week") {
-        const end = new Date(dayStart);
-        end.setDate(end.getDate() + 7);
-        return scheduledDate >= dayStart && scheduledDate < end;
-      }
-
-      const end = new Date(dayStart);
-      end.setDate(end.getDate() + 30);
-      return scheduledDate >= dayStart && scheduledDate < end;
-    },
-    [dateRange],
-  );
-
-  const sortEvents = useCallback(
-    (events: CalendarEvent[]) => {
-      return [...events].sort((a, b) => {
-        if (sortMode === "impact") {
-          const impactDiff = getImpactWeight(b.impact) - getImpactWeight(a.impact);
-          if (impactDiff !== 0) return impactDiff;
-        }
-
-        const aScheduled = new Date(a.scheduledAt).getTime();
-        const bScheduled = new Date(b.scheduledAt).getTime();
-        const dayDiff = aScheduled - bScheduled;
-        if (dayDiff !== 0) return dayDiff;
-
-        return parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time);
-      });
-    },
-    [sortMode],
-  );
+  const allEvents = useMemo(() => getAllCalendarEvents(), []);
+  const availableCurrencies = useMemo(() => getAvailableCalendarCurrencies(), []);
 
   const filteredEvents = useMemo(() => {
-    let events = [...calendarEvents];
-
-    if (impactFilter !== "all") {
-      events = events.filter((event) => event.impact === impactFilter);
-    }
-
-    if (currencyFilter !== "all") {
-      events = events.filter((event) => event.currency === currencyFilter);
-    }
-
-    events = events.filter(eventMatchesDateRange);
-
-    return sortEvents(events);
-  }, [impactFilter, currencyFilter, eventMatchesDateRange, sortEvents]);
+    return getFilteredCalendarEvents({
+      dateRange,
+      impact: impactFilter,
+      currency: currencyFilter,
+      sortMode,
+    });
+  }, [dateRange, impactFilter, currencyFilter, sortMode]);
 
   const filteredKeyEvents = useMemo(() => {
-    const items = keyEvents
-      .map((keyEvent) => getCalendarEventById(keyEvent.id))
-      .filter((event): event is CalendarEvent => Boolean(event))
-      .filter((event) => {
-        if (impactFilter !== "all" && event.impact !== impactFilter) return false;
-        if (currencyFilter !== "all" && event.currency !== currencyFilter) return false;
-        return eventMatchesDateRange(event);
-      });
+    return getNextKeyEvents(4).filter((event) => {
+      if (impactFilter !== "all" && event.impact !== impactFilter) return false;
+      if (currencyFilter !== "all" && event.currency !== currencyFilter) return false;
 
-    return sortEvents(items).slice(0, 4);
-  }, [impactFilter, currencyFilter, eventMatchesDateRange, sortEvents]);
+      if (dateRange === "today") {
+        const eventDate = new Date(event.scheduledAt);
+        const now = new Date();
+        return (
+          eventDate.getFullYear() === now.getFullYear() &&
+          eventDate.getMonth() === now.getMonth() &&
+          eventDate.getDate() === now.getDate()
+        );
+      }
+
+      return true;
+    });
+  }, [dateRange, impactFilter, currencyFilter]);
 
   const visibleEvents = useMemo(() => {
     if (showAllEvents || visibleCount === 999) {
@@ -191,20 +130,13 @@ function Calendar() {
     return filteredEvents.slice(0, visibleCount);
   }, [filteredEvents, showAllEvents, visibleCount]);
 
-  const counts = useMemo(() => {
-    return {
-      total: filteredEvents.length,
-      high: filteredEvents.filter((event) => event.impact === "high").length,
-      medium: filteredEvents.filter((event) => event.impact === "medium").length,
-      low: filteredEvents.filter((event) => event.impact === "low").length,
-    };
-  }, [filteredEvents]);
+  const counts = useMemo(() => getCalendarCounts(filteredEvents), [filteredEvents]);
 
   useEffect(() => {
     const eventId = searchParams.get("eventId");
     if (!eventId) return;
 
-    const match = getCalendarEventById(eventId) ?? null;
+    const match = getCalendarEventOrNullById(eventId);
     if (!match) return;
 
     setHighlightedEventId(match.id);
@@ -239,13 +171,7 @@ function Calendar() {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Select
-                value={dateRange}
-                onValueChange={(value) => {
-                  setDateRange(value as DateRangeFilter);
-                  setShowAllEvents(false);
-                }}
-              >
+              <Select value={dateRange} onValueChange={(value) => setDateRange(value as CalendarDateRange)}>
                 <SelectTrigger className="w-[160px] h-9">
                   <SelectValue placeholder="Date Range" />
                 </SelectTrigger>
@@ -256,13 +182,7 @@ function Calendar() {
                 </SelectContent>
               </Select>
 
-              <Select
-                value={impactFilter}
-                onValueChange={(value) => {
-                  setImpactFilter(value as ImpactFilter);
-                  setShowAllEvents(false);
-                }}
-              >
+              <Select value={impactFilter} onValueChange={(value) => setImpactFilter(value as ImpactFilter)}>
                 <SelectTrigger className="w-[160px] h-9">
                   <SelectValue placeholder="Impact" />
                 </SelectTrigger>
@@ -274,13 +194,7 @@ function Calendar() {
                 </SelectContent>
               </Select>
 
-              <Select
-                value={currencyFilter}
-                onValueChange={(value) => {
-                  setCurrencyFilter(value as CurrencyFilter);
-                  setShowAllEvents(false);
-                }}
-              >
+              <Select value={currencyFilter} onValueChange={(value) => setCurrencyFilter(value as CurrencyFilter)}>
                 <SelectTrigger className="w-[160px] h-9">
                   <SelectValue placeholder="Currency" />
                 </SelectTrigger>
@@ -294,7 +208,7 @@ function Calendar() {
                 </SelectContent>
               </Select>
 
-              <Select value={sortMode} onValueChange={(value) => setSortMode(value as SortMode)}>
+              <Select value={sortMode} onValueChange={(value) => setSortMode(value as CalendarSortMode)}>
                 <SelectTrigger className="w-[160px] h-9">
                   <SelectValue placeholder="Sort By" />
                 </SelectTrigger>
@@ -308,9 +222,7 @@ function Calendar() {
                 value={String(visibleCount)}
                 onValueChange={(value) => {
                   setVisibleCount(Number(value) as VisibleCount);
-                  if (value !== "999") {
-                    setShowAllEvents(false);
-                  }
+                  if (value !== "999") setShowAllEvents(false);
                 }}
               >
                 <SelectTrigger className="w-[120px] h-9">
@@ -378,7 +290,7 @@ function Calendar() {
                 No key events match the selected filters.
               </div>
             ) : (
-              filteredKeyEvents.map((event) => (
+              filteredKeyEvents.slice(0, 4).map((event) => (
                 <button
                   key={event.id}
                   type="button"
@@ -413,17 +325,11 @@ function Calendar() {
               <CardTitle>Calendar</CardTitle>
             </div>
 
-            {(showAllEvents || (filteredEvents.length > visibleEvents.length && visibleCount !== 999)) && (
+            {filteredEvents.length > visibleEvents.length && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  if (showAllEvents) {
-                    setShowAllEvents(false);
-                  } else {
-                    setShowAllEvents(true);
-                  }
-                }}
+                onClick={() => setShowAllEvents((prev) => !prev)}
                 className="shrink-0"
               >
                 {showAllEvents ? (
@@ -475,10 +381,7 @@ function Calendar() {
                       )}
                     >
                       <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
-                        {new Date(event.scheduledAt).toLocaleDateString([], {
-                          day: "2-digit",
-                          month: "short",
-                        })}
+                        {getEventDateLabel(event)}
                       </td>
 
                       <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.time}</td>
@@ -516,17 +419,6 @@ function Calendar() {
                 </Button>
               </div>
             )}
-
-            {showAllEvents &&
-              filteredEvents.length > (visibleCount === 999 ? 0 : visibleCount) &&
-              visibleCount !== 999 && (
-                <div className="flex justify-center pt-4">
-                  <Button variant="outline" onClick={() => setShowAllEvents(false)}>
-                    <ChevronUp className="h-4 w-4 mr-2" />
-                    Show less
-                  </Button>
-                </div>
-              )}
           </CardContent>
         </Card>
       </div>
