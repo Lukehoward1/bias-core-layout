@@ -68,16 +68,8 @@ export function getAvailableCalendarCurrencies(): string[] {
   return Array.from(new Set(calendarEvents.map((event) => event.currency))).sort();
 }
 
-export function filterCalendarEvents(
-  events: CalendarEvent[],
-  filters: CalendarFilters = {},
-): CalendarEvent[] {
-  const {
-    dateRange = "today",
-    impact = "all",
-    currency = "all",
-    sortMode = "impact",
-  } = filters;
+export function filterCalendarEvents(events: CalendarEvent[], filters: CalendarFilters = {}): CalendarEvent[] {
+  const { dateRange = "today", impact = "all", currency = "all", sortMode = "impact" } = filters;
 
   let next = [...events];
 
@@ -241,6 +233,23 @@ export function getEventTimeLabel(event: CalendarEvent): string {
 
 export function getEventDateTime(event: CalendarEvent): Date {
   return getEventDate(event);
+}
+
+export function formatCalendarEventDateLabel(event: CalendarEvent): string {
+  const date = getEventDate(event);
+
+  if (!isValidDate(date)) {
+    return event.time;
+  }
+
+  return `${date.toLocaleDateString([], {
+    day: "2-digit",
+    month: "short",
+  })} at ${date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })}`;
 }
 
 export function getCalendarEventOrNullById(id: string): CalendarEvent | null {
