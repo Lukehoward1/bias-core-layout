@@ -10,11 +10,16 @@ import { Star, TrendingUp, TrendingDown, Minus, Activity, AlertTriangle, Clock, 
 import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
 import { useMarketQuote } from "@/hooks/use-market-quotes";
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
-import { calendarEvents, sortCalendarEventsByImpact, type CalendarEvent } from "@/data/calendarEvents";
 import { toast } from "sonner";
 
 import { getEventImpact } from "@/data/eventImpactRules";
 import { getFormattedMarketChange } from "@/services/marketData";
+import {
+  getAllCalendarEvents,
+  getEventDateTime,
+  formatCalendarEventDateLabel,
+  type CalendarEvent,
+} from "@/services/calendarData";
 
 /* =======================
    DATA (demo placeholders)
@@ -75,19 +80,6 @@ const keyLevels = [
   { type: "Trendline", price: "—", notes: "Uptrend intact" },
 ];
 
-const upcomingNews = [
-  { time: "13:30", event: "USD CPI m/m", impact: "High", forecast: "0.3%", previous: "0.2%", actual: "—" },
-  { time: "15:00", event: "USD Core CPI y/y", impact: "High", forecast: "3.8%", previous: "3.9%", actual: "—" },
-  {
-    time: "15:30",
-    event: "USD Unemployment Claims",
-    impact: "Medium",
-    forecast: "220K",
-    previous: "218K",
-    actual: "—",
-  },
-];
-
 const sessionInsights = [
   { session: "London Open", volatility: "High", description: "Strong directional moves expected" },
   { session: "New York Open", volatility: "Medium", description: "Continuation or reversal likely" },
@@ -122,31 +114,6 @@ const toPillImpact = (impact: CalendarEvent["impact"]): "High" | "Medium" | "Low
   return "Low";
 };
 
-const sortRelevantEvents = (events: CalendarEvent[]) => {
-  return sortCalendarEventsByImpact(events).sort((a, b) => {
-    if (a.impact !== b.impact) return 0;
-    return a.time.localeCompare(b.time);
-  });
-};
-
-const isEventRelevantToSymbol = (symbol: string, event: CalendarEvent) => {
-  const normalizedSymbol = normalizeMarketSymbol(symbol);
-  const impact = getEventImpact({
-    title: event.event,
-    currency: event.currency,
-  });
-
-  if (impact.affectedPairs.includes(normalizedSymbol)) return true;
-  if (impact.affectedAssets.includes(normalizedSymbol)) return true;
-
-  if (isFxPairSymbol(normalizedSymbol)) {
-    const pairCurrencies = getFxCurrencies(normalizedSymbol);
-    return pairCurrencies.some((currency) => impact.affectedCurrencies.includes(currency));
-  }
-
-  return false;
-};
-
 const parseNewsTimeToHHMM = (timeStr: string) => {
   const match = timeStr.match(/(\d{1,2}:\d{2})/);
   if (!match) return null;
@@ -178,6 +145,58 @@ function formatBiasModeLabel(mode?: string) {
   return "Intraday";
 }
 
+function sortEventsByImpactThenTime(events: CalendarEvent[]) {
+  const impactValue = (impact: CalendarEvent["impact"]) => {
+    if (impact === "high") return 3;
+    if (impact === "medium") return 2;
+    return 1;
+  };
+
+  return [...events].sort((a, b) => {
+    const impactDiff = impactValue(b.impact) - impactValue(a.impact);
+    if (impactDiff !== 0) return impactDiff;
+    return getEventDateTime(a).getTime() - getEventDateTime(b).getTime();
+  });
+}
+
+const isEventRelevantToSymbol = (symbol: string, event: CalendarEvent) => {
+  const normalizedSymbol = normalizeMarketSymbol(symbol);
+  const impact = getEventImpact({
+    title: event.event,
+    currency: event.currency,
+  });
+
+  if (impact.affectedPairs.includes(normalizedSymbol)) return true;
+  if (impact.affectedAssets.includes(normalizedSymbol)) return true;
+
+  if (isFxPairSymbol(normalizedSymbol)) {
+    const pairCurrencies = getFxCurrencies(normalizedSymbol);
+    return pairCurrencies.some((currency) => impact.affectedCurrencies.includes(currency));
+  }
+
+  return false;
+};
+
+const formatTimeUntil = (date: Date) => {
+  if (Number.isNaN(date.getTime())) return null;
+
+  const now = Date.now();
+  const diffMs = date.getTime() - now;
+
+  if (diffMs <= 0) return "due now";
+
+  const diffMins = Math.ceil(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const mins = diffMins % 60;
+
+  if (diffHours <= 0) return `in ${diffMins}m`;
+  if (diffHours < 24) return `in ${diffHours}h ${mins}m`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  const remHours = diffHours % 24;
+  return `in ${diffDays}d ${remHours}h`;
+};
+
 /* =======================
    REUSABLE CONTENT
 ======================= */
@@ -196,6 +215,8 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
   const [newsExpanded, setNewsExpanded] = useState(false);
 
   const quote = useMarketQuote(symbol);
+
+  const allCalendarEvents = useMemo(() => getAllCalendarEvents(), []);
 
   const handleToggleWatchlist = () => {
     toggleWatchlist(symbol);
@@ -218,13 +239,40 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
   const relevantCalendarEvents = useMemo(() => {
     if (!symbol) return [];
-    return sortRelevantEvents(calendarEvents.filter((event) => isEventRelevantToSymbol(symbol, event)));
-  }, [symbol]);
+
+    return sortEventsByImpactThenTime(allCalendarEvents.filter((event) => isEventRelevantToSymbol(symbol, event)));
+  }, [symbol, allCalendarEvents]);
+
+  const upcomingRelevantCalendarEvents = useMemo(() => {
+    const now = Date.now();
+
+    return relevantCalendarEvents
+      .filter((event) => {
+        const time = getEventDateTime(event).getTime();
+        return !Number.isNaN(time) && time >= now;
+      })
+      .sort((a, b) => getEventDateTime(a).getTime() - getEventDateTime(b).getTime());
+  }, [relevantCalendarEvents]);
+
+  const nextHighImpactEvent = useMemo(() => {
+    return upcomingRelevantCalendarEvents.find((event) => event.impact === "high") ?? null;
+  }, [upcomingRelevantCalendarEvents]);
+
+  const highImpactEventsNext4Hours = useMemo(() => {
+    const now = Date.now();
+    const fourHoursFromNow = now + 4 * 60 * 60 * 1000;
+
+    return upcomingRelevantCalendarEvents.filter((event) => {
+      if (event.impact !== "high") return false;
+      const time = getEventDateTime(event).getTime();
+      return !Number.isNaN(time) && time >= now && time <= fourHoursFromNow;
+    });
+  }, [upcomingRelevantCalendarEvents]);
 
   const newsImpactPills: NewsPill[] = useMemo(() => {
     if (!symbol) return [];
 
-    const fromCalendar: NewsPill[] = relevantCalendarEvents.map((event) => ({
+    const fromCalendar: NewsPill[] = upcomingRelevantCalendarEvents.map((event) => ({
       key: `cal-${event.id}`,
       event: event.event,
       time: `${event.time} GMT`,
@@ -258,7 +306,11 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
     }
 
     return filtered;
-  }, [symbol, relevantCalendarEvents, showAllRelevantNews]);
+  }, [symbol, upcomingRelevantCalendarEvents, showAllRelevantNews]);
+
+  const upcomingNewsItems = useMemo(() => {
+    return upcomingRelevantCalendarEvents.slice(0, 3);
+  }, [upcomingRelevantCalendarEvents]);
 
   const openCalendarOverlayFromNewsPill = useCallback(
     (pill: NewsPill) => {
@@ -406,7 +458,10 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
                         <button
                           type="button"
-                          onClick={() => setShowAllRelevantNews((v) => !v)}
+                          onClick={() => {
+                            setShowAllRelevantNews((v) => !v);
+                            setNewsExpanded(false);
+                          }}
                           className="text-xs text-primary hover:underline"
                         >
                           {showAllRelevantNews ? "Show high impact only" : "Show all relevant"}
@@ -555,14 +610,70 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                 with {asset.biasConfidence}% confidence based on our multi-timeframe analysis.
               </p>
 
-              <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-destructive">
-                    <strong>Warning:</strong> High-impact news events scheduled within the next 4 hours.
-                  </p>
+              {highImpactEventsNext4Hours.length > 0 ? (
+                <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-destructive">
+                      <p>
+                        <strong>Warning:</strong> {highImpactEventsNext4Hours.length} high-impact news event
+                        {highImpactEventsNext4Hours.length > 1 ? "s are" : " is"} scheduled within the next 4 hours.
+                      </p>
+
+                      <div className="mt-2 space-y-1">
+                        {highImpactEventsNext4Hours.slice(0, 2).map((event) => (
+                          <button
+                            key={event.id}
+                            type="button"
+                            onPointerDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              openCalendarEvent(event);
+                            }}
+                            className="block text-left underline-offset-2 hover:underline"
+                          >
+                            {event.event} — {formatTimeUntil(getEventDateTime(event))}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : nextHighImpactEvent ? (
+                <div className="mt-4 p-4 bg-warning/10 border border-warning/20 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <Clock className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-warning">
+                      <p>
+                        <strong>Heads up:</strong> Next high-impact event is{" "}
+                        <strong>{nextHighImpactEvent.event}</strong>{" "}
+                        {formatTimeUntil(getEventDateTime(nextHighImpactEvent))}.
+                      </p>
+
+                      <button
+                        type="button"
+                        onPointerDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          openCalendarEvent(nextHighImpactEvent);
+                        }}
+                        className="mt-2 text-left underline-offset-2 hover:underline"
+                      >
+                        View event details
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 p-4 bg-muted/30 border border-border rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-muted-foreground">
+                      No relevant high-impact calendar events are currently scheduled.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -632,59 +743,49 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {upcomingNews.map((news, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-
-                      const matched = relevantCalendarEvents.find((event) => {
-                        const sameTime = event.time === news.time;
-                        const sameImpact = toPillImpact(event.impact) === news.impact;
-                        const titleA = event.event.toLowerCase();
-                        const titleB = news.event.toLowerCase();
-                        return (
-                          sameTime &&
-                          (titleA === titleB || titleA.includes(titleB) || titleB.includes(titleA) || sameImpact)
-                        );
-                      });
-
-                      if (!matched) {
-                        toast.error("No matching calendar event found for this news item yet.");
-                        return;
-                      }
-
-                      openCalendarEvent(matched);
-                    }}
-                    className="w-full text-left p-2 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-muted-foreground">{news.time}</span>
-                      <Badge variant={news.impact === "High" ? "destructive" : "default"} className="text-[10px]">
-                        {news.impact}
-                      </Badge>
-                    </div>
-                    <p className="text-sm font-medium text-foreground mb-1">{news.event}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>F: {news.forecast}</span>
-                      <span>P: {news.previous}</span>
-                      <span>A: {news.actual}</span>
-                    </div>
-                  </button>
-                ))}
+                {upcomingNewsItems.length === 0 ? (
+                  <div className="p-3 bg-muted/30 rounded-lg">
+                    <p className="text-sm text-muted-foreground">No relevant upcoming calendar events found.</p>
+                  </div>
+                ) : (
+                  upcomingNewsItems.map((news) => (
+                    <button
+                      key={news.id}
+                      type="button"
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openCalendarEvent(news);
+                      }}
+                      className="w-full text-left p-2 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-muted-foreground">{formatCalendarEventDateLabel(news)}</span>
+                        <Badge
+                          variant={
+                            news.impact === "high" ? "destructive" : news.impact === "medium" ? "default" : "secondary"
+                          }
+                          className="text-[10px]"
+                        >
+                          {toPillImpact(news.impact)}
+                        </Badge>
+                      </div>
+                      <p className="text-sm font-medium text-foreground mb-1">{news.event}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>F: {news.forecast}</span>
+                        <span>P: {news.previous}</span>
+                        <span>A: {news.actual}</span>
+                      </div>
+                    </button>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
 
-      <EventDetailsModal
-        event={selectedCalendarEvent as any}
-        isOpen={isEventModalOpen}
-        onClose={closeCalendarOverlay}
-      />
+      <EventDetailsModal event={selectedCalendarEvent} isOpen={isEventModalOpen} onClose={closeCalendarOverlay} />
     </>
   );
 }
