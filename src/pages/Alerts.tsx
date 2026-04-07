@@ -903,7 +903,6 @@ export default function Alerts() {
                   onMarkAllRead={markAllRead}
                   onDelete={deleteAlert}
                   onClearAll={clearAllAlerts}
-                  onOpenCalendarEvent={openCalendarEventById}
                   onOpenAlertItem={openGenericAlert}
                 />
               </div>
