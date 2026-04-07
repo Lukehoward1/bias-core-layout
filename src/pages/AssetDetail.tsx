@@ -14,12 +14,9 @@ import { toast } from "sonner";
 
 import { getEventImpact } from "@/data/eventImpactRules";
 import { getFormattedMarketChange } from "@/services/marketData";
-import {
-  getAllCalendarEvents,
-  getEventDateTime,
-  formatCalendarEventDateLabel,
-  type CalendarEvent,
-} from "@/services/calendarData";
+import type { CalendarEvent } from "@/data/calendarEvents";
+
+import { getAllCalendarEvents, getEventDateTime, formatCalendarEventDateLabel } from "@/services/calendarData";
 
 /* =======================
    DATA (demo placeholders)
