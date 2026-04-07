@@ -41,7 +41,7 @@ export function AlertInbox({
   onMarkAllRead,
   onDelete,
   onClearAll,
-  onOpenCalendarEvent,
+  onOpenCalendarEvent: _onOpenCalendarEvent,
   onOpenAlertItem,
 }: AlertInboxProps) {
   const navigate = useNavigate();
@@ -168,6 +168,11 @@ export function AlertInbox({
           return "/markets";
 
         case "news":
+          if (alert.eventId) {
+            return `/calendar?eventId=${encodeURIComponent(alert.eventId)}`;
+          }
+          return "/calendar";
+
         case "summary":
         case "breaking":
           if (alert.eventId) {
@@ -200,11 +205,6 @@ export function AlertInbox({
     (alert: AlertItem) => {
       onMarkRead(alert.id);
 
-      if (alert.eventId && onOpenCalendarEvent) {
-        onOpenCalendarEvent(alert.eventId);
-        return;
-      }
-
       if (onOpenAlertItem && (alert.type === "breaking" || alert.type === "summary" || alert.type === "session")) {
         onOpenAlertItem(alert);
         return;
@@ -215,7 +215,7 @@ export function AlertInbox({
         navigateWithModalSupport(target);
       }
     },
-    [onMarkRead, onOpenCalendarEvent, onOpenAlertItem, buildNavigateTarget, navigateWithModalSupport],
+    [onMarkRead, onOpenAlertItem, buildNavigateTarget, navigateWithModalSupport],
   );
 
   return (
@@ -274,7 +274,6 @@ export function AlertInbox({
                     const target = buildNavigateTarget(alert);
                     const isClickable = Boolean(
                       target ||
-                      (alert.eventId && onOpenCalendarEvent) ||
                       ((alert.type === "breaking" || alert.type === "summary" || alert.type === "session") &&
                         onOpenAlertItem),
                     );
