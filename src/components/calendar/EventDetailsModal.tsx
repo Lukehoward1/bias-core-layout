@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useAssets } from "@/hooks/use-watchlist";
 import { useAlertsContext } from "@/contexts/AlertsContext";
 import type { CalendarEvent } from "@/data/calendarEvents";
+import { getEventDateTime, formatCalendarEventDateLabel } from "@/services/calendarData";
 
 import {
   TrendingUp,
@@ -172,20 +173,6 @@ const getEventNarrative = (event: CalendarEvent) => {
   );
 };
 
-function formatScheduledLabel(scheduledAt: string, fallbackTime: string) {
-  const date = new Date(scheduledAt);
-  if (Number.isNaN(date.getTime())) return fallbackTime;
-
-  return `${date.toLocaleDateString([], {
-    day: "2-digit",
-    month: "short",
-  })} at ${date.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  })}`;
-}
-
 export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -213,9 +200,9 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     [event],
   );
 
-  const scheduledDate = useMemo(() => new Date(safeEvent.scheduledAt), [safeEvent.scheduledAt]);
-  const isScheduledDateValid = !Number.isNaN(scheduledDate.getTime());
-  const isReleased = safeEvent.actual !== "—" || (isScheduledDateValid && scheduledDate.getTime() <= Date.now());
+  const eventDateTime = useMemo(() => getEventDateTime(safeEvent), [safeEvent]);
+  const isValidEventDate = !Number.isNaN(eventDateTime.getTime());
+  const isReleased = safeEvent.actual !== "—" || (isValidEventDate && eventDateTime.getTime() <= Date.now());
 
   const historicalDataByYear = useMemo(() => getHistoricalDataByYear(safeEvent.eventKey), [safeEvent.eventKey]);
 
@@ -323,16 +310,14 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
       return;
     }
 
-    const scheduledFor = new Date(safeEvent.scheduledAt);
-
-    if (Number.isNaN(scheduledFor.getTime())) {
+    if (!isValidEventDate) {
       toast.error("Unable to schedule alert", {
         description: "This event does not currently have a valid scheduled time.",
       });
       return;
     }
 
-    if (scheduledFor.getTime() <= Date.now() || safeEvent.actual !== "—") {
+    if (eventDateTime.getTime() <= Date.now() || safeEvent.actual !== "—") {
       addAlert({
         type: "news",
         title: `${safeEvent.event} (${safeEvent.currency})`,
@@ -355,18 +340,18 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
     scheduleAlert({
       type: "news",
       title: `${safeEvent.event} (${safeEvent.currency})`,
-      message: `Scheduled: ${safeEvent.event} at ${formatScheduledLabel(safeEvent.scheduledAt, safeEvent.time)}`,
+      message: `Scheduled: ${safeEvent.event} at ${formatCalendarEventDateLabel(safeEvent)}`,
       severity: safeEvent.impact === "high" ? "high" : "info",
       relatedAsset: safeEvent.currency,
       eventId: safeEvent.id,
       routeTo: "/calendar",
-      scheduledFor,
+      scheduledFor: eventDateTime,
       recurrence: "once",
       recurrenceKey: safeEvent.eventKey,
     });
 
     toast.success("Alert scheduled", {
-      description: `${safeEvent.event} will notify you at ${formatScheduledLabel(safeEvent.scheduledAt, safeEvent.time)}`,
+      description: `${safeEvent.event} will notify you at ${formatCalendarEventDateLabel(safeEvent)}`,
     });
   };
 
@@ -449,7 +434,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <Clock className="h-4 w-4" />
-                  <span>{formatScheduledLabel(safeEvent.scheduledAt, safeEvent.time)}</span>
+                  <span>{formatCalendarEventDateLabel(safeEvent)}</span>
                 </div>
 
                 <div className="flex gap-2 shrink-0">
