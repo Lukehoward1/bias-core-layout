@@ -4,7 +4,7 @@ import { defaultAlertPreferences } from "@/types/alerts";
 import { useWatchlist } from "@/hooks/use-watchlist";
 import { useMarketQuotes } from "@/hooks/use-market-quotes";
 import { normalizeSymbol } from "@/services/marketData";
-import { calendarEvents } from "@/data/calendarEvents";
+import { getAllCalendarEvents, getEventDateTime, getNextEventByEventKey } from "@/services/calendarData";
 
 interface ScheduleAlertInput extends Omit<AlertItem, "id" | "timestamp" | "read" | "status" | "triggeredAt"> {
   scheduledFor: Date;
@@ -141,23 +141,6 @@ const parseStoredRecurringSubscription = (item: any): RecurringSubscription => {
   };
 };
 
-function formatEventScheduleLabel(scheduledAt: string, fallbackTime: string) {
-  const date = new Date(scheduledAt);
-
-  if (Number.isNaN(date.getTime())) {
-    return fallbackTime;
-  }
-
-  return `${date.toLocaleDateString([], {
-    day: "2-digit",
-    month: "short",
-  })} at ${date.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  })}`;
-}
-
 export function AlertsProvider({ children }: { children: React.ReactNode }) {
   const { watchlist, watchlistCurrencies } = useWatchlist();
 
@@ -173,6 +156,8 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
 
   const lastAlertIdRef = useRef<string | null>(null);
   const closeConfirmRef = useRef<Record<string, number>>({});
+
+  const allCalendarEvents = useMemo(() => getAllCalendarEvents(), []);
 
   const activePriceAlertSymbols = useMemo(() => {
     return Array.from(
@@ -451,12 +436,11 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     const newAlerts: AlertItem[] = [];
 
     recurringSubscriptions.forEach((sub) => {
-      const nextMatchingEvent = calendarEvents
-        .filter((event) => event.eventKey === sub.key)
-        .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
-        .find((event) => new Date(event.scheduledAt).getTime() <= now);
-
+      const nextMatchingEvent = getNextEventByEventKey(sub.key);
       if (!nextMatchingEvent) return;
+
+      const eventTime = getEventDateTime(nextMatchingEvent).getTime();
+      if (Number.isNaN(eventTime) || eventTime > now) return;
 
       const alreadyTriggeredForEvent = alerts.some(
         (alert) =>
