@@ -32,7 +32,13 @@ import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButto
 import { toast } from "sonner";
 
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
-import { calendarEvents } from "@/data/calendarEvents";
+import type { CalendarEvent } from "@/data/calendarEvents";
+import {
+  getAllCalendarEvents,
+  getEventDateTime,
+  getNextEventByEventKey,
+  getUpcomingCalendarEvents,
+} from "@/services/calendarData";
 
 import type { AlertItem, PriceAlert } from "@/types/alerts";
 
@@ -42,15 +48,6 @@ const sessions = [
   { name: "London", status: "closed", time: "Opens in 2:15:30", accent: "#F4D35E", region: "European Markets" },
   { name: "New York", status: "closed", time: "Opens in 5:45:12", accent: "#F77F00", region: "US Markets" },
 ];
-
-type CalendarEvent = (typeof calendarEvents)[0];
-
-const impactRank = (impact: string) => {
-  const value = (impact || "").toLowerCase();
-  if (value === "high") return 3;
-  if (value === "medium") return 2;
-  return 1;
-};
 
 const formatWhenLabel = (date?: Date) => {
   if (!date || Number.isNaN(date.getTime())) return "Scheduled";
@@ -139,10 +136,6 @@ const isRecurringAlert = (alert: AlertItem) => {
   return alert.recurrence === "event-series";
 };
 
-function getEventDate(event: CalendarEvent) {
-  return new Date(event.scheduledAt);
-}
-
 export default function Alerts() {
   const [activeTab, setActiveTab] = useState("overview");
   const [showCreatePriceAlert, setShowCreatePriceAlert] = useState(false);
@@ -178,6 +171,8 @@ export default function Alerts() {
   const isSessionTimersAdded = isCardOnDashboard(sessionTimersCardId);
   const isMyAlertsTimersAdded = isCardOnDashboard(myAlertsTimersCardId);
   const isPriceAlertsAdded = isCardOnDashboard(priceAlertsCardId);
+
+  const allCalendarEvents = useMemo(() => getAllCalendarEvents(), []);
 
   const handleAddCard = (cardId: string) => {
     addCard(cardId);
@@ -221,24 +216,18 @@ export default function Alerts() {
   );
 
   const recurringOverviewItems = useMemo(() => {
-    const now = Date.now();
-
     return recurringSubscriptions
       .map((sub) => {
-        const nextMatchingEvent = calendarEvents
-          .filter((event) => event.eventKey === sub.key)
-          .sort((a, b) => getEventDate(a).getTime() - getEventDate(b).getTime())
-          .find((event) => getEventDate(event).getTime() > now);
-
-        if (!nextMatchingEvent) return null;
+        const matchedEvent = getNextEventByEventKey(sub.key);
+        if (!matchedEvent) return null;
 
         return {
           id: sub.id,
-          title: `${nextMatchingEvent.event} (${nextMatchingEvent.currency})`,
-          currency: nextMatchingEvent.currency,
-          nextRelease: getEventDate(nextMatchingEvent),
+          title: `${matchedEvent.event} (${matchedEvent.currency})`,
+          currency: matchedEvent.currency,
+          nextRelease: getEventDateTime(matchedEvent),
           key: sub.key,
-          eventId: nextMatchingEvent.id,
+          eventId: matchedEvent.id,
         };
       })
       .filter(Boolean)
@@ -329,33 +318,7 @@ export default function Alerts() {
     return [...recurringRows, ...scheduledRows, ...liveRows, ...priceRows];
   }, [recurringOverviewItems, oneTimeScheduledAlerts, liveNonPriceAlerts, overviewActivePriceAlerts]);
 
-  const topNewsEvents = useMemo(() => {
-    const now = new Date();
-
-    return [...calendarEvents]
-      .map((event) => ({
-        ...event,
-        eventDate: getEventDate(event),
-      }))
-      .sort((a, b) => {
-        const aUpcoming = a.eventDate >= now;
-        const bUpcoming = b.eventDate >= now;
-
-        if (aUpcoming !== bUpcoming) {
-          return aUpcoming ? -1 : 1;
-        }
-
-        const impactDiff = impactRank(b.impact) - impactRank(a.impact);
-        if (impactDiff !== 0) {
-          return impactDiff;
-        }
-
-        const aDistance = Math.abs(a.eventDate.getTime() - now.getTime());
-        const bDistance = Math.abs(b.eventDate.getTime() - now.getTime());
-        return aDistance - bDistance;
-      })
-      .slice(0, 5);
-  }, []);
+  const topNewsEvents = useMemo(() => getUpcomingCalendarEvents(5), []);
 
   const openCalendarEvent = useCallback((event: CalendarEvent) => {
     setIsAlertModalOpen(false);
@@ -371,11 +334,11 @@ export default function Alerts() {
 
   const openCalendarEventById = useCallback(
     (eventId: string) => {
-      const matchedEvent = calendarEvents.find((event) => event.id === eventId);
+      const matchedEvent = allCalendarEvents.find((event) => event.id === eventId);
       if (!matchedEvent) return;
       openCalendarEvent(matchedEvent);
     },
-    [openCalendarEvent],
+    [allCalendarEvents, openCalendarEvent],
   );
 
   const openGenericAlert = useCallback((alert: AlertItem) => {
@@ -589,7 +552,7 @@ export default function Alerts() {
                           </div>
                           <div className="text-right">
                             <span className="block text-xs text-muted-foreground whitespace-nowrap">
-                              {item.eventDate.toLocaleDateString([], {
+                              {getEventDateTime(item).toLocaleDateString([], {
                                 day: "2-digit",
                                 month: "short",
                               })}
