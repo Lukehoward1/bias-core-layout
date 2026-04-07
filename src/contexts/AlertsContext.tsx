@@ -4,7 +4,7 @@ import { defaultAlertPreferences } from "@/types/alerts";
 import { useWatchlist } from "@/hooks/use-watchlist";
 import { useMarketQuotes } from "@/hooks/use-market-quotes";
 import { normalizeSymbol } from "@/services/marketData";
-import { getAllCalendarEvents, getEventDateTime, getNextEventByEventKey } from "@/services/calendarData";
+import { getAllCalendarEvents, getEventDateTime } from "@/services/calendarData";
 
 interface ScheduleAlertInput extends Omit<AlertItem, "id" | "timestamp" | "read" | "status" | "triggeredAt"> {
   scheduledFor: Date;
@@ -436,17 +436,24 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
     const newAlerts: AlertItem[] = [];
 
     recurringSubscriptions.forEach((sub) => {
-      const nextMatchingEvent = getNextEventByEventKey(sub.key);
-      if (!nextMatchingEvent) return;
+      const matchingEvents = allCalendarEvents
+        .filter((event) => event.eventKey === sub.key)
+        .sort((a, b) => getEventDateTime(a).getTime() - getEventDateTime(b).getTime());
 
-      const eventTime = getEventDateTime(nextMatchingEvent).getTime();
-      if (Number.isNaN(eventTime) || eventTime > now) return;
+      if (matchingEvents.length === 0) return;
+
+      const dueEvent = [...matchingEvents].reverse().find((event) => {
+        const eventTime = getEventDateTime(event).getTime();
+        return !Number.isNaN(eventTime) && eventTime <= now;
+      });
+
+      if (!dueEvent) return;
 
       const alreadyTriggeredForEvent = alerts.some(
         (alert) =>
           alert.recurrence === "event-series" &&
           alert.recurrenceKey === sub.key &&
-          alert.eventId === nextMatchingEvent.id &&
+          alert.eventId === dueEvent.id &&
           alert.status === "triggered",
       );
 
@@ -455,16 +462,16 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
       newAlerts.push({
         id: createId(),
         type: "news",
-        title: `${nextMatchingEvent.event} (${nextMatchingEvent.currency})`,
-        message: `${nextMatchingEvent.event} is due now.`,
+        title: `${dueEvent.event} (${dueEvent.currency})`,
+        message: `${dueEvent.event} is due now.`,
         timestamp: new Date(),
         read: false,
-        severity: nextMatchingEvent.impact === "high" ? "high" : "info",
+        severity: dueEvent.impact === "high" ? "high" : "info",
         status: "triggered",
         triggeredAt: new Date(),
-        relatedAsset: nextMatchingEvent.currency,
+        relatedAsset: dueEvent.currency,
         routeTo: "/calendar",
-        eventId: nextMatchingEvent.id,
+        eventId: dueEvent.id,
         recurrence: "event-series",
         recurrenceKey: sub.key,
       });
@@ -482,7 +489,7 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
         toastTriggeredAlert(alert);
       });
     }
-  }, [recurringSubscriptions, alerts, preferences.soundEnabled, isQuietHours, timeTick]);
+  }, [recurringSubscriptions, alerts, preferences.soundEnabled, isQuietHours, timeTick, allCalendarEvents]);
 
   useEffect(() => {
     if (priceAlerts.length === 0) return;
