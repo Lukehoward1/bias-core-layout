@@ -41,7 +41,7 @@ export function AlertInbox({
   onMarkAllRead,
   onDelete,
   onClearAll,
-  onOpenCalendarEvent: _onOpenCalendarEvent,
+  onOpenCalendarEvent,
   onOpenAlertItem,
 }: AlertInboxProps) {
   const navigate = useNavigate();
@@ -168,11 +168,6 @@ export function AlertInbox({
           return "/markets";
 
         case "news":
-          if (alert.eventId) {
-            return `/calendar?eventId=${encodeURIComponent(alert.eventId)}`;
-          }
-          return "/calendar";
-
         case "summary":
         case "breaking":
           if (alert.eventId) {
@@ -205,6 +200,11 @@ export function AlertInbox({
     (alert: AlertItem) => {
       onMarkRead(alert.id);
 
+      if (alert.eventId && onOpenCalendarEvent) {
+        onOpenCalendarEvent(alert.eventId);
+        return;
+      }
+
       if (onOpenAlertItem && (alert.type === "breaking" || alert.type === "summary" || alert.type === "session")) {
         onOpenAlertItem(alert);
         return;
@@ -215,7 +215,7 @@ export function AlertInbox({
         navigateWithModalSupport(target);
       }
     },
-    [onMarkRead, onOpenAlertItem, buildNavigateTarget, navigateWithModalSupport],
+    [onMarkRead, onOpenCalendarEvent, onOpenAlertItem, buildNavigateTarget, navigateWithModalSupport],
   );
 
   return (
@@ -274,6 +274,7 @@ export function AlertInbox({
                     const target = buildNavigateTarget(alert);
                     const isClickable = Boolean(
                       target ||
+                      (alert.eventId && onOpenCalendarEvent) ||
                       ((alert.type === "breaking" || alert.type === "summary" || alert.type === "session") &&
                         onOpenAlertItem),
                     );
@@ -281,25 +282,11 @@ export function AlertInbox({
                     return (
                       <div
                         key={alert.id}
-                        role={isClickable ? "button" : undefined}
-                        tabIndex={isClickable ? 0 : -1}
                         className={cn(
                           "p-3 rounded-lg border transition-colors",
                           getSeverityStyles(alert),
-                          isClickable ? "cursor-pointer hover:bg-muted/50" : "cursor-default",
+                          isClickable ? "hover:bg-muted/50" : "",
                         )}
-                        onPointerDown={(event) => {
-                          if (!isClickable) return;
-                          event.preventDefault();
-                          handleAlertOpen(alert);
-                        }}
-                        onKeyDown={(event) => {
-                          if (!isClickable) return;
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            handleAlertOpen(alert);
-                          }
-                        }}
                       >
                         <div className="flex items-start gap-3">
                           <div
@@ -319,61 +306,117 @@ export function AlertInbox({
                           </div>
 
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2 mb-0.5">
-                              <p
-                                className={cn(
-                                  "text-sm font-medium truncate",
-                                  alert.read && alert.status !== "pending"
-                                    ? "text-muted-foreground"
-                                    : "text-foreground",
-                                )}
-                              >
-                                {alert.title}
-                              </p>
+                            {isClickable ? (
+                              <button type="button" onClick={() => handleAlertOpen(alert)} className="w-full text-left">
+                                <div className="flex items-center justify-between gap-2 mb-0.5">
+                                  <p
+                                    className={cn(
+                                      "text-sm font-medium truncate",
+                                      alert.read && alert.status !== "pending"
+                                        ? "text-muted-foreground"
+                                        : "text-foreground",
+                                    )}
+                                  >
+                                    {alert.title}
+                                  </p>
 
-                              <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                                {getDisplayTime(alert)}
-                              </span>
-                            </div>
+                                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                    {getDisplayTime(alert)}
+                                  </span>
+                                </div>
 
-                            <p
-                              className={cn(
-                                "text-xs line-clamp-2",
-                                alert.read && alert.status !== "pending"
-                                  ? "text-muted-foreground/70"
-                                  : "text-muted-foreground",
-                              )}
-                            >
-                              {alert.message}
-                            </p>
+                                <p
+                                  className={cn(
+                                    "text-xs line-clamp-2",
+                                    alert.read && alert.status !== "pending"
+                                      ? "text-muted-foreground/70"
+                                      : "text-muted-foreground",
+                                  )}
+                                >
+                                  {alert.message}
+                                </p>
 
-                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                              {alert.status === "pending" ? (
-                                <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
-                                  Pending
-                                </Badge>
-                              ) : (
-                                <Badge variant="secondary" className="text-[10px]">
-                                  Live
-                                </Badge>
-                              )}
+                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                  {alert.status === "pending" ? (
+                                    <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                                      Pending
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="secondary" className="text-[10px]">
+                                      Live
+                                    </Badge>
+                                  )}
 
-                              {alert.recurrence === "event-series" && (
-                                <Badge variant="outline" className="text-[10px] border-warning/40 text-warning">
-                                  Recurring
-                                </Badge>
-                              )}
+                                  {alert.recurrence === "event-series" && (
+                                    <Badge variant="outline" className="text-[10px] border-warning/40 text-warning">
+                                      Recurring
+                                    </Badge>
+                                  )}
 
-                              {alert.relatedAsset && (
-                                <Badge variant="secondary" className="text-[10px]">
-                                  {alert.relatedAsset}
-                                </Badge>
-                              )}
+                                  {alert.relatedAsset && (
+                                    <Badge variant="secondary" className="text-[10px]">
+                                      {alert.relatedAsset}
+                                    </Badge>
+                                  )}
 
-                              {isClickable && (
-                                <span className="text-[11px] text-muted-foreground">• click to open</span>
-                              )}
-                            </div>
+                                  <span className="text-[11px] text-muted-foreground">• click to open</span>
+                                </div>
+                              </button>
+                            ) : (
+                              <>
+                                <div className="flex items-center justify-between gap-2 mb-0.5">
+                                  <p
+                                    className={cn(
+                                      "text-sm font-medium truncate",
+                                      alert.read && alert.status !== "pending"
+                                        ? "text-muted-foreground"
+                                        : "text-foreground",
+                                    )}
+                                  >
+                                    {alert.title}
+                                  </p>
+
+                                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                    {getDisplayTime(alert)}
+                                  </span>
+                                </div>
+
+                                <p
+                                  className={cn(
+                                    "text-xs line-clamp-2",
+                                    alert.read && alert.status !== "pending"
+                                      ? "text-muted-foreground/70"
+                                      : "text-muted-foreground",
+                                  )}
+                                >
+                                  {alert.message}
+                                </p>
+
+                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                  {alert.status === "pending" ? (
+                                    <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                                      Pending
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="secondary" className="text-[10px]">
+                                      Live
+                                    </Badge>
+                                  )}
+
+                                  {alert.recurrence === "event-series" && (
+                                    <Badge variant="outline" className="text-[10px] border-warning/40 text-warning">
+                                      Recurring
+                                    </Badge>
+                                  )}
+
+                                  {alert.relatedAsset && (
+                                    <Badge variant="secondary" className="text-[10px]">
+                                      {alert.relatedAsset}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </>
+                            )}
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0">
@@ -383,8 +426,7 @@ export function AlertInbox({
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                              onPointerDown={(event) => {
-                                event.preventDefault();
+                              onClick={(event) => {
                                 event.stopPropagation();
                                 onDelete(alert.id);
                               }}
