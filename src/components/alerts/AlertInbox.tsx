@@ -283,12 +283,12 @@ export function AlertInbox({
                       <div
                         key={alert.id}
                         className={cn(
-                          "p-3 rounded-lg border transition-colors",
+                          "rounded-lg border transition-colors",
                           getSeverityStyles(alert),
                           isClickable ? "hover:bg-muted/50" : "",
                         )}
                       >
-                        <div className="flex items-start gap-3">
+                        <div className="flex items-start gap-3 p-3">
                           <div
                             className={cn(
                               "p-1.5 rounded-md mt-0.5 shrink-0",
@@ -307,7 +307,11 @@ export function AlertInbox({
 
                           <div className="flex-1 min-w-0">
                             {isClickable ? (
-                              <button type="button" onClick={() => handleAlertOpen(alert)} className="w-full text-left">
+                              <button
+                                type="button"
+                                onClick={() => handleAlertOpen(alert)}
+                                className="w-full text-left rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
+                              >
                                 <div className="flex items-center justify-between gap-2 mb-0.5">
                                   <p
                                     className={cn(
