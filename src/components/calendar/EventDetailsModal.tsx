@@ -23,6 +23,7 @@ import {
   Minus,
   ChevronLeft,
   ChevronRight,
+  Inbox,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,6 +31,7 @@ interface EventDetailsModalProps {
   event: CalendarEvent | null;
   isOpen: boolean;
   onClose: () => void;
+  openedFromAlert?: boolean;
 }
 
 type HistoricalDataPoint = {
@@ -173,7 +175,7 @@ const getEventNarrative = (event: CalendarEvent) => {
   );
 };
 
-export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalProps) {
+export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = false }: EventDetailsModalProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { getAssetBySymbol } = useAssets();
@@ -417,68 +419,79 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
           className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 max-w-6xl w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border border-border p-0 rounded-lg z-[10001]"
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <div className="sticky top-0 z-10 bg-background border-b border-border px-8 py-5">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-3 flex-wrap">
-                <Badge variant="outline" className="text-sm font-bold px-3 py-1.5 bg-muted/50">
-                  {safeEvent.currency}
-                </Badge>
-
-                <Badge className={`text-xs font-semibold ${getImpactColor(safeEvent.impact)}`}>
-                  {safeEvent.impact.toUpperCase()} IMPACT
-                </Badge>
-
-                <h2 className="text-2xl font-bold text-foreground">{safeEvent.event}</h2>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  <span>{formatCalendarEventDateLabel(safeEvent)}</span>
-                </div>
-
-                <div className="flex gap-2 shrink-0">
-                  <Button variant="outline" size="sm" className="gap-1.5" onClick={handleAddToWatchlist}>
-                    <Star className="h-3.5 w-3.5" />
-                    Watchlist
-                  </Button>
-
-                  <Button variant="outline" size="sm" className="gap-1.5" onClick={handleSetAlert}>
-                    <Bell className="h-3.5 w-3.5" />
-                    {alertMode === "event-series"
-                      ? hasExistingRecurringAlert
-                        ? "Recurring Added"
-                        : "Set Recurring"
-                      : hasExistingOneTimeAlert
-                        ? "Alert Added"
-                        : "Set Alert"}
-                  </Button>
+          <div className="sticky top-0 z-10 bg-background border-b border-border">
+            {openedFromAlert && (
+              <div className="px-8 py-3 border-b border-primary/15 bg-primary/5">
+                <div className="flex items-center gap-2 text-sm text-primary">
+                  <Inbox className="h-4 w-4" />
+                  <span className="font-medium">Opened from alert</span>
                 </div>
               </div>
-            </div>
+            )}
 
-            <div className="mt-4 flex items-center gap-2 flex-wrap">
-              <Button
-                variant={alertMode === "once" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setAlertMode("once")}
-              >
-                One-time alert
-              </Button>
+            <div className="px-8 py-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Badge variant="outline" className="text-sm font-bold px-3 py-1.5 bg-muted/50">
+                    {safeEvent.currency}
+                  </Badge>
 
-              <Button
-                variant={alertMode === "event-series" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setAlertMode("event-series")}
-              >
-                Recurring
-              </Button>
+                  <Badge className={`text-xs font-semibold ${getImpactColor(safeEvent.impact)}`}>
+                    {safeEvent.impact.toUpperCase()} IMPACT
+                  </Badge>
 
-              <span className="text-xs text-muted-foreground">
-                {alertMode === "event-series"
-                  ? `This will alert you every time ${safeEvent.event} appears again.`
-                  : "This will alert you for this event only."}
-              </span>
+                  <h2 className="text-2xl font-bold text-foreground">{safeEvent.event}</h2>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    <span>{formatCalendarEventDateLabel(safeEvent)}</span>
+                  </div>
+
+                  <div className="flex gap-2 shrink-0">
+                    <Button variant="outline" size="sm" className="gap-1.5" onClick={handleAddToWatchlist}>
+                      <Star className="h-3.5 w-3.5" />
+                      Watchlist
+                    </Button>
+
+                    <Button variant="outline" size="sm" className="gap-1.5" onClick={handleSetAlert}>
+                      <Bell className="h-3.5 w-3.5" />
+                      {alertMode === "event-series"
+                        ? hasExistingRecurringAlert
+                          ? "Recurring Added"
+                          : "Set Recurring"
+                        : hasExistingOneTimeAlert
+                          ? "Alert Added"
+                          : "Set Alert"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center gap-2 flex-wrap">
+                <Button
+                  variant={alertMode === "once" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setAlertMode("once")}
+                >
+                  One-time alert
+                </Button>
+
+                <Button
+                  variant={alertMode === "event-series" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setAlertMode("event-series")}
+                >
+                  Recurring
+                </Button>
+
+                <span className="text-xs text-muted-foreground">
+                  {alertMode === "event-series"
+                    ? `This will alert you every time ${safeEvent.event} appears again.`
+                    : "This will alert you for this event only."}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -581,7 +594,9 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                     <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
                       <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Actual</div>
                       <div
-                        className={`text-2xl font-bold ${safeEvent.actual !== "—" ? "text-primary" : "text-muted-foreground"}`}
+                        className={`text-2xl font-bold ${
+                          safeEvent.actual !== "—" ? "text-primary" : "text-muted-foreground"
+                        }`}
                       >
                         {safeEvent.actual}
                       </div>
