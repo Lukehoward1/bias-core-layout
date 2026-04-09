@@ -318,7 +318,7 @@ export default function Alerts() {
     return [...recurringRows, ...scheduledRows, ...liveRows, ...priceRows];
   }, [recurringOverviewItems, oneTimeScheduledAlerts, liveNonPriceAlerts, overviewActivePriceAlerts]);
 
-  const topNewsEvents = useMemo(() => getUpcomingCalendarEvents(5), []);
+  const topNewsEvents = useMemo(() => getUpcomingCalendarEvents(5), [alerts, recurringSubscriptions]);
 
   const openCalendarEvent = useCallback((event: CalendarEvent) => {
     setIsAlertModalOpen(false);
