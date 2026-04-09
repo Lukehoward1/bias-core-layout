@@ -1057,7 +1057,12 @@ export default function Alerts() {
         </Tabs>
       </div>
 
-      <EventDetailsModal event={selectedCalendarEvent} isOpen={isEventModalOpen} onClose={closeCalendarOverlay} />
+      <EventDetailsModal
+        event={selectedCalendarEvent}
+        isOpen={isEventModalOpen}
+        onClose={closeCalendarOverlay}
+        openedFromAlert={true}
+      />
 
       <DialogPrimitive.Root open={isAlertModalOpen} onOpenChange={(open) => !open && closeAlertOverlay()}>
         <DialogPrimitive.Portal>
