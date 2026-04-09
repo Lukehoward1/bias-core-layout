@@ -29,10 +29,11 @@ import { CreatePriceAlertModal } from "@/components/alerts/CreatePriceAlertModal
 import { useAlertsContext } from "@/contexts/AlertsContext";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
+import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { toast } from "sonner";
 
-import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import type { CalendarEvent } from "@/data/calendarEvents";
+import type { AlertItem, PriceAlert } from "@/types/alerts";
 import {
   getAllCalendarEvents,
   getEventDateTime,
@@ -40,14 +41,12 @@ import {
   getUpcomingCalendarEvents,
 } from "@/services/calendarData";
 
-import type { AlertItem, PriceAlert } from "@/types/alerts";
-
 const sessions = [
   { name: "Sydney", status: "closed", time: "Opens in 8:30:00", accent: "#2EC4B6", region: "Asia-Pacific Markets" },
   { name: "Asia", status: "open", time: "Closes in 1:23:45", accent: "#4361EE", region: "Asia-Pacific Markets" },
   { name: "London", status: "closed", time: "Opens in 2:15:30", accent: "#F4D35E", region: "European Markets" },
   { name: "New York", status: "closed", time: "Opens in 5:45:12", accent: "#F77F00", region: "US Markets" },
-];
+] as const;
 
 const formatWhenLabel = (date?: Date) => {
   if (!date || Number.isNaN(date.getTime())) return "Scheduled";
@@ -136,6 +135,61 @@ const isRecurringAlert = (alert: AlertItem) => {
   return alert.recurrence === "event-series";
 };
 
+type RecurringOverviewItem = {
+  id: string;
+  title: string;
+  currency: string;
+  nextRelease: Date;
+  key: string;
+  eventId: string;
+};
+
+type MyAlertsRow =
+  | {
+      id: string;
+      kind: "recurring";
+      typeLabel: string;
+      what: string;
+      when: string;
+      statusLabel: string;
+      statusVariant: "outline";
+      recurringItem: RecurringOverviewItem;
+      isRecurring: true;
+    }
+  | {
+      id: string;
+      kind: "scheduled";
+      typeLabel: string;
+      what: string;
+      when: string;
+      statusLabel: string;
+      statusVariant: "outline";
+      alertItem: AlertItem;
+      isRecurring: false;
+    }
+  | {
+      id: string;
+      kind: "live";
+      typeLabel: string;
+      what: string;
+      when: string;
+      statusLabel: string;
+      statusVariant: "secondary";
+      alertItem: AlertItem;
+      isRecurring: boolean;
+    }
+  | {
+      id: string;
+      kind: "price";
+      typeLabel: string;
+      what: string;
+      when: string;
+      statusLabel: "Active" | "Paused";
+      statusVariant: "default" | "secondary";
+      priceAlert: PriceAlert;
+      isRecurring: false;
+    };
+
 export default function Alerts() {
   const [activeTab, setActiveTab] = useState("overview");
   const [showCreatePriceAlert, setShowCreatePriceAlert] = useState(false);
@@ -174,25 +228,34 @@ export default function Alerts() {
 
   const allCalendarEvents = useMemo(() => getAllCalendarEvents(), []);
 
-  const handleAddCard = (cardId: string) => {
-    addCard(cardId);
-    toast.success("Added to Dashboard");
-  };
+  const handleAddCard = useCallback(
+    (cardId: string) => {
+      addCard(cardId);
+      toast.success("Added to Dashboard");
+    },
+    [addCard],
+  );
 
-  const handleRemoveCard = (cardId: string) => {
-    removeCard(cardId);
-    toast.success("Removed from Dashboard");
-  };
+  const handleRemoveCard = useCallback(
+    (cardId: string) => {
+      removeCard(cardId);
+      toast.success("Removed from Dashboard");
+    },
+    [removeCard],
+  );
 
-  const handleTimerComplete = (label: string) => {
-    addAlert({
-      type: "timer",
-      title: "Timer Complete",
-      message: `Your timer "${label}" has finished.`,
-      severity: "info",
-      routeTo: "/alerts",
-    });
-  };
+  const handleTimerComplete = useCallback(
+    (label: string) => {
+      addAlert({
+        type: "timer",
+        title: "Timer Complete",
+        message: `Your timer "${label}" has finished.`,
+        severity: "info",
+        routeTo: "/alerts",
+      });
+    },
+    [addAlert],
+  );
 
   const activePriceAlertsCount = useMemo(
     () => priceAlerts.filter((alert) => !alert.triggered && alert.enabled).length,
@@ -215,7 +278,7 @@ export default function Alerts() {
     [alerts],
   );
 
-  const recurringOverviewItems = useMemo(() => {
+  const recurringOverviewItems = useMemo<RecurringOverviewItem[]>(() => {
     return recurringSubscriptions
       .map((sub) => {
         const matchedEvent = getNextEventByEventKey(sub.key);
@@ -230,15 +293,8 @@ export default function Alerts() {
           eventId: matchedEvent.id,
         };
       })
-      .filter(Boolean)
-      .sort((a, b) => a!.nextRelease.getTime() - b!.nextRelease.getTime()) as Array<{
-      id: string;
-      title: string;
-      currency: string;
-      nextRelease: Date;
-      key: string;
-      eventId: string;
-    }>;
+      .filter((item): item is RecurringOverviewItem => Boolean(item))
+      .sort((a, b) => a.nextRelease.getTime() - b.nextRelease.getTime());
   }, [recurringSubscriptions]);
 
   const liveNonPriceAlerts = useMemo(
@@ -266,51 +322,51 @@ export default function Alerts() {
     [alerts],
   );
 
-  const myAlertsAndTimersRows = useMemo(() => {
-    const recurringRows = recurringOverviewItems.map((item) => ({
+  const myAlertsAndTimersRows = useMemo<MyAlertsRow[]>(() => {
+    const recurringRows: MyAlertsRow[] = recurringOverviewItems.map((item) => ({
       id: `recurring-${item.id}`,
-      kind: "recurring" as const,
+      kind: "recurring",
       typeLabel: "Calendar News",
       what: item.title,
       when: formatRecurringNextLabel(item.nextRelease),
       statusLabel: "Recurring",
-      statusVariant: "outline" as const,
+      statusVariant: "outline",
       recurringItem: item,
       isRecurring: true,
     }));
 
-    const scheduledRows = oneTimeScheduledAlerts.map((alert) => ({
+    const scheduledRows: MyAlertsRow[] = oneTimeScheduledAlerts.map((alert) => ({
       id: `scheduled-${alert.id}`,
-      kind: "scheduled" as const,
+      kind: "scheduled",
       typeLabel: getAlertTypeLabel(alert),
       what: alert.title,
       when: formatWhenLabel(alert.scheduledFor),
       statusLabel: "Pending",
-      statusVariant: "outline" as const,
+      statusVariant: "outline",
       alertItem: alert,
       isRecurring: false,
     }));
 
-    const liveRows = liveNonPriceAlerts.map((alert) => ({
+    const liveRows: MyAlertsRow[] = liveNonPriceAlerts.map((alert) => ({
       id: `live-${alert.id}`,
-      kind: "live" as const,
+      kind: "live",
       typeLabel: getAlertTypeLabel(alert),
       what: alert.title,
       when: formatTriggeredLabel(alert.triggeredAt ?? alert.timestamp),
       statusLabel: "Live",
-      statusVariant: "secondary" as const,
+      statusVariant: "secondary",
       alertItem: alert,
       isRecurring: isRecurringAlert(alert),
     }));
 
-    const priceRows = overviewActivePriceAlerts.map((alert) => ({
+    const priceRows: MyAlertsRow[] = overviewActivePriceAlerts.map((alert) => ({
       id: `price-${alert.id}`,
-      kind: "price" as const,
+      kind: "price",
       typeLabel: "Price",
       what: `${alert.assetDisplayName} ${alert.direction} ${alert.price}`,
       when: alert.triggerType === "wick" ? "Touch" : `Close ${alert.timeframe}`,
-      statusLabel: alert.enabled ? ("Active" as const) : ("Paused" as const),
-      statusVariant: alert.enabled ? ("default" as const) : ("secondary" as const),
+      statusLabel: alert.enabled ? "Active" : "Paused",
+      statusVariant: alert.enabled ? "default" : "secondary",
       priceAlert: alert,
       isRecurring: false,
     }));
@@ -517,51 +573,58 @@ export default function Alerts() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {topNewsEvents.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onPointerDown={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          handleTopNewsClick(item);
-                        }}
-                        className="w-full text-left p-4 bg-muted/50 rounded-lg border border-border hover:bg-muted transition-colors"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-sm text-foreground mb-2">{item.event}</h3>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Badge variant="outline" className="text-xs">
-                                {item.currency}
-                              </Badge>
-                              <Badge
-                                variant={
-                                  item.impact === "high"
-                                    ? "destructive"
-                                    : item.impact === "medium"
-                                      ? "default"
-                                      : "secondary"
-                                }
-                                className="text-xs"
-                              >
-                                {item.impact}
-                              </Badge>
-                              <span className="text-[11px] text-muted-foreground ml-1">• click to view event</span>
+                    {topNewsEvents.length === 0 ? (
+                      <div className="p-4 bg-muted/30 rounded-lg border border-border">
+                        <p className="text-sm text-muted-foreground">No upcoming calendar events found.</p>
+                      </div>
+                    ) : (
+                      topNewsEvents.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onPointerDown={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            handleTopNewsClick(item);
+                          }}
+                          className="w-full text-left p-4 bg-muted/50 rounded-lg border border-border hover:bg-muted transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-medium text-sm text-foreground mb-2">{item.event}</h3>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge variant="outline" className="text-xs">
+                                  {item.currency}
+                                </Badge>
+                                <Badge
+                                  variant={
+                                    item.impact === "high"
+                                      ? "destructive"
+                                      : item.impact === "medium"
+                                        ? "default"
+                                        : "secondary"
+                                  }
+                                  className="text-xs"
+                                >
+                                  {item.impact}
+                                </Badge>
+                                <span className="text-[11px] text-muted-foreground ml-1">• click to view event</span>
+                              </div>
+                            </div>
+
+                            <div className="text-right">
+                              <span className="block text-xs text-muted-foreground whitespace-nowrap">
+                                {getEventDateTime(item).toLocaleDateString([], {
+                                  day: "2-digit",
+                                  month: "short",
+                                })}
+                              </span>
+                              <span className="block text-xs text-muted-foreground whitespace-nowrap">{item.time}</span>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <span className="block text-xs text-muted-foreground whitespace-nowrap">
-                              {getEventDateTime(item).toLocaleDateString([], {
-                                day: "2-digit",
-                                month: "short",
-                              })}
-                            </span>
-                            <span className="block text-xs text-muted-foreground whitespace-nowrap">{item.time}</span>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
+                        </button>
+                      ))
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -903,6 +966,7 @@ export default function Alerts() {
                   onMarkAllRead={markAllRead}
                   onDelete={deleteAlert}
                   onClearAll={clearAllAlerts}
+                  onOpenCalendarEvent={openCalendarEventById}
                   onOpenAlertItem={openGenericAlert}
                 />
               </div>
