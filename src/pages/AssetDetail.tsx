@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,6 @@ import { toast } from "sonner";
 import { getEventImpact } from "@/data/eventImpactRules";
 import { getFormattedMarketChange } from "@/services/marketData";
 import type { CalendarEvent } from "@/data/calendarEvents";
-
 import { getAllCalendarEvents, getEventDateTime, formatCalendarEventDateLabel } from "@/services/calendarData";
 
 /* =======================
@@ -199,6 +198,7 @@ const formatTimeUntil = (date: Date) => {
 ======================= */
 
 export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string; onRequestClose?: () => void }) {
+  const location = useLocation();
   const { getAssetBySymbol } = useAssets();
   const { isInWatchlist, toggleWatchlist } = useWatchlist();
 
@@ -214,6 +214,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
   const quote = useMarketQuote(symbol);
 
   const allCalendarEvents = useMemo(() => getAllCalendarEvents(), []);
+  const openedFromAlert = Boolean((location.state as { openedFromAlert?: boolean } | null)?.openedFromAlert);
 
   const handleToggleWatchlist = () => {
     toggleWatchlist(symbol);
@@ -432,9 +433,11 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                   <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
                     Quick Insights
                   </h3>
+
                   <div className="space-y-2">
                     {insights.map((insight, index) => {
                       const colors = ["bg-primary", "bg-success", "bg-warning", "bg-destructive"];
+
                       return (
                         <div key={index} className="flex items-start gap-2">
                           <div
@@ -519,14 +522,17 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                     <span className="text-xs text-muted-foreground block mb-1">Volume</span>
                     <span className="text-sm font-semibold text-foreground">{asset.volume}</span>
                   </div>
+
                   <div className="p-3 bg-muted/30 rounded-lg text-center">
                     <span className="text-xs text-muted-foreground block mb-1">Spread</span>
                     <span className="text-sm font-semibold text-foreground">{asset.spread}</span>
                   </div>
+
                   <div className="p-3 bg-muted/30 rounded-lg text-center">
                     <span className="text-xs text-muted-foreground block mb-1">Confidence</span>
                     <span className="text-sm font-semibold text-foreground">{asset.biasConfidence}%</span>
                   </div>
+
                   <div className="p-3 bg-muted/30 rounded-lg text-center">
                     <span className="text-xs text-muted-foreground block mb-1">Sentiment</span>
                     <span
@@ -599,6 +605,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
               AI Market Overview
             </CardTitle>
           </CardHeader>
+
           <CardContent>
             <div className="prose prose-sm dark:prose-invert max-w-none">
               <p className="text-muted-foreground leading-relaxed">
@@ -611,6 +618,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                 <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+
                     <div className="text-sm text-destructive">
                       <p>
                         <strong>Warning:</strong> {highImpactEventsNext4Hours.length} high-impact news event
@@ -640,6 +648,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                 <div className="mt-4 p-4 bg-warning/10 border border-warning/20 rounded-lg">
                   <div className="flex items-start gap-2">
                     <Clock className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
+
                     <div className="text-sm text-warning">
                       <p>
                         <strong>Heads up:</strong> Next high-impact event is{" "}
@@ -683,6 +692,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                 Key Levels
               </CardTitle>
             </CardHeader>
+
             <CardContent>
               <div className="space-y-3">
                 {keyLevels.map((level, index) => (
@@ -705,6 +715,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                 Session Insights
               </CardTitle>
             </CardHeader>
+
             <CardContent>
               <div className="space-y-3">
                 {sessionInsights.map((session, index) => (
@@ -738,6 +749,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                 Upcoming News
               </CardTitle>
             </CardHeader>
+
             <CardContent>
               <div className="space-y-3">
                 {upcomingNewsItems.length === 0 ? (
@@ -767,7 +779,9 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                           {toPillImpact(news.impact)}
                         </Badge>
                       </div>
+
                       <p className="text-sm font-medium text-foreground mb-1">{news.event}</p>
+
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span>F: {news.forecast}</span>
                         <span>P: {news.previous}</span>
@@ -782,13 +796,20 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
         </div>
       </div>
 
-      <EventDetailsModal event={selectedCalendarEvent} isOpen={isEventModalOpen} onClose={closeCalendarOverlay} />
+      <EventDetailsModal
+        event={selectedCalendarEvent}
+        isOpen={isEventModalOpen}
+        onClose={closeCalendarOverlay}
+        openedFromAlert={openedFromAlert}
+      />
     </>
   );
 }
 
 export default function AssetDetail() {
   const { symbol } = useParams<{ symbol: string }>();
+
   if (!symbol) return null;
+
   return <AssetDetailContent symbol={symbol} />;
 }
