@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
+
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 import { Filter, ChevronDown, ChevronUp, CalendarDays, Sparkles, BarChart3 } from "lucide-react";
+
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
@@ -30,6 +33,7 @@ type CurrencyFilter = "all" | string;
 type VisibleCount = 6 | 10 | 20 | 999;
 
 function Calendar() {
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -50,22 +54,25 @@ function Calendar() {
   const upcomingEventsCardId = "upcoming-events";
   const isUpcomingEventsAdded = isCardOnDashboard(upcomingEventsCardId);
 
-  const handleAddCard = () => {
+  const openedFromAlert = Boolean((location.state as { openedFromAlert?: boolean } | null)?.openedFromAlert);
+
+  const handleAddCard = useCallback(() => {
     addCard(upcomingEventsCardId);
     toast.success("Pinned to Dashboard");
-  };
+  }, [addCard]);
 
-  const handleRemoveCard = () => {
+  const handleRemoveCard = useCallback(() => {
     removeCard(upcomingEventsCardId);
     toast.success("Unpinned from Dashboard");
-  };
+  }, [removeCard]);
 
   const setEventRef = useCallback((eventId: string, el: HTMLTableRowElement | null) => {
     if (el) {
       eventRefs.current.set(eventId, el);
-    } else {
-      eventRefs.current.delete(eventId);
+      return;
     }
+
+    eventRefs.current.delete(eventId);
   }, []);
 
   const openEvent = useCallback((event: CalendarEvent | null) => {
@@ -91,7 +98,6 @@ function Calendar() {
     return "secondary";
   };
 
-  const allEvents = useMemo(() => getAllCalendarEvents(), []);
   const availableCurrencies = useMemo(() => getAvailableCalendarCurrencies(), []);
 
   const filteredEvents = useMemo(() => {
@@ -111,6 +117,7 @@ function Calendar() {
       if (dateRange === "today") {
         const eventDate = new Date(event.scheduledAt);
         const now = new Date();
+
         return (
           eventDate.getFullYear() === now.getFullYear() &&
           eventDate.getMonth() === now.getMonth() &&
@@ -142,7 +149,7 @@ function Calendar() {
     setHighlightedEventId(match.id);
     setShowAllEvents(true);
 
-    setTimeout(() => {
+    const openTimer = window.setTimeout(() => {
       eventRefs.current.get(match.id)?.scrollIntoView({
         behavior: "smooth",
         block: "center",
@@ -151,11 +158,16 @@ function Calendar() {
       openEvent(match);
     }, 100);
 
-    setTimeout(() => {
+    const clearHighlightTimer = window.setTimeout(() => {
       setHighlightedEventId(null);
     }, 3000);
 
     setSearchParams({}, { replace: true });
+
+    return () => {
+      window.clearTimeout(openTimer);
+      window.clearTimeout(clearHighlightTimer);
+    };
   }, [searchParams, setSearchParams, openEvent]);
 
   return (
@@ -222,7 +234,9 @@ function Calendar() {
                 value={String(visibleCount)}
                 onValueChange={(value) => {
                   setVisibleCount(Number(value) as VisibleCount);
-                  if (value !== "999") setShowAllEvents(false);
+                  if (value !== "999") {
+                    setShowAllEvents(false);
+                  }
                 }}
               >
                 <SelectTrigger className="w-[120px] h-9">
@@ -423,7 +437,12 @@ function Calendar() {
         </Card>
       </div>
 
-      <EventDetailsModal event={selectedEvent} isOpen={isModalOpen} onClose={closeModal} />
+      <EventDetailsModal
+        event={selectedEvent}
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        openedFromAlert={openedFromAlert}
+      />
     </div>
   );
 }
