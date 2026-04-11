@@ -131,6 +131,21 @@ const getAlertTypeLabel = (alert: AlertItem) => {
   }
 };
 
+const getAlertIcon = (alert: AlertItem) => {
+  switch (alert.type) {
+    case "breaking":
+      return <Radio className="h-4 w-4 text-destructive" />;
+    case "session":
+      return <Clock className="h-4 w-4 text-primary" />;
+    case "summary":
+      return <TrendingUp className="h-4 w-4 text-primary" />;
+    case "news":
+      return <Calendar className="h-4 w-4 text-primary" />;
+    default:
+      return <AlertTriangle className="h-4 w-4 text-primary" />;
+  }
+};
+
 const isRecurringAlert = (alert: AlertItem) => {
   return alert.recurrence === "event-series";
 };
@@ -1076,13 +1091,17 @@ export default function Alerts() {
           />
 
           <DialogPrimitive.Content
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[94vw] max-w-2xl bg-background border border-border rounded-lg p-0 z-[10001]"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[94vw] max-w-2xl bg-background border border-border rounded-lg p-0 z-[10001] shadow-2xl"
             onPointerDown={(event) => event.stopPropagation()}
           >
             {selectedAlertItem && (
               <>
-                <div className="border-b border-border px-6 py-5">
-                  <div className="flex items-center gap-3 flex-wrap">
+                <div className="border-b border-border px-6 py-5 space-y-4">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                      Opened from alert
+                    </Badge>
+
                     <Badge variant="outline" className="text-xs">
                       {getAlertTypeLabel(selectedAlertItem)}
                     </Badge>
@@ -1112,28 +1131,23 @@ export default function Alerts() {
                     )}
                   </div>
 
-                  <h2 className="text-xl font-bold text-foreground mt-3">{selectedAlertItem.title}</h2>
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 rounded-md bg-muted/60 p-2 shrink-0">{getAlertIcon(selectedAlertItem)}</div>
 
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {formatTriggeredLabel(selectedAlertItem.triggeredAt ?? selectedAlertItem.timestamp)}
-                  </p>
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-xl font-bold text-foreground">{selectedAlertItem.title}</h2>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {formatTriggeredLabel(selectedAlertItem.triggeredAt ?? selectedAlertItem.timestamp)}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="px-6 py-5 space-y-5">
-                  <Card>
+                  <Card className="bg-muted/20 border-border/70">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm flex items-center gap-2">
-                        {selectedAlertItem.type === "breaking" ? (
-                          <Radio className="h-4 w-4 text-destructive" />
-                        ) : selectedAlertItem.type === "session" ? (
-                          <Clock className="h-4 w-4 text-primary" />
-                        ) : selectedAlertItem.type === "summary" ? (
-                          <TrendingUp className="h-4 w-4 text-primary" />
-                        ) : selectedAlertItem.type === "news" ? (
-                          <Calendar className="h-4 w-4 text-primary" />
-                        ) : (
-                          <AlertTriangle className="h-4 w-4 text-primary" />
-                        )}
+                        {getAlertIcon(selectedAlertItem)}
                         Alert Details
                       </CardTitle>
                     </CardHeader>
