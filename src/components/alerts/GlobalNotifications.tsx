@@ -12,6 +12,7 @@ import {
   BarChart2,
   ShieldAlert,
 } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 import { useAlertsContext } from "@/contexts/AlertsContext";
 import type { AlertItem, AlertType } from "@/types/alerts";
@@ -85,7 +86,12 @@ export function GlobalNotifications() {
 
   const navigateWithModalSupport = useCallback(
     (target: string) => {
-      navigate(target, { state: { backgroundLocation: location } });
+      navigate(target, {
+        state: {
+          backgroundLocation: location,
+          openedFromAlert: true,
+        },
+      });
     },
     [navigate, location],
   );
@@ -93,7 +99,11 @@ export function GlobalNotifications() {
   const handleAlertClick = useCallback(
     (alert: AlertItem) => {
       markRead(alert.id);
-      setDismissedIds((prev) => new Set([...prev, alert.id]));
+      setDismissedIds((prev) => {
+        const next = new Set(prev);
+        next.add(alert.id);
+        return next;
+      });
 
       const target = buildNavigateTarget(alert);
       if (target) {
@@ -106,7 +116,11 @@ export function GlobalNotifications() {
   const handleDismiss = useCallback(
     (alertId: string) => {
       dismissAlert(alertId);
-      setDismissedIds((prev) => new Set([...prev, alertId]));
+      setDismissedIds((prev) => {
+        const next = new Set(prev);
+        next.add(alertId);
+        return next;
+      });
     },
     [dismissAlert],
   );
@@ -115,16 +129,20 @@ export function GlobalNotifications() {
     const timers: ReturnType<typeof setTimeout>[] = [];
 
     visibleAlerts.forEach((alert) => {
-      if (hoveredId !== alert.id && !isQuietHours) {
-        const timer = setTimeout(
-          () => {
-            setDismissedIds((prev) => new Set([...prev, alert.id]));
-          },
-          6000 + Math.random() * 2000,
-        );
+      if (hoveredId === alert.id || isQuietHours) return;
 
-        timers.push(timer);
-      }
+      const timer = setTimeout(
+        () => {
+          setDismissedIds((prev) => {
+            const next = new Set(prev);
+            next.add(alert.id);
+            return next;
+          });
+        },
+        6000 + Math.random() * 2000,
+      );
+
+      timers.push(timer);
     });
 
     return () => {
@@ -166,61 +184,76 @@ export function GlobalNotifications() {
     }
   };
 
+  const getIconStyles = (severity: AlertItem["severity"]) => {
+    switch (severity) {
+      case "high":
+        return "bg-destructive/20 text-destructive";
+      case "warning":
+        return "bg-warning/20 text-warning";
+      default:
+        return "bg-primary/20 text-primary";
+    }
+  };
+
   if (isQuietHours || visibleAlerts.length === 0) return null;
 
   return (
     <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm pointer-events-auto">
-      {visibleAlerts.map((alert, index) => (
-        <div
-          key={alert.id}
-          className={cn(
-            "p-3 rounded-lg border shadow-lg backdrop-blur-sm transition-all duration-300 cursor-pointer",
-            getSeverityStyles(alert.severity),
-            "animate-in slide-in-from-right-5 fade-in-0",
-          )}
-          style={{ animationDelay: `${index * 100}ms` }}
-          onMouseEnter={() => setHoveredId(alert.id)}
-          onMouseLeave={() => setHoveredId(null)}
-          onClick={() => handleAlertClick(alert)}
-        >
-          <div className="flex items-start gap-3">
-            <div
-              className={cn(
-                "p-1.5 rounded-md shrink-0",
-                alert.severity === "high"
-                  ? "bg-destructive/20 text-destructive"
-                  : alert.severity === "warning"
-                    ? "bg-warning/20 text-warning"
-                    : "bg-primary/20 text-primary",
-              )}
-            >
-              {getIcon(alert.type)}
+      {visibleAlerts.map((alert, index) => {
+        const isClickable = Boolean(alert.routeTo || alert.relatedAsset || alert.eventId);
+
+        return (
+          <button
+            key={alert.id}
+            type="button"
+            className={cn(
+              "w-full text-left p-3 rounded-lg border shadow-lg backdrop-blur-sm transition-all duration-300",
+              "animate-in slide-in-from-right-5 fade-in-0",
+              "hover:bg-muted/40",
+              isClickable ? "cursor-pointer" : "cursor-default",
+              getSeverityStyles(alert.severity),
+            )}
+            style={{ animationDelay: `${index * 100}ms` }}
+            onMouseEnter={() => setHoveredId(alert.id)}
+            onMouseLeave={() => setHoveredId(null)}
+            onClick={() => handleAlertClick(alert)}
+          >
+            <div className="flex items-start gap-3">
+              <div className={cn("p-1.5 rounded-md shrink-0", getIconStyles(alert.severity))}>
+                {getIcon(alert.type)}
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{alert.title}</p>
+                <p className="text-xs text-muted-foreground line-clamp-2">{alert.message}</p>
+
+                {isClickable && <p className="text-[11px] text-muted-foreground mt-1">• click to open</p>}
+              </div>
+
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleDismiss(alert.id);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    handleDismiss(alert.id);
+                  }
+                }}
+                className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                aria-label="Dismiss notification"
+                title="Dismiss"
+              >
+                <X className="h-4 w-4" />
+              </span>
             </div>
-
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">{alert.title}</p>
-              <p className="text-xs text-muted-foreground line-clamp-2">{alert.message}</p>
-
-              {(alert.routeTo || alert.relatedAsset || alert.eventId) && (
-                <p className="text-[11px] text-muted-foreground mt-1">• click to open</p>
-              )}
-            </div>
-
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                handleDismiss(alert.id);
-              }}
-              className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
-              aria-label="Dismiss notification"
-              title="Dismiss"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      ))}
+          </button>
+        );
+      })}
     </div>
   );
 }
