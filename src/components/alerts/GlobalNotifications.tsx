@@ -78,7 +78,7 @@ export function GlobalNotifications() {
           return "/alerts";
 
         default:
-          return "/alerts";
+          return null;
       }
     },
     [applyRouteParams],
@@ -98,6 +98,9 @@ export function GlobalNotifications() {
 
   const handleAlertClick = useCallback(
     (alert: AlertItem) => {
+      const target = buildNavigateTarget(alert);
+      if (!target) return;
+
       markRead(alert.id);
       setDismissedIds((prev) => {
         const next = new Set(prev);
@@ -105,12 +108,9 @@ export function GlobalNotifications() {
         return next;
       });
 
-      const target = buildNavigateTarget(alert);
-      if (target) {
-        navigateWithModalSupport(target);
-      }
+      navigateWithModalSupport(target);
     },
-    [markRead, buildNavigateTarget, navigateWithModalSupport],
+    [buildNavigateTarget, markRead, navigateWithModalSupport],
   );
 
   const handleDismiss = useCallback(
@@ -200,23 +200,33 @@ export function GlobalNotifications() {
   return (
     <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm pointer-events-auto">
       {visibleAlerts.map((alert, index) => {
-        const isClickable = Boolean(alert.routeTo || alert.relatedAsset || alert.eventId);
+        const isClickable = Boolean(buildNavigateTarget(alert));
 
         return (
-          <button
+          <div
             key={alert.id}
-            type="button"
             className={cn(
-              "w-full text-left p-3 rounded-lg border shadow-lg backdrop-blur-sm transition-all duration-300",
+              "p-3 rounded-lg border shadow-lg backdrop-blur-sm transition-all duration-300",
               "animate-in slide-in-from-right-5 fade-in-0",
-              "hover:bg-muted/40",
-              isClickable ? "cursor-pointer" : "cursor-default",
+              isClickable ? "cursor-pointer hover:bg-muted/40" : "cursor-default",
               getSeverityStyles(alert.severity),
             )}
             style={{ animationDelay: `${index * 100}ms` }}
             onMouseEnter={() => setHoveredId(alert.id)}
             onMouseLeave={() => setHoveredId(null)}
-            onClick={() => handleAlertClick(alert)}
+            onClick={() => {
+              if (!isClickable) return;
+              handleAlertClick(alert);
+            }}
+            role={isClickable ? "button" : undefined}
+            tabIndex={isClickable ? 0 : -1}
+            onKeyDown={(event) => {
+              if (!isClickable) return;
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                handleAlertClick(alert);
+              }
+            }}
           >
             <div className="flex items-start gap-3">
               <div className={cn("p-1.5 rounded-md shrink-0", getIconStyles(alert.severity))}>
@@ -230,28 +240,20 @@ export function GlobalNotifications() {
                 {isClickable && <p className="text-[11px] text-muted-foreground mt-1">• click to open</p>}
               </div>
 
-              <span
-                role="button"
-                tabIndex={0}
+              <button
+                type="button"
                 onClick={(event) => {
                   event.stopPropagation();
                   handleDismiss(alert.id);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    handleDismiss(alert.id);
-                  }
                 }}
                 className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
                 aria-label="Dismiss notification"
                 title="Dismiss"
               >
                 <X className="h-4 w-4" />
-              </span>
+              </button>
             </div>
-          </button>
+          </div>
         );
       })}
     </div>
