@@ -543,7 +543,33 @@ export default function Alerts() {
     return [...recurringRows, ...scheduledRows, ...liveRows, ...priceRows];
   }, [recurringOverviewItems, oneTimeScheduledAlerts, liveNonPriceAlerts, overviewActivePriceAlerts]);
 
-  const topNewsEvents = useMemo(() => getUpcomingCalendarEvents(5), []);
+  const topNewsEvents = useMemo(() => {
+    const now = Date.now();
+
+    const upcoming = getAllCalendarEvents()
+      .map((event) => ({
+        ...event,
+        ts: getEventDateTime(event).getTime(),
+      }))
+      .filter((event) => !Number.isNaN(event.ts) && event.ts >= now);
+
+    const impactScore = (impact: string) => {
+      if (impact === "high") return 3;
+      if (impact === "medium") return 2;
+      return 1;
+    };
+
+    const sorted = upcoming.sort((a, b) => {
+      // 1. Higher impact first
+      const impactDiff = impactScore(b.impact) - impactScore(a.impact);
+      if (impactDiff !== 0) return impactDiff;
+
+      // 2. Then closest time
+      return a.ts - b.ts;
+    });
+
+    return sorted.slice(0, 5);
+  }, []);
 
   const openCalendarEvent = useCallback((event: CalendarEvent) => {
     setIsAlertModalOpen(false);
