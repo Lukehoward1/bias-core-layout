@@ -34,12 +34,7 @@ import { toast } from "sonner";
 
 import type { CalendarEvent } from "@/data/calendarEvents";
 import type { AlertItem, PriceAlert } from "@/types/alerts";
-import {
-  getAllCalendarEvents,
-  getEventDateTime,
-  getNextEventByEventKey,
-  getUpcomingCalendarEvents,
-} from "@/services/calendarData";
+import { getAllCalendarEvents, getEventDateTime, getNextEventByEventKey } from "@/services/calendarData";
 
 type SessionCard = {
   name: string;
@@ -59,6 +54,61 @@ type SessionConfig = {
   closeHour: number;
   closeMinute: number;
 };
+
+type RecurringOverviewItem = {
+  id: string;
+  title: string;
+  currency: string;
+  nextRelease: Date;
+  key: string;
+  eventId: string;
+};
+
+type MyAlertsRow =
+  | {
+      id: string;
+      kind: "recurring";
+      typeLabel: string;
+      what: string;
+      when: string;
+      statusLabel: string;
+      statusVariant: "outline";
+      recurringItem: RecurringOverviewItem;
+      isRecurring: true;
+    }
+  | {
+      id: string;
+      kind: "scheduled";
+      typeLabel: string;
+      what: string;
+      when: string;
+      statusLabel: string;
+      statusVariant: "outline";
+      alertItem: AlertItem;
+      isRecurring: false;
+    }
+  | {
+      id: string;
+      kind: "live";
+      typeLabel: string;
+      what: string;
+      when: string;
+      statusLabel: string;
+      statusVariant: "secondary";
+      alertItem: AlertItem;
+      isRecurring: boolean;
+    }
+  | {
+      id: string;
+      kind: "price";
+      typeLabel: string;
+      what: string;
+      when: string;
+      statusLabel: "Active" | "Paused";
+      statusVariant: "default" | "secondary";
+      priceAlert: PriceAlert;
+      isRecurring: false;
+    };
 
 const SESSION_CONFIGS: SessionConfig[] = [
   {
@@ -291,60 +341,32 @@ const isRecurringAlert = (alert: AlertItem) => {
   return alert.recurrence === "event-series";
 };
 
-type RecurringOverviewItem = {
-  id: string;
-  title: string;
-  currency: string;
-  nextRelease: Date;
-  key: string;
-  eventId: string;
+const getUrgencyLabel = (date: Date) => {
+  const now = Date.now();
+  const diffMs = date.getTime() - now;
+
+  if (diffMs <= 0) return { label: "Now", variant: "destructive" as const };
+
+  const mins = Math.ceil(diffMs / 60000);
+
+  if (mins <= 15) return { label: "Soon", variant: "destructive" as const };
+  if (mins <= 60) return { label: "<1h", variant: "default" as const };
+
+  return null;
 };
 
-type MyAlertsRow =
-  | {
-      id: string;
-      kind: "recurring";
-      typeLabel: string;
-      what: string;
-      when: string;
-      statusLabel: string;
-      statusVariant: "outline";
-      recurringItem: RecurringOverviewItem;
-      isRecurring: true;
-    }
-  | {
-      id: string;
-      kind: "scheduled";
-      typeLabel: string;
-      what: string;
-      when: string;
-      statusLabel: string;
-      statusVariant: "outline";
-      alertItem: AlertItem;
-      isRecurring: false;
-    }
-  | {
-      id: string;
-      kind: "live";
-      typeLabel: string;
-      what: string;
-      when: string;
-      statusLabel: string;
-      statusVariant: "secondary";
-      alertItem: AlertItem;
-      isRecurring: boolean;
-    }
-  | {
-      id: string;
-      kind: "price";
-      typeLabel: string;
-      what: string;
-      when: string;
-      statusLabel: "Active" | "Paused";
-      statusVariant: "default" | "secondary";
-      priceAlert: PriceAlert;
-      isRecurring: false;
-    };
+const formatTimeUntilShort = (date: Date) => {
+  const now = Date.now();
+  const diffMs = date.getTime() - now;
+
+  if (diffMs <= 0) return "now";
+
+  const mins = Math.ceil(diffMs / 60000);
+  const hours = Math.floor(mins / 60);
+
+  if (hours === 0) return `${mins}m`;
+  return `${hours}h ${mins % 60}m`;
+};
 
 export default function Alerts() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -544,14 +566,7 @@ export default function Alerts() {
   }, [recurringOverviewItems, oneTimeScheduledAlerts, liveNonPriceAlerts, overviewActivePriceAlerts]);
 
   const topNewsEvents = useMemo(() => {
-    const now = Date.now();
-
-    const upcoming = getAllCalendarEvents()
-      .map((event) => ({
-        ...event,
-        ts: getEventDateTime(event).getTime(),
-      }))
-      .filter((event) => !Number.isNaN(event.ts) && event.ts >= now);
+    const currentNow = now.getTime();
 
     const impactScore = (impact: string) => {
       if (impact === "high") return 3;
@@ -559,17 +574,19 @@ export default function Alerts() {
       return 1;
     };
 
-    const sorted = upcoming.sort((a, b) => {
-      // 1. Higher impact first
-      const impactDiff = impactScore(b.impact) - impactScore(a.impact);
-      if (impactDiff !== 0) return impactDiff;
-
-      // 2. Then closest time
-      return a.ts - b.ts;
-    });
-
-    return sorted.slice(0, 5);
-  }, []);
+    return getAllCalendarEvents()
+      .map((event) => ({
+        ...event,
+        ts: getEventDateTime(event).getTime(),
+      }))
+      .filter((event) => !Number.isNaN(event.ts) && event.ts >= currentNow)
+      .sort((a, b) => {
+        const impactDiff = impactScore(b.impact) - impactScore(a.impact);
+        if (impactDiff !== 0) return impactDiff;
+        return a.ts - b.ts;
+      })
+      .slice(0, 5);
+  }, [now]);
 
   const openCalendarEvent = useCallback((event: CalendarEvent) => {
     setIsAlertModalOpen(false);
@@ -773,52 +790,72 @@ export default function Alerts() {
                         <p className="text-sm text-muted-foreground">No upcoming calendar events found.</p>
                       </div>
                     ) : (
-                      topNewsEvents.map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onPointerDown={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            handleTopNewsClick(item);
-                          }}
-                          className="w-full text-left p-4 bg-muted/50 rounded-lg border border-border hover:bg-muted transition-colors"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-medium text-sm text-foreground mb-2">{item.event}</h3>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <Badge variant="outline" className="text-xs">
-                                  {item.currency}
-                                </Badge>
-                                <Badge
-                                  variant={
-                                    item.impact === "high"
-                                      ? "destructive"
-                                      : item.impact === "medium"
-                                        ? "default"
-                                        : "secondary"
-                                  }
-                                  className="text-xs"
-                                >
-                                  {item.impact}
-                                </Badge>
-                                <span className="text-[11px] text-muted-foreground ml-1">• click to view event</span>
+                      topNewsEvents.map((item) => {
+                        const eventDate = getEventDateTime(item);
+                        const urgency = getUrgencyLabel(eventDate);
+
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onPointerDown={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              handleTopNewsClick(item);
+                            }}
+                            className="w-full text-left p-4 bg-muted/50 rounded-lg border border-border hover:bg-muted transition-colors"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-medium text-sm text-foreground mb-2">{item.event}</h3>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Badge variant="outline" className="text-xs">
+                                    {item.currency}
+                                  </Badge>
+                                  <Badge
+                                    variant={
+                                      item.impact === "high"
+                                        ? "destructive"
+                                        : item.impact === "medium"
+                                          ? "default"
+                                          : "secondary"
+                                    }
+                                    className="text-xs"
+                                  >
+                                    {item.impact}
+                                  </Badge>
+                                  <span className="text-[11px] text-muted-foreground ml-1">• click to view event</span>
+                                </div>
+                              </div>
+
+                              <div className="text-right">
+                                <span className="block text-xs text-muted-foreground whitespace-nowrap">
+                                  {eventDate.toLocaleDateString([], {
+                                    day: "2-digit",
+                                    month: "short",
+                                  })}
+                                </span>
+
+                                <div className="flex flex-col items-end gap-1 mt-1">
+                                  <span className="block text-xs text-muted-foreground whitespace-nowrap">
+                                    {item.time}
+                                  </span>
+
+                                  <span className="text-[11px] text-muted-foreground">
+                                    in {formatTimeUntilShort(eventDate)}
+                                  </span>
+
+                                  {urgency && (
+                                    <Badge variant={urgency.variant} className="text-[10px] h-4 px-1.5">
+                                      {urgency.label}
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
                             </div>
-
-                            <div className="text-right">
-                              <span className="block text-xs text-muted-foreground whitespace-nowrap">
-                                {getEventDateTime(item).toLocaleDateString([], {
-                                  day: "2-digit",
-                                  month: "short",
-                                })}
-                              </span>
-                              <span className="block text-xs text-muted-foreground whitespace-nowrap">{item.time}</span>
-                            </div>
-                          </div>
-                        </button>
-                      ))
+                          </button>
+                        );
+                      })
                     )}
                   </div>
                 </CardContent>
