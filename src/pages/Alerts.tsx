@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,12 +41,153 @@ import {
   getUpcomingCalendarEvents,
 } from "@/services/calendarData";
 
-const sessions = [
-  { name: "Sydney", status: "closed", time: "Opens in 8:30:00", accent: "#2EC4B6", region: "Asia-Pacific Markets" },
-  { name: "Asia", status: "open", time: "Closes in 1:23:45", accent: "#4361EE", region: "Asia-Pacific Markets" },
-  { name: "London", status: "closed", time: "Opens in 2:15:30", accent: "#F4D35E", region: "European Markets" },
-  { name: "New York", status: "closed", time: "Opens in 5:45:12", accent: "#F77F00", region: "US Markets" },
-] as const;
+type SessionCard = {
+  name: string;
+  status: "open" | "closed";
+  time: string;
+  accent: string;
+  region: string;
+};
+
+type SessionConfig = {
+  name: string;
+  accent: string;
+  region: string;
+  timeZone: string;
+  openHour: number;
+  openMinute: number;
+  closeHour: number;
+  closeMinute: number;
+};
+
+const SESSION_CONFIGS: SessionConfig[] = [
+  {
+    name: "Sydney",
+    accent: "#2EC4B6",
+    region: "Asia-Pacific Markets",
+    timeZone: "Australia/Sydney",
+    openHour: 9,
+    openMinute: 0,
+    closeHour: 17,
+    closeMinute: 0,
+  },
+  {
+    name: "Asia",
+    accent: "#4361EE",
+    region: "Asia-Pacific Markets",
+    timeZone: "Asia/Tokyo",
+    openHour: 9,
+    openMinute: 0,
+    closeHour: 15,
+    closeMinute: 0,
+  },
+  {
+    name: "London",
+    accent: "#F4D35E",
+    region: "European Markets",
+    timeZone: "Europe/London",
+    openHour: 8,
+    openMinute: 0,
+    closeHour: 16,
+    closeMinute: 30,
+  },
+  {
+    name: "New York",
+    accent: "#F77F00",
+    region: "US Markets",
+    timeZone: "America/New_York",
+    openHour: 9,
+    openMinute: 30,
+    closeHour: 16,
+    closeMinute: 0,
+  },
+];
+
+const formatCountdown = (totalSeconds: number) => {
+  const safeSeconds = Math.max(0, totalSeconds);
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const seconds = safeSeconds % 60;
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+};
+
+const getTimeZoneParts = (date: Date, timeZone: string) => {
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour12: false,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+
+  const parts = formatter.formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+
+  const weekdayMap: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+
+  return {
+    weekday: weekdayMap[get("weekday")] ?? 0,
+    hour: Number(get("hour")) || 0,
+    minute: Number(get("minute")) || 0,
+    second: Number(get("second")) || 0,
+  };
+};
+
+const buildSessionCard = (config: SessionConfig, now: Date): SessionCard => {
+  const { weekday, hour, minute, second } = getTimeZoneParts(now, config.timeZone);
+
+  const currentSeconds = hour * 3600 + minute * 60 + second;
+  const openSeconds = config.openHour * 3600 + config.openMinute * 60;
+  const closeSeconds = config.closeHour * 3600 + config.closeMinute * 60;
+
+  const isWeekday = weekday >= 1 && weekday <= 5;
+  const isOpen = isWeekday && currentSeconds >= openSeconds && currentSeconds < closeSeconds;
+
+  if (isOpen) {
+    return {
+      name: config.name,
+      status: "open",
+      time: `Closes in ${formatCountdown(closeSeconds - currentSeconds)}`,
+      accent: config.accent,
+      region: config.region,
+    };
+  }
+
+  let daysUntilOpen = 0;
+
+  if (weekday === 6) {
+    daysUntilOpen = 2;
+  } else if (weekday === 0) {
+    daysUntilOpen = 1;
+  } else if (currentSeconds < openSeconds) {
+    daysUntilOpen = 0;
+  } else {
+    daysUntilOpen = weekday === 5 ? 3 : 1;
+  }
+
+  const secondsUntilOpen =
+    daysUntilOpen === 0
+      ? openSeconds - currentSeconds
+      : 24 * 3600 - currentSeconds + (daysUntilOpen - 1) * 24 * 3600 + openSeconds;
+
+  return {
+    name: config.name,
+    status: "closed",
+    time: `Opens in ${formatCountdown(secondsUntilOpen)}`,
+    accent: config.accent,
+    region: config.region,
+  };
+};
 
 const formatWhenLabel = (date?: Date) => {
   if (!date || Number.isNaN(date.getTime())) return "Scheduled";
@@ -213,6 +354,7 @@ export default function Alerts() {
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [selectedAlertItem, setSelectedAlertItem] = useState<AlertItem | null>(null);
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
+  const [now, setNow] = useState(() => new Date());
 
   const {
     alerts,
@@ -242,6 +384,18 @@ export default function Alerts() {
   const isPriceAlertsAdded = isCardOnDashboard(priceAlertsCardId);
 
   const allCalendarEvents = useMemo(() => getAllCalendarEvents(), []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setNow(new Date());
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const dynamicSessions = useMemo<SessionCard[]>(() => {
+    return SESSION_CONFIGS.map((session) => buildSessionCard(session, now));
+  }, [now]);
 
   const handleAddCard = useCallback(
     (cardId: string) => {
@@ -655,7 +809,7 @@ export default function Alerts() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {sessions.map((session) => (
+                    {dynamicSessions.map((session) => (
                       <div
                         key={session.name}
                         className="relative p-4 bg-muted/50 rounded-lg border border-border overflow-hidden"
@@ -673,7 +827,7 @@ export default function Alerts() {
                         <p className="text-xs text-muted-foreground/70 mb-2">{session.region}</p>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Clock className="h-3.5 w-3.5" />
-                          <span className="text-xs">{session.time}</span>
+                          <span className="text-xs tabular-nums">{session.time}</span>
                         </div>
                       </div>
                     ))}
