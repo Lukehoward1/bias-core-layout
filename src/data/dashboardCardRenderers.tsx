@@ -842,31 +842,68 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
 
   "alerts-summary": () => (
     <Card className="h-full">
-      <CardHeader>
+      <CardHeader className="pb-4">
         <div className="flex items-center gap-2">
           <Bell className="h-4 w-4 text-primary" />
           <CardTitle className="text-sm font-medium">Alerts Summary</CardTitle>
         </div>
       </CardHeader>
-      <CardContent>
+
+      <CardContent className="space-y-5">
         <div className="grid grid-cols-2 gap-3">
-          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+          <div className="p-4 rounded-lg bg-muted/50 border border-border">
             <p className="text-xs text-muted-foreground">Pending</p>
-            <p className="text-lg font-bold text-foreground">3</p>
+            <p className="text-2xl font-bold text-foreground mt-1">3</p>
           </div>
-          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+
+          <div className="p-4 rounded-lg bg-muted/50 border border-border">
             <p className="text-xs text-muted-foreground">Live Alerts</p>
-            <p className="text-lg font-bold text-foreground">4</p>
+            <p className="text-2xl font-bold text-foreground mt-1">4</p>
           </div>
-          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+
+          <div className="p-4 rounded-lg bg-muted/50 border border-border">
             <p className="text-xs text-muted-foreground">Recurring</p>
-            <p className="text-lg font-bold text-foreground">2</p>
+            <p className="text-2xl font-bold text-foreground mt-1">2</p>
           </div>
-          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+
+          <div className="p-4 rounded-lg bg-muted/50 border border-border">
             <p className="text-xs text-muted-foreground">Active Price</p>
-            <p className="text-lg font-bold text-foreground">2</p>
+            <p className="text-2xl font-bold text-foreground mt-1">2</p>
           </div>
         </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <Bell className="h-4 w-4 text-primary" />
+            Recurring Alerts
+          </div>
+
+          <div className="p-3 rounded-lg border border-warning/20 bg-warning/5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium text-foreground truncate">BOE Interest Rate Decision (GBP)</p>
+              <span className="text-[10px] px-2 py-0.5 rounded border border-warning/40 text-warning whitespace-nowrap">
+                Recurring
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Next release in 20d 2h</p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <CalendarIcon className="h-4 w-4 text-primary" />
+            Pending News & Timers
+          </div>
+
+          <p className="text-sm text-muted-foreground">No pending scheduled alerts.</p>
+        </div>
+
+        <button
+          type="button"
+          className="w-full rounded-md bg-primary text-primary-foreground px-4 py-2.5 text-sm font-medium hover:opacity-90 transition-opacity"
+        >
+          + Create New Price Alert
+        </button>
       </CardContent>
     </Card>
   ),
