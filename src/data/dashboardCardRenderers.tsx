@@ -784,7 +784,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
       <CardContent>
         <div className="space-y-2">
           {[
-            { type: "Price Alert", what: "EURUSD > 1.0850", status: "active" },
+            { type: "Price Alert", what: "EURUSD &gt; 1.0850", status: "active" },
             { type: "News Alert", what: "USD High Impact", status: "pending" },
             { type: "Session Timer", what: "London Open", status: "active" },
           ].map((alert, i) => (
@@ -836,6 +836,37 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
           </div>
         </div>
         <p className="text-xs text-muted-foreground mt-3 text-center">2 active alerts</p>
+      </CardContent>
+    </Card>
+  ),
+
+  "alerts-summary": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Bell className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Alerts Summary</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+            <p className="text-xs text-muted-foreground">Pending</p>
+            <p className="text-lg font-bold text-foreground">3</p>
+          </div>
+          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+            <p className="text-xs text-muted-foreground">Live Alerts</p>
+            <p className="text-lg font-bold text-foreground">4</p>
+          </div>
+          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+            <p className="text-xs text-muted-foreground">Recurring</p>
+            <p className="text-lg font-bold text-foreground">2</p>
+          </div>
+          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+            <p className="text-xs text-muted-foreground">Active Price</p>
+            <p className="text-lg font-bold text-foreground">2</p>
+          </div>
+        </div>
       </CardContent>
     </Card>
   ),
