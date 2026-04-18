@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   TrendingUp,
   TrendingDown,
@@ -22,6 +24,12 @@ import { RiskRewardCalculator } from "@/components/risk/RiskRewardCalculator";
 import { DailyRiskLimitTracker } from "@/components/risk/DailyRiskLimitTracker";
 import { MaxDrawdownGuard } from "@/components/risk/MaxDrawdownGuard";
 import { WatchlistOverviewCard } from "@/components/dashboard/WatchlistOverviewCard";
+import { useAlertsContext } from "@/contexts/AlertsContext";
+import { getAllCalendarEvents, getEventDateTime, getUpcomingCalendarEvents } from "@/services/calendarData";
+
+/* =======================
+   SHARED DATA
+======================= */
 
 const getSampleEquityData = () => {
   const sampleTrades = [
@@ -61,6 +69,586 @@ const normalizeWatchlistSlotType = (slotType: CardRenderContext["slotType"]): Wa
   if (slotType === "three-equal" || slotType === "four-equal") return "equal";
   return slotType;
 };
+
+/* =======================
+   LIVE HELPERS
+======================= */
+
+type SessionCard = {
+  name: string;
+  status: "open" | "closed";
+  time: string;
+  accent: string;
+  region: string;
+};
+
+type SessionConfig = {
+  name: string;
+  accent: string;
+  region: string;
+  timeZone: string;
+  openHour: number;
+  openMinute: number;
+  closeHour: number;
+  closeMinute: number;
+};
+
+const SESSION_CONFIGS: SessionConfig[] = [
+  {
+    name: "Sydney",
+    accent: "#2EC4B6",
+    region: "Asia-Pacific Markets",
+    timeZone: "Australia/Sydney",
+    openHour: 9,
+    openMinute: 0,
+    closeHour: 17,
+    closeMinute: 0,
+  },
+  {
+    name: "Asia",
+    accent: "#4361EE",
+    region: "Asia-Pacific Markets",
+    timeZone: "Asia/Tokyo",
+    openHour: 9,
+    openMinute: 0,
+    closeHour: 15,
+    closeMinute: 0,
+  },
+  {
+    name: "London",
+    accent: "#F4D35E",
+    region: "European Markets",
+    timeZone: "Europe/London",
+    openHour: 8,
+    openMinute: 0,
+    closeHour: 16,
+    closeMinute: 30,
+  },
+  {
+    name: "New York",
+    accent: "#F77F00",
+    region: "US Markets",
+    timeZone: "America/New_York",
+    openHour: 9,
+    openMinute: 30,
+    closeHour: 16,
+    closeMinute: 0,
+  },
+];
+
+const formatCountdown = (totalSeconds: number) => {
+  const safeSeconds = Math.max(0, totalSeconds);
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const seconds = safeSeconds % 60;
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+};
+
+const getTimeZoneParts = (date: Date, timeZone: string) => {
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour12: false,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+
+  const parts = formatter.formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+
+  const weekdayMap: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+
+  return {
+    weekday: weekdayMap[get("weekday")] ?? 0,
+    hour: Number(get("hour")) || 0,
+    minute: Number(get("minute")) || 0,
+    second: Number(get("second")) || 0,
+  };
+};
+
+const buildSessionCard = (config: SessionConfig, now: Date): SessionCard => {
+  const { weekday, hour, minute, second } = getTimeZoneParts(now, config.timeZone);
+
+  const currentSeconds = hour * 3600 + minute * 60 + second;
+  const openSeconds = config.openHour * 3600 + config.openMinute * 60;
+  const closeSeconds = config.closeHour * 3600 + config.closeMinute * 60;
+
+  const isWeekday = weekday >= 1 && weekday <= 5;
+  const isOpen = isWeekday && currentSeconds >= openSeconds && currentSeconds < closeSeconds;
+
+  if (isOpen) {
+    return {
+      name: config.name,
+      status: "open",
+      time: `Closes in ${formatCountdown(closeSeconds - currentSeconds)}`,
+      accent: config.accent,
+      region: config.region,
+    };
+  }
+
+  let daysUntilOpen = 0;
+
+  if (weekday === 6) {
+    daysUntilOpen = 2;
+  } else if (weekday === 0) {
+    daysUntilOpen = 1;
+  } else if (currentSeconds < openSeconds) {
+    daysUntilOpen = 0;
+  } else {
+    daysUntilOpen = weekday === 5 ? 3 : 1;
+  }
+
+  const secondsUntilOpen =
+    daysUntilOpen === 0
+      ? openSeconds - currentSeconds
+      : 24 * 3600 - currentSeconds + (daysUntilOpen - 1) * 24 * 3600 + openSeconds;
+
+  return {
+    name: config.name,
+    status: "closed",
+    time: `Opens in ${formatCountdown(secondsUntilOpen)}`,
+    accent: config.accent,
+    region: config.region,
+  };
+};
+
+const impactRank = (impact: "high" | "medium" | "low") => {
+  if (impact === "high") return 3;
+  if (impact === "medium") return 2;
+  return 1;
+};
+
+const getSortedUpcomingEvents = () => {
+  const now = Date.now();
+
+  return getAllCalendarEvents()
+    .map((event) => ({
+      ...event,
+      ts: getEventDateTime(event).getTime(),
+    }))
+    .filter((event) => !Number.isNaN(event.ts) && event.ts >= now)
+    .sort((a, b) => {
+      const byImpact = impactRank(b.impact) - impactRank(a.impact);
+      if (byImpact !== 0) return byImpact;
+      return a.ts - b.ts;
+    });
+};
+
+const formatRelativeRelease = (date: Date) => {
+  if (Number.isNaN(date.getTime())) return "Upcoming";
+
+  const diffMs = date.getTime() - Date.now();
+  if (diffMs <= 0) return "Due now";
+
+  const diffMins = Math.ceil(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const mins = diffMins % 60;
+
+  if (diffHours <= 0) return `In ${diffMins}m`;
+  if (diffHours < 24) return `In ${diffHours}h ${mins}m`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  const remHours = diffHours % 24;
+  return `In ${diffDays}d ${remHours}h`;
+};
+
+const formatRecurringNextLabel = (date?: Date) => {
+  if (!date || Number.isNaN(date.getTime())) return "Next release scheduled";
+
+  const now = new Date();
+  const diffMs = date.getTime() - now.getTime();
+
+  if (diffMs <= 0) return "Next release due now";
+
+  const diffMins = Math.ceil(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  const remHours = diffHours % 24;
+
+  if (diffDays > 0) return `Next release in ${diffDays}d ${remHours}h`;
+  if (diffHours > 0) return `Next release in ${diffHours}h ${diffMins % 60}m`;
+  return `Next release in ${diffMins}m`;
+};
+
+const formatDashboardDate = (date: Date) => {
+  return date.toLocaleDateString([], {
+    day: "2-digit",
+    month: "short",
+  });
+};
+
+/* =======================
+   LIVE DASHBOARD CARDS
+======================= */
+
+function AlertsSummaryDashboardCard() {
+  const navigate = useNavigate();
+  const { alerts, recurringSubscriptions, priceAlerts } = useAlertsContext();
+
+  const pendingCount = useMemo(
+    () => alerts.filter((alert) => alert.status === "pending" && alert.recurrence !== "event-series").length,
+    [alerts],
+  );
+
+  const liveAlertsCount = useMemo(
+    () => alerts.filter((alert) => alert.status === "triggered" && alert.type !== "price").length,
+    [alerts],
+  );
+
+  const activePriceCount = useMemo(
+    () => priceAlerts.filter((alert) => !alert.triggered && alert.enabled).length,
+    [priceAlerts],
+  );
+
+  const recurringOverviewItems = useMemo(() => {
+    return recurringSubscriptions
+      .map((sub) => {
+        const matchedEvent = getAllCalendarEvents().find((event) => event.eventKey === sub.key);
+        if (!matchedEvent) return null;
+
+        return {
+          id: sub.id,
+          title: `${matchedEvent.event} (${matchedEvent.currency})`,
+          nextRelease: getEventDateTime(matchedEvent),
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a!.nextRelease.getTime() - b!.nextRelease.getTime())
+      .slice(0, 1) as Array<{
+      id: string;
+      title: string;
+      nextRelease: Date;
+    }>;
+  }, [recurringSubscriptions]);
+
+  const pendingItems = useMemo(() => {
+    return alerts
+      .filter((alert) => alert.status === "pending" && alert.recurrence !== "event-series")
+      .sort((a, b) => {
+        const aTime = a.scheduledFor?.getTime() ?? 0;
+        const bTime = b.scheduledFor?.getTime() ?? 0;
+        return aTime - bTime;
+      })
+      .slice(0, 1);
+  }, [alerts]);
+
+  return (
+    <Card className="h-full">
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-2">
+          <Bell className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Alerts Summary</CardTitle>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-5">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-4 rounded-lg bg-muted/50 border border-border">
+            <p className="text-xs text-muted-foreground">Pending</p>
+            <p className="text-2xl font-bold text-foreground mt-1">{pendingCount}</p>
+          </div>
+
+          <div className="p-4 rounded-lg bg-muted/50 border border-border">
+            <p className="text-xs text-muted-foreground">Live Alerts</p>
+            <p className="text-2xl font-bold text-foreground mt-1">{liveAlertsCount}</p>
+          </div>
+
+          <div className="p-4 rounded-lg bg-muted/50 border border-border">
+            <p className="text-xs text-muted-foreground">Recurring</p>
+            <p className="text-2xl font-bold text-foreground mt-1">{recurringSubscriptions.length}</p>
+          </div>
+
+          <div className="p-4 rounded-lg bg-muted/50 border border-border">
+            <p className="text-xs text-muted-foreground">Active Price</p>
+            <p className="text-2xl font-bold text-foreground mt-1">{activePriceCount}</p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <Bell className="h-4 w-4 text-primary" />
+            Recurring Alerts
+          </div>
+
+          {recurringOverviewItems.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No recurring alerts set.</p>
+          ) : (
+            recurringOverviewItems.map((item) => (
+              <div key={item.id} className="p-3 rounded-lg border border-warning/20 bg-warning/5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-foreground truncate">{item.title}</p>
+                  <span className="text-[10px] px-2 py-0.5 rounded border border-warning/40 text-warning whitespace-nowrap">
+                    Recurring
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{formatRecurringNextLabel(item.nextRelease)}</p>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <CalendarIcon className="h-4 w-4 text-primary" />
+            Pending News & Timers
+          </div>
+
+          {pendingItems.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No pending scheduled alerts.</p>
+          ) : (
+            pendingItems.map((item) => (
+              <div key={item.id} className="p-3 rounded-lg border border-primary/20 bg-primary/5">
+                <p className="text-sm font-medium text-foreground truncate">{item.title}</p>
+                <p className="text-xs text-muted-foreground mt-1">{item.message}</p>
+              </div>
+            ))
+          )}
+        </div>
+
+        <Button className="w-full" onClick={() => navigate("/alerts")}>
+          Open Alerts
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SessionTimersDashboardCard() {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setNow(new Date());
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const dynamicSessions = useMemo(() => {
+    return SESSION_CONFIGS.map((session) => buildSessionCard(session, now));
+  }, [now]);
+
+  return (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Clock className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Session Timers</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {dynamicSessions.map((session) => (
+            <div
+              key={session.name}
+              className="relative p-2 rounded-lg bg-muted/50 border border-border overflow-hidden"
+            >
+              <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: session.accent }} />
+              <div className="flex items-center justify-between pl-2">
+                <div>
+                  <p className="text-xs font-medium text-foreground">{session.name}</p>
+                  <p className="text-[10px] text-muted-foreground tabular-nums">{session.time}</p>
+                </div>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded ${
+                    session.status === "open" ? "bg-success/20 text-success" : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {session.status}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TopNewsDashboardCard() {
+  const events = useMemo(() => getSortedUpcomingEvents().slice(0, 3), []);
+
+  return (
+    <Card className="h-full">
+      <CardHeader>
+        <CardTitle className="text-sm font-medium">Top News</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {events.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No upcoming calendar events found.</p>
+          ) : (
+            events.map((item) => (
+              <div key={item.id} className="p-2 rounded-lg bg-muted/50 border border-border">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-foreground truncate">{item.event}</p>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                        {item.currency}
+                      </span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded ${
+                          item.impact === "high"
+                            ? "bg-destructive/20 text-destructive"
+                            : item.impact === "medium"
+                              ? "bg-warning/20 text-warning"
+                              : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {item.impact}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                    {formatRelativeRelease(getEventDateTime(item))}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function UpcomingEventsDashboardCard() {
+  const events = useMemo(() => getUpcomingCalendarEvents(4), []);
+
+  return (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <CalendarIcon className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Upcoming Events</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {events.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No upcoming events found.</p>
+          ) : (
+            events.map((item) => (
+              <div key={item.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      item.impact === "high" ? "bg-destructive" : item.impact === "medium" ? "bg-warning" : "bg-success"
+                    }`}
+                  />
+                  <div>
+                    <p className="text-xs font-medium text-foreground">{item.event}</p>
+                    <span className="text-[10px] text-muted-foreground">{item.currency}</span>
+                  </div>
+                </div>
+                <span className="text-[10px] text-muted-foreground">
+                  {formatDashboardDate(getEventDateTime(item))} {item.time}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function HighImpactEventsDashboardCard() {
+  const events = useMemo(
+    () =>
+      getSortedUpcomingEvents()
+        .filter((event) => event.impact === "high")
+        .slice(0, 3),
+    [],
+  );
+
+  return (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-destructive" />
+          <CardTitle className="text-sm font-medium">High Impact Events</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {events.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No high-impact events found.</p>
+          ) : (
+            events.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-border"
+              >
+                <div className="flex items-center gap-2">
+                  <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs font-medium text-foreground">{item.event}</p>
+                    <span className="text-[10px] text-muted-foreground">{item.currency}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground">{item.time}</span>
+                  <span className="w-2 h-2 rounded-full bg-destructive" />
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CalendarEventsDashboardCard() {
+  const events = useMemo(() => getSortedUpcomingEvents().slice(0, 4), []);
+
+  return (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <CalendarIcon className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Week Ahead</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {events.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No events found.</p>
+          ) : (
+            events.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-border"
+              >
+                <div>
+                  <p className="text-xs font-medium text-foreground">{item.event}</p>
+                  <p className="text-[10px] text-muted-foreground">{item.currency}</p>
+                </div>
+                <span className="text-[10px] text-muted-foreground">{formatDashboardDate(getEventDateTime(item))}</span>
+              </div>
+            ))
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* =======================
+   CARD RENDERERS
+======================= */
 
 export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.ReactNode> = {
   "todays-bias": () => (
@@ -104,39 +692,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
     </Card>
   ),
 
-  "high-impact-events": () => (
-    <Card className="h-full">
-      <CardHeader className="pb-2">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-destructive" />
-          <CardTitle className="text-sm font-medium">High Impact Events</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          {[
-            { event: "US CPI", currency: "USD", time: "14:30", impact: "high" },
-            { event: "ECB Rate Decision", currency: "EUR", time: "13:15", impact: "high" },
-            { event: "UK Employment", currency: "GBP", time: "09:00", impact: "medium" },
-          ].map((item, i) => (
-            <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-border">
-              <div className="flex items-center gap-2">
-                <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                <div>
-                  <p className="text-xs font-medium text-foreground">{item.event}</p>
-                  <span className="text-[10px] text-muted-foreground">{item.currency}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-muted-foreground">{item.time}</span>
-                <span className={`w-2 h-2 rounded-full ${item.impact === "high" ? "bg-destructive" : "bg-warning"}`} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  ),
+  "high-impact-events": () => <HighImpactEventsDashboardCard />,
 
   "watchlist-overview": ({ slotType }) => <WatchlistOverviewCard slotType={normalizeWatchlistSlotType(slotType)} />,
 
@@ -784,7 +1340,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
       <CardContent>
         <div className="space-y-2">
           {[
-            { type: "Price Alert", what: "EURUSD &gt; 1.0850", status: "active" },
+            { type: "Price Alert", what: "EURUSD > 1.0850", status: "active" },
             { type: "News Alert", what: "USD High Impact", status: "pending" },
             { type: "Session Timer", what: "London Open", status: "active" },
           ].map((alert, i) => (
@@ -840,73 +1396,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
     </Card>
   ),
 
-  "alerts-summary": () => (
-    <Card className="h-full">
-      <CardHeader className="pb-4">
-        <div className="flex items-center gap-2">
-          <Bell className="h-4 w-4 text-primary" />
-          <CardTitle className="text-sm font-medium">Alerts Summary</CardTitle>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-5">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="p-4 rounded-lg bg-muted/50 border border-border">
-            <p className="text-xs text-muted-foreground">Pending</p>
-            <p className="text-2xl font-bold text-foreground mt-1">3</p>
-          </div>
-
-          <div className="p-4 rounded-lg bg-muted/50 border border-border">
-            <p className="text-xs text-muted-foreground">Live Alerts</p>
-            <p className="text-2xl font-bold text-foreground mt-1">4</p>
-          </div>
-
-          <div className="p-4 rounded-lg bg-muted/50 border border-border">
-            <p className="text-xs text-muted-foreground">Recurring</p>
-            <p className="text-2xl font-bold text-foreground mt-1">2</p>
-          </div>
-
-          <div className="p-4 rounded-lg bg-muted/50 border border-border">
-            <p className="text-xs text-muted-foreground">Active Price</p>
-            <p className="text-2xl font-bold text-foreground mt-1">2</p>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <Bell className="h-4 w-4 text-primary" />
-            Recurring Alerts
-          </div>
-
-          <div className="p-3 rounded-lg border border-warning/20 bg-warning/5">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium text-foreground truncate">BOE Interest Rate Decision (GBP)</p>
-              <span className="text-[10px] px-2 py-0.5 rounded border border-warning/40 text-warning whitespace-nowrap">
-                Recurring
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Next release in 20d 2h</p>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <CalendarIcon className="h-4 w-4 text-primary" />
-            Pending News & Timers
-          </div>
-
-          <p className="text-sm text-muted-foreground">No pending scheduled alerts.</p>
-        </div>
-
-        <button
-          type="button"
-          className="w-full rounded-md bg-primary text-primary-foreground px-4 py-2.5 text-sm font-medium hover:opacity-90 transition-opacity"
-        >
-          + Create New Price Alert
-        </button>
-      </CardContent>
-    </Card>
-  ),
+  "alerts-summary": () => <AlertsSummaryDashboardCard />,
 
   "quick-calculator": () => <QuickRiskCalculator compact />,
 
@@ -918,148 +1408,13 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
 
   "max-drawdown-guard": () => <MaxDrawdownGuard compact />,
 
-  "top-news": () => (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">Top News</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          {[
-            { title: "Fed Signals Rate Hold", currency: "USD", time: "2h ago", sentiment: "hawkish" },
-            { title: "ECB Minutes Divided", currency: "EUR", time: "4h ago", sentiment: "mixed" },
-            { title: "BOE Hints at Cut", currency: "GBP", time: "5h ago", sentiment: "dovish" },
-          ].map((item, i) => (
-            <div key={i} className="p-2 rounded-lg bg-muted/50 border border-border">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-foreground truncate">{item.title}</p>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                      {item.currency}
-                    </span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded ${
-                        item.sentiment === "hawkish"
-                          ? "bg-success/20 text-success"
-                          : item.sentiment === "dovish"
-                            ? "bg-warning/20 text-warning"
-                            : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {item.sentiment}
-                    </span>
-                  </div>
-                </div>
-                <span className="text-[10px] text-muted-foreground whitespace-nowrap">{item.time}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  ),
+  "top-news": () => <TopNewsDashboardCard />,
 
-  "session-timers": () => (
-    <Card className="h-full">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-primary" />
-          <CardTitle className="text-sm font-medium">Session Timers</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          {[
-            { name: "Sydney", status: "closed", time: "Opens 8:30", accent: "#2EC4B6" },
-            { name: "Asia", status: "open", time: "Closes 1:23", accent: "#4361EE" },
-            { name: "London", status: "closed", time: "Opens 2:15", accent: "#F4D35E" },
-            { name: "New York", status: "closed", time: "Opens 5:45", accent: "#F77F00" },
-          ].map((session, i) => (
-            <div key={i} className="relative p-2 rounded-lg bg-muted/50 border border-border overflow-hidden">
-              <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: session.accent }} />
-              <div className="flex items-center justify-between pl-2">
-                <div>
-                  <p className="text-xs font-medium text-foreground">{session.name}</p>
-                  <p className="text-[10px] text-muted-foreground">{session.time}</p>
-                </div>
-                <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded ${
-                    session.status === "open" ? "bg-success/20 text-success" : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {session.status}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  ),
+  "session-timers": () => <SessionTimersDashboardCard />,
 
-  "upcoming-events": () => (
-    <Card className="h-full">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <CalendarIcon className="h-4 w-4 text-primary" />
-          <CardTitle className="text-sm font-medium">Upcoming Events</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          {[
-            { event: "FOMC Minutes", currency: "USD", date: "Wed 19:00", impact: "high" },
-            { event: "UK CPI", currency: "GBP", date: "Wed 09:00", impact: "high" },
-            { event: "EU Flash PMI", currency: "EUR", date: "Thu 10:00", impact: "medium" },
-            { event: "US Initial Claims", currency: "USD", date: "Thu 13:30", impact: "medium" },
-          ].map((item, i) => (
-            <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-              <div className="flex items-center gap-2">
-                <div
-                  className={`w-1.5 h-1.5 rounded-full ${item.impact === "high" ? "bg-destructive" : "bg-warning"}`}
-                />
-                <div>
-                  <p className="text-xs font-medium text-foreground">{item.event}</p>
-                  <span className="text-[10px] text-muted-foreground">{item.currency}</span>
-                </div>
-              </div>
-              <span className="text-[10px] text-muted-foreground">{item.date}</span>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  ),
+  "upcoming-events": () => <UpcomingEventsDashboardCard />,
 
-  "calendar-events": () => (
-    <Card className="h-full">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <CalendarIcon className="h-4 w-4 text-primary" />
-          <CardTitle className="text-sm font-medium">Week Ahead</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          {[
-            { day: "Mon", event: "Eurogroup Meetings", currency: "EUR" },
-            { day: "Wed", event: "UK CPI", currency: "GBP" },
-            { day: "Thu", event: "US Initial Claims", currency: "USD" },
-            { day: "Fri", event: "Retail Sales", currency: "USD" },
-          ].map((item, i) => (
-            <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-border">
-              <div>
-                <p className="text-xs font-medium text-foreground">{item.event}</p>
-                <p className="text-[10px] text-muted-foreground">{item.currency}</p>
-              </div>
-              <span className="text-[10px] text-muted-foreground">{item.day}</span>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  ),
+  "calendar-events": () => <CalendarEventsDashboardCard />,
 
   "reports-overview": () => (
     <Card className="h-full">
