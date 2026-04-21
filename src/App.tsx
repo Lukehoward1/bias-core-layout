@@ -3,13 +3,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route, useLocation, useNavigate } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { SessionLockProvider } from "@/hooks/use-session-lock";
 import { AlertsProvider } from "@/contexts/AlertsContext";
 import { GlobalNotifications } from "@/components/alerts/GlobalNotifications";
 import { AppLayout } from "@/layouts/AppLayout";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 // Global selection providers
 import { ActiveTradingAccountProvider } from "@/context/ActiveTradingAccountProvider";
@@ -30,7 +29,6 @@ const queryClient = new QueryClient();
 
 function AppRoutes() {
   const location = useLocation();
-  const navigate = useNavigate();
 
   const state = location.state as { backgroundLocation?: Location } | null;
   const backgroundLocation = state?.backgroundLocation;
