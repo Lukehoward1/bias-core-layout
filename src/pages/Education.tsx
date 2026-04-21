@@ -259,7 +259,7 @@ const demoCertificates: Certificate[] = [
 type ViewMode = "landing" | "courses" | "articles" | "tips";
 
 export default function Education() {
-  const [viewMode, setViewMode] = useState<ViewMode>("landing");
+  const [viewMode, setViewMode] = useState<ViewMode>("tips");
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [certificateCourse, setCertificateCourse] = useState<Course | null>(null);
@@ -681,22 +681,11 @@ export default function Education() {
           <AppHeader title="Education" />
 
           <div className="p-4 sm:p-6">
-            <div className="flex items-center gap-4 mb-6">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setViewMode("landing")}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back
-              </Button>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-foreground">Trading Tips</h1>
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  Execution and improvement techniques for serious traders.
-                </p>
-              </div>
+            <div className="mb-6">
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">Tips & Insights</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                Quick execution and improvement techniques for serious traders.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
