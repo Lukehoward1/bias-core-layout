@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +25,7 @@ import { DailyRiskLimitTracker } from "@/components/risk/DailyRiskLimitTracker";
 import { MaxDrawdownGuard } from "@/components/risk/MaxDrawdownGuard";
 import { WatchlistOverviewCard } from "@/components/dashboard/WatchlistOverviewCard";
 import { useAlertsContext } from "@/contexts/AlertsContext";
+import type { CalendarEvent } from "@/data/calendarEvents";
 import { getAllCalendarEvents, getEventDateTime, getUpcomingCalendarEvents } from "@/services/calendarData";
 
 /* =======================
@@ -288,6 +289,26 @@ const formatDashboardDate = (date: Date) => {
 };
 
 /* =======================
+   SHARED NAVIGATION
+======================= */
+
+function useDashboardEventNavigation() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  return useCallback(
+    (eventId: string) => {
+      navigate(`/calendar?eventId=${encodeURIComponent(eventId)}`, {
+        state: {
+          backgroundLocation: location,
+        },
+      });
+    },
+    [navigate, location],
+  );
+}
+
+/* =======================
    LIVE DASHBOARD CARDS
 ======================= */
 
@@ -476,6 +497,7 @@ function SessionTimersDashboardCard() {
 }
 
 function TopNewsDashboardCard() {
+  const openEvent = useDashboardEventNavigation();
   const events = useMemo(() => getSortedUpcomingEvents().slice(0, 3), []);
 
   return (
@@ -489,7 +511,12 @@ function TopNewsDashboardCard() {
             <p className="text-sm text-muted-foreground">No upcoming calendar events found.</p>
           ) : (
             events.map((item) => (
-              <div key={item.id} className="p-2 rounded-lg bg-muted/50 border border-border">
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => openEvent(item.id)}
+                className="w-full text-left p-2 rounded-lg bg-muted/50 border border-border hover:bg-muted/70 transition-colors"
+              >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-foreground truncate">{item.event}</p>
@@ -509,12 +536,14 @@ function TopNewsDashboardCard() {
                         {item.impact}
                       </span>
                     </div>
+                    <p className="text-[11px] text-muted-foreground mt-1">• click to open</p>
                   </div>
+
                   <span className="text-[10px] text-muted-foreground whitespace-nowrap">
                     {formatRelativeRelease(getEventDateTime(item))}
                   </span>
                 </div>
-              </div>
+              </button>
             ))
           )}
         </div>
@@ -524,6 +553,7 @@ function TopNewsDashboardCard() {
 }
 
 function UpcomingEventsDashboardCard() {
+  const openEvent = useDashboardEventNavigation();
   const events = useMemo(() => getUpcomingCalendarEvents(4), []);
 
   return (
@@ -540,7 +570,12 @@ function UpcomingEventsDashboardCard() {
             <p className="text-sm text-muted-foreground">No upcoming events found.</p>
           ) : (
             events.map((item) => (
-              <div key={item.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => openEvent(item.id)}
+                className="w-full text-left flex items-center justify-between p-2 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors"
+              >
                 <div className="flex items-center gap-2">
                   <div
                     className={`w-1.5 h-1.5 rounded-full ${
@@ -552,10 +587,14 @@ function UpcomingEventsDashboardCard() {
                     <span className="text-[10px] text-muted-foreground">{item.currency}</span>
                   </div>
                 </div>
-                <span className="text-[10px] text-muted-foreground">
-                  {formatDashboardDate(getEventDateTime(item))} {item.time}
-                </span>
-              </div>
+
+                <div className="text-right">
+                  <span className="block text-[10px] text-muted-foreground whitespace-nowrap">
+                    {formatDashboardDate(getEventDateTime(item))} {item.time}
+                  </span>
+                  <span className="block text-[11px] text-muted-foreground mt-0.5">click to open</span>
+                </div>
+              </button>
             ))
           )}
         </div>
@@ -565,6 +604,7 @@ function UpcomingEventsDashboardCard() {
 }
 
 function HighImpactEventsDashboardCard() {
+  const openEvent = useDashboardEventNavigation();
   const events = useMemo(
     () =>
       getSortedUpcomingEvents()
@@ -587,9 +627,11 @@ function HighImpactEventsDashboardCard() {
             <p className="text-sm text-muted-foreground">No high-impact events found.</p>
           ) : (
             events.map((item) => (
-              <div
+              <button
                 key={item.id}
-                className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-border"
+                type="button"
+                onClick={() => openEvent(item.id)}
+                className="w-full text-left flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-border hover:bg-muted/70 transition-colors"
               >
                 <div className="flex items-center gap-2">
                   <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
@@ -598,11 +640,12 @@ function HighImpactEventsDashboardCard() {
                     <span className="text-[10px] text-muted-foreground">{item.currency}</span>
                   </div>
                 </div>
+
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-muted-foreground">{item.time}</span>
                   <span className="w-2 h-2 rounded-full bg-destructive" />
                 </div>
-              </div>
+              </button>
             ))
           )}
         </div>
@@ -612,6 +655,7 @@ function HighImpactEventsDashboardCard() {
 }
 
 function CalendarEventsDashboardCard() {
+  const openEvent = useDashboardEventNavigation();
   const events = useMemo(() => getSortedUpcomingEvents().slice(0, 4), []);
 
   return (
@@ -628,16 +672,18 @@ function CalendarEventsDashboardCard() {
             <p className="text-sm text-muted-foreground">No events found.</p>
           ) : (
             events.map((item) => (
-              <div
+              <button
                 key={item.id}
-                className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-border"
+                type="button"
+                onClick={() => openEvent(item.id)}
+                className="w-full text-left flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-border hover:bg-muted/70 transition-colors"
               >
                 <div>
                   <p className="text-xs font-medium text-foreground">{item.event}</p>
                   <p className="text-[10px] text-muted-foreground">{item.currency}</p>
                 </div>
                 <span className="text-[10px] text-muted-foreground">{formatDashboardDate(getEventDateTime(item))}</span>
-              </div>
+              </button>
             ))
           )}
         </div>
