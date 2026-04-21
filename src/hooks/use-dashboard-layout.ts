@@ -154,13 +154,14 @@ const normalizeLayout = (raw: unknown): DashboardLayout => {
     })
     .filter((r): r is DashboardRow => Boolean(r));
 
-  // ✅ KPI row must exist and always match DEFAULT KPI IDs (not hardcoded High Impact)
-  const defaultKpiIds = getDefaultLayout().rows[0].cards.map((c) => c.id);
-  const existingKpi = normalizedRows.find((r) => r.id === "kpi-row" || r.type === "kpi" || r.isFixed);
+  if (normalizedRows.length === 0) {
+    return fallback;
+  }
 
-  const existingKpiIds = (existingKpi?.cards ?? []).map((c) => c.id).filter((id) => defaultKpiIds.includes(id));
-
-  const finalKpiIds = [...existingKpiIds, ...defaultKpiIds.filter((id) => !existingKpiIds.includes(id))].slice(0, 4);
+  return {
+    rows: normalizedRows,
+  };
+};
 
   const kpiRow: DashboardRow = {
     id: "kpi-row",
