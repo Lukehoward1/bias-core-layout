@@ -168,13 +168,6 @@ const normalizeLayout = (raw: unknown): DashboardLayout => {
     type: "kpi",
     isFixed: true,
     cards: finalKpiIds.map((id) => ({ id, isPinned: false })),
-  };
-
-  const nonKpiRows = normalizedRows.filter((r) => r !== existingKpi && !r.isFixed && r.type !== "kpi");
-
-  return {
-    rows: [kpiRow, ...nonKpiRows],
-  };
 };
 
 // Migrate from old v2 format
