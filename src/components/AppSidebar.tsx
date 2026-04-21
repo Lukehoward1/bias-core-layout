@@ -1,15 +1,10 @@
 import {
   LayoutDashboard,
-  TrendingUp,
   Calendar,
   Bell,
   Calculator,
   BookOpen,
-  Beaker,
-  Users,
   GraduationCap,
-  Video,
-  Link2,
   Settings,
   CreditCard,
   Moon,
@@ -31,21 +26,15 @@ type Item = { title: string; url: string; icon: any };
 
 const mainItems: Item[] = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Markets", url: "/markets", icon: TrendingUp },
-  { title: "Calendar", url: "/calendar", icon: Calendar },
   { title: "Alerts", url: "/alerts", icon: Bell },
+  { title: "Calendar", url: "/calendar", icon: Calendar },
   { title: "Risk Tools", url: "/risk-tools", icon: Calculator },
   { title: "Journal", url: "/journal", icon: BookOpen },
-  { title: "Strategy Tester", url: "/strategy-tester", icon: Beaker },
-  { title: "Community", url: "/community", icon: Users },
 ];
 
 const learningItems: Item[] = [
   { title: "Education", url: "/education", icon: GraduationCap },
-  { title: "Webinars", url: "/webinars", icon: Video },
 ];
-
-const brokerageItems: Item[] = [{ title: "Brokerage", url: "/brokerage", icon: Link2 }];
 
 const accountItems: Item[] = [
   { title: "Settings", url: "/settings", icon: Settings },
@@ -194,7 +183,6 @@ export function AppSidebar() {
       >
         <NavSection title="MAIN" items={mainItems} />
         <NavSection title="LEARNING" items={learningItems} />
-        <NavSection title="BROKERAGE" items={brokerageItems} />
         <NavSection title="ACCOUNT" items={accountItems} />
       </div>
 
