@@ -13,7 +13,7 @@ export const AVAILABLE_CARDS = DASHBOARD_CARD_REGISTRY.map((card) => ({
 }));
 
 // ✅ Bump this any time defaults change, to invalidate old saved layouts
-const STORAGE_KEY = "streambias-dashboard-layout-v5";
+const STORAGE_KEY = "streambias-dashboard-layout-v6";
 
 export interface DashboardCardEntry {
   id: string;
@@ -25,7 +25,7 @@ export interface DashboardRow {
   id: string;
   type: RowType;
   cards: DashboardCardEntry[];
-  isFixed?: boolean; // KPI row is fixed
+  isFixed?: boolean;
 }
 
 interface DashboardLayout {
@@ -37,31 +37,25 @@ const generateRowId = () => `row-${Date.now()}-${Math.random().toString(36).subs
 const getDefaultLayout = (): DashboardLayout => ({
   rows: [
     {
-      id: "kpi-row",
-      type: "kpi",
-      isFixed: true,
-      cards: [
-        { id: "todays-bias", isPinned: false },
-        { id: "active-trades", isPinned: false },
-        { id: "next-session", isPinned: false },
-        // ✅ RR is the default KPI #4 now
-        { id: "rr-calculator", isPinned: false },
-      ],
+      id: "hero-row",
+      type: "hero",
+      cards: [{ id: "top-news", isPinned: false }],
     },
     {
-      id: "analysis-row",
-      type: "wide-narrow",
+      id: "awareness-row",
+      type: "three-equal",
       cards: [
         { id: "watchlist-overview", isPinned: false },
         { id: "session-timers", isPinned: false },
+        { id: "upcoming-events", isPinned: false },
       ],
     },
     {
-      id: "overview-row",
+      id: "execution-row",
       type: "equal",
       cards: [
-        { id: "upcoming-events", isPinned: false },
-        { id: "performance-overview", isPinned: false },
+        { id: "alerts-summary", isPinned: false },
+        { id: "risk-snapshot", isPinned: false },
       ],
     },
   ],
