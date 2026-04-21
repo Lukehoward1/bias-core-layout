@@ -53,35 +53,6 @@ function AppRoutes() {
         <Route path="*" element={<NotFound />} />
       </Routes>
 
-      {backgroundLocation && (
-        <Routes>
-          <Route
-            path="/asset/:symbol"
-            element={
-              <Dialog
-                open
-                onOpenChange={(open) => {
-                  if (!open) navigate(-1);
-                }}
-              >
-                <DialogContent
-                  className="
-                    max-w-6xl w-[96vw]
-                    max-h-[92vh]
-                    overflow-y-auto
-                    p-0
-                    bg-background
-                    border-border
-                    backdrop-blur
-                  "
-                >
-                  <AssetDetail />
-                </DialogContent>
-              </Dialog>
-            }
-          />
-        </Routes>
-      )}
     </>
   );
 }
