@@ -163,13 +163,6 @@ const normalizeLayout = (raw: unknown): DashboardLayout => {
   };
 };
 
-  const kpiRow: DashboardRow = {
-    id: "kpi-row",
-    type: "kpi",
-    isFixed: true,
-    cards: finalKpiIds.map((id) => ({ id, isPinned: false })),
-};
-
 // Migrate from old v2 format
 const migrateOldLayout = (): DashboardLayout | null => {
   try {
