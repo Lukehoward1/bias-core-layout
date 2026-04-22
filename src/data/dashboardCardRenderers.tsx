@@ -228,14 +228,9 @@ const impactRank = (impact: "high" | "medium" | "low") => {
   return 1;
 };
 
-/**
- * Returns only the NEXT upcoming instance for each unique eventKey.
- * This prevents cards from filling with repeated recurring instances
- * of the same event, such as BOJ appearing multiple times.
- */
 const getUniqueUpcomingEvents = () => {
   const now = Date.now();
-  const nextByDisplayKey = new Map<string, ReturnType<typeof getAllCalendarEvents>[number] & { ts: number }>();
+  const nextByEventKey = new Map<string, ReturnType<typeof getAllCalendarEvents>[number] & { ts: number }>();
 
   getAllCalendarEvents()
     .map((event) => {
@@ -246,16 +241,16 @@ const getUniqueUpcomingEvents = () => {
       };
     })
     .filter((event) => !Number.isNaN(event.ts) && event.ts >= now)
+    .sort((a, b) => a.ts - b.ts)
     .forEach((event) => {
-      const displayKey = `${event.currency}-${event.event}`.toLowerCase().trim();
-      const existing = nextByDisplayKey.get(displayKey);
+      const key = event.eventKey || `${event.currency}-${event.event}`.toLowerCase().trim();
 
-      if (!existing || event.ts < existing.ts) {
-        nextByDisplayKey.set(displayKey, event);
+      if (!nextByEventKey.has(key)) {
+        nextByEventKey.set(key, event);
       }
     });
 
-  return Array.from(nextByDisplayKey.values()).sort((a, b) => {
+  return Array.from(nextByEventKey.values()).sort((a, b) => {
     if (a.ts !== b.ts) return a.ts - b.ts;
 
     const byImpact = impactRank(b.impact) - impactRank(a.impact);
@@ -582,16 +577,28 @@ function TopNewsDashboardCard() {
 
 function UpcomingEventsDashboardCard() {
   const openEvent = useDashboardEventNavigation();
+  const navigate = useNavigate();
   const events = useMemo(() => getUniqueUpcomingEvents().slice(0, 4), []);
 
   return (
     <Card className="h-full">
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div className="flex items-center gap-2">
           <CalendarIcon className="h-4 w-4 text-primary" />
-          <CardTitle className="text-sm font-medium">Upcoming Events TEST 123</CardTitle>
+          <CardTitle className="text-sm font-medium">Upcoming Events</CardTitle>
         </div>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => navigate("/calendar")}
+        >
+          View all
+        </Button>
       </CardHeader>
+
       <CardContent>
         <div className="space-y-2">
           {events.length === 0 ? (
@@ -691,7 +698,7 @@ function CalendarEventsDashboardCard() {
       <CardHeader>
         <div className="flex items-center gap-2">
           <CalendarIcon className="h-4 w-4 text-primary" />
-          <CardTitle className="text-sm font-medium">Week Ahead TEST 123</CardTitle>
+          <CardTitle className="text-sm font-medium">Week Ahead</CardTitle>
         </div>
       </CardHeader>
       <CardContent>
@@ -761,7 +768,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
       </CardHeader>
       <CardContent>
         <p className="text-2xl font-bold text-foreground">London</p>
-        <p className="text-xs text-muted-foreground mt-1">Opens in 2h 15m</p>
+        <p className="text-xs text-muted-foreground mt-1">Click session for details</p>
       </CardContent>
     </Card>
   ),
