@@ -219,10 +219,22 @@ export default function Dashboard() {
     const cardId = cardEntry.id;
 
     if (cardId === "upcoming-events") {
-      const upcoming = calendarEvents
-        .slice()
-        .sort((a, b) => (a.time || "").localeCompare(b.time || ""))
-        .slice(0, 4);
+      const now = Date.now();
+      const nextByEventKey = new Map<string, CalendarEvent>();
+
+      calendarEvents
+        .filter((event) => {
+          const ts = new Date(event.scheduledAt).getTime();
+          return !Number.isNaN(ts) && ts >= now;
+        })
+        .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
+        .forEach((event) => {
+          if (!nextByEventKey.has(event.eventKey)) {
+            nextByEventKey.set(event.eventKey, event);
+          }
+        });
+
+      const upcoming = Array.from(nextByEventKey.values()).slice(0, 4);
 
       return (
         <Card className="h-full">
