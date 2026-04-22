@@ -25,8 +25,7 @@ import { DailyRiskLimitTracker } from "@/components/risk/DailyRiskLimitTracker";
 import { MaxDrawdownGuard } from "@/components/risk/MaxDrawdownGuard";
 import { WatchlistOverviewCard } from "@/components/dashboard/WatchlistOverviewCard";
 import { useAlertsContext } from "@/contexts/AlertsContext";
-import type { CalendarEvent } from "@/data/calendarEvents";
-import { getAllCalendarEvents, getEventDateTime, getUpcomingCalendarEvents } from "@/services/calendarData";
+import { getAllCalendarEvents, getEventDateTime } from "@/services/calendarData";
 
 /* =======================
    SHARED DATA
@@ -229,20 +228,41 @@ const impactRank = (impact: "high" | "medium" | "low") => {
   return 1;
 };
 
-const getSortedUpcomingEvents = () => {
+const getUniqueUpcomingEvents = () => {
   const now = Date.now();
+  const seen = new Set<string>();
 
   return getAllCalendarEvents()
-    .map((event) => ({
-      ...event,
-      ts: getEventDateTime(event).getTime(),
-    }))
+    .map((event) => {
+      const eventDate = getEventDateTime(event);
+      return {
+        ...event,
+        ts: eventDate.getTime(),
+      };
+    })
     .filter((event) => !Number.isNaN(event.ts) && event.ts >= now)
     .sort((a, b) => {
+      if (a.ts !== b.ts) return a.ts - b.ts;
+
       const byImpact = impactRank(b.impact) - impactRank(a.impact);
       if (byImpact !== 0) return byImpact;
-      return a.ts - b.ts;
+
+      return a.event.localeCompare(b.event);
+    })
+    .filter((event) => {
+      const key = `${event.eventKey ?? event.event}|${event.currency}|${event.ts}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
     });
+};
+
+const getSortedUpcomingEvents = () => {
+  return [...getUniqueUpcomingEvents()].sort((a, b) => {
+    const byImpact = impactRank(b.impact) - impactRank(a.impact);
+    if (byImpact !== 0) return byImpact;
+    return a.ts - b.ts;
+  });
 };
 
 const formatRelativeRelease = (date: Date) => {
@@ -554,7 +574,7 @@ function TopNewsDashboardCard() {
 
 function UpcomingEventsDashboardCard() {
   const openEvent = useDashboardEventNavigation();
-  const events = useMemo(() => getUpcomingCalendarEvents(4), []);
+  const events = useMemo(() => getUniqueUpcomingEvents().slice(0, 4), []);
 
   return (
     <Card className="h-full">
@@ -656,7 +676,7 @@ function HighImpactEventsDashboardCard() {
 
 function CalendarEventsDashboardCard() {
   const openEvent = useDashboardEventNavigation();
-  const events = useMemo(() => getSortedUpcomingEvents().slice(0, 4), []);
+  const events = useMemo(() => getUniqueUpcomingEvents().slice(0, 4), []);
 
   return (
     <Card className="h-full">
