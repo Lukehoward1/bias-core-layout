@@ -1,38 +1,21 @@
 // src/pages/Dashboard.tsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { format } from "date-fns";
 
 import { AppHeader } from "@/components/AppHeader";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
-import {
-  TrendingUp,
-  Clock,
-  Calendar as CalendarIcon,
-  Activity,
-  AlertTriangle,
-  BookOpen,
-  Shield,
-  Plus,
-} from "lucide-react";
+import { Clock, Plus } from "lucide-react";
 
-import { useDashboardLayout, type DashboardCardEntry } from "@/hooks/use-dashboard-layout";
+import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { DashboardEditToolbar } from "@/components/dashboard/DashboardEditToolbar";
 import { DashboardRow } from "@/components/dashboard/DashboardRow";
 import { AddCardsModal } from "@/components/dashboard/AddCardsModal";
-import { WatchlistOverviewCard } from "@/components/dashboard/WatchlistOverviewCard";
 
 import { getCardRenderer, warnMissingRenderers } from "@/data/dashboardCardRenderers";
 import { DASHBOARD_CARD_REGISTRY } from "@/data/dashboardCardRegistry";
 import { cn } from "@/lib/utils";
 
-import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
-import { calendarEvents, type CalendarEvent } from "@/data/calendarEvents";
-
 import { SessionDetailsModal } from "@/components/dashboard/SessionDetailsModal";
-import { useTradingData } from "@/hooks/use-trading-data";
 
 type TradingSessionName = "Sydney" | "Asia" | "London" | "New York";
 
@@ -93,17 +76,11 @@ const buildSessions = (): TradingSession[] => [
 ];
 
 export default function Dashboard() {
-  const navigate = useNavigate();
-  const { stats } = useTradingData();
-
   const [showAddCardsModal, setShowAddCardsModal] = useState(false);
 
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
   const [dragOverCardId, setDragOverCardId] = useState<string | null>(null);
   const [dragOverRowId, setDragOverRowId] = useState<string | null>(null);
-
-  const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
-  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [selectedSessionName, setSelectedSessionName] = useState<TradingSessionName>("Asia");
@@ -127,21 +104,6 @@ export default function Dashboard() {
     const next = Math.max(0, (selectedSession?.timeRemainingSeconds ?? 0) - dec);
     return { ...selectedSession, timeRemainingSeconds: next } as TradingSession;
   }, [selectedSession, sessionTick, isSessionModalOpen]);
-
-  const openCalendarEvent = useCallback((ev: CalendarEvent) => {
-    setIsEventModalOpen(false);
-    setSelectedCalendarEvent(null);
-
-    requestAnimationFrame(() => {
-      setSelectedCalendarEvent(ev);
-      setIsEventModalOpen(true);
-    });
-  }, []);
-
-  const closeCalendarEvent = useCallback(() => {
-    setIsEventModalOpen(false);
-    setSelectedCalendarEvent(null);
-  }, []);
 
   const openSessionModal = useCallback(
     (name?: TradingSessionName) => {
@@ -215,94 +177,15 @@ export default function Dashboard() {
     warnMissingRenderers(registryCardIds);
   }, []);
 
-  const renderCardContent = (cardEntry: DashboardCardEntry, slotType: DashboardSlotType): React.ReactNode => {
+  const renderCardContent = (cardEntry: { id: string }, slotType: DashboardSlotType): React.ReactNode => {
     const cardId = cardEntry.id;
-
-    if (cardId === "upcoming-events") {
-      const now = Date.now();
-      const nextByEventKey = new Map<string, CalendarEvent>();
-
-      calendarEvents
-        .filter((event) => {
-          const ts = new Date(event.scheduledAt).getTime();
-          return !Number.isNaN(ts) && ts >= now;
-        })
-        .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
-        .forEach((event) => {
-          if (!nextByEventKey.has(event.eventKey)) {
-            nextByEventKey.set(event.eventKey, event);
-          }
-        });
-
-      const upcoming = Array.from(nextByEventKey.values()).slice(0, 4);
-
-      return (
-        <Card className="h-full">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-foreground">Upcoming Events</CardTitle>
-
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => navigate("/calendar")}
-              disabled={isEditMode}
-            >
-              View all
-            </Button>
-          </CardHeader>
-
-          <CardContent>
-            <div className="space-y-3">
-              {upcoming.map((ev) => (
-                <button
-                  key={ev.id}
-                  type="button"
-                  disabled={isEditMode}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (isEditMode) return;
-                    openCalendarEvent(ev);
-                  }}
-                  className={cn(
-                    "w-full text-left flex items-start gap-3 p-3 rounded-lg transition-colors",
-                    "bg-muted/50 hover:bg-muted",
-                    isEditMode && "opacity-60 cursor-not-allowed",
-                  )}
-                >
-                  <div className="min-w-[56px] text-sm font-medium text-muted-foreground">{ev.time}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-foreground truncate">{ev.event}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">{ev.currency}</div>
-                    <div
-                      className={cn(
-                        "text-xs mt-1 font-medium",
-                        ev.impact === "high"
-                          ? "text-destructive"
-                          : ev.impact === "medium"
-                            ? "text-accent"
-                            : "text-muted-foreground",
-                      )}
-                    >
-                      {(ev.impact || "low").toUpperCase()} IMPACT
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      );
-    }
 
     if (cardId === "next-session") {
       const active = sessions.find((s) => s.status === "active")?.name ?? "Asia";
 
       return (
-        <Card
-          className={cn("h-full flex flex-col", !isEditMode && "cursor-pointer hover:bg-muted/30 transition-colors")}
+        <div
+          className={cn("h-full", !isEditMode && "cursor-pointer")}
           onClick={() => {
             if (isEditMode) return;
             openSessionModal(active);
@@ -314,179 +197,23 @@ export default function Dashboard() {
             if (e.key === "Enter" || e.key === " ") openSessionModal(active);
           }}
         >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 flex-shrink-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Next Session</CardTitle>
-            <Clock className="h-4 w-4 text-accent" />
-          </CardHeader>
-          <CardContent className="flex-1 flex flex-col justify-center">
-            <div className="text-2xl font-bold text-foreground">{active}</div>
-            <p className="text-xs text-muted-foreground mt-1">Click session for details</p>
-          </CardContent>
-        </Card>
+          {getCardRenderer(cardId)?.({ slotType })}
+        </div>
       );
     }
 
     const renderer = getCardRenderer(cardId);
+
     if (renderer) {
       return renderer({ slotType });
     }
 
-    switch (cardId) {
-      case "todays-bias":
-        return (
-          <Card className="h-full flex flex-col">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 flex-shrink-0">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Today's Bias</CardTitle>
-              <TrendingUp className="h-4 w-4 text-success" />
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col justify-center">
-              <div className="text-2xl font-bold text-foreground">Bullish</div>
-              <p className="text-xs text-muted-foreground mt-1">85% confidence</p>
-            </CardContent>
-          </Card>
-        );
-
-      case "active-trades":
-        return (
-          <Card className="h-full flex flex-col">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 flex-shrink-0">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Active Trades</CardTitle>
-              <Activity className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col justify-center">
-              <div className="text-2xl font-bold text-foreground">3</div>
-              <p className="text-xs text-success mt-1">+$2,450 unrealized</p>
-            </CardContent>
-          </Card>
-        );
-
-      case "high-impact-events":
-        return (
-          <Card className="h-full flex flex-col">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 flex-shrink-0">
-              <CardTitle className="text-sm font-medium text-muted-foreground">High Impact</CardTitle>
-              <CalendarIcon className="h-4 w-4 text-destructive" />
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col justify-center">
-              <div className="text-2xl font-bold text-foreground">5</div>
-              <p className="text-xs text-muted-foreground mt-1">Events today</p>
-            </CardContent>
-          </Card>
-        );
-
-      case "watchlist-overview":
-        return <WatchlistOverviewCard isEditMode={isEditMode} slotType={slotType} />;
-
-      case "performance-overview": {
-        const weekPnl = stats.weekPnl ?? 0;
-        const monthPnl = stats.monthPnl ?? 0;
-
-        return (
-          <Card className="h-full">
-            <CardHeader>
-              <CardTitle>Performance Overview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">This Week</span>
-                  <span className={`text-lg font-bold ${weekPnl >= 0 ? "text-success" : "text-destructive"}`}>
-                    {weekPnl >= 0 ? "+" : ""}£{Number(weekPnl).toLocaleString()}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">This Month</span>
-                  <span className={`text-lg font-bold ${monthPnl >= 0 ? "text-success" : "text-destructive"}`}>
-                    {monthPnl >= 0 ? "+" : ""}£{Number(monthPnl).toLocaleString()}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Win Rate</span>
-                  <span className="text-lg font-bold text-foreground">{stats.winRate ?? 0}%</span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Total Trades</span>
-                  <span className="text-lg font-bold text-foreground">{stats.totalTrades ?? 0}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      }
-
-      case "journal-summary":
-        return (
-          <Card className="h-full">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle>Journal Summary</CardTitle>
-              <BookOpen className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Entries This Week</span>
-                  <span className="font-medium text-foreground">12</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Avg. Mood</span>
-                  <span className="font-medium text-success">Positive</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Last Entry</span>
-                  <span className="font-medium text-foreground">2h ago</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-
-      case "risk-snapshot":
-        return (
-          <Card className="h-full">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle>Risk Snapshot</CardTitle>
-              <Shield className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Daily Drawdown</span>
-                  <span className="font-medium text-foreground">1.2%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Max Position</span>
-                  <span className="font-medium text-foreground">2.5%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Risk Status</span>
-                  <span className="font-medium text-success">Healthy</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-
-      default:
-        return (
-          <Card className="h-full border-warning/30 bg-warning/5">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-warning">Unknown Card</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-warning" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground mb-2">Card ID: {cardEntry.id}</p>
-              <p className="text-xs text-muted-foreground">
-                This card type is not recognized. Use Edit mode to remove it.
-              </p>
-            </CardContent>
-          </Card>
-        );
-    }
+    return (
+      <div className="h-full rounded-xl border border-warning/30 bg-warning/5 p-4">
+        <p className="text-sm font-medium text-warning">Unknown Card</p>
+        <p className="text-xs text-muted-foreground mt-2">Card ID: {cardId}</p>
+      </div>
+    );
   };
 
   const handleAddRow = (afterRowId?: string) => addRow("equal", afterRowId);
@@ -560,8 +287,6 @@ export default function Dashboard() {
         onAddCard={addCard}
         onRemoveCard={removeCard}
       />
-
-      <EventDetailsModal event={selectedCalendarEvent} isOpen={isEventModalOpen} onClose={closeCalendarEvent} />
 
       <SessionDetailsModal isOpen={isSessionModalOpen} onClose={closeSessionModal} session={selectedSessionWithTick} />
     </div>
