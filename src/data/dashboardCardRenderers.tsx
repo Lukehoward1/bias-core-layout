@@ -228,11 +228,16 @@ const impactRank = (impact: "high" | "medium" | "low") => {
   return 1;
 };
 
+/**
+ * Returns only the NEXT upcoming instance for each unique eventKey.
+ * This prevents cards from filling with repeated recurring instances
+ * of the same event, such as BOJ appearing multiple times.
+ */
 const getUniqueUpcomingEvents = () => {
   const now = Date.now();
-  const seen = new Set<string>();
+  const nextByEventKey = new Map<string, ReturnType<typeof getAllCalendarEvents>[number] & { ts: number }>();
 
-  return getAllCalendarEvents()
+  getAllCalendarEvents()
     .map((event) => {
       const eventDate = getEventDateTime(event);
       return {
@@ -241,20 +246,23 @@ const getUniqueUpcomingEvents = () => {
       };
     })
     .filter((event) => !Number.isNaN(event.ts) && event.ts >= now)
-    .sort((a, b) => {
-      if (a.ts !== b.ts) return a.ts - b.ts;
+    .forEach((event) => {
+      const key = event.eventKey || `${event.event}-${event.currency}`;
+      const existing = nextByEventKey.get(key);
 
-      const byImpact = impactRank(b.impact) - impactRank(a.impact);
-      if (byImpact !== 0) return byImpact;
-
-      return a.event.localeCompare(b.event);
-    })
-    .filter((event) => {
-      const key = `${event.eventKey ?? event.event}|${event.currency}|${event.ts}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
+      if (!existing || event.ts < existing.ts) {
+        nextByEventKey.set(key, event);
+      }
     });
+
+  return Array.from(nextByEventKey.values()).sort((a, b) => {
+    if (a.ts !== b.ts) return a.ts - b.ts;
+
+    const byImpact = impactRank(b.impact) - impactRank(a.impact);
+    if (byImpact !== 0) return byImpact;
+
+    return a.event.localeCompare(b.event);
+  });
 };
 
 const getSortedUpcomingEvents = () => {
