@@ -691,7 +691,7 @@ function CalendarEventsDashboardCard() {
       <CardHeader>
         <div className="flex items-center gap-2">
           <CalendarIcon className="h-4 w-4 text-primary" />
-          <CardTitle className="text-sm font-medium">Week Ahead</CardTitle>
+          <CardTitle className="text-sm font-medium">Week Ahead TEST 123</CardTitle>
         </div>
       </CardHeader>
       <CardContent>
