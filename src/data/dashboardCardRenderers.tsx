@@ -235,7 +235,7 @@ const impactRank = (impact: "high" | "medium" | "low") => {
  */
 const getUniqueUpcomingEvents = () => {
   const now = Date.now();
-  const nextByEventKey = new Map<string, ReturnType<typeof getAllCalendarEvents>[number] & { ts: number }>();
+  const nextByDisplayKey = new Map<string, ReturnType<typeof getAllCalendarEvents>[number] & { ts: number }>();
 
   getAllCalendarEvents()
     .map((event) => {
@@ -247,15 +247,15 @@ const getUniqueUpcomingEvents = () => {
     })
     .filter((event) => !Number.isNaN(event.ts) && event.ts >= now)
     .forEach((event) => {
-      const key = event.eventKey ?? `${event.currency}-${event.event}`.toLowerCase();
-      const existing = nextByEventKey.get(key);
+      const displayKey = `${event.currency}-${event.event}`.toLowerCase().trim();
+      const existing = nextByDisplayKey.get(displayKey);
 
       if (!existing || event.ts < existing.ts) {
-        nextByEventKey.set(key, event);
+        nextByDisplayKey.set(displayKey, event);
       }
     });
 
-  return Array.from(nextByEventKey.values()).sort((a, b) => {
+  return Array.from(nextByDisplayKey.values()).sort((a, b) => {
     if (a.ts !== b.ts) return a.ts - b.ts;
 
     const byImpact = impactRank(b.impact) - impactRank(a.impact);
