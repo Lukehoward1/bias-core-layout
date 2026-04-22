@@ -60,6 +60,45 @@ function parseTimeToMinutes(time: string) {
   return (hours || 0) * 60 + (minutes || 0);
 }
 
+function sortEventsByUpcomingPriority(events: CalendarEvent[]): CalendarEvent[] {
+  const now = Date.now();
+
+  return [...events].sort((a, b) => {
+    const aTime = getEventDate(a).getTime();
+    const bTime = getEventDate(b).getTime();
+
+    const aUpcoming = aTime >= now;
+    const bUpcoming = bTime >= now;
+
+    if (aUpcoming !== bUpcoming) {
+      return aUpcoming ? -1 : 1;
+    }
+
+    const impactDiff = impactRank[b.impact] - impactRank[a.impact];
+    if (impactDiff !== 0) return impactDiff;
+
+    return aTime - bTime;
+  });
+}
+
+function dedupeEventsById(events: CalendarEvent[]): CalendarEvent[] {
+  const seen = new Set<string>();
+  return events.filter((event) => {
+    if (seen.has(event.id)) return false;
+    seen.add(event.id);
+    return true;
+  });
+}
+
+function dedupeEventsByEventKey(events: CalendarEvent[]): CalendarEvent[] {
+  const seen = new Set<string>();
+  return events.filter((event) => {
+    if (seen.has(event.eventKey)) return false;
+    seen.add(event.eventKey);
+    return true;
+  });
+}
+
 export function getAllCalendarEvents(): CalendarEvent[] {
   return [...calendarEvents];
 }
@@ -142,30 +181,23 @@ export function getCalendarCounts(events: CalendarEvent[]) {
 export function getUpcomingCalendarEvents(limit = 5): CalendarEvent[] {
   const now = Date.now();
 
-  return [...calendarEvents]
-    .filter((event) => {
-      const eventTime = getEventDate(event).getTime();
-      return !Number.isNaN(eventTime);
-    })
-    .sort((a, b) => {
-      const aDate = getEventDate(a);
-      const bDate = getEventDate(b);
+  const futureEvents = calendarEvents.filter((event) => {
+    const eventTime = getEventDate(event).getTime();
+    return !Number.isNaN(eventTime) && eventTime >= now;
+  });
 
-      const aUpcoming = aDate.getTime() >= now;
-      const bUpcoming = bDate.getTime() >= now;
+  return dedupeEventsById(sortEventsByUpcomingPriority(futureEvents)).slice(0, limit);
+}
 
-      if (aUpcoming !== bUpcoming) {
-        return aUpcoming ? -1 : 1;
-      }
+export function getUpcomingDistinctCalendarEvents(limit = 5): CalendarEvent[] {
+  const now = Date.now();
 
-      const impactDiff = impactRank[b.impact] - impactRank[a.impact];
-      if (impactDiff !== 0) return impactDiff;
+  const futureEvents = calendarEvents.filter((event) => {
+    const eventTime = getEventDate(event).getTime();
+    return !Number.isNaN(eventTime) && eventTime >= now;
+  });
 
-      const aDistance = Math.abs(aDate.getTime() - now);
-      const bDistance = Math.abs(bDate.getTime() - now);
-      return aDistance - bDistance;
-    })
-    .slice(0, limit);
+  return dedupeEventsByEventKey(sortEventsByUpcomingPriority(futureEvents)).slice(0, limit);
 }
 
 export function getUpcomingEventsByEventKey(eventKey: string): CalendarEvent[] {
