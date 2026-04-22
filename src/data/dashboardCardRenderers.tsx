@@ -247,7 +247,7 @@ const getUniqueUpcomingEvents = () => {
     })
     .filter((event) => !Number.isNaN(event.ts) && event.ts >= now)
     .forEach((event) => {
-      const key = event.eventKey || `${event.event}-${event.currency}`;
+      const key = event.eventKey ?? `${event.currency}-${event.event}`.toLowerCase();
       const existing = nextByEventKey.get(key);
 
       if (!existing || event.ts < existing.ts) {
