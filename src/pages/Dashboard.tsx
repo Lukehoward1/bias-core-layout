@@ -3,8 +3,18 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-import { Clock, Plus } from "lucide-react";
+import {
+  Clock,
+  Plus,
+  Star,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  ChevronRight,
+  Calendar as CalendarIcon,
+} from "lucide-react";
 
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { DashboardEditToolbar } from "@/components/dashboard/DashboardEditToolbar";
@@ -16,6 +26,14 @@ import { DASHBOARD_CARD_REGISTRY } from "@/data/dashboardCardRegistry";
 import { cn } from "@/lib/utils";
 
 import { SessionDetailsModal } from "@/components/dashboard/SessionDetailsModal";
+import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
+import { AssetDetailContent } from "@/pages/AssetDetail";
+
+import { useWatchlist } from "@/hooks/use-watchlist";
+import { useMarketQuotes } from "@/hooks/use-market-quotes";
+import { getFormattedMarketChange, normalizeSymbol, type MarketQuote } from "@/services/marketData";
+
+import { calendarEvents, type CalendarEvent } from "@/data/calendarEvents";
 
 type TradingSessionName = "Sydney" | "Asia" | "London" | "New York";
 
@@ -75,6 +93,72 @@ const buildSessions = (): TradingSession[] => [
   },
 ];
 
+const impactRank = (impact: "high" | "medium" | "low") => {
+  if (impact === "high") return 3;
+  if (impact === "medium") return 2;
+  return 1;
+};
+
+const formatPriceNoCommas = (raw: string | number) => {
+  const cleaned = (raw ?? "").toString().trim();
+  if (!cleaned || cleaned === "—") return "—";
+
+  const noCommas = cleaned.replace(/,/g, "");
+  const n = Number(noCommas);
+  if (!Number.isFinite(n)) return noCommas;
+
+  const m = noCommas.match(/^\d+(\.(\d+))?$/);
+  if (m) {
+    const decimals = m[2]?.length ?? 0;
+    if (decimals > 0) return n.toFixed(decimals);
+  }
+
+  return String(n);
+};
+
+const getEventTimestamp = (event: CalendarEvent) => {
+  const ts = new Date(event.scheduledAt).getTime();
+  return Number.isNaN(ts) ? 0 : ts;
+};
+
+const getUniqueUpcomingEvents = () => {
+  const now = Date.now();
+  const nextByEventKey = new Map<string, CalendarEvent>();
+
+  calendarEvents
+    .filter((event) => {
+      const ts = getEventTimestamp(event);
+      return ts >= now;
+    })
+    .sort((a, b) => getEventTimestamp(a) - getEventTimestamp(b))
+    .forEach((event) => {
+      const key = event.eventKey || `${event.currency}-${event.event}`;
+      if (!nextByEventKey.has(key)) {
+        nextByEventKey.set(key, event);
+      }
+    });
+
+  return Array.from(nextByEventKey.values()).sort((a, b) => {
+    const timeDiff = getEventTimestamp(a) - getEventTimestamp(b);
+    if (timeDiff !== 0) return timeDiff;
+
+    const impactDiff = impactRank(b.impact) - impactRank(a.impact);
+    if (impactDiff !== 0) return impactDiff;
+
+    return a.event.localeCompare(b.event);
+  });
+};
+
+const formatDashboardDate = (event: CalendarEvent) => {
+  const date = new Date(event.scheduledAt);
+  if (Number.isNaN(date.getTime())) return event.date;
+
+  return date.toLocaleDateString([], {
+    day: "2-digit",
+    month: "short",
+  });
+};
+
 export default function Dashboard() {
   const [showAddCardsModal, setShowAddCardsModal] = useState(false);
 
@@ -85,7 +169,12 @@ export default function Dashboard() {
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [selectedSessionName, setSelectedSessionName] = useState<TradingSessionName>("Asia");
 
+  const [selectedAssetSymbol, setSelectedAssetSymbol] = useState<string | null>(null);
+  const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+
   const sessions = useMemo(() => buildSessions(), []);
+
   const selectedSession = useMemo(() => {
     const found = sessions.find((s) => s.name === selectedSessionName);
     return found ?? sessions.find((s) => s.status === "active") ?? sessions[0];
@@ -116,6 +205,7 @@ export default function Dashboard() {
           const active = sessions.find((s) => s.status === "active")?.name ?? "Asia";
           setSelectedSessionName(active);
         }
+
         setIsSessionModalOpen(true);
       });
     },
@@ -123,6 +213,33 @@ export default function Dashboard() {
   );
 
   const closeSessionModal = useCallback(() => setIsSessionModalOpen(false), []);
+
+  const openAssetOverlay = useCallback((symbol: string) => {
+    setSelectedAssetSymbol(null);
+
+    requestAnimationFrame(() => {
+      setSelectedAssetSymbol(symbol);
+    });
+  }, []);
+
+  const closeAssetOverlay = useCallback(() => {
+    setSelectedAssetSymbol(null);
+  }, []);
+
+  const openCalendarEvent = useCallback((event: CalendarEvent) => {
+    setIsEventModalOpen(false);
+    setSelectedCalendarEvent(null);
+
+    requestAnimationFrame(() => {
+      setSelectedCalendarEvent(event);
+      setIsEventModalOpen(true);
+    });
+  }, []);
+
+  const closeCalendarEvent = useCallback(() => {
+    setIsEventModalOpen(false);
+    setSelectedCalendarEvent(null);
+  }, []);
 
   const {
     layout,
@@ -179,6 +296,20 @@ export default function Dashboard() {
 
   const renderCardContent = (cardEntry: { id: string }, slotType: DashboardSlotType): React.ReactNode => {
     const cardId = cardEntry.id;
+
+    if (cardId === "watchlist-overview") {
+      return <DashboardWatchlistCard isEditMode={isEditMode} onOpenAsset={openAssetOverlay} />;
+    }
+
+    if (cardId === "upcoming-events" || cardId === "calendar-events") {
+      return (
+        <DashboardUpcomingEventsCard
+          title={cardId === "calendar-events" ? "Week Ahead" : "Upcoming Events"}
+          isEditMode={isEditMode}
+          onOpenEvent={openCalendarEvent}
+        />
+      );
+    }
 
     if (cardId === "next-session") {
       const active = sessions.find((s) => s.status === "active")?.name ?? "Asia";
@@ -289,6 +420,231 @@ export default function Dashboard() {
       />
 
       <SessionDetailsModal isOpen={isSessionModalOpen} onClose={closeSessionModal} session={selectedSessionWithTick} />
+
+      <EventDetailsModal event={selectedCalendarEvent} isOpen={isEventModalOpen} onClose={closeCalendarEvent} />
+
+      {selectedAssetSymbol && (
+        <div
+          className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              closeAssetOverlay();
+            }
+          }}
+        >
+          <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-xl bg-background border border-border shadow-2xl">
+            <AssetDetailContent symbol={selectedAssetSymbol} onRequestClose={closeAssetOverlay} />
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function DashboardWatchlistCard({
+  isEditMode,
+  onOpenAsset,
+}: {
+  isEditMode: boolean;
+  onOpenAsset: (symbol: string) => void;
+}) {
+  const { watchlistAssets } = useWatchlist();
+
+  const displayAssets = useMemo(() => watchlistAssets.slice(0, 5), [watchlistAssets]);
+  const symbols = useMemo(() => displayAssets.map((asset) => asset.symbol), [displayAssets]);
+  const quotes = useMarketQuotes(symbols);
+
+  const getBiasIcon = (bias: string) => {
+    if (bias === "Bullish") return <TrendingUp className="h-4 w-4" />;
+    if (bias === "Bearish") return <TrendingDown className="h-4 w-4" />;
+    return <Minus className="h-4 w-4" />;
+  };
+
+  const getBiasColor = (bias: string) => {
+    if (bias === "Bullish") return "text-success";
+    if (bias === "Bearish") return "text-destructive";
+    return "text-muted-foreground";
+  };
+
+  const getQuoteForAsset = (symbol: string): MarketQuote | undefined => {
+    return quotes[normalizeSymbol(symbol)];
+  };
+
+  const getChangeColor = (quote: MarketQuote | undefined, fallbackChange?: string) => {
+    if (quote) {
+      const formatted = getFormattedMarketChange(quote);
+      if (formatted.direction === "up") return "text-success";
+      if (formatted.direction === "down") return "text-destructive";
+      return "text-muted-foreground";
+    }
+
+    if (fallbackChange?.startsWith("+")) return "text-success";
+    if (fallbackChange?.startsWith("-")) return "text-destructive";
+    return "text-muted-foreground";
+  };
+
+  const getDisplayedChange = (quote: MarketQuote | undefined, fallbackChange?: string) => {
+    if (quote) return getFormattedMarketChange(quote).value;
+    return fallbackChange || "0.00%";
+  };
+
+  if (displayAssets.length === 0) {
+    return (
+      <Card className="h-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Star className="h-4 w-4 text-accent" />
+            Watchlist Overview
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-6 text-center">
+            <Star className="h-8 w-8 text-muted-foreground/50 mb-3" />
+            <p className="text-sm text-muted-foreground mb-2">No assets in your watchlist</p>
+            <p className="text-xs text-muted-foreground">Add assets from the Markets page to see them here</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="h-full">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Star className="h-4 w-4 text-accent" />
+          Watchlist Overview
+        </CardTitle>
+      </CardHeader>
+
+      <CardContent>
+        <div className="space-y-3">
+          {displayAssets.map((asset) => {
+            const quote = getQuoteForAsset(asset.symbol);
+
+            return (
+              <button
+                key={asset.symbol}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (isEditMode) return;
+                  onOpenAsset(asset.symbol);
+                }}
+                disabled={isEditMode}
+                className="w-full text-left flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors group disabled:cursor-default disabled:hover:bg-muted/50"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className="font-semibold text-foreground">{asset.symbol}</span>
+                    <div className={`flex items-center gap-1 text-xs font-medium ${getBiasColor(asset.biasDirection)}`}>
+                      {getBiasIcon(asset.biasDirection)}
+                      <span>{asset.biasDirection}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                    <span>Confidence: {asset.biasConfidence}%</span>
+                    <span>Spread: {asset.spread}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="text-right">
+                    <div className="text-sm font-medium text-foreground">
+                      {formatPriceNoCommas(quote?.last?.toString() ?? asset.latestPrice)}
+                    </div>
+                    <div className={`text-xs ${getChangeColor(quote, asset.priceChange)}`}>
+                      {getDisplayedChange(quote, asset.priceChange)}
+                    </div>
+                  </div>
+
+                  {!isEditMode && (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {watchlistAssets.length > 5 && (
+          <p className="text-xs text-muted-foreground text-center mt-3">
+            +{watchlistAssets.length - 5} more in watchlist
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function DashboardUpcomingEventsCard({
+  title,
+  isEditMode,
+  onOpenEvent,
+}: {
+  title: string;
+  isEditMode: boolean;
+  onOpenEvent: (event: CalendarEvent) => void;
+}) {
+  const events = useMemo(() => getUniqueUpcomingEvents().slice(0, 4), []);
+
+  return (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <CalendarIcon className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        </div>
+      </CardHeader>
+
+      <CardContent>
+        <div className="space-y-2">
+          {events.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No upcoming events found.</p>
+          ) : (
+            events.map((event) => (
+              <button
+                key={event.id}
+                type="button"
+                disabled={isEditMode}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (isEditMode) return;
+                  onOpenEvent(event);
+                }}
+                className="w-full text-left flex items-center justify-between p-2 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <div
+                    className={cn(
+                      "w-1.5 h-1.5 rounded-full shrink-0",
+                      event.impact === "high"
+                        ? "bg-destructive"
+                        : event.impact === "medium"
+                          ? "bg-warning"
+                          : "bg-success",
+                    )}
+                  />
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-foreground truncate">{event.event}</p>
+                    <span className="text-[10px] text-muted-foreground">{event.currency}</span>
+                  </div>
+                </div>
+
+                <div className="text-right shrink-0">
+                  <span className="block text-[10px] text-muted-foreground whitespace-nowrap">
+                    {formatDashboardDate(event)} {event.time}
+                  </span>
+                  <span className="block text-[11px] text-muted-foreground mt-0.5">click to open</span>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
