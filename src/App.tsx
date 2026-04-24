@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { SessionLockProvider } from "@/hooks/use-session-lock";
 import { AlertsProvider } from "@/contexts/AlertsContext";
@@ -29,26 +29,40 @@ import AssetDetail from "./pages/AssetDetail";
 const queryClient = new QueryClient();
 
 function AppRoutes() {
+  const location = useLocation();
+
+  const state = location.state as { backgroundLocation?: Location } | null;
+  const backgroundLocation = state?.backgroundLocation;
+
   return (
-    <Routes>
-      <Route element={<AppLayout />}>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/markets" element={<Markets />} />
-        <Route path="/markets/:symbol" element={<AssetDetail />} />
-        <Route path="/asset/:symbol" element={<AssetDetail />} />
+    <>
+      <Routes location={backgroundLocation || location}>
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/markets" element={<Markets />} />
+          <Route path="/calendar" element={<Calendar />} />
+          <Route path="/alerts" element={<Alerts />} />
+          <Route path="/risk-tools" element={<RiskTools />} />
+          <Route path="/journal" element={<Journal />} />
+          <Route path="/education" element={<Education />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/billing" element={<Billing />} />
 
-        <Route path="/calendar" element={<Calendar />} />
-        <Route path="/alerts" element={<Alerts />} />
-        <Route path="/risk-tools" element={<RiskTools />} />
-        <Route path="/journal" element={<Journal />} />
-        <Route path="/education" element={<Education />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/billing" element={<Billing />} />
-      </Route>
+          {!backgroundLocation && <Route path="/markets/:symbol" element={<AssetDetail />} />}
+          {!backgroundLocation && <Route path="/asset/:symbol" element={<AssetDetail />} />}
+        </Route>
 
-      <Route path="/pricing" element={<Pricing />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+
+      {backgroundLocation && (
+        <Routes>
+          <Route path="/markets/:symbol" element={<AssetDetail />} />
+          <Route path="/asset/:symbol" element={<AssetDetail />} />
+        </Routes>
+      )}
+    </>
   );
 }
 
