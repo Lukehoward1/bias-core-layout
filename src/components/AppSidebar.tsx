@@ -1,5 +1,6 @@
 import {
   LayoutDashboard,
+  TrendingUp,
   Calendar,
   Bell,
   Calculator,
@@ -26,15 +27,14 @@ type Item = { title: string; url: string; icon: any };
 
 const mainItems: Item[] = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Markets", url: "/markets", icon: TrendingUp },
   { title: "Alerts", url: "/alerts", icon: Bell },
   { title: "Calendar", url: "/calendar", icon: Calendar },
   { title: "Risk Tools", url: "/risk-tools", icon: Calculator },
   { title: "Journal", url: "/journal", icon: BookOpen },
 ];
 
-const learningItems: Item[] = [
-  { title: "Education", url: "/education", icon: GraduationCap },
-];
+const learningItems: Item[] = [{ title: "Education", url: "/education", icon: GraduationCap }];
 
 const accountItems: Item[] = [
   { title: "Settings", url: "/settings", icon: Settings },
@@ -55,7 +55,6 @@ export function AppSidebar() {
     if (isMobile) setMobileOpen(false);
   };
 
-  // Unified nav button styling (so Theme/Upgrade match the rest)
   const navBtnBase = `
     w-full text-left
     flex items-center rounded-lg transition-all relative
@@ -65,9 +64,9 @@ export function AppSidebar() {
     select-none
   `;
 
-  // Wrapper to show tooltip ONLY when collapsed on desktop
   const WithCollapsedTooltip = ({ label, children }: { label: string; children: React.ReactNode }) => {
     if (!collapsed || isMobile) return <>{children}</>;
+
     return (
       <Tooltip>
         <TooltipTrigger asChild>{children}</TooltipTrigger>
@@ -96,7 +95,6 @@ export function AppSidebar() {
               key={item.url}
               type="button"
               onPointerDown={(e) => {
-                // navigate on pointerdown to avoid environments where click gets suppressed
                 e.preventDefault();
                 e.stopPropagation();
                 go(item.url);
@@ -110,13 +108,11 @@ export function AppSidebar() {
               className={[
                 navBtnBase,
                 collapsed && !isMobile ? "justify-center mx-1 px-0" : "justify-start",
-                // Active state clarity (especially when collapsed)
                 isActive ? "bg-sidebar-accent text-sidebar-primary ring-1 ring-primary/20" : "",
               ].join(" ")}
               aria-current={isActive ? "page" : undefined}
               title={collapsed && !isMobile ? item.title : undefined}
             >
-              {/* Left indicator only when expanded (cleaner when collapsed) */}
               {isActive && !collapsed && (
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary rounded-r-full" />
               )}
@@ -138,16 +134,10 @@ export function AppSidebar() {
 
   const sidebarContent = (
     <>
-      {/* TOP: Logo (no border lines) */}
       <div className="flex-shrink-0">
         <div className={`h-14 ${collapsed && !isMobile ? "px-3" : "px-4"} flex items-center justify-between`}>
           <div className={`flex items-center ${collapsed && !isMobile ? "justify-center" : "gap-3"}`}>
-            <img
-              src={sbLogo}
-              alt="StreamBias"
-              // SB mark stays BIG even when collapsed; wordmark still hides
-              className={"h-10 w-auto flex-shrink-0"}
-            />
+            <img src={sbLogo} alt="StreamBias" className="h-10 w-auto flex-shrink-0" />
             {(!collapsed || isMobile) && <span className="text-lg font-bold text-foreground">StreamBias</span>}
           </div>
 
@@ -158,7 +148,6 @@ export function AppSidebar() {
           )}
         </div>
 
-        {/* Collapse Button - Desktop only (no border divider) */}
         {!isMobile && (
           <div className="px-3 py-2">
             <Button
@@ -173,11 +162,9 @@ export function AppSidebar() {
         )}
       </div>
 
-      {/* MIDDLE */}
       <div
         className={[
           "flex-1 flex flex-col overflow-y-auto px-3 py-2",
-          // collapsed rhythm: more separation between groups without labels/dividers
           collapsed && !isMobile ? "space-y-4" : "space-y-5",
         ].join(" ")}
       >
@@ -186,9 +173,7 @@ export function AppSidebar() {
         <NavSection title="ACCOUNT" items={accountItems} />
       </div>
 
-      {/* BOTTOM (aligned to same nav styling) */}
       <div className="flex-shrink-0 px-3 py-3 space-y-2">
-        {/* Theme row - same padding/font/hover as nav items */}
         <WithCollapsedTooltip label="Theme">
           <button
             type="button"
@@ -205,7 +190,6 @@ export function AppSidebar() {
           </button>
         </WithCollapsedTooltip>
 
-        {/* Upgrade row - aligned like nav item, but styled as CTA */}
         <WithCollapsedTooltip label="Upgrade">
           <button
             type="button"
@@ -229,7 +213,6 @@ export function AppSidebar() {
     </>
   );
 
-  // Mobile drawer
   if (isMobile) {
     return (
       <>
@@ -249,7 +232,6 @@ export function AppSidebar() {
     );
   }
 
-  // Desktop: in normal flow (no border lines on sidebar)
   return (
     <aside
       className={`
