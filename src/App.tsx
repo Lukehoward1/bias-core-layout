@@ -14,6 +14,7 @@ import { ActiveTradingAccountProvider } from "@/context/ActiveTradingAccountProv
 import { TraderStyleProvider } from "@/context/TraderStyleProvider";
 
 import Dashboard from "./pages/Dashboard";
+import Markets from "./pages/Markets";
 import Calendar from "./pages/Calendar";
 import Alerts from "./pages/Alerts";
 import RiskTools from "./pages/RiskTools";
@@ -32,6 +33,10 @@ function AppRoutes() {
     <Routes>
       <Route element={<AppLayout />}>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/markets" element={<Markets />} />
+        <Route path="/markets/:symbol" element={<AssetDetail />} />
+        <Route path="/asset/:symbol" element={<AssetDetail />} />
+
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/risk-tools" element={<RiskTools />} />
@@ -39,7 +44,6 @@ function AppRoutes() {
         <Route path="/education" element={<Education />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/billing" element={<Billing />} />
-        <Route path="/asset/:symbol" element={<AssetDetail />} />
       </Route>
 
       <Route path="/pricing" element={<Pricing />} />
