@@ -41,7 +41,9 @@ export function WatchlistOverviewCard({ isEditMode = false }: WatchlistOverviewC
     (symbol: string) => {
       if (isEditMode) return;
 
-      navigate(`/asset/${symbol}`, {
+      navigate(`/markets?symbol=${encodeURIComponent(symbol)}`, {
+  state: { backgroundLocation: location },
+});
         state: { backgroundLocation: location },
       });
     },
