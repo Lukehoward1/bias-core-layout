@@ -1,11 +1,11 @@
 import { useMemo, useState, useCallback } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-import { Star, TrendingUp, TrendingDown, Minus, Activity, AlertTriangle, Clock, Target, Zap } from "lucide-react";
+import { Star, TrendingUp, TrendingDown, Minus, Activity, AlertTriangle, Clock, Target, Zap, X } from "lucide-react";
 
 import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
 import { useMarketQuote } from "@/hooks/use-market-quotes";
@@ -16,10 +16,6 @@ import { getEventImpact } from "@/data/eventImpactRules";
 import { getFormattedMarketChange } from "@/services/marketData";
 import type { CalendarEvent } from "@/data/calendarEvents";
 import { getAllCalendarEvents, getEventDateTime, formatCalendarEventDateLabel } from "@/services/calendarData";
-
-/* =======================
-   DATA (demo placeholders)
-======================= */
 
 const assetNewsEvents: Record<string, { event: string; time: string; impact: "High" | "Medium" | "Low" }[]> = {
   EURUSD: [
@@ -82,10 +78,6 @@ const sessionInsights = [
   { session: "Asia", volatility: "Low", description: "Consolidation phase typical" },
 ];
 
-/* =======================
-   HELPERS
-======================= */
-
 type NewsPill = {
   key: string;
   event: string;
@@ -95,7 +87,6 @@ type NewsPill = {
 };
 
 const normalizeMarketSymbol = (symbol: string) => symbol.toUpperCase().replace(/[^A-Z0-9]/g, "");
-
 const isFxPairSymbol = (symbol: string) => /^[A-Z]{6}$/.test(symbol);
 
 const getFxCurrencies = (symbol: string) => {
@@ -193,10 +184,6 @@ const formatTimeUntil = (date: Date) => {
   return `in ${diffDays}d ${remHours}h`;
 };
 
-/* =======================
-   REUSABLE CONTENT
-======================= */
-
 export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string; onRequestClose?: () => void }) {
   const location = useLocation();
   const { getAssetBySymbol } = useAssets();
@@ -207,7 +194,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
-
   const [showAllRelevantNews, setShowAllRelevantNews] = useState(false);
   const [newsExpanded, setNewsExpanded] = useState(false);
 
@@ -215,10 +201,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
   const allCalendarEvents = useMemo(() => getAllCalendarEvents(), []);
   const openedFromAlert = Boolean((location.state as { openedFromAlert?: boolean } | null)?.openedFromAlert);
-
-  const handleToggleWatchlist = () => {
-    toggleWatchlist(symbol);
-  };
 
   const openCalendarEvent = useCallback((event: CalendarEvent) => {
     setIsEventModalOpen(false);
@@ -237,7 +219,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
   const relevantCalendarEvents = useMemo(() => {
     if (!symbol) return [];
-
     return sortEventsByImpactThenTime(allCalendarEvents.filter((event) => isEventRelevantToSymbol(symbol, event)));
   }, [symbol, allCalendarEvents]);
 
@@ -299,9 +280,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
     const combined = [...fromCalendar, ...extras];
     const filtered = showAllRelevantNews ? combined : combined.filter((item) => item.impact === "High");
 
-    if (!showAllRelevantNews && filtered.length === 0 && combined.length > 0) {
-      return combined;
-    }
+    if (!showAllRelevantNews && filtered.length === 0 && combined.length > 0) return combined;
 
     return filtered;
   }, [symbol, upcomingRelevantCalendarEvents, showAllRelevantNews]);
@@ -366,6 +345,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
   const insights = useMemo(() => {
     if (!symbol || !asset) return [];
+
     return (
       quickInsights[symbol] || [
         `Bias: ${asset.biasDirection} → monitoring key levels`,
@@ -388,7 +368,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
   const modeLabel = formatBiasModeLabel((asset as any).biasMode);
   const tfs = Array.isArray((asset as any).biasTimeframes) ? ((asset as any).biasTimeframes as string[]) : [];
   const tfLabel = tfs.length ? tfs.join(" / ") : "—";
-
   const displayPrice = formatPriceNoCommas(quote?.last?.toString() ?? asset.latestPrice);
 
   return (
@@ -402,7 +381,8 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
         </div>
 
         {onRequestClose && (
-          <Button variant="outline" size="sm" onClick={onRequestClose}>
+          <Button variant="outline" size="sm" onClick={onRequestClose} className="gap-2">
+            <X className="h-4 w-4" />
             Close
           </Button>
         )}
@@ -415,7 +395,8 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
               <div className="flex flex-col">
                 <div className="flex items-center gap-3 mb-3">
                   <h1 className="text-4xl font-bold text-foreground">{asset.symbol}</h1>
-                  <Button variant="ghost" size="icon" onClick={handleToggleWatchlist} className="h-10 w-10">
+
+                  <Button variant="ghost" size="icon" onClick={() => toggleWatchlist(symbol)} className="h-10 w-10">
                     <Star
                       className={`h-6 w-6 ${
                         isWatchlisted ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
@@ -480,7 +461,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                             <button
                               key={pill.key}
                               type="button"
-                              onPointerDown={(e) => {
+                              onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
                                 openCalendarOverlayFromNewsPill(pill);
@@ -607,80 +588,77 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
           </CardHeader>
 
           <CardContent>
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <p className="text-muted-foreground leading-relaxed">
-                <strong className="text-foreground">{asset.symbol}</strong> is currently showing a{" "}
-                <strong className={getBiasColor(asset.biasDirection)}>{asset.biasDirection.toLowerCase()}</strong> bias
-                with {asset.biasConfidence}% confidence based on our multi-timeframe analysis.
-              </p>
+            <p className="text-muted-foreground leading-relaxed">
+              <strong className="text-foreground">{asset.symbol}</strong> is currently showing a{" "}
+              <strong className={getBiasColor(asset.biasDirection)}>{asset.biasDirection.toLowerCase()}</strong> bias
+              with {asset.biasConfidence}% confidence based on our multi-timeframe analysis.
+            </p>
 
-              {highImpactEventsNext4Hours.length > 0 ? (
-                <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+            {highImpactEventsNext4Hours.length > 0 ? (
+              <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
 
-                    <div className="text-sm text-destructive">
-                      <p>
-                        <strong>Warning:</strong> {highImpactEventsNext4Hours.length} high-impact news event
-                        {highImpactEventsNext4Hours.length > 1 ? "s are" : " is"} scheduled within the next 4 hours.
-                      </p>
-
-                      <div className="mt-2 space-y-1">
-                        {highImpactEventsNext4Hours.slice(0, 2).map((event) => (
-                          <button
-                            key={event.id}
-                            type="button"
-                            onPointerDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              openCalendarEvent(event);
-                            }}
-                            className="block text-left underline-offset-2 hover:underline"
-                          >
-                            {event.event} — {formatTimeUntil(getEventDateTime(event))}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : nextHighImpactEvent ? (
-                <div className="mt-4 p-4 bg-warning/10 border border-warning/20 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <Clock className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
-
-                    <div className="text-sm text-warning">
-                      <p>
-                        <strong>Heads up:</strong> Next high-impact event is{" "}
-                        <strong>{nextHighImpactEvent.event}</strong>{" "}
-                        {formatTimeUntil(getEventDateTime(nextHighImpactEvent))}.
-                      </p>
-
-                      <button
-                        type="button"
-                        onPointerDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          openCalendarEvent(nextHighImpactEvent);
-                        }}
-                        className="mt-2 text-left underline-offset-2 hover:underline"
-                      >
-                        View event details
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-4 p-4 bg-muted/30 border border-border rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                    <p className="text-sm text-muted-foreground">
-                      No relevant high-impact calendar events are currently scheduled.
+                  <div className="text-sm text-destructive">
+                    <p>
+                      <strong>Warning:</strong> {highImpactEventsNext4Hours.length} high-impact news event
+                      {highImpactEventsNext4Hours.length > 1 ? "s are" : " is"} scheduled within the next 4 hours.
                     </p>
+
+                    <div className="mt-2 space-y-1">
+                      {highImpactEventsNext4Hours.slice(0, 2).map((event) => (
+                        <button
+                          key={event.id}
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openCalendarEvent(event);
+                          }}
+                          className="block text-left underline-offset-2 hover:underline"
+                        >
+                          {event.event} — {formatTimeUntil(getEventDateTime(event))}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : nextHighImpactEvent ? (
+              <div className="mt-4 p-4 bg-warning/10 border border-warning/20 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <Clock className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
+
+                  <div className="text-sm text-warning">
+                    <p>
+                      <strong>Heads up:</strong> Next high-impact event is <strong>{nextHighImpactEvent.event}</strong>{" "}
+                      {formatTimeUntil(getEventDateTime(nextHighImpactEvent))}.
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openCalendarEvent(nextHighImpactEvent);
+                      }}
+                      className="mt-2 text-left underline-offset-2 hover:underline"
+                    >
+                      View event details
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 p-4 bg-muted/30 border border-border rounded-lg">
+                <div className="flex items-start gap-2">
+                  <Clock className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-muted-foreground">
+                    No relevant high-impact calendar events are currently scheduled.
+                  </p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -761,7 +739,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                     <button
                       key={news.id}
                       type="button"
-                      onPointerDown={(e) => {
+                      onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         openCalendarEvent(news);
@@ -808,8 +786,33 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
 export default function AssetDetail() {
   const { symbol } = useParams<{ symbol: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const closeOverlay = useCallback(() => {
+    const from = (location.state as { from?: string } | null)?.from;
+
+    if (from) {
+      navigate(from);
+      return;
+    }
+
+    navigate("/markets");
+  }, [navigate, location.state]);
 
   if (!symbol) return null;
 
-  return <AssetDetailContent symbol={symbol} />;
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm p-4 md:p-8 overflow-y-auto"
+      onClick={closeOverlay}
+    >
+      <div
+        className="mx-auto max-w-6xl rounded-xl border border-border bg-background shadow-2xl overflow-hidden"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <AssetDetailContent symbol={symbol} onRequestClose={closeOverlay} />
+      </div>
+    </div>
+  );
 }
