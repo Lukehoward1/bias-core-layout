@@ -3,14 +3,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { SessionLockProvider } from "@/hooks/use-session-lock";
 import { AlertsProvider } from "@/contexts/AlertsContext";
 import { GlobalNotifications } from "@/components/alerts/GlobalNotifications";
 import { AppLayout } from "@/layouts/AppLayout";
 
-// Global selection providers
 import { ActiveTradingAccountProvider } from "@/context/ActiveTradingAccountProvider";
 import { TraderStyleProvider } from "@/context/TraderStyleProvider";
 
@@ -24,34 +23,28 @@ import Settings from "./pages/Settings";
 import Billing from "./pages/Billing";
 import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
+import AssetDetail from "./pages/AssetDetail";
 
 const queryClient = new QueryClient();
 
 function AppRoutes() {
-  const location = useLocation();
-
-  const state = location.state as { backgroundLocation?: Location } | null;
-  const backgroundLocation = state?.backgroundLocation;
-
   return (
-    <>
-      <Routes location={backgroundLocation || location}>
-        <Route element={<AppLayout />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/calendar" element={<Calendar />} />
-          <Route path="/alerts" element={<Alerts />} />
-          <Route path="/risk-tools" element={<RiskTools />} />
-          <Route path="/journal" element={<Journal />} />
-          <Route path="/education" element={<Education />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/billing" element={<Billing />} />
-        </Route>
+    <Routes>
+      <Route element={<AppLayout />}>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/calendar" element={<Calendar />} />
+        <Route path="/alerts" element={<Alerts />} />
+        <Route path="/risk-tools" element={<RiskTools />} />
+        <Route path="/journal" element={<Journal />} />
+        <Route path="/education" element={<Education />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/billing" element={<Billing />} />
+        <Route path="/asset/:symbol" element={<AssetDetail />} />
+      </Route>
 
-        <Route path="/pricing" element={<Pricing />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-
-    </>
+      <Route path="/pricing" element={<Pricing />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
   );
 }
 
@@ -64,7 +57,6 @@ export default function App() {
             <SessionLockProvider>
               <TraderStyleProvider>
                 <ActiveTradingAccountProvider>
-                  {/* ✅ must be inside AlertsProvider */}
                   <GlobalNotifications />
                   <Toaster />
                   <Sonner />
