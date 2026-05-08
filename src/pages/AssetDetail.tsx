@@ -16,6 +16,8 @@ import { getEventImpact } from "@/data/eventImpactRules";
 import { getFormattedMarketChange } from "@/services/marketData";
 import type { CalendarEvent } from "@/data/calendarEvents";
 import { getAllCalendarEvents, getEventDateTime, formatCalendarEventDateLabel } from "@/services/calendarData";
+import { buildMarketContext, type KeyLevel, type SessionContextItem } from "@/services/contextEngine";
+import { useTraderStyle } from "@/context/TraderStyleProvider";
 
 const assetNewsEvents: Record<string, { event: string; time: string; impact: "High" | "Medium" | "Low" }[]> = {
   EURUSD: [
