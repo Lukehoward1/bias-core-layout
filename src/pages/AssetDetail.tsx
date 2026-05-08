@@ -16,6 +16,8 @@ import { getEventImpact } from "@/data/eventImpactRules";
 import { getFormattedMarketChange } from "@/services/marketData";
 import type { CalendarEvent } from "@/data/calendarEvents";
 import { getAllCalendarEvents, getEventDateTime, formatCalendarEventDateLabel } from "@/services/calendarData";
+import { buildMarketContext, type KeyLevel, type SessionContextItem } from "@/services/contextEngine";
+import { useTraderStyle } from "@/context/TraderStyleProvider";
 
 const assetNewsEvents: Record<string, { event: string; time: string; impact: "High" | "Medium" | "Low" }[]> = {
   EURUSD: [
@@ -356,6 +358,18 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
     );
   }, [symbol, asset]);
 
+  const { traderStyle } = useTraderStyle();
+
+  const marketContext = useMemo(() => {
+    if (!asset) return null;
+    return buildMarketContext({
+      asset,
+      quote,
+      upcomingRelevantEvents: upcomingRelevantCalendarEvents,
+      traderStyle,
+    });
+  }, [asset, quote, upcomingRelevantCalendarEvents, traderStyle]);
+
   if (!asset) {
     return (
       <div className="text-center py-10 px-6">
@@ -588,10 +602,18 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
           </CardHeader>
 
           <CardContent>
+            {marketContext && (
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="text-xs">{marketContext.biasState}</Badge>
+                <Badge variant="secondary" className="text-xs">{marketContext.structureState}</Badge>
+                <span className="text-xs text-muted-foreground">
+                  Bias TF: {marketContext.timeframes.bias.join(" / ")} • Structure TF:{" "}
+                  {marketContext.timeframes.structure.join(" / ")}
+                </span>
+              </div>
+            )}
             <p className="text-muted-foreground leading-relaxed">
-              <strong className="text-foreground">{asset.symbol}</strong> is currently showing a{" "}
-              <strong className={getBiasColor(asset.biasDirection)}>{asset.biasDirection.toLowerCase()}</strong> bias
-              with {asset.biasConfidence}% confidence based on our multi-timeframe analysis.
+              {marketContext?.overview ?? `${asset.symbol} context is being evaluated.`}
             </p>
 
             {highImpactEventsNext4Hours.length > 0 ? (
@@ -673,15 +695,33 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
             <CardContent>
               <div className="space-y-3">
-                {keyLevels.map((level, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
-                    <div>
-                      <span className="text-sm font-medium text-foreground">{level.type}</span>
-                      <p className="text-xs text-muted-foreground">{level.notes}</p>
-                    </div>
-                    <span className="text-sm font-semibold text-foreground">{level.price}</span>
-                  </div>
-                ))}
+                {(marketContext?.levels ?? []).length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No context-driven levels available.</p>
+                ) : (
+                  marketContext!.levels.map((level: KeyLevel, index: number) => {
+                    const relVariant =
+                      level.relevance === "High relevance"
+                        ? "destructive"
+                        : level.relevance === "Medium relevance"
+                          ? "default"
+                          : "secondary";
+                    return (
+                      <div key={index} className="p-2 bg-muted/30 rounded-lg">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="text-sm font-medium text-foreground">{level.type}</span>
+                          <span className="text-sm font-semibold text-foreground">{level.price}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1 mb-1">
+                          <Badge variant={relVariant} className="text-[10px]">{level.relevance}</Badge>
+                          {level.tags.map((t) => (
+                            <Badge key={t} variant="outline" className="text-[10px]">{t}</Badge>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{level.reason}</p>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </CardContent>
           </Card>
@@ -696,26 +736,24 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
             <CardContent>
               <div className="space-y-3">
-                {sessionInsights.map((session, index) => (
-                  <div key={index} className="p-2 bg-muted/30 rounded-lg">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-foreground">{session.session}</span>
-                      <Badge
-                        variant={
-                          session.volatility === "High"
-                            ? "destructive"
-                            : session.volatility === "Medium"
-                              ? "default"
-                              : "secondary"
-                        }
-                        className="text-[10px]"
-                      >
-                        {session.volatility}
-                      </Badge>
+                {(marketContext?.sessionContext ?? []).map((session: SessionContextItem, index: number) => {
+                  const variant =
+                    session.emphasis === "elevated"
+                      ? "destructive"
+                      : session.emphasis === "watch"
+                        ? "default"
+                        : "secondary";
+                  return (
+                    <div key={index} className="p-2 bg-muted/30 rounded-lg">
+                      <div className="flex items-center justify-between mb-1 gap-2">
+                        <span className="text-sm font-medium text-foreground">{session.session}</span>
+                        <Badge variant={variant} className="text-[10px] capitalize">{session.emphasis}</Badge>
+                      </div>
+                      <p className="text-sm text-foreground mb-0.5">{session.headline}</p>
+                      <p className="text-xs text-muted-foreground">{session.description}</p>
                     </div>
-                    <p className="text-xs text-muted-foreground">{session.description}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
