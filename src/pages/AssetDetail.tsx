@@ -736,26 +736,24 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
             <CardContent>
               <div className="space-y-3">
-                {sessionInsights.map((session, index) => (
-                  <div key={index} className="p-2 bg-muted/30 rounded-lg">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-foreground">{session.session}</span>
-                      <Badge
-                        variant={
-                          session.volatility === "High"
-                            ? "destructive"
-                            : session.volatility === "Medium"
-                              ? "default"
-                              : "secondary"
-                        }
-                        className="text-[10px]"
-                      >
-                        {session.volatility}
-                      </Badge>
+                {(marketContext?.sessionContext ?? []).map((session: SessionContextItem, index: number) => {
+                  const variant =
+                    session.emphasis === "elevated"
+                      ? "destructive"
+                      : session.emphasis === "watch"
+                        ? "default"
+                        : "secondary";
+                  return (
+                    <div key={index} className="p-2 bg-muted/30 rounded-lg">
+                      <div className="flex items-center justify-between mb-1 gap-2">
+                        <span className="text-sm font-medium text-foreground">{session.session}</span>
+                        <Badge variant={variant} className="text-[10px] capitalize">{session.emphasis}</Badge>
+                      </div>
+                      <p className="text-sm text-foreground mb-0.5">{session.headline}</p>
+                      <p className="text-xs text-muted-foreground">{session.description}</p>
                     </div>
-                    <p className="text-xs text-muted-foreground">{session.description}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
