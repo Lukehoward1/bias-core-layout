@@ -602,10 +602,18 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
           </CardHeader>
 
           <CardContent>
+            {marketContext && (
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="text-xs">{marketContext.biasState}</Badge>
+                <Badge variant="secondary" className="text-xs">{marketContext.structureState}</Badge>
+                <span className="text-xs text-muted-foreground">
+                  Bias TF: {marketContext.timeframes.bias.join(" / ")} • Structure TF:{" "}
+                  {marketContext.timeframes.structure.join(" / ")}
+                </span>
+              </div>
+            )}
             <p className="text-muted-foreground leading-relaxed">
-              <strong className="text-foreground">{asset.symbol}</strong> is currently showing a{" "}
-              <strong className={getBiasColor(asset.biasDirection)}>{asset.biasDirection.toLowerCase()}</strong> bias
-              with {asset.biasConfidence}% confidence based on our multi-timeframe analysis.
+              {marketContext?.overview ?? `${asset.symbol} context is being evaluated.`}
             </p>
 
             {highImpactEventsNext4Hours.length > 0 ? (
