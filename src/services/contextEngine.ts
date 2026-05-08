@@ -251,7 +251,8 @@ function buildLevels(asset: Asset, quote: MarketQuote | null | undefined, biasSt
 
   const decimals = inferDecimals(ref);
   // Per-asset relative range: use bigger swings for crypto/indices, tighter for FX.
-  const rel = asset.category === "crypto" ? 0.025 : asset.category === "index" ? 0.012 : asset.category === "commodity" ? 0.01 : 0.0035;
+  const cat = asset.category;
+  const rel = cat === "Crypto" ? 0.025 : cat === "Indices" ? 0.012 : cat === "Commodities" ? 0.01 : 0.0035;
 
   const offsets = seededOffsets(asset.symbol, 6);
   const isBull = biasState.startsWith("Bullish");
