@@ -695,15 +695,33 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
             <CardContent>
               <div className="space-y-3">
-                {keyLevels.map((level, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
-                    <div>
-                      <span className="text-sm font-medium text-foreground">{level.type}</span>
-                      <p className="text-xs text-muted-foreground">{level.notes}</p>
-                    </div>
-                    <span className="text-sm font-semibold text-foreground">{level.price}</span>
-                  </div>
-                ))}
+                {(marketContext?.levels ?? []).length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No context-driven levels available.</p>
+                ) : (
+                  marketContext!.levels.map((level: KeyLevel, index: number) => {
+                    const relVariant =
+                      level.relevance === "High relevance"
+                        ? "destructive"
+                        : level.relevance === "Medium relevance"
+                          ? "default"
+                          : "secondary";
+                    return (
+                      <div key={index} className="p-2 bg-muted/30 rounded-lg">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="text-sm font-medium text-foreground">{level.type}</span>
+                          <span className="text-sm font-semibold text-foreground">{level.price}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1 mb-1">
+                          <Badge variant={relVariant} className="text-[10px]">{level.relevance}</Badge>
+                          {level.tags.map((t) => (
+                            <Badge key={t} variant="outline" className="text-[10px]">{t}</Badge>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{level.reason}</p>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </CardContent>
           </Card>
