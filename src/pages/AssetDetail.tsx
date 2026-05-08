@@ -425,16 +425,19 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                  <h3 className="text-xs font-medium text-muted-foreground/70 uppercase tracking-widest mb-5">
                     Market Context Snapshot
                   </h3>
 
-                  <div className="divide-y divide-border/60 rounded-lg border border-border/60 bg-muted/20">
+                  <div className="space-y-5">
                     {(() => {
                       if (!marketContext) {
                         return insights.map((insight, index) => (
-                          <div key={index} className="px-3 py-2.5">
-                            <p className="text-sm text-muted-foreground">{insight}</p>
+                          <div key={index} className="flex gap-3 items-start">
+                            <div className="w-px self-stretch bg-muted-foreground/20 rounded-full" />
+                            <div className="min-w-0">
+                              <p className="text-sm text-foreground/80 leading-relaxed">{insight}</p>
+                            </div>
                           </div>
                         ));
                       }
@@ -515,20 +518,20 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                       }
 
                       const toneAccent: Record<string, string> = {
-                        neutral: "bg-muted-foreground/40",
-                        positive: "bg-success",
-                        negative: "bg-destructive",
-                        warn: "bg-warning",
+                        neutral: "bg-muted-foreground/25",
+                        positive: "bg-success/60",
+                        negative: "bg-destructive/60",
+                        warn: "bg-warning/60",
                       };
 
                       return blocks.map((b, i) => (
-                        <div key={i} className="px-3 py-2.5 flex gap-3">
-                          <div className={`w-0.5 rounded-full flex-shrink-0 ${toneAccent[b.tone]}`} />
+                        <div key={i} className="flex gap-3 items-start">
+                          <div className={`w-px self-stretch rounded-full ${toneAccent[b.tone]}`} />
                           <div className="min-w-0">
-                            <div className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase mb-1">
+                            <div className="text-[10px] font-medium tracking-widest text-muted-foreground/60 uppercase mb-1.5">
                               {b.label}
                             </div>
-                            <p className="text-sm text-foreground leading-snug">{b.text}</p>
+                            <p className="text-sm text-foreground/90 leading-relaxed">{b.text}</p>
                           </div>
                         </div>
                       ));
