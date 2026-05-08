@@ -426,22 +426,113 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
                 <div>
                   <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
-                    Quick Insights
+                    Market Context Snapshot
                   </h3>
 
-                  <div className="space-y-2">
-                    {insights.map((insight, index) => {
-                      const colors = ["bg-primary", "bg-success", "bg-warning", "bg-destructive"];
+                  <div className="divide-y divide-border/60 rounded-lg border border-border/60 bg-muted/20">
+                    {(() => {
+                      if (!marketContext) {
+                        return insights.map((insight, index) => (
+                          <div key={index} className="px-3 py-2.5">
+                            <p className="text-sm text-muted-foreground">{insight}</p>
+                          </div>
+                        ));
+                      }
 
-                      return (
-                        <div key={index} className="flex items-start gap-2">
-                          <div
-                            className={`h-1.5 w-1.5 rounded-full ${colors[index % colors.length]} mt-1.5 flex-shrink-0`}
-                          />
-                          <p className="text-sm text-muted-foreground">{insight}</p>
+                      const { biasState, structureState, levels, timeframes, highImpactSoon } = marketContext;
+                      const biasTf = timeframes.bias[1] ?? timeframes.bias[0];
+                      const structTf = timeframes.structure[1] ?? timeframes.structure[0];
+                      const isBull = biasState.startsWith("Bullish");
+                      const isBear = biasState.startsWith("Bearish");
+
+                      const swingLow = levels.find((l) => l.type === "Swing Low");
+                      const swingHigh = levels.find((l) => l.type === "Swing High");
+                      const liquidity = levels.find((l) => l.type === "Liquidity Sweep");
+                      const target = levels.find((l) => l.type === "Nearby Target");
+                      const reaction = levels.find((l) => l.type === "Strong Reaction Zone");
+
+                      const invalidationLevel = isBull ? swingLow : isBear ? swingHigh : null;
+
+                      const blocks: { label: string; text: string; tone: "neutral" | "positive" | "negative" | "warn" }[] = [
+                        {
+                          label: "Higher Timeframe Bias",
+                          tone: isBull ? "positive" : isBear ? "negative" : "neutral",
+                          text: isBull
+                            ? `${biasTf} structure remains bullish; upside bias is intact.`
+                            : isBear
+                              ? `${biasTf} structure remains bearish; downside bias is intact.`
+                              : `${biasTf} structure is range-bound with no dominant directional pressure.`,
+                        },
+                        {
+                          label: "Current Market Condition",
+                          tone: "neutral",
+                          text: (() => {
+                            switch (structureState) {
+                              case "Trending Up":
+                                return `${structTf} continuation in motion; higher highs / higher lows holding.`;
+                              case "Trending Down":
+                                return `${structTf} continuation in motion; lower highs / lower lows holding.`;
+                              case "Structure Shifting":
+                                return `${structTf} attempted continuation but failed to hold acceptance.`;
+                              case "Compressed":
+                                return `${structTf} compressed; awaiting break of a key level.`;
+                              default:
+                                return `${structTf} ranging between recent extremes.`;
+                            }
+                          })(),
+                        },
+                        {
+                          label: "Active Risk",
+                          tone: biasState.includes("Weakening") || biasState === "Failure Detected" || highImpactSoon ? "warn" : "neutral",
+                          text: highImpactSoon
+                            ? "High-impact news risk soon — short-term volatility expected."
+                            : biasState.includes("Weakening")
+                              ? `Pullback risk elevated while ${isBull ? "below intraday highs" : "above intraday lows"}.`
+                              : biasState === "Failure Detected"
+                                ? "Prior bias appears to be failing — context becoming inconclusive."
+                                : "No elevated short-term risk flags at current price.",
+                        },
+                      ];
+
+                      if (invalidationLevel) {
+                        blocks.push({
+                          label: "Invalidation Level",
+                          tone: "negative",
+                          text: `${isBull ? "Bullish" : "Bearish"} continuation weakens ${isBull ? "below" : "above"} ${invalidationLevel.price} ${isBull ? "support" : "resistance"}.`,
+                        });
+                      }
+
+                      const areas: string[] = [];
+                      if (liquidity) areas.push(`Liquidity: ${liquidity.price}`);
+                      if (target) areas.push(`Nearby target: ${target.price}`);
+                      if (!liquidity && reaction) areas.push(`Reaction zone: ${reaction.price}`);
+                      if (areas.length > 0) {
+                        blocks.push({
+                          label: "Next Relevant Areas",
+                          tone: "neutral",
+                          text: areas.join("  •  "),
+                        });
+                      }
+
+                      const toneAccent: Record<string, string> = {
+                        neutral: "bg-muted-foreground/40",
+                        positive: "bg-success",
+                        negative: "bg-destructive",
+                        warn: "bg-warning",
+                      };
+
+                      return blocks.map((b, i) => (
+                        <div key={i} className="px-3 py-2.5 flex gap-3">
+                          <div className={`w-0.5 rounded-full flex-shrink-0 ${toneAccent[b.tone]}`} />
+                          <div className="min-w-0">
+                            <div className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase mb-1">
+                              {b.label}
+                            </div>
+                            <p className="text-sm text-foreground leading-snug">{b.text}</p>
+                          </div>
                         </div>
-                      );
-                    })}
+                      ));
+                    })()}
                   </div>
 
                   {newsImpactPills.length > 0 && (
