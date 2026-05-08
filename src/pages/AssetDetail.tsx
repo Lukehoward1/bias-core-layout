@@ -358,6 +358,18 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
     );
   }, [symbol, asset]);
 
+  const { traderStyle } = useTraderStyle();
+
+  const marketContext = useMemo(() => {
+    if (!asset) return null;
+    return buildMarketContext({
+      asset,
+      quote,
+      upcomingRelevantEvents: upcomingRelevantCalendarEvents,
+      traderStyle,
+    });
+  }, [asset, quote, upcomingRelevantCalendarEvents, traderStyle]);
+
   if (!asset) {
     return (
       <div className="text-center py-10 px-6">
