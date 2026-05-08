@@ -389,7 +389,7 @@ function deriveSessionContext(
   });
 
   // Light asset hint without being advisory.
-  if (asset.category === "crypto") {
+  if (asset.category === "Crypto") {
     items[0].description += " Crypto trades 24/7, so session edges are softer.";
   }
 
