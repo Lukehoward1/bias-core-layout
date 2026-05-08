@@ -1,3 +1,4 @@
+// src/pages/AssetDetail.tsx
 import { useMemo, useState, useCallback } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
@@ -46,46 +47,18 @@ const assetNewsEvents: Record<string, { event: string; time: string; impact: "Hi
   ETHUSD: [{ event: "ETH Network Update", time: "18:00 GMT", impact: "Medium" }],
 };
 
-const quickInsights: Record<string, string[]> = {
-  XAUUSD: [
-    "Bias: Bullish → approaching resistance at 2035",
-    "Level: Price near D1 support 2018–2022",
-    "Trend: H4 structure remains bullish",
-    "Volatility: High-impact USD news in 2 hours",
-  ],
-  EURUSD: [
-    "Bias: Bullish → testing 1.0850 resistance",
-    "Level: Price above D1 support 1.0820",
-    "Trend: H4 bullish momentum increasing",
-    "Volatility: CPI data expected today",
-  ],
-  BTCUSD: [
-    "Bias: Bullish → ETF decision pending",
-    "Level: Price consolidating near 37,000",
-    "Trend: Weekly structure bullish",
-    "Volatility: High due to regulatory news",
-  ],
-};
-
-const keyLevels = [
-  { type: "Daily Support", price: "2018.5", notes: "Retest zone" },
-  { type: "Daily Resistance", price: "2035.0", notes: "Liquidity overhead" },
-  { type: "Weekly Support", price: "2000.0", notes: "Major level" },
-  { type: "Trendline", price: "—", notes: "Uptrend intact" },
-];
-
-const sessionInsights = [
-  { session: "London Open", volatility: "High", description: "Strong directional moves expected" },
-  { session: "New York Open", volatility: "Medium", description: "Continuation or reversal likely" },
-  { session: "Asia", volatility: "Low", description: "Consolidation phase typical" },
-];
-
 type NewsPill = {
   key: string;
   event: string;
   time: string;
   impact: "High" | "Medium" | "Low";
   calendarEvent?: CalendarEvent;
+};
+
+type ContextSnapshotItem = {
+  label: string;
+  text: string;
+  accent: "success" | "warning" | "destructive" | "primary" | "muted";
 };
 
 const normalizeMarketSymbol = (symbol: string) => symbol.toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -186,10 +159,32 @@ const formatTimeUntil = (date: Date) => {
   return `in ${diffDays}d ${remHours}h`;
 };
 
+const getAccentClass = (accent: ContextSnapshotItem["accent"]) => {
+  switch (accent) {
+    case "success":
+      return "border-success";
+    case "warning":
+      return "border-warning";
+    case "destructive":
+      return "border-destructive";
+    case "primary":
+      return "border-primary";
+    default:
+      return "border-muted-foreground/30";
+  }
+};
+
+const getDirectionalWord = (bias: string) => {
+  if (bias === "Bullish") return "upside";
+  if (bias === "Bearish") return "downside";
+  return "neutral";
+};
+
 export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string; onRequestClose?: () => void }) {
   const location = useLocation();
   const { getAssetBySymbol } = useAssets();
   const { isInWatchlist, toggleWatchlist } = useWatchlist();
+  const { traderStyle } = useTraderStyle();
 
   const asset = symbol ? getAssetBySymbol(symbol) : undefined;
   const isWatchlisted = symbol ? isInWatchlist(symbol) : false;
@@ -315,6 +310,87 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
     [openCalendarEvent, relevantCalendarEvents],
   );
 
+  const marketContext = useMemo(() => {
+    if (!asset) return null;
+    return buildMarketContext({
+      asset,
+      quote,
+      upcomingRelevantEvents: upcomingRelevantCalendarEvents,
+      traderStyle,
+    });
+  }, [asset, quote, upcomingRelevantCalendarEvents, traderStyle]);
+
+  const contextSnapshot = useMemo<ContextSnapshotItem[]>(() => {
+    if (!asset || !marketContext) return [];
+
+    const biasTf = marketContext.timeframes.bias[0] ?? "Higher timeframe";
+    const structureTf = marketContext.timeframes.structure[0] ?? "Structure timeframe";
+    const direction = getDirectionalWord(asset.biasDirection);
+
+    const nearestPullback =
+      marketContext.levels.find((level) =>
+        asset.biasDirection === "Bullish"
+          ? level.type.toLowerCase().includes("low") || level.reason.toLowerCase().includes("demand")
+          : level.type.toLowerCase().includes("high") || level.reason.toLowerCase().includes("supply"),
+      ) ?? marketContext.levels[0];
+
+    const nearbyTarget =
+      marketContext.levels.find((level) => level.type.toLowerCase().includes("target")) ??
+      marketContext.levels.find((level) => level.tags.some((tag) => tag.toLowerCase().includes("nearby"))) ??
+      marketContext.levels[1];
+
+    const liquidityLevel =
+      marketContext.levels.find((level) => level.type.toLowerCase().includes("liquidity")) ??
+      marketContext.levels.find((level) => level.tags.some((tag) => tag.toLowerCase().includes("liquidity")));
+
+    const isWeakening = marketContext.biasState.toLowerCase().includes("weakening");
+    const isFailure = marketContext.biasState.toLowerCase().includes("failure");
+    const isNeutral = marketContext.biasState.toLowerCase().includes("neutral");
+
+    return [
+      {
+        label: "Higher timeframe bias",
+        text: isNeutral
+          ? `${biasTf} context remains neutral; directional conviction is limited.`
+          : `${biasTf} structure remains ${asset.biasDirection.toLowerCase()}; ${direction} bias is intact.`,
+        accent:
+          asset.biasDirection === "Bullish" ? "success" : asset.biasDirection === "Bearish" ? "destructive" : "muted",
+      },
+      {
+        label: "Current market condition",
+        text: `${structureTf} ${marketContext.structureState.toLowerCase()}; current structure is being monitored for continuation or failure.`,
+        accent: "primary",
+      },
+      {
+        label: "Active risk",
+        text: isFailure
+          ? "Prior bias has shown failure characteristics; confirmation is needed before respecting the opposite side."
+          : isWeakening
+            ? "Short-term continuation risk is elevated; current bias is losing momentum."
+            : "No elevated short-term risk flags at current price.",
+        accent: isFailure ? "destructive" : isWeakening ? "warning" : "muted",
+      },
+      {
+        label: "Invalidation level",
+        text: nearestPullback
+          ? `${asset.biasDirection} continuation weakens around ${nearestPullback.price}.`
+          : "No clear invalidation level available from current context.",
+        accent: "destructive",
+      },
+      {
+        label: "Next relevant areas",
+        text:
+          [
+            liquidityLevel ? `Liquidity: ${liquidityLevel.price}` : null,
+            nearbyTarget ? `Nearby target: ${nearbyTarget.price}` : null,
+          ]
+            .filter(Boolean)
+            .join(" • ") || "No clear nearby reaction areas available.",
+        accent: "muted",
+      },
+    ];
+  }, [asset, marketContext]);
+
   const getBiasColor = (bias: string) => {
     if (bias === "Bullish") return "text-success";
     if (bias === "Bearish") return "text-destructive";
@@ -344,31 +420,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
     if (quote) return getFormattedMarketChange(quote).value;
     return asset?.priceChange || "0.00%";
   };
-
-  const insights = useMemo(() => {
-    if (!symbol || !asset) return [];
-
-    return (
-      quickInsights[symbol] || [
-        `Bias: ${asset.biasDirection} → monitoring key levels`,
-        "Level: Price near significant support/resistance",
-        "Trend: Structure developing on H4",
-        "Volatility: Watch for upcoming news events",
-      ]
-    );
-  }, [symbol, asset]);
-
-  const { traderStyle } = useTraderStyle();
-
-  const marketContext = useMemo(() => {
-    if (!asset) return null;
-    return buildMarketContext({
-      asset,
-      quote,
-      upcomingRelevantEvents: upcomingRelevantCalendarEvents,
-      traderStyle,
-    });
-  }, [asset, quote, upcomingRelevantCalendarEvents, traderStyle]);
 
   if (!asset) {
     return (
@@ -425,117 +476,19 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                 </div>
 
                 <div>
-                  <h3 className="text-xs font-medium text-muted-foreground/70 uppercase tracking-widest mb-5">
+                  <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
                     Market Context Snapshot
                   </h3>
 
-                  <div className="space-y-5">
-                    {(() => {
-                      if (!marketContext) {
-                        return insights.map((insight, index) => (
-                          <div key={index} className="flex gap-3 items-start">
-                            <div className="w-px self-stretch bg-muted-foreground/20 rounded-full" />
-                            <div className="min-w-0">
-                              <p className="text-sm text-foreground/80 leading-relaxed">{insight}</p>
-                            </div>
-                          </div>
-                        ));
-                      }
-
-                      const { biasState, structureState, levels, timeframes, highImpactSoon } = marketContext;
-                      const biasTf = timeframes.bias[1] ?? timeframes.bias[0];
-                      const structTf = timeframes.structure[1] ?? timeframes.structure[0];
-                      const isBull = biasState.startsWith("Bullish");
-                      const isBear = biasState.startsWith("Bearish");
-
-                      const swingLow = levels.find((l) => l.type === "Swing Low");
-                      const swingHigh = levels.find((l) => l.type === "Swing High");
-                      const liquidity = levels.find((l) => l.type === "Liquidity Sweep");
-                      const target = levels.find((l) => l.type === "Nearby Target");
-                      const reaction = levels.find((l) => l.type === "Strong Reaction Zone");
-
-                      const invalidationLevel = isBull ? swingLow : isBear ? swingHigh : null;
-
-                      const blocks: { label: string; text: string; tone: "neutral" | "positive" | "negative" | "warn" }[] = [
-                        {
-                          label: "Higher Timeframe Bias",
-                          tone: isBull ? "positive" : isBear ? "negative" : "neutral",
-                          text: isBull
-                            ? `${biasTf} structure remains bullish; upside bias is intact.`
-                            : isBear
-                              ? `${biasTf} structure remains bearish; downside bias is intact.`
-                              : `${biasTf} structure is range-bound with no dominant directional pressure.`,
-                        },
-                        {
-                          label: "Current Market Condition",
-                          tone: "neutral",
-                          text: (() => {
-                            switch (structureState) {
-                              case "Trending Up":
-                                return `${structTf} continuation in motion; higher highs / higher lows holding.`;
-                              case "Trending Down":
-                                return `${structTf} continuation in motion; lower highs / lower lows holding.`;
-                              case "Structure Shifting":
-                                return `${structTf} attempted continuation but failed to hold acceptance.`;
-                              case "Compressed":
-                                return `${structTf} compressed; awaiting break of a key level.`;
-                              default:
-                                return `${structTf} ranging between recent extremes.`;
-                            }
-                          })(),
-                        },
-                        {
-                          label: "Active Risk",
-                          tone: biasState.includes("Weakening") || biasState === "Failure Detected" || highImpactSoon ? "warn" : "neutral",
-                          text: highImpactSoon
-                            ? "High-impact news risk soon — short-term volatility expected."
-                            : biasState.includes("Weakening")
-                              ? `Pullback risk elevated while ${isBull ? "below intraday highs" : "above intraday lows"}.`
-                              : biasState === "Failure Detected"
-                                ? "Prior bias appears to be failing — context becoming inconclusive."
-                                : "No elevated short-term risk flags at current price.",
-                        },
-                      ];
-
-                      if (invalidationLevel) {
-                        blocks.push({
-                          label: "Invalidation Level",
-                          tone: "negative",
-                          text: `${isBull ? "Bullish" : "Bearish"} continuation weakens ${isBull ? "below" : "above"} ${invalidationLevel.price} ${isBull ? "support" : "resistance"}.`,
-                        });
-                      }
-
-                      const areas: string[] = [];
-                      if (liquidity) areas.push(`Liquidity: ${liquidity.price}`);
-                      if (target) areas.push(`Nearby target: ${target.price}`);
-                      if (!liquidity && reaction) areas.push(`Reaction zone: ${reaction.price}`);
-                      if (areas.length > 0) {
-                        blocks.push({
-                          label: "Next Relevant Areas",
-                          tone: "neutral",
-                          text: areas.join("  •  "),
-                        });
-                      }
-
-                      const toneAccent: Record<string, string> = {
-                        neutral: "bg-muted-foreground/25",
-                        positive: "bg-success/60",
-                        negative: "bg-destructive/60",
-                        warn: "bg-warning/60",
-                      };
-
-                      return blocks.map((b, i) => (
-                        <div key={i} className="flex gap-3 items-start">
-                          <div className={`w-px self-stretch rounded-full ${toneAccent[b.tone]}`} />
-                          <div className="min-w-0">
-                            <div className="text-[10px] font-medium tracking-widest text-muted-foreground/60 uppercase mb-1.5">
-                              {b.label}
-                            </div>
-                            <p className="text-sm text-foreground/90 leading-relaxed">{b.text}</p>
-                          </div>
+                  <div className="space-y-3">
+                    {contextSnapshot.map((item) => (
+                      <div key={item.label} className={`border-l ${getAccentClass(item.accent)} pl-3`}>
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground/70 leading-none mb-1">
+                          {item.label}
                         </div>
-                      ));
-                    })()}
+                        <p className="text-sm font-medium text-foreground leading-snug">{item.text}</p>
+                      </div>
+                    ))}
                   </div>
 
                   {newsImpactPills.length > 0 && (
@@ -698,14 +651,19 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
           <CardContent>
             {marketContext && (
               <div className="mb-3 flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className="text-xs">{marketContext.biasState}</Badge>
-                <Badge variant="secondary" className="text-xs">{marketContext.structureState}</Badge>
+                <Badge variant="outline" className="text-xs">
+                  {marketContext.biasState}
+                </Badge>
+                <Badge variant="secondary" className="text-xs">
+                  {marketContext.structureState}
+                </Badge>
                 <span className="text-xs text-muted-foreground">
                   Bias TF: {marketContext.timeframes.bias.join(" / ")} • Structure TF:{" "}
                   {marketContext.timeframes.structure.join(" / ")}
                 </span>
               </div>
             )}
+
             <p className="text-muted-foreground leading-relaxed">
               {marketContext?.overview ?? `${asset.symbol} context is being evaluated.`}
             </p>
@@ -799,6 +757,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                         : level.relevance === "Medium relevance"
                           ? "default"
                           : "secondary";
+
                     return (
                       <div key={index} className="p-2 bg-muted/30 rounded-lg">
                         <div className="flex items-center justify-between gap-2 mb-1">
@@ -806,9 +765,13 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                           <span className="text-sm font-semibold text-foreground">{level.price}</span>
                         </div>
                         <div className="flex flex-wrap items-center gap-1 mb-1">
-                          <Badge variant={relVariant} className="text-[10px]">{level.relevance}</Badge>
+                          <Badge variant={relVariant} className="text-[10px]">
+                            {level.relevance}
+                          </Badge>
                           {level.tags.map((t) => (
-                            <Badge key={t} variant="outline" className="text-[10px]">{t}</Badge>
+                            <Badge key={t} variant="outline" className="text-[10px]">
+                              {t}
+                            </Badge>
                           ))}
                         </div>
                         <p className="text-xs text-muted-foreground">{level.reason}</p>
@@ -837,11 +800,14 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                       : session.emphasis === "watch"
                         ? "default"
                         : "secondary";
+
                   return (
                     <div key={index} className="p-2 bg-muted/30 rounded-lg">
                       <div className="flex items-center justify-between mb-1 gap-2">
                         <span className="text-sm font-medium text-foreground">{session.session}</span>
-                        <Badge variant={variant} className="text-[10px] capitalize">{session.emphasis}</Badge>
+                        <Badge variant={variant} className="text-[10px] capitalize">
+                          {session.emphasis}
+                        </Badge>
                       </div>
                       <p className="text-sm text-foreground mb-0.5">{session.headline}</p>
                       <p className="text-xs text-muted-foreground">{session.description}</p>
