@@ -468,6 +468,66 @@ function buildOverview(opts: {
   return `${biasSentence} ${structureSentence} ${zoneSentence}${newsSentence}`;
 }
 
+// ── Timeframe context ────────────────────────────────────────
+
+function getDefaultTimeframesForStyle(style: TraderStyle): [string, string, string] {
+  if (style === "scalper") return ["1m", "5m", "15m"];
+  if (style === "swing") return ["1H", "4H", "Daily"];
+  return ["5m", "15m", "1H"];
+}
+
+function buildTimeframeContext(
+  asset: Asset,
+  biasState: BiasState,
+  structureState: StructureState,
+  quote: MarketQuote | null | undefined,
+  highImpactSoon: boolean,
+  style: TraderStyle,
+): TimeframeContextItem[] {
+  const tfs = getDefaultTimeframesForStyle(style);
+  const dir = asset.biasDirection;
+  const change = quote?.changePercent ?? 0;
+  const isWeakening = biasState.includes("Weakening");
+  const isFailure = biasState === "Failure Detected";
+  const isNeutral = biasState === "Neutral / Ranging";
+
+  return tfs.map((tf, i) => {
+    // Higher timeframe (HTF bias)
+    if (i === 2) {
+      if (isNeutral) return { timeframe: tf, state: "neutral", label: "Higher timeframe neutral", detail: "No dominant directional pressure on the higher timeframe." };
+      if (isFailure) return { timeframe: tf, state: "weakening", label: "Higher timeframe bias challenged", detail: "Prior higher timeframe context shows signs of failure." };
+      if (dir === "Bullish") return { timeframe: tf, state: "bullish", label: "Higher timeframe bias intact", detail: "Bullish higher timeframe structure remains the dominant context." };
+      if (dir === "Bearish") return { timeframe: tf, state: "bearish", label: "Higher timeframe bias intact", detail: "Bearish higher timeframe structure remains the dominant context." };
+      return { timeframe: tf, state: "neutral", label: "Higher timeframe neutral", detail: "Directional context is unclear on the higher timeframe." };
+    }
+    // Mid timeframe (structure)
+    if (i === 1) {
+      if (isNeutral || structureState === "Ranging") return { timeframe: tf, state: "neutral", label: "Neutral / choppy", detail: "Structure shows no committed direction." };
+      if (isFailure) return { timeframe: tf, state: "bearish", label: "Structure broken", detail: "Mid-timeframe structure has failed to hold." };
+      if (isWeakening) return { timeframe: tf, state: "weakening", label: "Structure weakening", detail: "Mid-timeframe momentum is fading; reaction risk is elevated." };
+      if (structureState === "Structure Shifting") return { timeframe: tf, state: "weakening", label: "Structure shifting", detail: "Recent move is challenging the prevailing read." };
+      if (dir === "Bullish") return { timeframe: tf, state: "bullish", label: "Bullish structure holding", detail: "Mid-timeframe price action remains aligned with current bias." };
+      if (dir === "Bearish") return { timeframe: tf, state: "bearish", label: "Bearish structure holding", detail: "Mid-timeframe price action remains aligned with current bias." };
+      return { timeframe: tf, state: "neutral", label: "Neutral / choppy", detail: "Structure shows no committed direction." };
+    }
+    // Lowest timeframe (short-term)
+    if (highImpactSoon) return { timeframe: tf, state: "liquidity", label: "Liquidity area nearby", detail: "Short-term price is sensitive to upcoming high-impact event risk." };
+    if (structureState === "Compressed") return { timeframe: tf, state: "weakening", label: "Pullback risk elevated", detail: "Short-term price is compressed; reaction risk is elevated." };
+    if (isFailure) return { timeframe: tf, state: "bearish", label: "Structure broken", detail: "Short-term price action has invalidated the prior context." };
+    if (isWeakening) return { timeframe: tf, state: "weakening", label: "Pullback forming", detail: "Short-term momentum is fading against current bias." };
+    if (isNeutral) return { timeframe: tf, state: "neutral", label: "Neutral / choppy", detail: "Short-term price action lacks directional commitment." };
+    if (dir === "Bullish") {
+      if (change < -0.1) return { timeframe: tf, state: "weakening", label: "Pullback forming", detail: "Short-term price is pulling back from recent highs." };
+      return { timeframe: tf, state: "bullish", label: "Bullish continuation", detail: "Short-term price remains aligned with current intraday context." };
+    }
+    if (dir === "Bearish") {
+      if (change > 0.1) return { timeframe: tf, state: "weakening", label: "Bounce forming", detail: "Short-term price is bouncing against bearish bias." };
+      return { timeframe: tf, state: "bearish", label: "Bearish continuation", detail: "Short-term price remains aligned with current intraday context." };
+    }
+    return { timeframe: tf, state: "neutral", label: "Neutral / choppy", detail: "Short-term price action lacks directional commitment." };
+  });
+}
+
 // ── Public entry point ───────────────────────────────────────
 
 export function buildMarketContext(input: ContextEngineInput): MarketContext {
@@ -486,6 +546,7 @@ export function buildMarketContext(input: ContextEngineInput): MarketContext {
   const structureState = deriveStructureState(asset, quote);
   const levels = buildLevels(asset, quote, biasState);
   const sessionContext = deriveSessionContext(asset, biasState, highImpactSoon);
+  const timeframeContext = buildTimeframeContext(asset, biasState, structureState, quote, highImpactSoon, traderStyle);
   const overview = buildOverview({
     asset,
     biasState,
@@ -503,6 +564,7 @@ export function buildMarketContext(input: ContextEngineInput): MarketContext {
     sessionContext,
     overview,
     timeframes: getStyleTimeframes(traderStyle),
+    timeframeContext,
     highImpactSoon,
   };
 }
