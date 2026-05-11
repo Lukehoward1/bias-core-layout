@@ -83,6 +83,15 @@ export type StyleTimeframes = {
   execution: [string, string];
 };
 
+export type TimeframeState = "bullish" | "weakening" | "bearish" | "liquidity" | "neutral";
+
+export interface TimeframeContextItem {
+  timeframe: string;
+  state: TimeframeState;
+  label: string;
+  detail: string;
+}
+
 export interface MarketContext {
   symbol: string;
   biasState: BiasState;
@@ -91,6 +100,7 @@ export interface MarketContext {
   sessionContext: SessionContextItem[];
   overview: string;
   timeframes: StyleTimeframes;
+  timeframeContext: TimeframeContextItem[];
   highImpactSoon: boolean;
 }
 
