@@ -672,41 +672,95 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                   })}
                 </div>
 
-                <div className="space-y-2">
-                  {marketContext.timeframeContext.map((tf) => {
-                    const barClass =
-                      tf.state === "bullish"
-                        ? "bg-success"
-                        : tf.state === "bearish"
-                          ? "bg-destructive"
-                          : tf.state === "weakening"
-                            ? "bg-warning"
-                            : tf.state === "liquidity"
-                              ? "bg-primary"
-                              : "bg-muted-foreground/40";
-                    const barWidth =
-                      tf.state === "neutral"
-                        ? "35%"
-                        : tf.state === "weakening" || tf.state === "liquidity"
-                          ? "65%"
-                          : tf.state === "bearish"
-                            ? "85%"
-                            : "92%";
-                    return (
-                      <div key={`${tf.timeframe}-bar`} className="flex items-center gap-3">
-                        <span className="text-[11px] font-mono text-muted-foreground/70 w-8 shrink-0">
-                          {tf.timeframe}
-                        </span>
-                        <span className="flex-1 h-1.5 rounded-full bg-muted/40 overflow-hidden">
-                          <span
-                            className={`block h-full rounded-full ${barClass} transition-all`}
-                            style={{ width: barWidth }}
-                          />
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
+                {(() => {
+                  const allTfs = ["1m", "5m", "15m", "30m", "1H", "4H", "D", "W"] as const;
+                  const styleTfs: Record<string, string[]> = {
+                    scalper: ["1m", "5m", "15m"],
+                    intraday: ["5m", "15m", "1H"],
+                    swing: ["1H", "4H", "D"],
+                  };
+                  const highlight = new Set(styleTfs[traderStyle] ?? styleTfs.intraday);
+                  const ctxMap = new Map(
+                    marketContext.timeframeContext.map((t) => [t.timeframe, t]),
+                  );
+                  // Derive a coarse state for timeframes not in ctxMap, using bias/structure.
+                  const dir = asset.biasDirection;
+                  const biasState = marketContext.biasState;
+                  const structureState = marketContext.structureState;
+                  const highImpactSoon = marketContext.highImpactSoon;
+                  const isWeakening = biasState.includes("Weakening");
+                  const isFailure = biasState === "Failure Detected";
+                  const isNeutral = biasState === "Neutral / Ranging";
+
+                  type S = "bullish" | "bearish" | "weakening" | "liquidity" | "neutral";
+                  const isHTF = (tf: string) => ["4H", "D", "W"].includes(tf);
+                  const isLTF = (tf: string) => ["1m", "5m", "15m", "30m"].includes(tf);
+
+                  const deriveState = (tf: string): { state: S; label: string } => {
+                    const existing = ctxMap.get(tf);
+                    if (existing) return { state: existing.state as S, label: existing.label };
+                    if (isNeutral) return { state: "neutral", label: "Neutral / choppy" };
+                    if (isFailure) return { state: "bearish", label: "Structure broken" };
+                    if (isHTF(tf)) {
+                      if (dir === "Bullish") return { state: "bullish", label: "HTF bias intact" };
+                      if (dir === "Bearish") return { state: "bearish", label: "HTF bias intact" };
+                      return { state: "neutral", label: "HTF neutral" };
+                    }
+                    if (isLTF(tf)) {
+                      if (highImpactSoon) return { state: "liquidity", label: "Liquidity area nearby" };
+                      if (isWeakening || structureState === "Compressed")
+                        return { state: "weakening", label: "Pullback risk elevated" };
+                      if (dir === "Bullish") return { state: "bullish", label: "Bullish continuation" };
+                      if (dir === "Bearish") return { state: "bearish", label: "Bearish continuation" };
+                      return { state: "neutral", label: "Neutral" };
+                    }
+                    if (isWeakening) return { state: "weakening", label: "Structure weakening" };
+                    if (dir === "Bullish") return { state: "bullish", label: "Bullish structure" };
+                    if (dir === "Bearish") return { state: "bearish", label: "Bearish structure" };
+                    return { state: "neutral", label: "Neutral" };
+                  };
+
+                  const dotColor: Record<S, string> = {
+                    bullish: "bg-success",
+                    bearish: "bg-destructive",
+                    weakening: "bg-warning",
+                    liquidity: "bg-primary",
+                    neutral: "bg-muted-foreground/40",
+                  };
+
+                  return (
+                    <div className="flex items-end justify-between gap-2 sm:gap-3 pt-1">
+                      {allTfs.map((tf) => {
+                        const { state, label } = deriveState(tf);
+                        const isStyleTf = highlight.has(tf);
+                        return (
+                          <div
+                            key={tf}
+                            className="flex flex-col items-center gap-1.5 flex-1 min-w-0"
+                            title={`${tf} — ${label}`}
+                          >
+                            <span
+                              className={`text-[11px] font-mono leading-none ${
+                                isStyleTf
+                                  ? "text-foreground font-semibold"
+                                  : "text-muted-foreground/70"
+                              }`}
+                            >
+                              {tf}
+                            </span>
+                            <span
+                              className={`h-2.5 w-2.5 rounded-full ${dotColor[state]} ${
+                                isStyleTf
+                                  ? "ring-2 ring-offset-1 ring-offset-background ring-foreground/30"
+                                  : "opacity-80"
+                              }`}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </CardContent>
