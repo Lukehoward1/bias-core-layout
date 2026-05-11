@@ -491,48 +491,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                     ))}
                   </div>
 
-                  {marketContext && marketContext.timeframeContext.length > 0 && (
-                    <div className="mt-6">
-                      <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
-                        Timeframe Context
-                      </h3>
-                      <div className="space-y-2.5">
-                        {marketContext.timeframeContext.map((tf) => {
-                          const colorClass =
-                            tf.state === "bullish"
-                              ? "bg-success"
-                              : tf.state === "bearish"
-                                ? "bg-destructive"
-                                : tf.state === "weakening"
-                                  ? "bg-warning"
-                                  : tf.state === "liquidity"
-                                    ? "bg-primary"
-                                    : "bg-muted-foreground/40";
-                          const barWidth =
-                            tf.state === "neutral"
-                              ? "30%"
-                              : tf.state === "weakening" || tf.state === "liquidity"
-                                ? "60%"
-                                : "90%";
-                          return (
-                            <div key={tf.timeframe} className="flex items-center gap-3" title={tf.detail}>
-                              <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${colorClass}`} />
-                              <span className="text-xs font-mono text-muted-foreground/80 w-10 shrink-0">
-                                {tf.timeframe}
-                              </span>
-                              <span className="text-sm text-foreground flex-1 leading-snug truncate">
-                                {tf.label}
-                              </span>
-                              <span className="h-1 w-16 rounded-full bg-muted/40 overflow-hidden shrink-0">
-                                <span className={`block h-full ${colorClass}`} style={{ width: barWidth }} />
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
                   {newsImpactPills.length > 0 && (
                     <div className="mt-5">
                       <div className="flex items-center justify-between mb-3">
