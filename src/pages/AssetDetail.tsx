@@ -637,6 +637,78 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                 </div>
               </div>
             </div>
+
+            {marketContext && marketContext.timeframeContext.length > 0 && (
+              <div className="mt-8 pt-6 border-t border-border/60">
+                <h3 className="text-xs font-medium text-muted-foreground/70 uppercase tracking-[0.18em] mb-4">
+                  Timeframe Context
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+                  {marketContext.timeframeContext.map((tf) => {
+                    const dotClass =
+                      tf.state === "bullish"
+                        ? "bg-success"
+                        : tf.state === "bearish"
+                          ? "bg-destructive"
+                          : tf.state === "weakening"
+                            ? "bg-warning"
+                            : tf.state === "liquidity"
+                              ? "bg-primary"
+                              : "bg-muted-foreground/40";
+                    return (
+                      <div
+                        key={tf.timeframe}
+                        className="flex items-center gap-2.5 min-w-0"
+                        title={tf.detail}
+                      >
+                        <span className={`h-2 w-2 rounded-full shrink-0 ${dotClass}`} />
+                        <span className="text-xs font-mono text-muted-foreground shrink-0 w-8">
+                          {tf.timeframe}
+                        </span>
+                        <span className="text-sm text-foreground truncate">{tf.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="space-y-2">
+                  {marketContext.timeframeContext.map((tf) => {
+                    const barClass =
+                      tf.state === "bullish"
+                        ? "bg-success"
+                        : tf.state === "bearish"
+                          ? "bg-destructive"
+                          : tf.state === "weakening"
+                            ? "bg-warning"
+                            : tf.state === "liquidity"
+                              ? "bg-primary"
+                              : "bg-muted-foreground/40";
+                    const barWidth =
+                      tf.state === "neutral"
+                        ? "35%"
+                        : tf.state === "weakening" || tf.state === "liquidity"
+                          ? "65%"
+                          : tf.state === "bearish"
+                            ? "85%"
+                            : "92%";
+                    return (
+                      <div key={`${tf.timeframe}-bar`} className="flex items-center gap-3">
+                        <span className="text-[11px] font-mono text-muted-foreground/70 w-8 shrink-0">
+                          {tf.timeframe}
+                        </span>
+                        <span className="flex-1 h-1.5 rounded-full bg-muted/40 overflow-hidden">
+                          <span
+                            className={`block h-full rounded-full ${barClass} transition-all`}
+                            style={{ width: barWidth }}
+                          />
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
