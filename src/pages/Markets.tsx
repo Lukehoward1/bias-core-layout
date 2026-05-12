@@ -24,6 +24,8 @@ import { useTraderStyle } from "@/context/TraderStyleProvider";
 
 type MarketType = "Watchlist" | "All" | "FX" | "Crypto" | "Indices" | "Commodities" | "ETFs" | "Futures";
 
+const marketTypes: MarketType[] = ["Watchlist", "All", "FX", "Crypto", "Indices", "Commodities", "ETFs", "Futures"];
+
 const formatPriceNoCommas = (raw: string | number) => {
   const cleaned = (raw ?? "").toString().trim();
   if (!cleaned || cleaned === "—") return "—";
@@ -106,12 +108,7 @@ export default function Markets() {
   const isWatchlistOverviewAdded = isCardOnDashboard(watchlistOverviewCardId);
 
   const [selectedType, setSelectedType] = useState<MarketType>(() => {
-    if (
-      filterParam &&
-      ["Watchlist", "All", "FX", "Crypto", "Indices", "Commodities", "ETFs", "Futures"].includes(filterParam)
-    ) {
-      return filterParam;
-    }
+    if (filterParam && marketTypes.includes(filterParam)) return filterParam;
 
     const saved = localStorage.getItem("watchlist");
     const parsed = saved ? JSON.parse(saved) : [];
@@ -120,8 +117,6 @@ export default function Markets() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedNews, setExpandedNews] = useState<Record<string, boolean>>({});
-
-  const marketTypes: MarketType[] = ["Watchlist", "All", "FX", "Crypto", "Indices", "Commodities", "ETFs", "Futures"];
 
   const filteredPairs = useMemo(() => {
     let filtered =
@@ -287,31 +282,40 @@ export default function Markets() {
                       onClick={() => openAssetDetail(asset.symbol)}
                       className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/40 cursor-pointer transition-colors group"
                     >
-                      <span className="font-semibold text-foreground min-w-[80px]">{asset.symbol}</span>
-
-                      <div className={`flex items-center gap-1 min-w-[115px] ${getBiasColor(asset.biasDirection)}`}>
-                        {getBiasIcon(asset.biasDirection)}
-                        <span className="text-sm">{context.biasState}</span>
+                      <div className="min-w-[90px]">
+                        <div className="font-semibold text-foreground">{asset.symbol}</div>
+                        <div className="text-[11px] text-muted-foreground">{asset.category}</div>
                       </div>
 
-                      <span className="text-sm text-muted-foreground flex-1 truncate">{context.overview}</span>
-
-                      <div className="flex items-center gap-3">
-                        <div className="text-right hidden md:block">
-                          <div className="text-sm font-medium text-foreground">
-                            {formatPriceNoCommas(quote?.last?.toString() ?? asset.latestPrice)}
-                          </div>
-                          <div className={`text-xs ${getChangeColor(quote, asset.priceChange)}`}>
-                            {getDisplayedChange(quote, asset.priceChange)}
-                          </div>
+                      <div className="hidden md:block min-w-[130px]">
+                        <div className="text-sm font-medium text-foreground">
+                          {formatPriceNoCommas(quote?.last?.toString() ?? asset.latestPrice)}
                         </div>
+                        <div className={`text-xs ${getChangeColor(quote, asset.priceChange)}`}>
+                          {getDisplayedChange(quote, asset.priceChange)}
+                        </div>
+                      </div>
 
+                      <div className={`flex items-center gap-1 min-w-[120px] ${getBiasColor(asset.biasDirection)}`}>
+                        {getBiasIcon(asset.biasDirection)}
+                        <span className="text-sm">{asset.biasDirection}</span>
+                      </div>
+
+                      <div className="hidden lg:flex items-center gap-2 flex-1 min-w-0">
+                        <Badge variant="outline" className="text-[10px] shrink-0">
+                          {context.structureState}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground truncate">
+                          {context.timeframeContext[0]?.label}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 ml-auto">
                         {context.highImpactSoon && (
                           <Badge variant="destructive" className="text-[10px] hidden lg:inline-flex">
                             News risk
                           </Badge>
                         )}
-
                         <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                       </div>
                     </div>
@@ -391,54 +395,60 @@ export default function Markets() {
 
                   <CardHeader className="pb-3 pr-12">
                     <div className="flex items-center justify-between mb-2">
-                      <CardTitle className="text-lg">{asset.symbol}</CardTitle>
+                      <div>
+                        <CardTitle className="text-xl leading-none">{asset.symbol}</CardTitle>
+                        <p className="text-xs text-muted-foreground mt-1">{asset.displayName}</p>
+                      </div>
 
                       <div className={`flex items-center gap-1.5 ${getBiasColor(asset.biasDirection)}`}>
                         {getBiasIcon(asset.biasDirection)}
-                        <span className="text-sm font-medium">{context.biasState}</span>
+                        <span className="text-sm font-medium">{asset.biasDirection}</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <span className="text-xl font-bold text-foreground">
-                        {formatPriceNoCommas(quote?.last?.toString() ?? asset.latestPrice)}
-                      </span>
+                    <div className="flex items-end justify-between">
+                      <div>
+                        <span className="text-2xl font-bold text-foreground">
+                          {formatPriceNoCommas(quote?.last?.toString() ?? asset.latestPrice)}
+                        </span>
+                        <div className={`text-sm font-medium ${getChangeColor(quote, asset.priceChange)}`}>
+                          {getDisplayedChange(quote, asset.priceChange)}
+                        </div>
+                      </div>
 
-                      <span className={`text-sm font-medium ${getChangeColor(quote, asset.priceChange)}`}>
-                        {getDisplayedChange(quote, asset.priceChange)}
-                      </span>
+                      <Badge variant="outline" className="text-[10px] mb-1">
+                        {context.biasState}
+                      </Badge>
                     </div>
                   </CardHeader>
 
                   <CardContent className="space-y-3">
-                    <div className="rounded-lg bg-muted/30 p-3">
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Context</span>
-                        <Badge variant="outline" className="text-[10px]">
-                          {context.structureState}
-                        </Badge>
+                    <div className="flex items-center justify-between gap-2 border-y border-border/60 py-2">
+                      <div className="min-w-0">
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Structure</div>
+                        <div className="text-xs font-medium text-foreground truncate">{context.structureState}</div>
                       </div>
 
-                      <p className="text-xs text-muted-foreground line-clamp-2">{context.overview}</p>
-
                       {nearestLevel && (
-                        <div className="mt-2 flex items-center justify-between gap-2 text-xs">
-                          <span className="text-muted-foreground truncate">{nearestLevel.type}</span>
-                          <span className="font-medium text-foreground">{nearestLevel.price}</span>
+                        <div className="text-right min-w-0">
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Key area</div>
+                          <div className="text-xs font-medium text-foreground">{nearestLevel.price}</div>
                         </div>
                       )}
                     </div>
 
                     <div className="flex items-center justify-between gap-2">
-                      {mainTimeframes.map((tf) => (
-                        <div key={tf.timeframe} className="flex items-center gap-1.5 min-w-0">
-                          <span className="text-[10px] text-muted-foreground">{tf.timeframe}</span>
-                          <span className={`h-2 w-2 rounded-full ${getStateDotClass(tf.state)}`} />
-                        </div>
-                      ))}
+                      <div className="flex items-center gap-3">
+                        {mainTimeframes.map((tf) => (
+                          <div key={tf.timeframe} className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-muted-foreground">{tf.timeframe}</span>
+                            <span className={`h-2 w-2 rounded-full ${getStateDotClass(tf.state)}`} />
+                          </div>
+                        ))}
+                      </div>
 
                       {context.highImpactSoon && (
-                        <Badge variant="destructive" className="text-[10px] ml-auto">
+                        <Badge variant="destructive" className="text-[10px]">
                           News risk
                         </Badge>
                       )}
