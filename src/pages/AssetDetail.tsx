@@ -657,15 +657,9 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                               ? "bg-primary"
                               : "bg-muted-foreground/40";
                     return (
-                      <div
-                        key={tf.timeframe}
-                        className="flex items-center gap-2.5 min-w-0"
-                        title={tf.detail}
-                      >
+                      <div key={tf.timeframe} className="flex items-center gap-2.5 min-w-0" title={tf.detail}>
                         <span className={`h-2 w-2 rounded-full shrink-0 ${dotClass}`} />
-                        <span className="text-xs font-mono text-muted-foreground shrink-0 w-8">
-                          {tf.timeframe}
-                        </span>
+                        <span className="text-xs font-mono text-muted-foreground shrink-0 w-8">{tf.timeframe}</span>
                         <span className="text-sm text-foreground truncate">{tf.label}</span>
                       </div>
                     );
@@ -680,9 +674,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                     swing: ["1H", "4H", "D"],
                   };
                   const highlight = new Set(styleTfs[traderStyle] ?? styleTfs.intraday);
-                  const ctxMap = new Map(
-                    marketContext.timeframeContext.map((t) => [t.timeframe, t]),
-                  );
+                  const ctxMap = new Map(marketContext.timeframeContext.map((t) => [t.timeframe, t]));
                   // Derive a coarse state for timeframes not in ctxMap, using bias/structure.
                   const dir = asset.biasDirection;
                   const biasState = marketContext.biasState;
@@ -708,7 +700,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                     }
                     if (isLTF(tf)) {
                       if (highImpactSoon) return { state: "liquidity", label: "Liquidity area nearby" };
-                      if (isWeakening || structureState === "Compressed")
+                      if (isWeakening || structureState === "Consolidating")
                         return { state: "weakening", label: "Pullback risk elevated" };
                       if (dir === "Bullish") return { state: "bullish", label: "Bullish continuation" };
                       if (dir === "Bearish") return { state: "bearish", label: "Bearish continuation" };
@@ -741,9 +733,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                           >
                             <span
                               className={`text-[11px] font-mono leading-none ${
-                                isStyleTf
-                                  ? "text-foreground font-semibold"
-                                  : "text-muted-foreground/70"
+                                isStyleTf ? "text-foreground font-semibold" : "text-muted-foreground/70"
                               }`}
                             >
                               {tf}
