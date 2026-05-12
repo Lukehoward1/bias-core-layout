@@ -1,23 +1,8 @@
 // src/services/contextEngine.ts
-// ─────────────────────────────────────────────────────────────
-// StreamBias Context Engine v1
-//
-// Pure logic layer that converts existing asset metadata, market
-// quotes and calendar events into explainable, NEUTRAL trading
-// context (no signals, no entries, no SL/TP).
-//
-// Designed so real OHLC candle history can be plugged in later
-// without touching consumer UI: replace the deterministic mock
-// generators inside `buildLevels` / `deriveStructureState` while
-// keeping the exported public API stable.
-// ─────────────────────────────────────────────────────────────
-
 import type { Asset } from "@/data/assets";
 import type { MarketQuote } from "@/services/marketData";
 import type { CalendarEvent } from "@/data/calendarEvents";
 import type { TraderStyle } from "@/context/TraderStyleProvider";
-
-// ── Public types ─────────────────────────────────────────────
 
 export type BiasState =
   | "Bullish Active"
@@ -28,12 +13,7 @@ export type BiasState =
   | "Flip Confirmed"
   | "Neutral / Ranging";
 
-export type StructureState =
-  | "Trending Up"
-  | "Trending Down"
-  | "Ranging"
-  | "Structure Shifting"
-  | "Compressed";
+export type StructureState = "Trending Up" | "Trending Down" | "Ranging" | "Structure Shifting" | "Compressed";
 
 export type LevelType =
   | "Swing High"
@@ -111,19 +91,17 @@ export interface ContextEngineInput {
   traderStyle?: TraderStyle;
 }
 
-// ── Style → timeframe mapping ────────────────────────────────
-
 export function getStyleTimeframes(style: TraderStyle = "intraday"): StyleTimeframes {
   if (style === "scalper") {
     return { bias: ["15m", "1H"], structure: ["5m", "15m"], execution: ["1m", "5m"] };
   }
+
   if (style === "swing") {
     return { bias: ["Daily", "Weekly"], structure: ["4H", "Daily"], execution: ["1H", "4H"] };
   }
+
   return { bias: ["1H", "4H"], structure: ["15m", "1H"], execution: ["5m", "15m"] };
 }
-
-// ── Helpers ──────────────────────────────────────────────────
 
 function toNumber(value: string | number | undefined | null): number {
   if (value === undefined || value === null) return NaN;
@@ -144,115 +122,119 @@ function fmtPrice(value: number, decimals: number): string {
   return value.toFixed(decimals);
 }
 
-// Deterministic pseudo-random seeded by symbol so values are stable per asset.
-function seedFromString(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = (h * 16777619) >>> 0;
-  }
-  return h >>> 0;
-}
-
-function seededOffsets(symbol: string, count: number): number[] {
-  let seed = seedFromString(symbol);
-  const out: number[] = [];
-  for (let i = 0; i < count; i++) {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    out.push((seed % 1000) / 1000); // 0..1
-  }
-  return out;
-}
-
 function relevanceFromScore(score: number): Relevance {
   if (score >= 4) return "High relevance";
   if (score >= 2) return "Medium relevance";
   return "Low relevance";
 }
 
-// ── Bias state derivation ────────────────────────────────────
+function getInstrumentRange(asset: Asset, ref: number): number {
+  if (asset.category === "Crypto") return ref * 0.025;
+  if (asset.category === "Indices") return ref * 0.012;
+  if (asset.category === "Commodities") return ref * 0.01;
+  if (asset.category === "Futures") return ref * 0.01;
+  if (asset.category === "ETFs") return ref * 0.008;
+  return ref * 0.0035;
+}
+
+function scoreLevel(opts: {
+  tags: LevelTag[];
+  higherTimeframe: boolean;
+  alignedWithBias: boolean;
+  messySurrounding?: boolean;
+}): number {
+  let score = 0;
+  const tags = new Set(opts.tags);
+
+  if (tags.has("Liquidity swept")) score += 2;
+  if (tags.has("Strong reaction")) score += 2;
+  if (opts.higherTimeframe) score += 2;
+  if (tags.has("Retested")) score += 1;
+  if (tags.has("Untested")) score += 1;
+  if (opts.alignedWithBias) score += 1;
+
+  if (tags.has("Tested multiple times")) score -= 2;
+  if (tags.has("Weak reaction")) score -= 1;
+  if (tags.has("Broken")) score -= 2;
+  if (opts.messySurrounding) score -= 1;
+
+  return score;
+}
 
 export function deriveBiasState(asset: Asset, quote?: MarketQuote | null): BiasState {
-  const dir = asset.biasDirection;
-  const conf = asset.biasConfidence ?? 0;
+  const direction = asset.biasDirection;
+  const confidence = asset.biasConfidence ?? 0;
   const sentiment = asset.sentiment ?? 0;
+  const change = quote?.changePercent ?? 0;
 
-  // Quote-vs-bias divergence weakens bias.
-  let divergence = false;
-  if (quote) {
-    if (dir === "Bullish" && quote.direction === "down" && Math.abs(quote.changePercent) > 0.2) divergence = true;
-    if (dir === "Bearish" && quote.direction === "up" && Math.abs(quote.changePercent) > 0.2) divergence = true;
-  }
+  if (direction === "Neutral" || confidence < 42) return "Neutral / Ranging";
 
-  if (dir === "Neutral" || conf < 40) return "Neutral / Ranging";
+  const quoteAgainstBullish = direction === "Bullish" && change < -0.2;
+  const quoteAgainstBearish = direction === "Bearish" && change > 0.2;
 
-  if (dir === "Bullish") {
-    if (conf < 55 && sentiment < 0) return "Failure Detected";
-    if (divergence && conf < 70) return "Bullish Weakening";
-    if (divergence) return "Bullish Weakening";
-    if (conf < 65) return "Bullish Weakening";
+  if (direction === "Bullish") {
+    if (confidence < 55 && sentiment < 0) return "Failure Detected";
+    if (quoteAgainstBullish || confidence < 65) return "Bullish Weakening";
     return "Bullish Active";
   }
 
-  if (dir === "Bearish") {
-    if (conf < 55 && sentiment > 0) return "Failure Detected";
-    if (divergence && conf < 70) return "Bearish Weakening";
-    if (divergence) return "Bearish Weakening";
-    if (conf < 65) return "Bearish Weakening";
+  if (direction === "Bearish") {
+    if (confidence < 55 && sentiment > 0) return "Failure Detected";
+    if (quoteAgainstBearish || confidence < 65) return "Bearish Weakening";
     return "Bearish Active";
   }
 
   return "Neutral / Ranging";
 }
 
-// ── Structure state derivation ───────────────────────────────
-
 export function deriveStructureState(asset: Asset, quote?: MarketQuote | null): StructureState {
-  const dir = asset.biasDirection;
-  const conf = asset.biasConfidence ?? 0;
+  const direction = asset.biasDirection;
+  const confidence = asset.biasConfidence ?? 0;
   const change = quote?.changePercent ?? 0;
 
-  if (conf < 45) return "Ranging";
-  if (Math.abs(change) < 0.1 && conf < 70) return "Compressed";
+  if (confidence < 45) return "Ranging";
+  if (Math.abs(change) < 0.1 && confidence < 70) return "Compressed";
 
-  if (dir === "Bullish") {
+  if (direction === "Bullish") {
     if (change < -0.3) return "Structure Shifting";
     return "Trending Up";
   }
-  if (dir === "Bearish") {
+
+  if (direction === "Bearish") {
     if (change > 0.3) return "Structure Shifting";
     return "Trending Down";
   }
+
   return "Ranging";
 }
 
-// ── Level construction (deterministic mock) ──────────────────
-// When real OHLC candles become available, replace this function
-// with a true swing/sweep detector that returns the same KeyLevel[].
-
-function scoreLevel(opts: {
+function makeLevel(input: {
+  type: LevelType;
+  price: number;
+  decimals: number;
   tags: LevelTag[];
-  higherTimeframe: boolean;
+  reason: string;
   alignedWithBias: boolean;
-  closeToOpposingMajor: boolean;
-  messySurrounding: boolean;
-}): number {
-  let s = 0;
-  const t = new Set(opts.tags);
-  if (t.has("Liquidity swept")) s += 2;
-  if (t.has("Strong reaction")) s += 2;
-  if (opts.higherTimeframe) s += 2;
-  if (t.has("Retested")) s += 1; // clean break and retest
-  if (t.has("Untested")) s += 1;
-  if (opts.alignedWithBias) s += 1;
+  higherTimeframe: boolean;
+  messySurrounding?: boolean;
+}): KeyLevel {
+  const score = scoreLevel({
+    tags: input.tags,
+    higherTimeframe: input.higherTimeframe,
+    alignedWithBias: input.alignedWithBias,
+    messySurrounding: input.messySurrounding,
+  });
 
-  if (t.has("Tested multiple times")) s -= 2;
-  if (t.has("Weak reaction")) s -= 1;
-  if (opts.messySurrounding) s -= 1;
-  if (t.has("Broken")) s -= 2;
-  if (opts.closeToOpposingMajor) s -= 1;
-
-  return s;
+  return {
+    type: input.type,
+    price: fmtPrice(input.price, input.decimals),
+    tags: input.tags,
+    reason: input.reason,
+    alignedWithBias: input.alignedWithBias,
+    higherTimeframe: input.higherTimeframe,
+    score,
+    relevance: relevanceFromScore(score),
+  };
 }
 
 function buildLevels(asset: Asset, quote: MarketQuote | null | undefined, biasState: BiasState): KeyLevel[] {
@@ -260,153 +242,146 @@ function buildLevels(asset: Asset, quote: MarketQuote | null | undefined, biasSt
   if (!Number.isFinite(ref) || ref <= 0) return [];
 
   const decimals = inferDecimals(ref);
-  // Per-asset relative range: use bigger swings for crypto/indices, tighter for FX.
-  const cat = asset.category;
-  const rel = cat === "Crypto" ? 0.025 : cat === "Indices" ? 0.012 : cat === "Commodities" ? 0.01 : 0.0035;
+  const range = getInstrumentRange(asset, ref);
 
-  const offsets = seededOffsets(asset.symbol, 6);
-  const isBull = biasState.startsWith("Bullish");
-  const isBear = biasState.startsWith("Bearish");
+  const isBullish = biasState.startsWith("Bullish");
+  const isBearish = biasState.startsWith("Bearish");
+  const isNeutral = biasState === "Neutral / Ranging";
 
-  // Construct candidate levels around current price.
-  const candidates: Array<Omit<KeyLevel, "score" | "relevance"> & { messy: boolean; opposingClose: boolean }> = [
-    {
+  const upside1 = ref + range * 0.75;
+  const upside2 = ref + range * 1.45;
+  const downside1 = ref - range * 0.75;
+  const downside2 = ref - range * 1.45;
+
+  const levels: KeyLevel[] = [];
+
+  levels.push(
+    makeLevel({
       type: "Swing High",
-      price: fmtPrice(ref * (1 + rel * (1 + offsets[0] * 0.6)), decimals),
-      tags: ["Tested once"],
-      reason: "Recent swing high acting as overhead supply.",
-      alignedWithBias: isBear,
+      price: upside1,
+      decimals,
+      tags: ["Tested once", "Possible reaction zone"],
+      reason: "Nearest overhead swing area where price may react if upside continuation persists.",
+      alignedWithBias: isBearish,
       higherTimeframe: false,
-      messy: false,
-      opposingClose: false,
-    },
-    {
+    }),
+  );
+
+  levels.push(
+    makeLevel({
       type: "Swing Low",
-      price: fmtPrice(ref * (1 - rel * (1 + offsets[1] * 0.6)), decimals),
-      tags: ["Tested once"],
-      reason: "Recent swing low providing demand reference.",
-      alignedWithBias: isBull,
+      price: downside1,
+      decimals,
+      tags: ["Tested once", "Possible reaction zone"],
+      reason: "Nearest downside swing area acting as the closest pullback or demand reference.",
+      alignedWithBias: isBullish,
       higherTimeframe: false,
-      messy: false,
-      opposingClose: false,
-    },
-    {
-      type: "Liquidity Sweep",
-      price: fmtPrice(ref * (1 + rel * (1.6 + offsets[2] * 0.4) * (isBull ? 1 : -1)), decimals),
-      tags: ["Liquidity swept", "Strong reaction"],
-      reason: "Stops likely cleared above/below recent extreme; possible reaction zone.",
-      alignedWithBias: true,
-      higherTimeframe: true,
-      messy: false,
-      opposingClose: false,
-    },
-    {
-      type: "Break and Retest Zone",
-      price: fmtPrice(ref * (1 + rel * (0.4 + offsets[3] * 0.3) * (isBull ? -1 : 1)), decimals),
-      tags: ["Broken", "Retested"],
-      reason: "Prior structure broken and revisited as confirmation zone.",
-      alignedWithBias: isBull || isBear,
-      higherTimeframe: false,
-      messy: false,
-      opposingClose: false,
-    },
-    {
+    }),
+  );
+
+  levels.push(
+    makeLevel({
       type: "Strong Reaction Zone",
-      price: fmtPrice(ref * (1 - rel * (1.3 + offsets[4] * 0.5) * (isBull ? 1 : -1)), decimals),
+      price: isBullish ? downside2 : upside2,
+      decimals,
       tags: ["Strong reaction", "Untested"],
-      reason: "Higher-timeframe area with prior decisive reaction.",
-      alignedWithBias: true,
+      reason: isBullish
+        ? "Higher-timeframe demand reference below current price; useful as a pullback/invalidation area."
+        : isBearish
+          ? "Higher-timeframe supply reference above current price; useful as a bounce/invalidation area."
+          : "Higher-timeframe reaction area near current range extremes.",
+      alignedWithBias: !isNeutral,
       higherTimeframe: true,
-      messy: false,
-      opposingClose: false,
-    },
-    {
+    }),
+  );
+
+  levels.push(
+    makeLevel({
       type: "Nearby Target",
-      price: fmtPrice(ref * (1 + rel * (0.8 + offsets[5] * 0.4) * (isBull ? 1 : -1)), decimals),
-      tags: ["Nearby target"],
-      reason: "Closest unmitigated level in the direction of context.",
-      alignedWithBias: true,
+      price: isBearish ? downside2 : upside2,
+      decimals,
+      tags: ["Nearby target", "Untested"],
+      reason: isBearish
+        ? "Closest downside reference in the current directional context."
+        : isBullish
+          ? "Closest upside reference in the current directional context."
+          : "Outer range reference while market remains neutral.",
+      alignedWithBias: !isNeutral,
       higherTimeframe: false,
-      messy: biasState === "Neutral / Ranging",
-      opposingClose: false,
-    },
-  ];
+      messySurrounding: isNeutral,
+    }),
+  );
 
-  return candidates.map((c) => {
-    const score = scoreLevel({
-      tags: c.tags,
-      higherTimeframe: c.higherTimeframe,
-      alignedWithBias: c.alignedWithBias,
-      closeToOpposingMajor: c.opposingClose,
-      messySurrounding: c.messy,
-    });
-    return {
-      type: c.type,
-      price: c.price,
-      tags: c.tags,
-      reason: c.reason,
-      alignedWithBias: c.alignedWithBias,
-      higherTimeframe: c.higherTimeframe,
-      score,
-      relevance: relevanceFromScore(score),
-    };
-  });
+  levels.push(
+    makeLevel({
+      type: "Break and Retest Zone",
+      price: isBearish ? upside1 : downside1,
+      decimals,
+      tags: ["Retested", "Possible reaction zone"],
+      reason: isBearish
+        ? "Prior support/resistance area above price that may act as a retest zone."
+        : "Prior support/resistance area below price that may act as a retest zone.",
+      alignedWithBias: !isNeutral,
+      higherTimeframe: false,
+    }),
+  );
+
+  levels.push(
+    makeLevel({
+      type: "Liquidity Sweep",
+      price: isBearish ? downside1 : upside1,
+      decimals,
+      tags: ["Liquidity swept", "Possible reaction zone"],
+      reason: isBearish
+        ? "Downside liquidity area near recent lows; reaction depends on acceptance or reclaim."
+        : "Upside liquidity area near recent highs; reaction depends on acceptance or rejection.",
+      alignedWithBias: !isNeutral,
+      higherTimeframe: false,
+    }),
+  );
+
+  return levels.sort((a, b) => b.score - a.score).slice(0, 6);
 }
-
-// ── Session context ──────────────────────────────────────────
 
 function currentUtcHour(): number {
   return new Date().getUTCHours();
 }
 
-function deriveSessionContext(
-  asset: Asset,
-  biasState: BiasState,
-  highImpactSoon: boolean,
-): SessionContextItem[] {
+function deriveSessionContext(asset: Asset, biasState: BiasState, highImpactSoon: boolean): SessionContextItem[] {
   const hour = currentUtcHour();
   const isAsia = hour >= 0 && hour < 7;
   const isLondon = hour >= 7 && hour < 13;
   const isNY = hour >= 13 && hour < 21;
+  const weakening = biasState.includes("Weakening") || biasState === "Failure Detected";
 
-  const items: SessionContextItem[] = [];
-
-  items.push({
-    session: "Asia",
-    headline: isAsia ? "Asia session active — range reference" : "Asian range reference",
-    description:
-      "Lower-volatility window typically forms the reference range used by later sessions.",
-    emphasis: isAsia ? "watch" : "info",
-  });
-
-  items.push({
-    session: "London",
-    headline: isLondon ? "London open — liquidity sweep risk" : "London liquidity sweep risk",
-    description:
-      biasState.includes("Weakening")
-        ? "Bias weakening into London; context favours possible reaction at swept liquidity."
-        : "London open often sweeps Asian range extremes before establishing direction.",
-    emphasis: isLondon ? "elevated" : "watch",
-  });
-
-  items.push({
-    session: "New York",
-    headline: isNY ? "New York volatility window active" : "NY volatility watch",
-    description: highImpactSoon
-      ? "High-impact data within the NY window — short-term retracement risk elevated."
-      : "NY session can extend or reverse the London move; key level to watch.",
-    emphasis: highImpactSoon ? "elevated" : isNY ? "watch" : "info",
-  });
-
-  // Light asset hint without being advisory.
-  if (asset.category === "Crypto") {
-    items[0].description += " Crypto trades 24/7, so session edges are softer.";
-  }
-
-  return items;
+  return [
+    {
+      session: "Asia",
+      headline: isAsia ? "Asia session forming range" : "Asian range reference",
+      description:
+        asset.category === "Crypto"
+          ? "Crypto trades continuously, but session highs/lows can still act as reaction references."
+          : "Asian high and low act as reference points for later liquidity sweeps.",
+      emphasis: isAsia ? "watch" : "info",
+    },
+    {
+      session: "London",
+      headline: isLondon ? "London liquidity window active" : "London sweep awareness",
+      description: weakening
+        ? "Bias is weakening into the London window; watch how price reacts around session extremes."
+        : "London often tests Asian range highs/lows before directional intent becomes clearer.",
+      emphasis: isLondon ? "elevated" : "watch",
+    },
+    {
+      session: "New York",
+      headline: isNY ? "New York volatility window active" : "NY continuation/reversal watch",
+      description: highImpactSoon
+        ? "Relevant high-impact news is close; short-term structure can shift quickly."
+        : "NY can extend the London move or reverse from earlier liquidity areas.",
+      emphasis: highImpactSoon ? "elevated" : isNY ? "watch" : "info",
+    },
+  ];
 }
-
-// ── Overview text ────────────────────────────────────────────
 
 function buildOverview(opts: {
   asset: Asset;
@@ -418,57 +393,45 @@ function buildOverview(opts: {
 }): string {
   const { asset, biasState, structureState, levels, highImpactSoon, nextHighImpactTitle } = opts;
 
-  const reactionZone = levels.find((l) => l.type === "Possible Reaction Zone")
-    ?? levels.find((l) => l.type === "Strong Reaction Zone")
-    ?? levels.find((l) => l.type === "Liquidity Sweep")
-    ?? levels.find((l) => l.type === "Nearby Target");
+  const target = levels.find((level) => level.type === "Nearby Target");
+  const reaction = levels.find((level) => level.type === "Strong Reaction Zone") ?? levels[0];
 
-  const biasSentence = (() => {
-    switch (biasState) {
-      case "Bullish Active":
-        return `${asset.symbol} context favours the upside; bullish bias remains active.`;
-      case "Bearish Active":
-        return `${asset.symbol} context favours the downside; bearish bias remains active.`;
-      case "Bullish Weakening":
-        return `${asset.symbol} bullish bias is weakening; short-term retracement risk is elevated.`;
-      case "Bearish Weakening":
-        return `${asset.symbol} bearish bias is weakening; short-term retracement risk is elevated.`;
-      case "Failure Detected":
-        return `${asset.symbol} prior bias appears to be failing — context becoming inconclusive.`;
-      case "Flip Confirmed":
-        return `${asset.symbol} structure has flipped; new directional context forming.`;
-      default:
-        return `${asset.symbol} is in a neutral / ranging context with no dominant directional pressure.`;
-    }
-  })();
+  const biasText =
+    biasState === "Bullish Active"
+      ? `${asset.symbol} remains supported by bullish context.`
+      : biasState === "Bearish Active"
+        ? `${asset.symbol} remains pressured by bearish context.`
+        : biasState === "Bullish Weakening"
+          ? `${asset.symbol} bullish context is weakening; pullback risk is elevated.`
+          : biasState === "Bearish Weakening"
+            ? `${asset.symbol} bearish context is weakening; bounce risk is elevated.`
+            : biasState === "Failure Detected"
+              ? `${asset.symbol} is showing failure characteristics against the prior bias.`
+              : `${asset.symbol} is currently range-bound with limited directional conviction.`;
 
-  const structureSentence = (() => {
-    switch (structureState) {
-      case "Trending Up":
-        return "Structure remains constructive with higher highs / higher lows in place.";
-      case "Trending Down":
-        return "Structure remains under pressure with lower highs / lower lows in place.";
-      case "Structure Shifting":
-        return "Structure is shifting — recent move challenges the prevailing read.";
-      case "Compressed":
-        return "Price is compressed; expansion likely once a key level breaks.";
-      default:
-        return "Structure is range-bound with no clear directional commitment.";
-    }
-  })();
+  const structureText =
+    structureState === "Trending Up"
+      ? "Structure is trending higher."
+      : structureState === "Trending Down"
+        ? "Structure is trending lower."
+        : structureState === "Structure Shifting"
+          ? "Structure is shifting against the prior read."
+          : structureState === "Compressed"
+            ? "Price is compressed near current structure."
+            : "Structure remains choppy/ranging.";
 
-  const zoneSentence = reactionZone
-    ? `Next key level to watch: ${reactionZone.type.toLowerCase()} near ${reactionZone.price} — possible reaction zone.`
-    : "No immediate reaction zone stands out at current price.";
+  const levelText = target
+    ? `Next area to monitor is ${target.price}.`
+    : reaction
+      ? `Primary reaction area is near ${reaction.price}.`
+      : "No clear reaction area is available.";
 
-  const newsSentence = highImpactSoon
-    ? ` High-impact news risk soon${nextHighImpactTitle ? ` (${nextHighImpactTitle})` : ""} — context can shift quickly.`
+  const newsText = highImpactSoon
+    ? ` Relevant high-impact news risk is close${nextHighImpactTitle ? ` (${nextHighImpactTitle})` : ""}.`
     : "";
 
-  return `${biasSentence} ${structureSentence} ${zoneSentence}${newsSentence}`;
+  return `${biasText} ${structureText} ${levelText}${newsText}`;
 }
-
-// ── Timeframe context ────────────────────────────────────────
 
 function getDefaultTimeframesForStyle(style: TraderStyle): [string, string, string] {
   if (style === "scalper") return ["1m", "5m", "15m"];
@@ -484,69 +447,160 @@ function buildTimeframeContext(
   highImpactSoon: boolean,
   style: TraderStyle,
 ): TimeframeContextItem[] {
-  const tfs = getDefaultTimeframesForStyle(style);
-  const dir = asset.biasDirection;
+  const timeframes = getDefaultTimeframesForStyle(style);
+  const direction = asset.biasDirection;
   const change = quote?.changePercent ?? 0;
-  const isWeakening = biasState.includes("Weakening");
-  const isFailure = biasState === "Failure Detected";
-  const isNeutral = biasState === "Neutral / Ranging";
+  const weakening = biasState.includes("Weakening");
+  const failure = biasState === "Failure Detected";
+  const neutral = biasState === "Neutral / Ranging";
 
-  return tfs.map((tf, i) => {
-    // Higher timeframe (HTF bias)
-    if (i === 2) {
-      if (isNeutral) return { timeframe: tf, state: "neutral", label: "Higher timeframe neutral", detail: "No dominant directional pressure on the higher timeframe." };
-      if (isFailure) return { timeframe: tf, state: "weakening", label: "Higher timeframe bias challenged", detail: "Prior higher timeframe context shows signs of failure." };
-      if (dir === "Bullish") return { timeframe: tf, state: "bullish", label: "Higher timeframe bias intact", detail: "Bullish higher timeframe structure remains the dominant context." };
-      if (dir === "Bearish") return { timeframe: tf, state: "bearish", label: "Higher timeframe bias intact", detail: "Bearish higher timeframe structure remains the dominant context." };
-      return { timeframe: tf, state: "neutral", label: "Higher timeframe neutral", detail: "Directional context is unclear on the higher timeframe." };
+  return timeframes.map((timeframe, index) => {
+    if (index === 2) {
+      if (neutral) {
+        return {
+          timeframe,
+          state: "neutral",
+          label: "HTF neutral",
+          detail: "Higher timeframe direction is not clearly committed.",
+        };
+      }
+
+      if (failure) {
+        return {
+          timeframe,
+          state: "weakening",
+          label: "HTF challenged",
+          detail: "Higher timeframe bias is being challenged.",
+        };
+      }
+
+      return {
+        timeframe,
+        state: direction === "Bullish" ? "bullish" : "bearish",
+        label: "HTF bias intact",
+        detail: `${direction} higher timeframe context remains intact.`,
+      };
     }
-    // Mid timeframe (structure)
-    if (i === 1) {
-      if (isNeutral || structureState === "Ranging") return { timeframe: tf, state: "neutral", label: "Neutral / choppy", detail: "Structure shows no committed direction." };
-      if (isFailure) return { timeframe: tf, state: "bearish", label: "Structure broken", detail: "Mid-timeframe structure has failed to hold." };
-      if (isWeakening) return { timeframe: tf, state: "weakening", label: "Structure weakening", detail: "Mid-timeframe momentum is fading; reaction risk is elevated." };
-      if (structureState === "Structure Shifting") return { timeframe: tf, state: "weakening", label: "Structure shifting", detail: "Recent move is challenging the prevailing read." };
-      if (dir === "Bullish") return { timeframe: tf, state: "bullish", label: "Bullish structure holding", detail: "Mid-timeframe price action remains aligned with current bias." };
-      if (dir === "Bearish") return { timeframe: tf, state: "bearish", label: "Bearish structure holding", detail: "Mid-timeframe price action remains aligned with current bias." };
-      return { timeframe: tf, state: "neutral", label: "Neutral / choppy", detail: "Structure shows no committed direction." };
+
+    if (index === 1) {
+      if (structureState === "Ranging" || neutral) {
+        return {
+          timeframe,
+          state: "neutral",
+          label: "Neutral / choppy",
+          detail: "Structure lacks clean directional commitment.",
+        };
+      }
+
+      if (failure) {
+        return {
+          timeframe,
+          state: "bearish",
+          label: "Structure failure",
+          detail: "Mid-timeframe structure has failed to hold prior context.",
+        };
+      }
+
+      if (weakening || structureState === "Structure Shifting") {
+        return {
+          timeframe,
+          state: "weakening",
+          label: "Structure weakening",
+          detail: "Momentum is fading and reaction risk is elevated.",
+        };
+      }
+
+      return {
+        timeframe,
+        state: direction === "Bullish" ? "bullish" : "bearish",
+        label: direction === "Bullish" ? "Structure holding" : "Structure pressing lower",
+        detail: "Mid-timeframe structure remains aligned with current context.",
+      };
     }
-    // Lowest timeframe (short-term)
-    if (highImpactSoon) return { timeframe: tf, state: "liquidity", label: "Liquidity area nearby", detail: "Short-term price is sensitive to upcoming high-impact event risk." };
-    if (structureState === "Compressed") return { timeframe: tf, state: "weakening", label: "Pullback risk elevated", detail: "Short-term price is compressed; reaction risk is elevated." };
-    if (isFailure) return { timeframe: tf, state: "bearish", label: "Structure broken", detail: "Short-term price action has invalidated the prior context." };
-    if (isWeakening) return { timeframe: tf, state: "weakening", label: "Pullback forming", detail: "Short-term momentum is fading against current bias." };
-    if (isNeutral) return { timeframe: tf, state: "neutral", label: "Neutral / choppy", detail: "Short-term price action lacks directional commitment." };
-    if (dir === "Bullish") {
-      if (change < -0.1) return { timeframe: tf, state: "weakening", label: "Pullback forming", detail: "Short-term price is pulling back from recent highs." };
-      return { timeframe: tf, state: "bullish", label: "Bullish continuation", detail: "Short-term price remains aligned with current intraday context." };
+
+    if (highImpactSoon) {
+      return {
+        timeframe,
+        state: "liquidity",
+        label: "News-sensitive",
+        detail: "Short-term price may react sharply around upcoming news.",
+      };
     }
-    if (dir === "Bearish") {
-      if (change > 0.1) return { timeframe: tf, state: "weakening", label: "Bounce forming", detail: "Short-term price is bouncing against bearish bias." };
-      return { timeframe: tf, state: "bearish", label: "Bearish continuation", detail: "Short-term price remains aligned with current intraday context." };
+
+    if (failure) {
+      return {
+        timeframe,
+        state: "bearish",
+        label: "Short-term break",
+        detail: "Short-term structure has broken against prior context.",
+      };
     }
-    return { timeframe: tf, state: "neutral", label: "Neutral / choppy", detail: "Short-term price action lacks directional commitment." };
+
+    if (weakening || structureState === "Compressed") {
+      return {
+        timeframe,
+        state: "weakening",
+        label: direction === "Bearish" ? "Bounce risk" : "Pullback risk",
+        detail: "Short-term momentum is no longer clean.",
+      };
+    }
+
+    if (neutral) {
+      return {
+        timeframe,
+        state: "neutral",
+        label: "Choppy",
+        detail: "Short-term movement lacks clean direction.",
+      };
+    }
+
+    if (direction === "Bullish") {
+      return {
+        timeframe,
+        state: change < -0.1 ? "weakening" : "bullish",
+        label: change < -0.1 ? "Pullback forming" : "Continuation holding",
+        detail: "Short-term price remains inside bullish context.",
+      };
+    }
+
+    if (direction === "Bearish") {
+      return {
+        timeframe,
+        state: change > 0.1 ? "weakening" : "bearish",
+        label: change > 0.1 ? "Bounce forming" : "Continuation lower",
+        detail: "Short-term price remains inside bearish context.",
+      };
+    }
+
+    return {
+      timeframe,
+      state: "neutral",
+      label: "Neutral",
+      detail: "Short-term context is unclear.",
+    };
   });
 }
-
-// ── Public entry point ───────────────────────────────────────
 
 export function buildMarketContext(input: ContextEngineInput): MarketContext {
   const { asset, quote, upcomingRelevantEvents = [], traderStyle = "intraday" } = input;
 
   const now = Date.now();
   const fourHours = 4 * 60 * 60 * 1000;
-  const highImpactSoon = upcomingRelevantEvents.some((e) => {
-    if (e.impact !== "high") return false;
-    const t = new Date(e.scheduledAt).getTime();
-    return Number.isFinite(t) && t >= now && t <= now + fourHours;
+
+  const highImpactSoon = upcomingRelevantEvents.some((event) => {
+    if (event.impact !== "high") return false;
+    const eventTime = new Date(event.scheduledAt).getTime();
+    return Number.isFinite(eventTime) && eventTime >= now && eventTime <= now + fourHours;
   });
-  const nextHigh = upcomingRelevantEvents.find((e) => e.impact === "high");
+
+  const nextHigh = upcomingRelevantEvents.find((event) => event.impact === "high");
 
   const biasState = deriveBiasState(asset, quote);
   const structureState = deriveStructureState(asset, quote);
   const levels = buildLevels(asset, quote, biasState);
   const sessionContext = deriveSessionContext(asset, biasState, highImpactSoon);
   const timeframeContext = buildTimeframeContext(asset, biasState, structureState, quote, highImpactSoon, traderStyle);
+
   const overview = buildOverview({
     asset,
     biasState,
