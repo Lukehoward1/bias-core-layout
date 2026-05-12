@@ -1,25 +1,28 @@
+// src/pages/Markets.tsx
 import { useMemo, useState } from "react";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
+
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
 import { TrendingUp, TrendingDown, Minus, Calendar, Star, ChevronRight, Activity, Search } from "lucide-react";
-import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
+
 import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
 import { useMarketQuotes } from "@/hooks/use-market-quotes";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { toast } from "sonner";
+
 import { calendarEvents, sortCalendarEventsByImpact, type CalendarEvent } from "@/data/calendarEvents";
 import { getEventImpact } from "@/data/eventImpactRules";
 import { getFormattedMarketChange, type MarketQuote } from "@/services/marketData";
+import { buildMarketContext, type TimeframeState } from "@/services/contextEngine";
+import { useTraderStyle } from "@/context/TraderStyleProvider";
 
 type MarketType = "Watchlist" | "All" | "FX" | "Crypto" | "Indices" | "Commodities" | "ETFs" | "Futures";
-
-/* =======================
-   PRICE FORMATTING
-======================= */
 
 const formatPriceNoCommas = (raw: string | number) => {
   const cleaned = (raw ?? "").toString().trim();
@@ -37,10 +40,6 @@ const formatPriceNoCommas = (raw: string | number) => {
 
   return String(n);
 };
-
-/* =======================
-   EVENT ↔ SYMBOL RELEVANCE
-======================= */
 
 const normalizeMarketSymbol = (symbol: string) => symbol.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
@@ -77,9 +76,20 @@ const sortRelevantEvents = (events: CalendarEvent[]) => {
   });
 };
 
-/* =======================
-   PAGE
-======================= */
+const getStateDotClass = (state: TimeframeState) => {
+  switch (state) {
+    case "bullish":
+      return "bg-success";
+    case "bearish":
+      return "bg-destructive";
+    case "weakening":
+      return "bg-warning";
+    case "liquidity":
+      return "bg-primary";
+    default:
+      return "bg-muted-foreground/40";
+  }
+};
 
 export default function Markets() {
   const [searchParams] = useSearchParams();
@@ -90,6 +100,7 @@ export default function Markets() {
   const { assets } = useAssets();
   const { watchlist, toggleWatchlist, isInWatchlist, watchlistAssets } = useWatchlist();
   const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
+  const { traderStyle } = useTraderStyle();
 
   const watchlistOverviewCardId = "watchlist-overview";
   const isWatchlistOverviewAdded = isCardOnDashboard(watchlistOverviewCardId);
@@ -111,21 +122,6 @@ export default function Markets() {
   const [expandedNews, setExpandedNews] = useState<Record<string, boolean>>({});
 
   const marketTypes: MarketType[] = ["Watchlist", "All", "FX", "Crypto", "Indices", "Commodities", "ETFs", "Futures"];
-
-  const handleAddCard = () => {
-    addCard(watchlistOverviewCardId);
-    toast.success("Added to Dashboard");
-  };
-
-  const handleRemoveCard = () => {
-    removeCard(watchlistOverviewCardId);
-    toast.success("Removed from Dashboard");
-  };
-
-  const handleToggleWatchlist = (symbol: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    toggleWatchlist(symbol);
-  };
 
   const filteredPairs = useMemo(() => {
     let filtered =
@@ -183,7 +179,10 @@ export default function Markets() {
 
   const openAssetDetail = (symbol: string) => {
     navigate(`/asset/${symbol}?from=${selectedType}`, {
-      state: { backgroundLocation: location },
+      state: {
+        backgroundLocation: location,
+        from: `${location.pathname}${location.search}`,
+      },
     });
   };
 
@@ -197,6 +196,21 @@ export default function Markets() {
     }
 
     navigate(`/calendar?eventId=${encodeURIComponent(eventId)}`);
+  };
+
+  const handleAddCard = () => {
+    addCard(watchlistOverviewCardId);
+    toast.success("Added to Dashboard");
+  };
+
+  const handleRemoveCard = () => {
+    removeCard(watchlistOverviewCardId);
+    toast.success("Removed from Dashboard");
+  };
+
+  const handleToggleWatchlist = (symbol: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleWatchlist(symbol);
   };
 
   return (
@@ -258,6 +272,14 @@ export default function Markets() {
               <div className="space-y-2">
                 {watchlistAssets.map((asset) => {
                   const quote = quotes[asset.symbol];
+                  const context = buildMarketContext({
+                    asset,
+                    quote,
+                    upcomingRelevantEvents: calendarEvents.filter((event) =>
+                      isEventRelevantToSymbol(asset.symbol, event),
+                    ),
+                    traderStyle,
+                  });
 
                   return (
                     <div
@@ -267,12 +289,12 @@ export default function Markets() {
                     >
                       <span className="font-semibold text-foreground min-w-[80px]">{asset.symbol}</span>
 
-                      <div className={`flex items-center gap-1 min-w-[80px] ${getBiasColor(asset.biasDirection)}`}>
+                      <div className={`flex items-center gap-1 min-w-[115px] ${getBiasColor(asset.biasDirection)}`}>
                         {getBiasIcon(asset.biasDirection)}
-                        <span className="text-sm">{asset.biasDirection}</span>
+                        <span className="text-sm">{context.biasState}</span>
                       </div>
 
-                      <span className="text-sm text-muted-foreground flex-1 truncate">{asset.insight}</span>
+                      <span className="text-sm text-muted-foreground flex-1 truncate">{context.overview}</span>
 
                       <div className="flex items-center gap-3">
                         <div className="text-right hidden md:block">
@@ -284,14 +306,9 @@ export default function Markets() {
                           </div>
                         </div>
 
-                        <div className="text-xs text-muted-foreground hidden lg:block">
-                          <span className="mr-3">Vol: {asset.volume}</span>
-                          <span>Spread: {asset.spread}</span>
-                        </div>
-
-                        {asset.news && (
+                        {context.highImpactSoon && (
                           <Badge variant="destructive" className="text-[10px] hidden lg:inline-flex">
-                            News
+                            News risk
                           </Badge>
                         )}
 
@@ -341,6 +358,16 @@ export default function Markets() {
               const isExpanded = !!expandedNews[asset.symbol];
               const eventsToShow = isExpanded ? relevantEvents : highImpactRelevant;
 
+              const context = buildMarketContext({
+                asset,
+                quote,
+                upcomingRelevantEvents: relevantEvents,
+                traderStyle,
+              });
+
+              const mainTimeframes = context.timeframeContext.slice(0, 3);
+              const nearestLevel = context.levels[0];
+
               return (
                 <Card
                   key={asset.symbol}
@@ -368,7 +395,7 @@ export default function Markets() {
 
                       <div className={`flex items-center gap-1.5 ${getBiasColor(asset.biasDirection)}`}>
                         {getBiasIcon(asset.biasDirection)}
-                        <span className="text-sm font-medium">{asset.biasDirection}</span>
+                        <span className="text-sm font-medium">{context.biasState}</span>
                       </div>
                     </div>
 
@@ -384,6 +411,39 @@ export default function Markets() {
                   </CardHeader>
 
                   <CardContent className="space-y-3">
+                    <div className="rounded-lg bg-muted/30 p-3">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Context</span>
+                        <Badge variant="outline" className="text-[10px]">
+                          {context.structureState}
+                        </Badge>
+                      </div>
+
+                      <p className="text-xs text-muted-foreground line-clamp-2">{context.overview}</p>
+
+                      {nearestLevel && (
+                        <div className="mt-2 flex items-center justify-between gap-2 text-xs">
+                          <span className="text-muted-foreground truncate">{nearestLevel.type}</span>
+                          <span className="font-medium text-foreground">{nearestLevel.price}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                      {mainTimeframes.map((tf) => (
+                        <div key={tf.timeframe} className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-[10px] text-muted-foreground">{tf.timeframe}</span>
+                          <span className={`h-2 w-2 rounded-full ${getStateDotClass(tf.state)}`} />
+                        </div>
+                      ))}
+
+                      {context.highImpactSoon && (
+                        <Badge variant="destructive" className="text-[10px] ml-auto">
+                          News risk
+                        </Badge>
+                      )}
+                    </div>
+
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
                         <span className="text-muted-foreground">Spread</span>
@@ -393,35 +453,6 @@ export default function Markets() {
                       <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
                         <span className="text-muted-foreground">Vol</span>
                         <span className="font-medium text-foreground">{asset.volume}</span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs text-muted-foreground">Sentiment</span>
-                        <span
-                          className={`text-xs font-medium ${
-                            asset.sentiment > 0
-                              ? "text-success"
-                              : asset.sentiment < 0
-                                ? "text-destructive"
-                                : "text-muted-foreground"
-                          }`}
-                        >
-                          {asset.sentiment > 0 ? "+" : ""}
-                          {asset.sentiment}
-                        </span>
-                      </div>
-
-                      <div className="w-full bg-muted rounded-full h-1.5 relative">
-                        <div className="absolute left-1/2 top-0 w-px h-1.5 bg-border" />
-                        <div
-                          className={`${asset.sentiment > 0 ? "bg-success" : "bg-destructive"} rounded-full h-1.5 transition-all`}
-                          style={{
-                            width: `${Math.abs(asset.sentiment) / 2}%`,
-                            marginLeft: asset.sentiment > 0 ? "50%" : `${50 - Math.abs(asset.sentiment) / 2}%`,
-                          }}
-                        />
                       </div>
                     </div>
 
