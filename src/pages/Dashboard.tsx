@@ -5,16 +5,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-import {
-  Clock,
-  Plus,
-  Star,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  ChevronRight,
-  Calendar as CalendarIcon,
-} from "lucide-react";
+import { Plus, Star, TrendingUp, TrendingDown, Minus, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { DashboardEditToolbar } from "@/components/dashboard/DashboardEditToolbar";
@@ -34,6 +25,9 @@ import { useMarketQuotes } from "@/hooks/use-market-quotes";
 import { getFormattedMarketChange, normalizeSymbol, type MarketQuote } from "@/services/marketData";
 
 import { calendarEvents, type CalendarEvent } from "@/data/calendarEvents";
+import { getEventImpact } from "@/data/eventImpactRules";
+import { buildMarketContext, type TimeframeState } from "@/services/contextEngine";
+import { useTraderStyle } from "@/context/TraderStyleProvider";
 
 type TradingSessionName = "Sydney" | "Asia" | "London" | "New York";
 
@@ -126,16 +120,11 @@ const getUniqueUpcomingEvents = () => {
   const nextByEventKey = new Map<string, CalendarEvent>();
 
   calendarEvents
-    .filter((event) => {
-      const ts = getEventTimestamp(event);
-      return ts >= now;
-    })
+    .filter((event) => getEventTimestamp(event) >= now)
     .sort((a, b) => getEventTimestamp(a) - getEventTimestamp(b))
     .forEach((event) => {
       const key = event.eventKey || `${event.currency}-${event.event}`;
-      if (!nextByEventKey.has(key)) {
-        nextByEventKey.set(key, event);
-      }
+      if (!nextByEventKey.has(key)) nextByEventKey.set(key, event);
     });
 
   return Array.from(nextByEventKey.values()).sort((a, b) => {
@@ -157,6 +146,48 @@ const formatDashboardDate = (event: CalendarEvent) => {
     day: "2-digit",
     month: "short",
   });
+};
+
+const normalizeMarketSymbol = (symbol: string) => symbol.toUpperCase().replace(/[^A-Z0-9]/g, "");
+const isFxPairSymbol = (symbol: string) => /^[A-Z]{6}$/.test(symbol);
+
+const getFxCurrencies = (symbol: string) => {
+  const normalized = normalizeMarketSymbol(symbol);
+  if (!isFxPairSymbol(normalized)) return [];
+  return [normalized.slice(0, 3), normalized.slice(3, 6)];
+};
+
+const isEventRelevantToSymbol = (symbol: string, event: CalendarEvent) => {
+  const normalizedSymbol = normalizeMarketSymbol(symbol);
+  const impact = getEventImpact({
+    title: event.event,
+    currency: event.currency,
+  });
+
+  if (impact.affectedPairs.includes(normalizedSymbol)) return true;
+  if (impact.affectedAssets.includes(normalizedSymbol)) return true;
+
+  if (isFxPairSymbol(normalizedSymbol)) {
+    const pairCurrencies = getFxCurrencies(normalizedSymbol);
+    return pairCurrencies.some((currency) => impact.affectedCurrencies.includes(currency));
+  }
+
+  return false;
+};
+
+const getStateDotClass = (state: TimeframeState) => {
+  switch (state) {
+    case "bullish":
+      return "bg-success";
+    case "bearish":
+      return "bg-destructive";
+    case "weakening":
+      return "bg-warning";
+    case "liquidity":
+      return "bg-primary";
+    default:
+      return "bg-muted-foreground/40";
+  }
 };
 
 export default function Dashboard() {
@@ -216,15 +247,10 @@ export default function Dashboard() {
 
   const openAssetOverlay = useCallback((symbol: string) => {
     setSelectedAssetSymbol(null);
-
-    requestAnimationFrame(() => {
-      setSelectedAssetSymbol(symbol);
-    });
+    requestAnimationFrame(() => setSelectedAssetSymbol(symbol));
   }, []);
 
-  const closeAssetOverlay = useCallback(() => {
-    setSelectedAssetSymbol(null);
-  }, []);
+  const closeAssetOverlay = useCallback(() => setSelectedAssetSymbol(null), []);
 
   const openCalendarEvent = useCallback((event: CalendarEvent) => {
     setIsEventModalOpen(false);
@@ -266,15 +292,11 @@ export default function Dashboard() {
   const handleDragStart = (cardId: string) => setDraggingCardId(cardId);
 
   const handleDragOver = (cardId: string) => {
-    if (draggingCardId && cardId !== draggingCardId) {
-      setDragOverCardId(cardId);
-    }
+    if (draggingCardId && cardId !== draggingCardId) setDragOverCardId(cardId);
   };
 
   const handleDragOverRow = (rowId: string) => {
-    if (draggingCardId) {
-      setDragOverRowId(rowId);
-    }
+    if (draggingCardId) setDragOverRowId(rowId);
   };
 
   const handleDragEnd = () => {
@@ -335,9 +357,7 @@ export default function Dashboard() {
 
     const renderer = getCardRenderer(cardId);
 
-    if (renderer) {
-      return renderer({ slotType });
-    }
+    if (renderer) return renderer({ slotType });
 
     return (
       <div className="h-full rounded-xl border border-warning/30 bg-warning/5 p-4">
@@ -427,9 +447,7 @@ export default function Dashboard() {
         <div
           className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
           onMouseDown={(e) => {
-            if (e.target === e.currentTarget) {
-              closeAssetOverlay();
-            }
+            if (e.target === e.currentTarget) closeAssetOverlay();
           }}
         >
           <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-xl bg-background border border-border shadow-2xl">
@@ -449,6 +467,7 @@ function DashboardWatchlistCard({
   onOpenAsset: (symbol: string) => void;
 }) {
   const { watchlistAssets } = useWatchlist();
+  const { traderStyle } = useTraderStyle();
 
   const displayAssets = useMemo(() => watchlistAssets.slice(0, 5), [watchlistAssets]);
   const symbols = useMemo(() => displayAssets.map((asset) => asset.symbol), [displayAssets]);
@@ -521,6 +540,16 @@ function DashboardWatchlistCard({
         <div className="space-y-3">
           {displayAssets.map((asset) => {
             const quote = getQuoteForAsset(asset.symbol);
+            const relevantEvents = calendarEvents.filter((event) => isEventRelevantToSymbol(asset.symbol, event));
+            const context = buildMarketContext({
+              asset,
+              quote,
+              upcomingRelevantEvents: relevantEvents,
+              traderStyle,
+            });
+
+            const shortTf = context.timeframeContext[0];
+            const nearestLevel = context.levels[0];
 
             return (
               <button
@@ -533,36 +562,51 @@ function DashboardWatchlistCard({
                   onOpenAsset(asset.symbol);
                 }}
                 disabled={isEditMode}
-                className="w-full text-left flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors group disabled:cursor-default disabled:hover:bg-muted/50"
+                className="w-full text-left p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors group disabled:cursor-default disabled:hover:bg-muted/50"
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className="font-semibold text-foreground">{asset.symbol}</span>
-                    <div className={`flex items-center gap-1 text-xs font-medium ${getBiasColor(asset.biasDirection)}`}>
-                      {getBiasIcon(asset.biasDirection)}
-                      <span>{asset.biasDirection}</span>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="font-semibold text-foreground">{asset.symbol}</span>
+
+                      <div
+                        className={`flex items-center gap-1 text-xs font-medium ${getBiasColor(asset.biasDirection)}`}
+                      >
+                        {getBiasIcon(asset.biasDirection)}
+                        <span>{asset.biasDirection}</span>
+                      </div>
+
+                      <Badge variant="outline" className="text-[10px]">
+                        {context.structureState}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                      {shortTf && (
+                        <span className="inline-flex items-center gap-1">
+                          <span className={`h-1.5 w-1.5 rounded-full ${getStateDotClass(shortTf.state)}`} />
+                          {shortTf.timeframe}: {shortTf.label}
+                        </span>
+                      )}
+
+                      {nearestLevel && <span>Key area: {nearestLevel.price}</span>}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                    <span>Confidence: {asset.biasConfidence}%</span>
-                    <span>Spread: {asset.spread}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <div className="text-right">
-                    <div className="text-sm font-medium text-foreground">
-                      {formatPriceNoCommas(quote?.last?.toString() ?? asset.latestPrice)}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="text-right">
+                      <div className="text-sm font-medium text-foreground">
+                        {formatPriceNoCommas(quote?.last?.toString() ?? asset.latestPrice)}
+                      </div>
+                      <div className={`text-xs ${getChangeColor(quote, asset.priceChange)}`}>
+                        {getDisplayedChange(quote, asset.priceChange)}
+                      </div>
                     </div>
-                    <div className={`text-xs ${getChangeColor(quote, asset.priceChange)}`}>
-                      {getDisplayedChange(quote, asset.priceChange)}
-                    </div>
-                  </div>
 
-                  {!isEditMode && (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                  )}
+                    {!isEditMode && (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                    )}
+                  </div>
                 </div>
               </button>
             );
