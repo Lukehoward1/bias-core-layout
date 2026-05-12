@@ -13,7 +13,7 @@ export type BiasState =
   | "Flip Confirmed"
   | "Neutral / Ranging";
 
-export type StructureState = "Trending Up" | "Trending Down" | "Ranging" | "Structure Shifting" | "Compressed";
+export type StructureState = "Trending Up" | "Trending Down" | "Ranging" | "Structure Shifting" | "Consolidating";
 
 export type LevelType =
   | "Swing High"
@@ -193,7 +193,7 @@ export function deriveStructureState(asset: Asset, quote?: MarketQuote | null): 
   const change = quote?.changePercent ?? 0;
 
   if (confidence < 45) return "Ranging";
-  if (Math.abs(change) < 0.1 && confidence < 70) return "Compressed";
+  if (Math.abs(change) < 0.1 && confidence < 70) return "Consolidating";
 
   if (direction === "Bullish") {
     if (change < -0.3) return "Structure Shifting";
@@ -416,8 +416,8 @@ function buildOverview(opts: {
         ? "Structure is trending lower."
         : structureState === "Structure Shifting"
           ? "Structure is shifting against the prior read."
-          : structureState === "Compressed"
-            ? "Price is compressed near current structure."
+          : structureState === "Consolidating"
+            ? "Price is consolidating inside the current range."
             : "Structure remains choppy/ranging.";
 
   const levelText = target
@@ -510,6 +510,15 @@ function buildTimeframeContext(
         };
       }
 
+      if (structureState === "Consolidating") {
+        return {
+          timeframe,
+          state: "neutral",
+          label: "Consolidating",
+          detail: "Price is moving inside a defined range; watch for acceptance above or below.",
+        };
+      }
+
       return {
         timeframe,
         state: direction === "Bullish" ? "bullish" : "bearish",
@@ -536,12 +545,21 @@ function buildTimeframeContext(
       };
     }
 
-    if (weakening || structureState === "Compressed") {
+    if (weakening) {
       return {
         timeframe,
         state: "weakening",
         label: direction === "Bearish" ? "Bounce risk" : "Pullback risk",
         detail: "Short-term momentum is no longer clean.",
+      };
+    }
+
+    if (structureState === "Consolidating") {
+      return {
+        timeframe,
+        state: "neutral",
+        label: "Inside range",
+        detail: "Short-term price is consolidating; range high/low are the important references.",
       };
     }
 
