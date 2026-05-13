@@ -10,6 +10,26 @@ import { CreatePriceAlertModal } from "./CreatePriceAlertModal";
 import { cn } from "@/lib/utils";
 import type { PriceAlert } from "@/types/alerts";
 
+const getTriggerLabel = (alert: PriceAlert) => {
+  return alert.triggerType === "wick" ? "Price touch" : `${alert.timeframe} candle close`;
+};
+
+const getConditionLabel = (alert: PriceAlert) => {
+  return alert.direction === "above" ? `Tests above ${alert.price}` : `Tests below ${alert.price}`;
+};
+
+const getContextLabel = (alert: PriceAlert) => {
+  if (alert.triggerType === "wick") {
+    return alert.direction === "above"
+      ? "Notify when price touches or sweeps this upper level."
+      : "Notify when price touches or sweeps this lower level.";
+  }
+
+  return alert.direction === "above"
+    ? `Notify only if price closes above this level on ${alert.timeframe}.`
+    : `Notify only if price closes below this level on ${alert.timeframe}.`;
+};
+
 export function PriceAlertsPanel() {
   const { priceAlerts, togglePriceAlert, deletePriceAlert, updatePriceAlert } = useAlertsContext();
 
@@ -85,7 +105,7 @@ export function PriceAlertsPanel() {
             {triggeredAlerts.length > 0 && (
               <Button variant="outline" size="sm" className="h-8" onClick={resetHistory}>
                 <RotateCcw className="h-4 w-4 mr-1" />
-                Reset History (demo)
+                Reset History
               </Button>
             )}
 
@@ -108,7 +128,7 @@ export function PriceAlertsPanel() {
                 <div className="text-center py-8 text-muted-foreground">
                   <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">No active price alerts</p>
-                  <p className="text-xs mt-1">Create one to get started</p>
+                  <p className="text-xs mt-1">Create one to track a key level or candle close</p>
                 </div>
               ) : (
                 <div className="space-y-2 pr-4">
@@ -123,9 +143,9 @@ export function PriceAlertsPanel() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-2 flex-1 min-w-0">
                           {alert.direction === "above" ? (
-                            <ArrowUp className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                            <ArrowUp className="h-4 w-4 text-success mt-0.5 shrink-0" />
                           ) : (
-                            <ArrowDown className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                            <ArrowDown className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
                           )}
 
                           <div className="flex-1 min-w-0">
@@ -133,7 +153,7 @@ export function PriceAlertsPanel() {
                               <span className="font-medium text-sm truncate">{alert.assetDisplayName}</span>
 
                               <Badge variant="outline" className="text-[10px]">
-                                {alert.triggerType === "wick" ? "Touch" : `Close ${alert.timeframe}`}
+                                {getTriggerLabel(alert)}
                               </Badge>
 
                               {!alert.enabled && (
@@ -143,9 +163,8 @@ export function PriceAlertsPanel() {
                               )}
                             </div>
 
-                            <p className="text-xs text-muted-foreground">
-                              {alert.direction === "above" ? "Above" : "Below"} {alert.price}
-                            </p>
+                            <p className="text-xs text-foreground font-medium">{getConditionLabel(alert)}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{getContextLabel(alert)}</p>
                           </div>
                         </div>
 
@@ -199,9 +218,9 @@ export function PriceAlertsPanel() {
                     <div key={alert.id} className="p-2.5 rounded-lg bg-muted/30 border border-border/50">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                          <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />
                           <span className="text-sm truncate">
-                            {alert.assetDisplayName} {alert.direction} {alert.price}
+                            {alert.assetDisplayName} — {getConditionLabel(alert)}
                           </span>
                         </div>
 
@@ -215,7 +234,7 @@ export function PriceAlertsPanel() {
                           className="h-6 w-6 text-muted-foreground hover:text-foreground"
                           onClick={() => restoreAlert(alert.id)}
                           aria-label="Restore alert"
-                          title="Restore (demo)"
+                          title="Restore"
                         >
                           <Undo2 className="h-3 w-3" />
                         </Button>
