@@ -404,7 +404,7 @@ function buildOverview(opts: {
         : biasState === "Bullish Weakening"
           ? `${asset.symbol} bullish context is weakening; pullback risk is elevated.`
           : biasState === "Bearish Weakening"
-            ? `${asset.symbol} bearish context is weakening; bounce risk is elevated.`
+            ? `${asset.symbol} bearish context is weakening; rejection risk is elevated.`
             : biasState === "Failure Detected"
               ? `${asset.symbol} is showing failure characteristics against the prior bias.`
               : `${asset.symbol} is currently range-bound with limited directional conviction.`;
@@ -549,7 +549,7 @@ function buildTimeframeContext(
       return {
         timeframe,
         state: "weakening",
-        label: direction === "Bearish" ? "Bounce risk" : "Pullback risk",
+        label: direction === "Bearish" ? "Rejection risk" : "Pullback risk",
         detail: "Short-term momentum is no longer clean.",
       };
     }
