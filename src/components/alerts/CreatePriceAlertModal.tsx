@@ -16,15 +16,7 @@ import { toast } from "sonner";
 interface CreatePriceAlertModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-
-  /**
-   * Optional: if provided, modal becomes "Edit" mode and pre-fills fields
-   */
   editingAlert?: PriceAlert | null;
-
-  /**
-   * Optional: convenience default when opening from elsewhere
-   */
   defaultAsset?: string;
 }
 
@@ -47,6 +39,24 @@ const formatPriceNoCommas = (raw: string | number) => {
   return String(n);
 };
 
+const getDirectionLabel = (direction: PriceAlertDirection) => {
+  return direction === "above" ? "Tests above" : "Tests below";
+};
+
+const getPreviewMessage = (
+  assetName: string,
+  direction: PriceAlertDirection,
+  triggerType: PriceAlertTriggerType,
+  price: string,
+  timeframe: PriceAlertTimeframe,
+) => {
+  if (triggerType === "wick") {
+    return `${assetName} tests ${direction === "above" ? "above" : "below"} ${price} by price touch.`;
+  }
+
+  return `${assetName} confirms a ${timeframe} candle close ${direction === "above" ? "above" : "below"} ${price}.`;
+};
+
 export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editingAlert }: CreatePriceAlertModalProps) {
   const { addPriceAlert, updatePriceAlert } = useAlertsContext();
 
@@ -67,7 +77,6 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
     return "—";
   }, [quote, selectedAsset]);
 
-  // Prefill when opening
   useEffect(() => {
     if (!open) return;
 
@@ -96,13 +105,13 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
     }
 
     const priceNum = parseFloat(price);
-    if (isNaN(priceNum) || priceNum <= 0) {
-      toast.error("Please enter a valid price");
+    if (Number.isNaN(priceNum) || priceNum <= 0) {
+      toast.error("Please enter a valid price level");
       return;
     }
 
     if (triggerType === "close" && !timeframe) {
-      toast.error("Please select a timeframe for close-based alerts");
+      toast.error("Please select a timeframe for candle-close alerts");
       return;
     }
 
@@ -146,10 +155,7 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
     if (!asset || !price) return null;
 
     const assetName = selectedAsset?.displayName || asset;
-    if (triggerType === "wick") {
-      return `"${assetName} wicked ${direction} ${price}"`;
-    }
-    return `"${assetName} closed ${direction} ${price} on ${timeframe}"`;
+    return getPreviewMessage(assetName, direction, triggerType, price, timeframe);
   }, [asset, price, selectedAsset, triggerType, direction, timeframe]);
 
   return (
@@ -185,7 +191,7 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
           </div>
 
           <div className="space-y-2">
-            <Label>Direction</Label>
+            <Label>Level Direction</Label>
             <RadioGroup
               value={direction}
               onValueChange={(v) => setDirection(v as PriceAlertDirection)}
@@ -194,22 +200,23 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="above" id="above" />
                 <Label htmlFor="above" className="flex items-center gap-1.5 cursor-pointer">
-                  <ArrowUp className="h-4 w-4 text-green-500" />
-                  Above
+                  <ArrowUp className="h-4 w-4 text-success" />
+                  Tests above
                 </Label>
               </div>
+
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="below" id="below" />
                 <Label htmlFor="below" className="flex items-center gap-1.5 cursor-pointer">
-                  <ArrowDown className="h-4 w-4 text-red-500" />
-                  Below
+                  <ArrowDown className="h-4 w-4 text-destructive" />
+                  Tests below
                 </Label>
               </div>
             </RadioGroup>
           </div>
 
           <div className="space-y-2">
-            <Label>Trigger Type</Label>
+            <Label>Trigger Condition</Label>
             <RadioGroup
               value={triggerType}
               onValueChange={(v) => setTriggerType(v as PriceAlertTriggerType)}
@@ -219,10 +226,10 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
                 <RadioGroupItem value="wick" id="wick" className="mt-0.5" />
                 <div>
                   <Label htmlFor="wick" className="cursor-pointer font-medium">
-                    Wick / Touch
+                    Price Touch / Sweep
                   </Label>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Triggers when price trades beyond the level (any touch)
+                    Notifies when price touches, trades through, or sweeps the level.
                   </p>
                 </div>
               </div>
@@ -231,10 +238,10 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
                 <RadioGroupItem value="close" id="close" className="mt-0.5" />
                 <div>
                   <Label htmlFor="close" className="cursor-pointer font-medium">
-                    Close Above/Below
+                    Candle Close Confirmation
                   </Label>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Triggers only when a candle closes beyond the level
+                    Notifies only when the selected timeframe closes beyond the level.
                   </p>
                 </div>
               </div>
@@ -243,7 +250,7 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
 
           {triggerType === "close" && (
             <div className="space-y-2">
-              <Label>Timeframe</Label>
+              <Label>Confirmation Timeframe</Label>
               <Select value={timeframe} onValueChange={(v) => setTimeframe(v as PriceAlertTimeframe)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -268,7 +275,11 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
               value={price}
               onChange={(e) => setPrice(e.target.value)}
             />
-            {selectedAsset && <p className="text-xs text-muted-foreground">Current price: {livePrice}</p>}
+            {selectedAsset && (
+              <p className="text-xs text-muted-foreground">
+                Current price: {livePrice} · Alert condition: {getDirectionLabel(direction)}
+              </p>
+            )}
           </div>
 
           {previewMessage && (

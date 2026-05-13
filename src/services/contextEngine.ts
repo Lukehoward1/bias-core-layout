@@ -238,7 +238,7 @@ function makeLevel(input: {
 }
 
 function buildLevels(asset: Asset, quote: MarketQuote | null | undefined, biasState: BiasState): KeyLevel[] {
-  const ref = toNumber(quote?.last) || toNumber(asset.latestPrice);
+  const ref = toNumber(asset.latestPrice) || toNumber(quote?.last);
   if (!Number.isFinite(ref) || ref <= 0) return [];
 
   const decimals = inferDecimals(ref);
