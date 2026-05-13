@@ -27,6 +27,12 @@ import { WatchlistOverviewCard } from "@/components/dashboard/WatchlistOverviewC
 import { useAlertsContext } from "@/contexts/AlertsContext";
 import { getAllCalendarEvents, getEventDateTime } from "@/services/calendarData";
 
+import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
+import { useMarketQuotes } from "@/hooks/use-market-quotes";
+import { normalizeSymbol } from "@/services/marketData";
+import { buildMarketContext } from "@/services/contextEngine";
+import { useTraderStyle } from "@/context/TraderStyleProvider";
+
 /* =======================
    SHARED DATA
 ======================= */
@@ -335,6 +341,66 @@ function useDashboardEventNavigation() {
    LIVE DASHBOARD CARDS
 ======================= */
 
+function TodaysBiasDashboardCard() {
+  const { assets } = useAssets();
+  const { watchlistAssets } = useWatchlist();
+  const { traderStyle } = useTraderStyle();
+
+  const basisAssets = useMemo(() => {
+    return (watchlistAssets.length > 0 ? watchlistAssets : assets).slice(0, 6);
+  }, [watchlistAssets, assets]);
+
+  const symbols = useMemo(() => basisAssets.map((asset) => asset.symbol), [basisAssets]);
+  const quotes = useMarketQuotes(symbols);
+
+  const contexts = useMemo(() => {
+    return basisAssets.map((asset) =>
+      buildMarketContext({
+        asset,
+        quote: quotes[normalizeSymbol(asset.symbol)],
+        upcomingRelevantEvents: [],
+        traderStyle,
+      }),
+    );
+  }, [basisAssets, quotes, traderStyle]);
+
+  const bullishCount = contexts.filter((ctx) => ctx.biasState.includes("Bullish")).length;
+  const bearishCount = contexts.filter((ctx) => ctx.biasState.includes("Bearish")).length;
+  const weakeningCount = contexts.filter((ctx) => ctx.biasState.includes("Weakening")).length;
+
+  const dominantBias = bullishCount > bearishCount ? "Bullish" : bearishCount > bullishCount ? "Bearish" : "Mixed";
+
+  const dominantColor =
+    dominantBias === "Bullish"
+      ? "text-success"
+      : dominantBias === "Bearish"
+        ? "text-destructive"
+        : "text-muted-foreground";
+
+  const DominantIcon = dominantBias === "Bullish" ? TrendingUp : dominantBias === "Bearish" ? TrendingDown : Activity;
+
+  return (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Today&apos;s Bias</CardTitle>
+      </CardHeader>
+
+      <CardContent>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className={`text-2xl font-bold ${dominantColor}`}>{dominantBias}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {bullishCount} bullish · {bearishCount} bearish · {weakeningCount} weakening
+            </p>
+          </div>
+
+          <DominantIcon className={`h-6 w-6 ${dominantColor}`} />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function AlertsSummaryDashboardCard() {
   const navigate = useNavigate();
   const { alerts, recurringSubscriptions, priceAlerts } = useAlertsContext();
@@ -416,47 +482,6 @@ function AlertsSummaryDashboardCard() {
             <p className="text-xs text-muted-foreground">Active Price</p>
             <p className="text-2xl font-bold text-foreground mt-1">{activePriceCount}</p>
           </div>
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <Bell className="h-4 w-4 text-primary" />
-            Recurring Alerts
-          </div>
-
-          {recurringOverviewItems.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No recurring alerts set.</p>
-          ) : (
-            recurringOverviewItems.map((item) => (
-              <div key={item.id} className="p-3 rounded-lg border border-warning/20 bg-warning/5">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-foreground truncate">{item.title}</p>
-                  <span className="text-[10px] px-2 py-0.5 rounded border border-warning/40 text-warning whitespace-nowrap">
-                    Recurring
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">{formatRecurringNextLabel(item.nextRelease)}</p>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <CalendarIcon className="h-4 w-4 text-primary" />
-            Pending News & Timers
-          </div>
-
-          {pendingItems.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No pending scheduled alerts.</p>
-          ) : (
-            pendingItems.map((item) => (
-              <div key={item.id} className="p-3 rounded-lg border border-primary/20 bg-primary/5">
-                <p className="text-sm font-medium text-foreground truncate">{item.title}</p>
-                <p className="text-xs text-muted-foreground mt-1">{item.message}</p>
-              </div>
-            ))
-          )}
         </div>
 
         <Button className="w-full" onClick={() => navigate("/alerts")}>
@@ -543,23 +568,9 @@ function TopNewsDashboardCard() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-foreground truncate">{item.event}</p>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                        {item.currency}
-                      </span>
-                      <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded ${
-                          item.impact === "high"
-                            ? "bg-destructive/20 text-destructive"
-                            : item.impact === "medium"
-                              ? "bg-warning/20 text-warning"
-                              : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {item.impact}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground mt-1">• click to open</p>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      {item.currency} · {item.impact}
+                    </p>
                   </div>
 
                   <span className="text-[10px] text-muted-foreground whitespace-nowrap">
@@ -732,22 +743,7 @@ function CalendarEventsDashboardCard() {
 ======================= */
 
 export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.ReactNode> = {
-  "todays-bias": () => (
-    <Card className="h-full">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">Today&apos;s Bias</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-2xl font-bold text-success">Bullish</p>
-            <p className="text-xs text-muted-foreground mt-1">Multi-timeframe alignment</p>
-          </div>
-          <TrendingUp className="h-6 w-6 text-success" />
-        </div>
-      </CardContent>
-    </Card>
-  ),
+  "todays-bias": () => <TodaysBiasDashboardCard />,
 
   "active-trades": () => (
     <Card className="h-full">
@@ -774,8 +770,18 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   ),
 
   "high-impact-events": () => <HighImpactEventsDashboardCard />,
-
   "watchlist-overview": ({ slotType }) => <WatchlistOverviewCard slotType={normalizeWatchlistSlotType(slotType)} />,
+  "alerts-summary": () => <AlertsSummaryDashboardCard />,
+  "top-news": () => <TopNewsDashboardCard />,
+  "session-timers": () => <SessionTimersDashboardCard />,
+  "upcoming-events": () => <UpcomingEventsDashboardCard />,
+  "calendar-events": () => <CalendarEventsDashboardCard />,
+
+  "quick-calculator": () => <QuickRiskCalculator compact />,
+  "position-size-calculator": () => <PositionSizeCalculator compact />,
+  "rr-calculator": () => <RiskRewardCalculator compact />,
+  "daily-risk-limit": () => <DailyRiskLimitTracker compact />,
+  "max-drawdown-guard": () => <MaxDrawdownGuard compact />,
 
   "performance-overview": () => (
     <Card className="h-full">
@@ -1007,7 +1013,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
                     border: "1px solid hsl(var(--border))",
                     borderRadius: "8px",
                   }}
-                  formatter={(value: number) => [`£${value.toLocaleString()}`, "Cumulative P&amp;L"]}
+                  formatter={(value: number) => [`£${value.toLocaleString()}`, "Cumulative P&L"]}
                 />
                 <Area
                   type="monotone"
@@ -1025,391 +1031,6 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
     );
   },
 
-  "reports-overview-edge": () => (
-    <Card className="h-full border-primary/30 bg-primary/5">
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">Your Strongest Edge</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground">High-confidence setups with 4+ star ratings</p>
-      </CardContent>
-    </Card>
-  ),
-
-  "reports-sessions-comparison": () => (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">Session Comparison</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-3 gap-3 text-center">
-          <div className="p-3 rounded-lg bg-success/5 border border-success/20">
-            <p className="text-xs text-muted-foreground">London</p>
-            <p className="text-lg font-bold text-success">71%</p>
-            <p className="text-xs text-muted-foreground">Win Rate</p>
-          </div>
-          <div className="p-3 rounded-lg bg-muted/50 border border-border">
-            <p className="text-xs text-muted-foreground">New York</p>
-            <p className="text-lg font-bold text-foreground">65%</p>
-            <p className="text-xs text-muted-foreground">Win Rate</p>
-          </div>
-          <div className="p-3 rounded-lg bg-muted/50 border border-border">
-            <p className="text-xs text-muted-foreground">Asian</p>
-            <p className="text-lg font-bold text-foreground">58%</p>
-            <p className="text-xs text-muted-foreground">Win Rate</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  ),
-
-  "reports-sessions-recommendations": () => (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">Session Recommendations</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          <div className="p-3 rounded-lg bg-success/5 border border-success/20">
-            <p className="text-xs text-success font-medium">✓ Best Session</p>
-            <p className="text-sm font-medium text-foreground">London</p>
-            <p className="text-xs text-muted-foreground">71% win rate, £450 avg profit</p>
-          </div>
-          <div className="p-3 rounded-lg bg-destructive/5 border border-destructive/20">
-            <p className="text-xs text-destructive font-medium">✗ Avoid</p>
-            <p className="text-sm font-medium text-foreground">Asian (Low Volume)</p>
-            <p className="text-xs text-muted-foreground">42% win rate, -£85 avg</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  ),
-
-  "reports-assets-pnl": () => (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">P&amp;L by Instrument</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {[
-            { pair: "EUR/USD", pnl: "+£1,250", trades: 45, color: "text-success" },
-            { pair: "GBP/USD", pnl: "+£820", trades: 32, color: "text-success" },
-            { pair: "USD/JPY", pnl: "-£180", trades: 18, color: "text-destructive" },
-          ].map((item) => (
-            <div key={item.pair} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">{item.pair}</span>
-              </div>
-              <div className="text-right">
-                <p className={`text-sm font-bold ${item.color}`}>{item.pnl}</p>
-                <p className="text-xs text-muted-foreground">{item.trades} trades</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  ),
-
-  "reports-assets-table": () => (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">Instrument Statistics</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="text-left py-2 text-xs text-muted-foreground">Pair</th>
-                <th className="text-right py-2 text-xs text-muted-foreground">Win %</th>
-                <th className="text-right py-2 text-xs text-muted-foreground">P&amp;L</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b border-border/50">
-                <td className="py-2">EUR/USD</td>
-                <td className="text-right text-success">68%</td>
-                <td className="text-right text-success">+£1,250</td>
-              </tr>
-              <tr className="border-b border-border/50">
-                <td className="py-2">GBP/USD</td>
-                <td className="text-right text-success">62%</td>
-                <td className="text-right text-success">+£820</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </CardContent>
-    </Card>
-  ),
-
-  "reports-setup-best-worst": () => (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">Best &amp; Worst Setups</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="p-3 rounded-lg border-success/30 bg-success/5 border">
-            <div className="flex items-center gap-1 mb-1">
-              <TrendingUp className="h-3.5 w-3.5 text-success" />
-              <p className="text-xs font-medium text-muted-foreground">Best</p>
-            </div>
-            <p className="text-sm font-bold text-success">5 Star</p>
-            <p className="text-xs text-muted-foreground">£320/trade</p>
-          </div>
-          <div className="p-3 rounded-lg border-destructive/30 bg-destructive/5 border">
-            <div className="flex items-center gap-1 mb-1">
-              <TrendingDown className="h-3.5 w-3.5 text-destructive" />
-              <p className="text-xs font-medium text-muted-foreground">Worst</p>
-            </div>
-            <p className="text-sm font-bold text-destructive">1 Star</p>
-            <p className="text-xs text-muted-foreground">-£85/trade</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  ),
-
-  "reports-setup-patterns": () => (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">Common Patterns</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          {["Breakout", "Pullback", "Reversal"].map((pattern, i) => (
-            <div key={pattern} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-              <span className="text-sm text-foreground">{pattern}</span>
-              <span className="text-xs text-muted-foreground">{[32, 28, 15][i]} trades</span>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  ),
-
-  "reports-psychology-sentiment": () => (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">Sentiment Summary</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-center gap-4">
-          <div className="text-center">
-            <p className="text-2xl font-bold text-success">68%</p>
-            <p className="text-xs text-muted-foreground">Positive</p>
-          </div>
-          <div className="h-8 w-px bg-border" />
-          <div className="text-center">
-            <p className="text-2xl font-bold text-destructive">32%</p>
-            <p className="text-xs text-muted-foreground">Negative</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  ),
-
-  "reports-psychology-triggers": () => (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">Emotional Triggers</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {[
-            { trigger: "FOMO", impact: "High", color: "text-destructive" },
-            { trigger: "Revenge Trading", impact: "Medium", color: "text-amber-500" },
-            { trigger: "Overconfidence", impact: "Low", color: "text-muted-foreground" },
-          ].map((item) => (
-            <div key={item.trigger} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-              <div className="flex items-center gap-2">
-                <Brain className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-foreground">{item.trigger}</span>
-              </div>
-              <span className={`text-xs font-medium ${item.color}`}>{item.impact}</span>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  ),
-
-  "reports-psychology-improvement": () => (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">Improvement Focus</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">Focus on reducing FOMO-driven trades</p>
-          <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
-            <p className="text-xs font-medium text-primary">Suggestion</p>
-            <p className="text-sm text-foreground">Wait for confirmation before entering</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  ),
-
-  "reports-risk-kpis": () => (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">Risk KPIs</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-3 gap-3 text-center">
-          <div>
-            <p className="text-lg font-bold text-foreground">1.2%</p>
-            <p className="text-xs text-muted-foreground">Avg Risk</p>
-          </div>
-          <div>
-            <p className="text-lg font-bold text-foreground">2.5%</p>
-            <p className="text-xs text-muted-foreground">Max Risk</p>
-          </div>
-          <div>
-            <p className="text-lg font-bold text-destructive">-£850</p>
-            <p className="text-xs text-muted-foreground">Max Loss</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  ),
-
-  "reports-risk-distribution": ({ slotType }) => {
-    const chartHeight = slotType === "hero" ? "h-64" : "h-40";
-
-    return (
-      <Card className="h-full">
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Risk Distribution</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className={chartHeight + " flex items-center justify-center"}>
-            <div className="grid grid-cols-4 gap-2 w-full">
-              {["0-1%", "1-2%", "2-3%", "3%+"].map((range, i) => (
-                <div key={range} className="text-center">
-                  <div className="w-full bg-primary/20 rounded-t" style={{ height: `${[45, 85, 35, 15][i]}px` }} />
-                  <p className="text-xs text-muted-foreground mt-1">{range}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  },
-
-  "reports-risk-discipline": () => (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">Risk Discipline Score</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-center">
-          <div className="text-center">
-            <div className="relative w-20 h-20 mx-auto">
-              <svg className="w-20 h-20 transform -rotate-90">
-                <circle cx="40" cy="40" r="35" stroke="hsl(var(--muted))" strokeWidth="6" fill="none" />
-                <circle
-                  cx="40"
-                  cy="40"
-                  r="35"
-                  stroke="hsl(var(--success))"
-                  strokeWidth="6"
-                  fill="none"
-                  strokeDasharray={`${85 * 2.2} ${220 - 85 * 2.2}`}
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-lg font-bold text-foreground">85%</span>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">Excellent discipline</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  ),
-
-  "reports-performance-by-day": () => (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">Win Rate by Day</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          {["Mon", "Tue", "Wed", "Thu", "Fri"].map((day, i) => (
-            <div key={day} className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground w-8">{day}</span>
-              <div className="flex-1 h-4 bg-muted rounded-full overflow-hidden">
-                <div className="h-full bg-primary rounded-full" style={{ width: `${[72, 65, 58, 70, 68][i]}%` }} />
-              </div>
-              <span className="text-xs text-foreground w-10">{[72, 65, 58, 70, 68][i]}%</span>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  ),
-
-  "reports-performance-by-session": () => (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">Win Rate by Session</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { name: "London", rate: 71, color: "#F4D35E" },
-            { name: "New York", rate: 65, color: "#F77F00" },
-            { name: "Asian", rate: 58, color: "#4361EE" },
-            { name: "Sydney", rate: 52, color: "#2EC4B6" },
-          ].map((session) => (
-            <div
-              key={session.name}
-              className="p-2 rounded-lg bg-muted/50 border-l-2"
-              style={{ borderColor: session.color }}
-            >
-              <p className="text-xs text-muted-foreground">{session.name}</p>
-              <p className="text-lg font-bold text-foreground">{session.rate}%</p>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  ),
-
-  "reports-performance-distribution": () => (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="text-sm font-medium">Trade Distribution</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-center gap-6">
-          <div className="text-center">
-            <div className="w-16 h-16 rounded-full bg-success/20 flex items-center justify-center mx-auto">
-              <TrendingUp className="h-6 w-6 text-success" />
-            </div>
-            <p className="text-lg font-bold text-foreground mt-2">62%</p>
-            <p className="text-xs text-muted-foreground">Long</p>
-          </div>
-          <div className="text-center">
-            <div className="w-16 h-16 rounded-full bg-destructive/20 flex items-center justify-center mx-auto">
-              <TrendingDown className="h-6 w-6 text-destructive" />
-            </div>
-            <p className="text-lg font-bold text-foreground mt-2">38%</p>
-            <p className="text-xs text-muted-foreground">Short</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  ),
-
   "alerts-my-alerts-timers": () => (
     <Card className="h-full">
       <CardHeader>
@@ -1419,30 +1040,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-2">
-          {[
-            { type: "Price Alert", what: "EURUSD > 1.0850", status: "active" },
-            { type: "News Alert", what: "USD High Impact", status: "pending" },
-            { type: "Session Timer", what: "London Open", status: "active" },
-          ].map((alert, i) => (
-            <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-              <div className="flex items-center gap-2">
-                <Bell className="h-3.5 w-3.5 text-muted-foreground" />
-                <div>
-                  <p className="text-xs font-medium text-foreground">{alert.type}</p>
-                  <p className="text-xs text-muted-foreground">{alert.what}</p>
-                </div>
-              </div>
-              <span
-                className={`text-xs px-2 py-0.5 rounded ${
-                  alert.status === "active" ? "bg-success/20 text-success" : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {alert.status}
-              </span>
-            </div>
-          ))}
-        </div>
+        <p className="text-sm text-muted-foreground">Alerts and timer summary.</p>
       </CardContent>
     </Card>
   ),
@@ -1456,46 +1054,10 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-border">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-success" />
-              <span className="text-sm text-foreground">EUR/USD above 1.0850</span>
-            </div>
-            <span className="text-xs text-muted-foreground">Touch</span>
-          </div>
-          <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-border">
-            <div className="flex items-center gap-2">
-              <TrendingDown className="h-4 w-4 text-destructive" />
-              <span className="text-sm text-foreground">Gold below 2020.00</span>
-            </div>
-            <span className="text-xs text-muted-foreground">Close 1H</span>
-          </div>
-        </div>
-        <p className="text-xs text-muted-foreground mt-3 text-center">2 active alerts</p>
+        <p className="text-sm text-muted-foreground">Active price alert overview.</p>
       </CardContent>
     </Card>
   ),
-
-  "alerts-summary": () => <AlertsSummaryDashboardCard />,
-
-  "quick-calculator": () => <QuickRiskCalculator compact />,
-
-  "position-size-calculator": () => <PositionSizeCalculator compact />,
-
-  "rr-calculator": () => <RiskRewardCalculator compact />,
-
-  "daily-risk-limit": () => <DailyRiskLimitTracker compact />,
-
-  "max-drawdown-guard": () => <MaxDrawdownGuard compact />,
-
-  "top-news": () => <TopNewsDashboardCard />,
-
-  "session-timers": () => <SessionTimersDashboardCard />,
-
-  "upcoming-events": () => <UpcomingEventsDashboardCard />,
-
-  "calendar-events": () => <CalendarEventsDashboardCard />,
 
   "reports-overview": () => (
     <Card className="h-full">
@@ -1506,7 +1068,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">Key trading metrics at a glance (dashboard summary card).</p>
+        <p className="text-sm text-muted-foreground">Key trading metrics at a glance.</p>
       </CardContent>
     </Card>
   ),
@@ -1520,7 +1082,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">Win rate and session breakdowns (dashboard summary card).</p>
+        <p className="text-sm text-muted-foreground">Win rate and session breakdowns.</p>
       </CardContent>
     </Card>
   ),
@@ -1534,7 +1096,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">Performance by trading session (dashboard summary card).</p>
+        <p className="text-sm text-muted-foreground">Performance by trading session.</p>
       </CardContent>
     </Card>
   ),
@@ -1548,7 +1110,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">Performance by instrument (dashboard summary card).</p>
+        <p className="text-sm text-muted-foreground">Performance by instrument.</p>
       </CardContent>
     </Card>
   ),
@@ -1562,7 +1124,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">Performance by setup rating (dashboard summary card).</p>
+        <p className="text-sm text-muted-foreground">Performance by setup rating.</p>
       </CardContent>
     </Card>
   ),
@@ -1576,7 +1138,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">Emotional trading analysis (dashboard summary card).</p>
+        <p className="text-sm text-muted-foreground">Emotional trading analysis.</p>
       </CardContent>
     </Card>
   ),
@@ -1590,7 +1152,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">Risk metrics and analysis (dashboard summary card).</p>
+        <p className="text-sm text-muted-foreground">Risk metrics and analysis.</p>
       </CardContent>
     </Card>
   ),
@@ -1604,7 +1166,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">Recent journal entries overview (dashboard summary card).</p>
+        <p className="text-sm text-muted-foreground">Recent journal entries overview.</p>
       </CardContent>
     </Card>
   ),
@@ -1618,7 +1180,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">Current week trading calendar preview (dashboard summary card).</p>
+        <p className="text-sm text-muted-foreground">Current week trading calendar preview.</p>
       </CardContent>
     </Card>
   ),
