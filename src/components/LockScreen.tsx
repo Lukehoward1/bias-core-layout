@@ -97,14 +97,16 @@ function getActiveSession(now: Date) {
     if (isOpen) {
       return {
         name: session.name,
-        timeRemaining: formatCountdown(closeSeconds - currentSeconds),
+        timeRemaining: `Closes in ${formatCountdown(closeSeconds - currentSeconds)}`,
       };
     }
   }
 
+  const nextSession = SESSION_CONFIGS[0];
+
   return {
-    name: "Markets Monitoring",
-    timeRemaining: "Next session pending",
+    name: "Next Session",
+    timeRemaining: `${nextSession.name.replace(" Session Live", "")} opens next`,
   };
 }
 
