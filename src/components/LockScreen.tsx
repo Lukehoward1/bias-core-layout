@@ -251,12 +251,37 @@ export function LockScreen() {
               {watchlistAssets.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No watchlist pairs selected yet.</p>
               ) : (
-                <div className="flex flex-wrap gap-2">
-                  {watchlistAssets.map((asset) => (
-                    <Badge key={asset.symbol} variant="outline">
-                      {asset.symbol}
-                    </Badge>
-                  ))}
+                <div className="space-y-2">
+                  {watchlistAssets.slice(0, 6).map((asset) => {
+                    const bullish = asset.biasDirection === "Bullish";
+
+                    return (
+                      <div
+                        key={asset.symbol}
+                        className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-3 py-2"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="font-medium text-sm text-foreground">{asset.symbol}</div>
+
+                          <div
+                            className={`flex items-center gap-1 text-xs font-medium ${
+                              bullish
+                                ? "text-success"
+                                : asset.biasDirection === "Bearish"
+                                  ? "text-destructive"
+                                  : "text-muted-foreground"
+                            }`}
+                          >
+                            <span>{bullish ? "↗" : asset.biasDirection === "Bearish" ? "↘" : "→"}</span>
+
+                            <span>{asset.biasDirection}</span>
+                          </div>
+                        </div>
+
+                        <div className="text-xs text-muted-foreground">{asset.biasConfidence}% confidence</div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
