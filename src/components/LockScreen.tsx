@@ -268,7 +268,7 @@ export function LockScreen() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-4">
-                <div className="font-semibold text-foreground">Watchlist pairs</div>
+                <div className="font-semibold text-foreground">Lock screen pairs</div>
                 <button
                   type="button"
                   className="text-sm text-muted-foreground hover:text-foreground"
@@ -279,7 +279,7 @@ export function LockScreen() {
               </div>
 
               {watchlistAssets.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No watchlist pairs selected yet.</p>
+                <p className="text-sm text-muted-foreground">No lock screen pairs selected yet.</p>
               ) : (
                 <div className="space-y-2">
                   {watchlistAssets.slice(0, 6).map((asset) => {
