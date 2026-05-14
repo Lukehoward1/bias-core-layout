@@ -110,12 +110,12 @@ export function LockScreen() {
           <div className="space-y-3">
             <div className="text-xs tracking-wider uppercase text-muted-foreground">Today’s red news</div>
 
-            <div className="rounded-xl border border-border bg-card/40 overflow-hidden">
+            <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-background via-background to-muted">
               {news.map((n, idx) => (
                 <button
                   key={`${n.time}-${n.currency}-${idx}`}
                   type="button"
-                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-card/70 transition text-left"
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/60 transition text-left"
                   onClick={() =>
                     setModal({
                       title: `${n.currency} • ${n.title}`,
