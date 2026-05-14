@@ -167,21 +167,51 @@ export function LockScreen() {
             <div className="text-sm sm:text-base text-muted-foreground">{formatDate(now)}</div>
           </div>
 
-          <div className="flex items-center justify-center gap-3 flex-wrap">
-            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/90 px-4 py-2 text-sm shadow-sm">
-              <span className="h-2 w-2 rounded-full bg-success" />
-              <span className="text-foreground">{activeSession.name}</span>
-              <span className="text-muted-foreground">•</span>
-              <span className="text-muted-foreground">{activeSession.timeRemaining}</span>
+          <div className="space-y-3">
+            <div className="flex items-center justify-center gap-3 flex-wrap">
+              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/90 px-4 py-2 text-sm shadow-sm">
+                <span className="h-2 w-2 rounded-full bg-success" />
+                <span className="text-foreground">{activeSession.name}</span>
+                <span className="text-muted-foreground">•</span>
+                <span className="text-muted-foreground">{activeSession.timeRemaining}</span>
+              </div>
+
+              <button
+                className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-4"
+                onClick={() => setShowPairs(true)}
+                type="button"
+              >
+                Edit pairs
+              </button>
             </div>
 
-            <button
-              className="text-sm text-muted-foreground hover:text-foreground underline underline-offset-4"
-              onClick={() => setShowPairs(true)}
-              type="button"
-            >
-              View pairs
-            </button>
+            {watchlistAssets.length > 0 && (
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                {watchlistAssets.slice(0, 6).map((asset) => {
+                  const bullish = asset.biasDirection === "Bullish";
+                  const bearish = asset.biasDirection === "Bearish";
+
+                  return (
+                    <div
+                      key={asset.symbol}
+                      className="inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-3 py-1.5 text-xs shadow-sm"
+                    >
+                      <span className="font-medium text-foreground">{asset.symbol}</span>
+
+                      <span
+                        className={`font-medium ${
+                          bullish ? "text-success" : bearish ? "text-destructive" : "text-muted-foreground"
+                        }`}
+                      >
+                        {bullish ? "↗" : bearish ? "↘" : "→"} {asset.biasDirection}
+                      </span>
+
+                      <span className="text-muted-foreground">{asset.biasConfidence}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="space-y-3">
