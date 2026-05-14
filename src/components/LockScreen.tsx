@@ -72,7 +72,7 @@ export function LockScreen() {
   };
 
   const overlay = (
-    <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-gray-900 via-gray-950 to-black">
+    <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-background via-background to-muted">
       {/* IMPORTANT: do NOT preventDefault on pointer events.
           That was killing click/press interactions. */}
       <div className="min-h-screen w-full flex items-center justify-center px-4">
