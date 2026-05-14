@@ -901,7 +901,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   "reports-kpi-win-rate": () => (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate Estimate Estimate</CardTitle>
       </CardHeader>
       <CardContent>
         <p className="text-2xl font-bold text-foreground">66.7%</p>
@@ -909,10 +909,10 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
     </Card>
   ),
 
-  "reports-kpi-expectancy": () => (
+  "reports-kpi-Avg Expectancy": () => (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">Expectancy</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">Avg Expectancy</CardTitle>
       </CardHeader>
       <CardContent>
         <p className="text-2xl font-bold text-success">£256/trade</p>
@@ -940,7 +940,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
       <CardHeader className="pb-2">
         <div className="flex items-center gap-2">
           <TrendingDown className="h-4 w-4 text-destructive" />
-          <CardTitle className="text-sm font-medium text-muted-foreground">Worst Losing Day</CardTitle>
+          <CardTitle className="text-sm font-medium text-muted-foreground">Lowest Realised P&L Day</CardTitle>
         </div>
       </CardHeader>
       <CardContent>
@@ -1068,7 +1068,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">Key trading metrics at a glance.</p>
+        <p className="text-sm text-muted-foreground">Core account and performance metrics.</p>
       </CardContent>
     </Card>
   ),
@@ -1082,7 +1082,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">Win rate and session breakdowns.</p>
+        <p className="text-sm text-muted-foreground">Win Rate Estimate and session breakdowns.</p>
       </CardContent>
     </Card>
   ),
@@ -1096,7 +1096,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">Performance by trading session.</p>
+        <p className="text-sm text-muted-foreground">Session-based performance review.</p>
       </CardContent>
     </Card>
   ),
@@ -1110,7 +1110,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">Performance by instrument.</p>
+        <p className="text-sm text-muted-foreground">Instrument-level performance review.</p>
       </CardContent>
     </Card>
   ),
@@ -1124,7 +1124,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">Performance by setup rating.</p>
+        <p className="text-sm text-muted-foreground">Setup quality and outcome review.</p>
       </CardContent>
     </Card>
   ),
@@ -1138,7 +1138,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">Emotional trading analysis.</p>
+        <p className="text-sm text-muted-foreground">Behaviour and discipline review.</p>
       </CardContent>
     </Card>
   ),
@@ -1148,11 +1148,11 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
       <CardHeader>
         <div className="flex items-center gap-2">
           <Shield className="h-4 w-4 text-primary" />
-          <CardTitle className="text-sm font-medium">Risk Management Report</CardTitle>
+          <CardTitle className="text-sm font-medium">Risk Report</CardTitle>
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">Risk metrics and analysis.</p>
+        <p className="text-sm text-muted-foreground">Exposure, drawdown, and risk consistency.</p>
       </CardContent>
     </Card>
   ),
