@@ -901,7 +901,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   "reports-kpi-win-rate": () => (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate Estimate Estimate</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate Estimate</CardTitle>
       </CardHeader>
       <CardContent>
         <p className="text-2xl font-bold text-foreground">66.7%</p>
@@ -1082,7 +1082,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">Win Rate Estimate and session breakdowns.</p>
+        <p className="text-sm text-muted-foreground">Win Rate and session breakdowns.</p>
       </CardContent>
     </Card>
   ),
