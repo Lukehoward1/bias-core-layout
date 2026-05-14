@@ -368,7 +368,12 @@ function TodaysBiasDashboardCard() {
   const bearishCount = contexts.filter((ctx) => ctx.biasState.includes("Bearish")).length;
   const weakeningCount = contexts.filter((ctx) => ctx.biasState.includes("Weakening")).length;
 
-  const dominantBias = bullishCount > bearishCount ? "Bullish" : bearishCount > bullishCount ? "Bearish" : "Mixed";
+  const dominantBias =
+    bullishCount > bearishCount
+      ? "Bullish Conditions"
+      : bearishCount > bullishCount
+        ? "Bearish Conditions"
+        : "Mixed Conditions";
 
   const dominantColor =
     dominantBias === "Bullish"
@@ -752,7 +757,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
       </CardHeader>
       <CardContent>
         <p className="text-2xl font-bold text-foreground">3</p>
-        <p className="text-xs text-muted-foreground mt-1">2 long · 1 short</p>
+        <p className="text-xs text-muted-foreground mt-1">Directional exposure overview</p>
       </CardContent>
     </Card>
   ),
@@ -1040,7 +1045,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">Alerts and timer summary.</p>
+        <p className="text-sm text-muted-foreground">Active alerts, timers, and scheduled event tracking.</p>
       </CardContent>
     </Card>
   ),
@@ -1054,7 +1059,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">Active price alert overview.</p>
+        <p className="text-sm text-muted-foreground">Live market level and trigger monitoring.</p>
       </CardContent>
     </Card>
   ),
