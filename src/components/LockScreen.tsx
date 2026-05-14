@@ -20,10 +20,6 @@ function formatTime(d: Date) {
 
 export function LockScreen() {
   const { isLocked, unlock, pinEnabled, pinSet } = useSessionLock();
-
-  // If not locked, render nothing at all (cannot block the app)
-  if (!isLocked) return null;
-
   const [now, setNow] = useState(() => new Date());
   const [modal, setModal] = useState<null | { title: string; body: string }>(null);
 
@@ -45,11 +41,13 @@ export function LockScreen() {
   }, [host]);
 
   useEffect(() => {
+    if (!isLocked) return;
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [isLocked]);
 
-  // Demo UI data (wire later)
+  if (!isLocked) return null;
+
   const sessionName = "London Session Live";
   const sessionTPlus = "2h 15m";
 
@@ -60,33 +58,29 @@ export function LockScreen() {
   ];
 
   const attemptUnlock = () => {
-    // If PIN is enabled+set, this should be a PIN flow later.
-    // For now, keep button unlock behaviour.
     const ok = unlock(undefined);
     if (!ok) {
       setModal({
         title: "Locked",
-        body: "Unlock failed (PIN may be enabled). We can wire the PIN entry UI next.",
+        body: "Unlock failed. PIN entry can be wired here next.",
       });
     }
   };
 
   const overlay = (
-    <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-background via-background to-muted">
-      {/* IMPORTANT: do NOT preventDefault on pointer events.
-          That was killing click/press interactions. */}
-      <div className="min-h-screen w-full flex items-center justify-center px-4">
-        <div className="w-full max-w-3xl text-center space-y-6" onClick={(e) => e.stopPropagation()}>
-          {/* Time + date */}
+    <div className="fixed inset-0 z-[9999] overflow-y-auto bg-background">
+      <div className="absolute inset-0 bg-gradient-to-br from-muted/70 via-background to-background dark:from-gray-900 dark:via-gray-950 dark:to-black" />
+
+      <div className="relative min-h-screen w-full flex items-center justify-center px-4 py-10">
+        <div className="w-full max-w-3xl text-center space-y-6">
           <div className="space-y-2">
             <div className="text-6xl sm:text-7xl font-light tracking-tight text-foreground">{formatTime(now)}</div>
             <div className="text-sm sm:text-base text-muted-foreground">{formatDate(now)}</div>
           </div>
 
-          {/* Session pill row */}
           <div className="flex items-center justify-center gap-3 flex-wrap">
-            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/50 px-4 py-2 text-sm">
-              <span className="h-2 w-2 rounded-full bg-green-500" />
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/90 px-4 py-2 text-sm shadow-sm">
+              <span className="h-2 w-2 rounded-full bg-success" />
               <span className="text-foreground">{sessionName}</span>
               <span className="text-muted-foreground">•</span>
               <span className="text-muted-foreground">{sessionTPlus}</span>
@@ -97,7 +91,7 @@ export function LockScreen() {
               onClick={() =>
                 setModal({
                   title: "Edit pairs",
-                  body: "Placeholder: next step is to wire this to your real pairs state (watchlist / selected pairs).",
+                  body: "Placeholder: this can later connect to selected pairs or watchlist preferences.",
                 })
               }
               type="button"
@@ -106,11 +100,10 @@ export function LockScreen() {
             </button>
           </div>
 
-          {/* News list */}
           <div className="space-y-3">
             <div className="text-xs tracking-wider uppercase text-muted-foreground">Today’s red news</div>
 
-            <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-background via-background to-muted">
+            <div className="rounded-xl border border-border bg-card/90 shadow-sm overflow-hidden">
               {news.map((n, idx) => (
                 <button
                   key={`${n.time}-${n.currency}-${idx}`}
@@ -119,7 +112,7 @@ export function LockScreen() {
                   onClick={() =>
                     setModal({
                       title: `${n.currency} • ${n.title}`,
-                      body: `Time: ${n.time}\n\nNext step: open the Calendar event detail drawer / route (once we decide where these live).`,
+                      body: `Time: ${n.time}\n\nLater this can open the full calendar event detail modal.`,
                     })
                   }
                 >
@@ -136,32 +129,29 @@ export function LockScreen() {
             </div>
           </div>
 
-          {/* Unlock */}
           <div className="pt-2 space-y-2">
-            {/* We intentionally removed the “tap anywhere…” text because we’re button-only now */}
             <Button
               onClick={attemptUnlock}
               className="px-10"
               disabled={pinEnabled && pinSet}
-              title={pinEnabled && pinSet ? "PIN is enabled — we’ll add PIN entry next." : "Unlock"}
+              title={pinEnabled && pinSet ? "PIN is enabled — PIN entry can be added next." : "Unlock"}
             >
               Unlock
             </Button>
 
             {pinEnabled && pinSet && (
-              <div className="text-xs text-muted-foreground">PIN is enabled. Next step: add PIN entry UI here.</div>
+              <div className="text-xs text-muted-foreground">PIN is enabled. PIN entry UI can be added here next.</div>
             )}
           </div>
         </div>
 
-        {/* Simple modal */}
         {modal && (
           <div
-            className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center px-4"
+            className="fixed inset-0 z-[10000] bg-black/50 flex items-center justify-center px-4"
             onClick={() => setModal(null)}
           >
             <div
-              className="w-full max-w-lg rounded-xl border border-border bg-card p-5 text-left"
+              className="w-full max-w-lg rounded-xl border border-border bg-card p-5 text-left shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-3">
@@ -174,6 +164,7 @@ export function LockScreen() {
                   Close
                 </button>
               </div>
+
               <div className="text-sm text-muted-foreground whitespace-pre-line">{modal.body}</div>
 
               <div className="mt-4 flex justify-end">
