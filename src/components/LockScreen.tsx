@@ -42,7 +42,14 @@ const SESSION_CONFIGS: SessionConfig[] = [
     closeHour: 16,
     closeMinute: 0,
   },
-  { name: "Asia Session Live", timeZone: "Asia/Tokyo", openHour: 9, openMinute: 0, closeHour: 15, closeMinute: 0 },
+  {
+    name: "Asia Session Live",
+    timeZone: "Asia/Tokyo",
+    openHour: 9,
+    openMinute: 0,
+    closeHour: 15,
+    closeMinute: 0,
+  },
 ];
 
 function getTimeZoneParts(date: Date, timeZone: string) {
@@ -80,7 +87,9 @@ function formatCountdown(totalSeconds: number) {
   const safeSeconds = Math.max(0, totalSeconds);
   const hours = Math.floor(safeSeconds / 3600);
   const minutes = Math.floor((safeSeconds % 3600) / 60);
-  return `${hours}h ${minutes}m`;
+  const seconds = safeSeconds % 60;
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
 function getActiveSession(now: Date) {
@@ -108,6 +117,36 @@ function getActiveSession(now: Date) {
     name: "Next Session",
     timeRemaining: `${nextSession.name.replace(" Session Live", "")} opens next`,
   };
+}
+
+function getRelevantCurrencies(symbols: string[]) {
+  const currencies = new Set<string>();
+
+  symbols.forEach((symbol) => {
+    const upper = symbol.toUpperCase();
+
+    if (upper.includes("USD")) currencies.add("USD");
+    if (upper.includes("EUR")) currencies.add("EUR");
+    if (upper.includes("GBP")) currencies.add("GBP");
+    if (upper.includes("JPY")) currencies.add("JPY");
+    if (upper.includes("AUD")) currencies.add("AUD");
+    if (upper.includes("NZD")) currencies.add("NZD");
+    if (upper.includes("CAD")) currencies.add("CAD");
+    if (upper.includes("CHF")) currencies.add("CHF");
+
+    if (
+      upper.includes("XAU") ||
+      upper.includes("NAS") ||
+      upper.includes("US30") ||
+      upper.includes("SPX") ||
+      upper.includes("DAX") ||
+      upper.includes("GER40")
+    ) {
+      currencies.add("USD");
+    }
+  });
+
+  return Array.from(currencies);
 }
 
 export function LockScreen() {
@@ -145,16 +184,22 @@ export function LockScreen() {
 
   const redNews = useMemo(() => {
     const currentTs = now.getTime();
+    const relevantCurrencies = getRelevantCurrencies(watchlistAssets.map((asset) => asset.symbol));
 
     return getAllCalendarEvents()
       .map((event) => ({
         ...event,
         ts: getEventDateTime(event).getTime(),
+        relevant: relevantCurrencies.includes(event.currency),
       }))
       .filter((event) => !Number.isNaN(event.ts) && event.ts >= currentTs && event.impact === "high")
-      .sort((a, b) => a.ts - b.ts)
+      .sort((a, b) => {
+        if (a.relevant && !b.relevant) return -1;
+        if (!a.relevant && b.relevant) return 1;
+        return a.ts - b.ts;
+      })
       .slice(0, 3);
-  }, [now]);
+  }, [now, watchlistAssets]);
 
   if (!isLocked) return null;
 
@@ -175,7 +220,7 @@ export function LockScreen() {
                 <span className="h-2 w-2 rounded-full bg-success" />
                 <span className="text-foreground">{activeSession.name}</span>
                 <span className="text-muted-foreground">•</span>
-                <span className="text-muted-foreground">{activeSession.timeRemaining}</span>
+                <span className="text-muted-foreground tabular-nums">{activeSession.timeRemaining}</span>
               </div>
 
               <button
@@ -286,6 +331,7 @@ export function LockScreen() {
                 <div className="space-y-2">
                   {watchlistAssets.slice(0, 6).map((asset) => {
                     const bullish = asset.biasDirection === "Bullish";
+                    const bearish = asset.biasDirection === "Bearish";
 
                     return (
                       <div
@@ -297,20 +343,15 @@ export function LockScreen() {
 
                           <div
                             className={`flex items-center gap-1 text-xs font-medium ${
-                              bullish
-                                ? "text-success"
-                                : asset.biasDirection === "Bearish"
-                                  ? "text-destructive"
-                                  : "text-muted-foreground"
+                              bullish ? "text-success" : bearish ? "text-destructive" : "text-muted-foreground"
                             }`}
                           >
-                            <span>{bullish ? "↗" : asset.biasDirection === "Bearish" ? "↘" : "→"}</span>
-
+                            <span>{bullish ? "↗" : bearish ? "↘" : "→"}</span>
                             <span>{asset.biasDirection}</span>
                           </div>
                         </div>
 
-                        <div className="text-xs text-muted-foreground">{asset.biasConfidence}% confidence</div>
+                        <div className="text-xs text-muted-foreground">{asset.biasConfidence}%</div>
                       </div>
                     );
                   })}
