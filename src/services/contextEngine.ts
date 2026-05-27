@@ -615,14 +615,25 @@ export async function buildMarketContext(input: ContextEngineInput): Promise<Mar
   const nextHigh = upcomingRelevantEvents.find((event) => event.impact === "high");
 
   let biasState: BiasState;
+  let structureState: StructureState;
   try {
     const mtf = await getMultiTimeframeBias(asset.symbol, traderStyle);
-    biasState = mtf.biasState !== "Neutral / Ranging" ? mtf.biasState : deriveBiasState(asset, quote);
+    if (mtf.biasState !== "Neutral / Ranging") {
+      biasState = mtf.biasState;
+      structureState =
+        mtf.confidence > 75
+          ? biasState.startsWith("Bullish")
+            ? "Trending Up"
+            : "Trending Down"
+          : deriveStructureState(asset, quote);
+    } else {
+      biasState = deriveBiasState(asset, quote);
+      structureState = deriveStructureState(asset, quote);
+    }
   } catch {
     biasState = deriveBiasState(asset, quote);
+    structureState = deriveStructureState(asset, quote);
   }
-
-  const structureState = deriveStructureState(asset, quote);
   const levels = buildLevels(asset, quote, biasState);
   const sessionContext = deriveSessionContext(asset, biasState, highImpactSoon);
   const timeframeContext = buildTimeframeContext(asset, biasState, structureState, quote, highImpactSoon, traderStyle);
