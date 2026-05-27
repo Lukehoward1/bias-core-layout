@@ -121,6 +121,15 @@ function sortEventsByImpactThenTime(events: CalendarEvent[]) {
   });
 }
 
+const deduplicateByEventKey = (events: CalendarEvent[]) => {
+  const seen = new Set<string>();
+  return events.filter((event) => {
+    if (seen.has(event.eventKey)) return false;
+    seen.add(event.eventKey);
+    return true;
+  });
+};
+
 const isEventRelevantToSymbol = (symbol: string, event: CalendarEvent) => {
   const normalizedSymbol = normalizeMarketSymbol(symbol);
   const impact = getEventImpact({
@@ -216,7 +225,9 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
   const relevantCalendarEvents = useMemo(() => {
     if (!symbol) return [];
-    return sortEventsByImpactThenTime(allCalendarEvents.filter((event) => isEventRelevantToSymbol(symbol, event)));
+    return sortEventsByImpactThenTime(
+      deduplicateByEventKey(allCalendarEvents.filter((event) => isEventRelevantToSymbol(symbol, event))),
+    );
   }, [symbol, allCalendarEvents]);
 
   const upcomingRelevantCalendarEvents = useMemo(() => {

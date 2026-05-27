@@ -71,8 +71,17 @@ const isEventRelevantToSymbol = (symbol: string, event: CalendarEvent) => {
   return false;
 };
 
+const deduplicateByEventKey = (events: CalendarEvent[]) => {
+  const seen = new Set<string>();
+  return events.filter((event) => {
+    if (seen.has(event.eventKey)) return false;
+    seen.add(event.eventKey);
+    return true;
+  });
+};
+
 const sortRelevantEvents = (events: CalendarEvent[]) => {
-  return sortCalendarEventsByImpact(events).sort((a, b) => {
+  return sortCalendarEventsByImpact(deduplicateByEventKey(events)).sort((a, b) => {
     if (a.impact !== b.impact) return 0;
     return a.time.localeCompare(b.time);
   });
@@ -249,7 +258,7 @@ export default function Markets() {
           </div>
 
           <Badge variant="outline" className="text-xs">
-            Live demo pricing
+            Live Pricing
           </Badge>
         </div>
 
