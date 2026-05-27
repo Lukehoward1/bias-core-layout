@@ -1,5 +1,5 @@
 // src/pages/AssetDetail.tsx
-import { useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import { getEventImpact } from "@/data/eventImpactRules";
 import { getFormattedMarketChange } from "@/services/marketData";
 import type { CalendarEvent } from "@/data/calendarEvents";
 import { getAllCalendarEvents, getEventDateTime, formatCalendarEventDateLabel } from "@/services/calendarData";
-import { buildMarketContext, type KeyLevel, type SessionContextItem } from "@/services/contextEngine";
+import { buildMarketContext, type KeyLevel, type MarketContext, type SessionContextItem } from "@/services/contextEngine";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
 
 const assetNewsEvents: Record<string, { event: string; time: string; impact: "High" | "Medium" | "Low" }[]> = {
@@ -310,14 +310,27 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
     [openCalendarEvent, relevantCalendarEvents],
   );
 
-  const marketContext = useMemo(() => {
-    if (!asset) return null;
-    return buildMarketContext({
+  const [marketContext, setMarketContext] = useState<MarketContext | null>(null);
+
+  useEffect(() => {
+    if (!asset) {
+      setMarketContext(null);
+      return;
+    }
+    let cancelled = false;
+    buildMarketContext({
       asset,
       quote,
       upcomingRelevantEvents: upcomingRelevantCalendarEvents,
       traderStyle,
-    });
+    })
+      .then((ctx) => {
+        if (!cancelled) setMarketContext(ctx);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [asset, quote, upcomingRelevantCalendarEvents, traderStyle]);
 
   const contextSnapshot = useMemo<ContextSnapshotItem[]>(() => {

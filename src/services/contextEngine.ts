@@ -3,6 +3,7 @@ import type { Asset } from "@/data/assets";
 import type { MarketQuote } from "@/services/marketData";
 import type { CalendarEvent } from "@/data/calendarEvents";
 import type { TraderStyle } from "@/context/TraderStyleProvider";
+import { getMultiTimeframeBias } from "./candleData";
 
 export type BiasState =
   | "Bullish Active"
@@ -599,7 +600,7 @@ function buildTimeframeContext(
   });
 }
 
-export function buildMarketContext(input: ContextEngineInput): MarketContext {
+export async function buildMarketContext(input: ContextEngineInput): Promise<MarketContext> {
   const { asset, quote, upcomingRelevantEvents = [], traderStyle = "intraday" } = input;
 
   const now = Date.now();
@@ -613,7 +614,14 @@ export function buildMarketContext(input: ContextEngineInput): MarketContext {
 
   const nextHigh = upcomingRelevantEvents.find((event) => event.impact === "high");
 
-  const biasState = deriveBiasState(asset, quote);
+  let biasState: BiasState;
+  try {
+    const mtf = await getMultiTimeframeBias(asset.symbol, traderStyle);
+    biasState = mtf.biasState !== "Neutral / Ranging" ? mtf.biasState : deriveBiasState(asset, quote);
+  } catch {
+    biasState = deriveBiasState(asset, quote);
+  }
+
   const structureState = deriveStructureState(asset, quote);
   const levels = buildLevels(asset, quote, biasState);
   const sessionContext = deriveSessionContext(asset, biasState, highImpactSoon);

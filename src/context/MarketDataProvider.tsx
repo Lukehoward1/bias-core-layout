@@ -8,7 +8,7 @@ type MarketDataContextValue = {
 
 const MarketDataContext = createContext<MarketDataContextValue | null>(null);
 
-const POLL_INTERVAL = 3000;
+const POLL_INTERVAL = 15000;
 
 export function MarketDataProvider({ children }: { children: React.ReactNode }) {
   const [quotes, setQuotes] = useState<Record<string, MarketQuote>>({});

@@ -274,26 +274,53 @@ export function getFormattedMarketChange(quote: MarketQuote | null | undefined):
   };
 }
 
-// ── Twelve Data integration (placeholder) ───────────────────
+// ── Twelve Data integration ──────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function fetchTwelveDataQuote(_symbol: string): Promise<MarketQuote | null> {
-  // TODO: implement when VITE_TWELVE_API_KEY is available
-  // const apiKey = import.meta.env.VITE_TWELVE_API_KEY;
-  // if (!apiKey) return null;
-  //
-  // Example future flow:
-  // 1. Fetch provider data
-  // 2. Normalise into StreamBias MarketQuote shape
-  // 3. Include previousClose / change / changePercent / direction
-  //
-  // const url = `https://api.twelvedata.com/price?symbol=${toProviderSymbol(_symbol)}&apikey=${apiKey}`;
-  // const res = await fetch(url);
-  // if (!res.ok) return null;
-  // const json = await res.json();
-  // return { ...normalisedQuote, source: "twelvedata" };
+async function fetchTwelveDataQuote(symbol: string): Promise<MarketQuote | null> {
+  const apiKey = import.meta.env.VITE_TWELVE_DATA_API_KEY;
+  if (!apiKey) return null;
 
-  return null;
+  const providerSymbol = toProviderSymbol(symbol);
+  const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(providerSymbol)}&apikey=${apiKey}`;
+
+  let res: Response;
+  try {
+    res = await fetch(url);
+  } catch (err) {
+    console.log("[TwelveData] Fetch error:", err);
+    return null;
+  }
+  if (!res.ok) {
+    console.log("[TwelveData] HTTP error:", res.status, res.statusText);
+    return null;
+  }
+
+  const json = await res.json();
+  if (json.status === "error" || !json.close) return null;
+
+  const last = parseFloat(json.close);
+  const previousClose = parseFloat(json.previous_close);
+  const change = parseFloat(json.change);
+  const changePercent = parseFloat(json.percent_change);
+
+  if (!Number.isFinite(last) || last <= 0) return null;
+
+  const hs = MOCK_HALF_SPREADS[symbol] ?? defaultHalfSpread(last);
+
+  return {
+    symbol,
+    providerSymbol,
+    last: roundSmart(last),
+    bid: roundSmart(last - hs),
+    ask: roundSmart(last + hs),
+    spread: roundSmart(hs * 2),
+    previousClose: roundSmart(previousClose),
+    change: roundSmart(change),
+    changePercent: Number(changePercent.toFixed(2)),
+    direction: getDirection(change),
+    timestamp: Date.now(),
+    source: "twelvedata",
+  };
 }
 
 // ── Public API ──────────────────────────────────────────────

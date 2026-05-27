@@ -30,7 +30,7 @@ import { getAllCalendarEvents, getEventDateTime } from "@/services/calendarData"
 import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
 import { useMarketQuotes } from "@/hooks/use-market-quotes";
 import { normalizeSymbol } from "@/services/marketData";
-import { buildMarketContext } from "@/services/contextEngine";
+import { buildMarketContext, type MarketContext } from "@/services/contextEngine";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
 
 /* =======================
@@ -353,16 +353,28 @@ function TodaysBiasDashboardCard() {
   const symbols = useMemo(() => basisAssets.map((asset) => asset.symbol), [basisAssets]);
   const quotes = useMarketQuotes(symbols);
 
-  const contexts = useMemo(() => {
-    return basisAssets.map((asset) =>
-      buildMarketContext({
-        asset,
-        quote: quotes[normalizeSymbol(asset.symbol)],
-        upcomingRelevantEvents: [],
-        traderStyle,
-      }),
-    );
-  }, [basisAssets, quotes, traderStyle]);
+  const [contexts, setContexts] = useState<MarketContext[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(
+      basisAssets.map((asset) =>
+        buildMarketContext({
+          asset,
+          quote: quotes[normalizeSymbol(asset.symbol)],
+          upcomingRelevantEvents: [],
+          traderStyle,
+        }),
+      ),
+    )
+      .then((result) => {
+        if (!cancelled) setContexts(result);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [basisAssets, traderStyle]); // quotes intentionally omitted — new ref every render would cause infinite loop
 
   const bullishCount = contexts.filter((ctx) => ctx.biasState.includes("Bullish")).length;
   const bearishCount = contexts.filter((ctx) => ctx.biasState.includes("Bearish")).length;
@@ -914,7 +926,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
     </Card>
   ),
 
-  "reports-kpi-Avg Expectancy": () => (
+  "reports-kpi-expectancy": () => (
     <Card className="h-full">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">Avg Expectancy</CardTitle>
@@ -1186,6 +1198,230 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
       </CardHeader>
       <CardContent>
         <p className="text-sm text-muted-foreground">Current week trading calendar preview.</p>
+      </CardContent>
+    </Card>
+  ),
+
+  "reports-overview-edge": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Activity className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Edge Statistics</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">Edge statistics and expectancy breakdown.</p>
+      </CardContent>
+    </Card>
+  ),
+
+  "reports-performance-by-day": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <CalendarIcon className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Performance by Day</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">P&amp;L performance grouped by day of week.</p>
+      </CardContent>
+    </Card>
+  ),
+
+  "reports-performance-by-session": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Clock className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Performance by Session</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">P&amp;L performance grouped by trading session.</p>
+      </CardContent>
+    </Card>
+  ),
+
+  "reports-performance-distribution": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <BarChart3 className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Performance Distribution</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">Win/loss distribution and trade outcome spread.</p>
+      </CardContent>
+    </Card>
+  ),
+
+  "reports-sessions-comparison": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Activity className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Sessions Comparison</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">Side-by-side session performance comparison.</p>
+      </CardContent>
+    </Card>
+  ),
+
+  "reports-sessions-recommendations": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Brain className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Session Recommendations</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">Session-based coaching and focus recommendations.</p>
+      </CardContent>
+    </Card>
+  ),
+
+  "reports-assets-pnl": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Assets P&amp;L</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">P&amp;L breakdown by traded instrument.</p>
+      </CardContent>
+    </Card>
+  ),
+
+  "reports-assets-table": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <BarChart3 className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Assets Table</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">Tabulated asset-level statistics and metrics.</p>
+      </CardContent>
+    </Card>
+  ),
+
+  "reports-setup-best-worst": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Target className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Best &amp; Worst Setups</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">Best and worst performing setup types.</p>
+      </CardContent>
+    </Card>
+  ),
+
+  "reports-setup-patterns": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Activity className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Setup Patterns</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">Recurring setup patterns and outcome analysis.</p>
+      </CardContent>
+    </Card>
+  ),
+
+  "reports-psychology-sentiment": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Brain className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Sentiment Trends</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">Sentiment trends across journal entries.</p>
+      </CardContent>
+    </Card>
+  ),
+
+  "reports-psychology-triggers": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Emotional Triggers</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">Emotional triggers and behavioural patterns.</p>
+      </CardContent>
+    </Card>
+  ),
+
+  "reports-psychology-improvement": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Brain className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Improvement Areas</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">Focus areas and improvement recommendations.</p>
+      </CardContent>
+    </Card>
+  ),
+
+  "reports-risk-kpis": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Shield className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Risk KPIs</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">Key risk metrics and exposure summary.</p>
+      </CardContent>
+    </Card>
+  ),
+
+  "reports-risk-distribution": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <BarChart3 className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Risk Distribution</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">Risk distribution across trades and sessions.</p>
+      </CardContent>
+    </Card>
+  ),
+
+  "reports-risk-discipline": () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Shield className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Risk Discipline</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">Rule adherence and risk discipline scoring.</p>
       </CardContent>
     </Card>
   ),

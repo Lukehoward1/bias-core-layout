@@ -1,5 +1,5 @@
 // src/pages/Markets.tsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 
 import { AppHeader } from "@/components/AppHeader";
@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { calendarEvents, sortCalendarEventsByImpact, type CalendarEvent } from "@/data/calendarEvents";
 import { getEventImpact } from "@/data/eventImpactRules";
 import { getFormattedMarketChange, type MarketQuote } from "@/services/marketData";
-import { buildMarketContext, type TimeframeState } from "@/services/contextEngine";
+import { buildMarketContext, type MarketContext, type TimeframeState } from "@/services/contextEngine";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
 
 type MarketType = "Watchlist" | "All" | "FX" | "Crypto" | "Indices" | "Commodities" | "ETFs" | "Futures";
@@ -141,6 +141,30 @@ export default function Markets() {
   }, [selectedType, watchlistAssets, searchQuery, assets]);
 
   const quotes = useMarketQuotes(filteredPairs.map((asset) => asset.symbol));
+
+  const [contextMap, setContextMap] = useState<Record<string, MarketContext>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    const allAssets = [...watchlistAssets, ...filteredPairs].filter(
+      (asset, i, arr) => arr.findIndex((a) => a.symbol === asset.symbol) === i,
+    );
+    Promise.all(
+      allAssets.map(async (asset) => {
+        const quote = quotes[asset.symbol];
+        const relevantEvents = calendarEvents.filter((event) => isEventRelevantToSymbol(asset.symbol, event));
+        const ctx = await buildMarketContext({ asset, quote, upcomingRelevantEvents: relevantEvents, traderStyle });
+        return [asset.symbol, ctx] as const;
+      }),
+    )
+      .then((entries) => {
+        if (!cancelled) setContextMap(Object.fromEntries(entries));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [watchlistAssets, filteredPairs, traderStyle]); // quotes intentionally omitted — new ref every render would cause infinite loop
 
   const getBiasIcon = (bias: string) => {
     if (bias === "Bullish") return <TrendingUp className="h-4 w-4" />;
@@ -267,14 +291,7 @@ export default function Markets() {
               <div className="space-y-2">
                 {watchlistAssets.map((asset) => {
                   const quote = quotes[asset.symbol];
-                  const context = buildMarketContext({
-                    asset,
-                    quote,
-                    upcomingRelevantEvents: calendarEvents.filter((event) =>
-                      isEventRelevantToSymbol(asset.symbol, event),
-                    ),
-                    traderStyle,
-                  });
+                  const context = contextMap[asset.symbol];
 
                   return (
                     <div
@@ -302,16 +319,18 @@ export default function Markets() {
                       </div>
 
                       <div className="hidden lg:flex items-center gap-2 flex-1 min-w-0">
-                        <Badge variant="outline" className="text-[10px] shrink-0">
-                          {context.structureState}
-                        </Badge>
+                        {context?.structureState && (
+                          <Badge variant="outline" className="text-[10px] shrink-0">
+                            {context.structureState}
+                          </Badge>
+                        )}
                         <span className="text-xs text-muted-foreground truncate">
-                          {context.timeframeContext[0]?.label}
+                          {context?.timeframeContext[0]?.label}
                         </span>
                       </div>
 
                       <div className="flex items-center gap-2 ml-auto">
-                        {context.highImpactSoon && (
+                        {context?.highImpactSoon && (
                           <Badge variant="destructive" className="text-[10px] hidden lg:inline-flex">
                             News risk
                           </Badge>
@@ -362,15 +381,9 @@ export default function Markets() {
               const isExpanded = !!expandedNews[asset.symbol];
               const eventsToShow = isExpanded ? relevantEvents : highImpactRelevant;
 
-              const context = buildMarketContext({
-                asset,
-                quote,
-                upcomingRelevantEvents: relevantEvents,
-                traderStyle,
-              });
-
-              const mainTimeframes = context.timeframeContext.slice(0, 3);
-              const nearestLevel = context.levels[0];
+              const context = contextMap[asset.symbol];
+              const mainTimeframes = context?.timeframeContext.slice(0, 3) ?? [];
+              const nearestLevel = context?.levels[0];
 
               return (
                 <Card
@@ -416,9 +429,11 @@ export default function Markets() {
                         </div>
                       </div>
 
-                      <Badge variant="outline" className="text-[10px] mb-1">
-                        {context.biasState}
-                      </Badge>
+                      {context?.biasState && (
+                        <Badge variant="outline" className="text-[10px] mb-1">
+                          {context.biasState}
+                        </Badge>
+                      )}
                     </div>
                   </CardHeader>
 
@@ -426,7 +441,9 @@ export default function Markets() {
                     <div className="flex items-center justify-between gap-2 border-y border-border/60 py-2">
                       <div className="min-w-0">
                         <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Structure</div>
-                        <div className="text-xs font-medium text-foreground truncate">{context.structureState}</div>
+                        <div className="text-xs font-medium text-foreground truncate">
+                          {context?.structureState ?? "—"}
+                        </div>
                       </div>
 
                       {nearestLevel && (
@@ -447,7 +464,7 @@ export default function Markets() {
                         ))}
                       </div>
 
-                      {context.highImpactSoon && (
+                      {context?.highImpactSoon && (
                         <Badge variant="destructive" className="text-[10px]">
                           News risk
                         </Badge>

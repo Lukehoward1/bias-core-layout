@@ -27,7 +27,7 @@ import { getFormattedMarketChange, normalizeSymbol, type MarketQuote } from "@/s
 
 import { calendarEvents, type CalendarEvent } from "@/data/calendarEvents";
 import { getEventImpact } from "@/data/eventImpactRules";
-import { buildMarketContext, type TimeframeState } from "@/services/contextEngine";
+import { buildMarketContext, type MarketContext, type TimeframeState } from "@/services/contextEngine";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
 
 type TradingSessionName = "Sydney" | "Asia" | "London" | "New York";
@@ -490,6 +490,27 @@ function DashboardWatchlistCard({
     return quotes[normalizeSymbol(symbol)];
   };
 
+  const [contextMap, setContextMap] = useState<Record<string, MarketContext>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(
+      displayAssets.map(async (asset) => {
+        const quote = quotes[normalizeSymbol(asset.symbol)];
+        const relevantEvents = calendarEvents.filter((event) => isEventRelevantToSymbol(asset.symbol, event));
+        const ctx = await buildMarketContext({ asset, quote, upcomingRelevantEvents: relevantEvents, traderStyle });
+        return [asset.symbol, ctx] as const;
+      }),
+    )
+      .then((entries) => {
+        if (!cancelled) setContextMap(Object.fromEntries(entries));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [displayAssets, traderStyle]); // quotes intentionally omitted — new ref every render would cause infinite loop
+
   const getChangeColor = (quote: MarketQuote | undefined, fallbackChange?: string) => {
     if (quote) {
       const formatted = getFormattedMarketChange(quote);
@@ -541,16 +562,9 @@ function DashboardWatchlistCard({
         <div className="space-y-3">
           {displayAssets.map((asset) => {
             const quote = getQuoteForAsset(asset.symbol);
-            const relevantEvents = calendarEvents.filter((event) => isEventRelevantToSymbol(asset.symbol, event));
-            const context = buildMarketContext({
-              asset,
-              quote,
-              upcomingRelevantEvents: relevantEvents,
-              traderStyle,
-            });
-
-            const shortTf = context.timeframeContext[0];
-            const nearestLevel = context.levels[0];
+            const context = contextMap[asset.symbol];
+            const shortTf = context?.timeframeContext[0];
+            const nearestLevel = context?.levels[0];
 
             return (
               <button
@@ -577,9 +591,11 @@ function DashboardWatchlistCard({
                         <span>{asset.biasDirection}</span>
                       </div>
 
-                      <Badge variant="outline" className="text-[10px]">
-                        {context.structureState}
-                      </Badge>
+                      {context?.structureState && (
+                        <Badge variant="outline" className="text-[10px]">
+                          {context.structureState}
+                        </Badge>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
