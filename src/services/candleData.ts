@@ -26,7 +26,52 @@ export interface MultiTimeframeBias {
 
 // ── Cache ────────────────────────────────────────────────────
 
-const CACHE_TTL_MS = 300_000; // 5 minutes — reduces repeat API hits across page loads
+const MIN_TTL_MS = 60_000; // floor: never cache for less than a minute
+
+/**
+ * Returns milliseconds until the next close boundary for the given interval.
+ * Bias data only needs refreshing when a candle actually closes, so caching
+ * until that moment avoids unnecessary re-fetches mid-candle.
+ */
+function getNextCandleCloseMs(interval: string): number {
+  const now = new Date();
+  const nowMs = now.getTime();
+
+  if (interval === "1day") {
+    // Next midnight UTC
+    const next = Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate() + 1,
+    );
+    return Math.max(MIN_TTL_MS, next - nowMs);
+  }
+
+  if (interval === "4h") {
+    // Closes at 00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC
+    const nextCloseHour = (Math.floor(now.getUTCHours() / 4) + 1) * 4;
+    const next = Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      nextCloseHour, // Date.UTC handles overflow (e.g. hour 24 → next day 00:00)
+    );
+    return Math.max(MIN_TTL_MS, next - nowMs);
+  }
+
+  if (interval === "1h") {
+    // Next top of the hour UTC
+    const next = Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      now.getUTCHours() + 1,
+    );
+    return Math.max(MIN_TTL_MS, next - nowMs);
+  }
+
+  return 300_000; // 5-minute default for sub-hour intervals
+}
 
 interface CacheEntry {
   data: MarketCandle[];
@@ -45,8 +90,8 @@ function getCached(key: string): MarketCandle[] | null {
   return entry.data;
 }
 
-function setCache(key: string, data: MarketCandle[]): void {
-  candleCache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+function setCache(key: string, data: MarketCandle[], interval: string): void {
+  candleCache.set(key, { data, expiresAt: Date.now() + getNextCandleCloseMs(interval) });
 }
 
 // ── Request queue ─────────────────────────────────────────────
@@ -159,7 +204,7 @@ export async function fetchCandles(
       volume: parseFloat(v.volume ?? "0"),
     }));
 
-    setCache(cacheKey, candles);
+    setCache(cacheKey, candles, interval);
     return candles;
   }, priority).finally(() => {
     _inFlight.delete(cacheKey);

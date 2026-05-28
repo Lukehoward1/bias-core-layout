@@ -11,6 +11,23 @@ import {
   type CalendarImpact,
 } from "@/data/calendarEvents";
 
+import { getLiveCalendarEvents } from "./calendarService";
+
+// Module-level live events, populated in the background on first import.
+// Synchronous callers get static data until the fetch resolves.
+let _liveEvents: CalendarEvent[] | null = null;
+
+getLiveCalendarEvents()
+  .then((events) => {
+    if (events.length > 0) _liveEvents = events;
+  })
+  .catch(() => {});
+
+// Returns live FMP events when available, otherwise the static fallback.
+function _getSource(): CalendarEvent[] {
+  return _liveEvents ?? calendarEvents;
+}
+
 export type CalendarDateRange = "today" | "week" | "month";
 export type CalendarSortMode = "time" | "impact";
 
@@ -100,11 +117,11 @@ function dedupeEventsByEventKey(events: CalendarEvent[]): CalendarEvent[] {
 }
 
 export function getAllCalendarEvents(): CalendarEvent[] {
-  return [...calendarEvents];
+  return [..._getSource()];
 }
 
 export function getAvailableCalendarCurrencies(): string[] {
-  return Array.from(new Set(calendarEvents.map((event) => event.currency))).sort();
+  return Array.from(new Set(_getSource().map((event) => event.currency))).sort();
 }
 
 export function filterCalendarEvents(events: CalendarEvent[], filters: CalendarFilters = {}): CalendarEvent[] {
@@ -166,7 +183,7 @@ export function filterCalendarEvents(events: CalendarEvent[], filters: CalendarF
 }
 
 export function getFilteredCalendarEvents(filters: CalendarFilters = {}): CalendarEvent[] {
-  return filterCalendarEvents(calendarEvents, filters);
+  return filterCalendarEvents(_getSource(), filters);
 }
 
 export function getCalendarCounts(events: CalendarEvent[]) {
@@ -181,7 +198,7 @@ export function getCalendarCounts(events: CalendarEvent[]) {
 export function getUpcomingCalendarEvents(limit = 5): CalendarEvent[] {
   const now = Date.now();
 
-  const futureEvents = calendarEvents.filter((event) => {
+  const futureEvents = _getSource().filter((event) => {
     const eventTime = getEventDate(event).getTime();
     return !Number.isNaN(eventTime) && eventTime >= now;
   });
@@ -192,7 +209,7 @@ export function getUpcomingCalendarEvents(limit = 5): CalendarEvent[] {
 export function getUpcomingDistinctCalendarEvents(limit = 5): CalendarEvent[] {
   const now = Date.now();
 
-  const futureEvents = calendarEvents.filter((event) => {
+  const futureEvents = _getSource().filter((event) => {
     const eventTime = getEventDate(event).getTime();
     return !Number.isNaN(eventTime) && eventTime >= now;
   });
@@ -203,7 +220,7 @@ export function getUpcomingDistinctCalendarEvents(limit = 5): CalendarEvent[] {
 export function getUpcomingEventsByEventKey(eventKey: string): CalendarEvent[] {
   const now = Date.now();
 
-  return calendarEvents
+  return _getSource()
     .filter((event) => event.eventKey === eventKey)
     .filter((event) => {
       const eventTime = getEventDate(event).getTime();
