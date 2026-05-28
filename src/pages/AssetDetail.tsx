@@ -17,38 +17,28 @@ import { getEventImpact } from "@/data/eventImpactRules";
 import { getFormattedMarketChange } from "@/services/marketData";
 import type { CalendarEvent } from "@/data/calendarEvents";
 import { getAllCalendarEvents, getEventDateTime, formatCalendarEventDateLabel } from "@/services/calendarData";
+import { getLiveCalendarEvents } from "@/services/calendarService";
 import { buildMarketContext, type KeyLevel, type MarketContext, type SessionContextItem } from "@/services/contextEngine";
 import { setPrioritySymbol } from "@/services/candleData";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
 import { CandlestickChart, type CandlestickChartRef } from "@/components/CandlestickChart";
 import { fetchRealOhlcData, type OhlcDataPoint } from "@/lib/mockOhlcData";
 
-const assetNewsEvents: Record<string, { event: string; time: string; impact: "High" | "Medium" | "Low" }[]> = {
-  EURUSD: [
-    { event: "CPI (USD)", time: "13:30 GMT", impact: "High" },
-    { event: "Core CPI (USD)", time: "15:00 GMT", impact: "High" },
-  ],
-  GBPUSD: [
-    { event: "Retail Sales (GBP)", time: "14:00 GMT", impact: "Medium" },
-    { event: "CPI (USD)", time: "13:30 GMT", impact: "High" },
-  ],
-  USDJPY: [],
-  XAUUSD: [
-    { event: "CPI (USD)", time: "13:30 GMT", impact: "High" },
-    { event: "Gold Futures Report", time: "15:30 GMT", impact: "Medium" },
-  ],
-  BTCUSD: [{ event: "BTC ETF Decision", time: "12:00 GMT", impact: "High" }],
-  AUDUSD: [],
-  USDCAD: [
-    { event: "CAD Inflation", time: "16:00 GMT", impact: "High" },
-    { event: "CPI (USD)", time: "13:30 GMT", impact: "High" },
-  ],
-  SPX500: [
-    { event: "US Market Open", time: "14:30 GMT", impact: "Low" },
-    { event: "CPI (USD)", time: "13:30 GMT", impact: "High" },
-  ],
-  ETHUSD: [{ event: "ETH Network Update", time: "18:00 GMT", impact: "Medium" }],
+// Returns the currencies relevant to a symbol for FMP calendar filtering.
+// FX pairs split naturally; indices and metals map to their primary currency.
+const INDEX_CCY: Record<string, string[]> = {
+  NAS100: ["USD"], US30: ["USD"], SPX500: ["USD"],
+  GER40: ["EUR"], UK100: ["GBP"],
 };
+
+function getSymbolCurrencies(symbol: string): string[] {
+  const norm = normalizeMarketSymbol(symbol);
+  if (isFxPairSymbol(norm)) return [norm.slice(0, 3), norm.slice(3, 6)];
+  if (INDEX_CCY[norm]) return INDEX_CCY[norm];
+  // Commodity pairs like XAUUSD: use the quote currency (last 3 chars)
+  if (norm.length >= 6) return [norm.slice(-3)];
+  return ["USD"];
+}
 
 type NewsPill = {
   key: string;
@@ -194,6 +184,7 @@ const getDirectionalWord = (bias: string) => {
 
 export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string; onRequestClose?: () => void }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { getAssetBySymbol } = useAssets();
   const { isInWatchlist, toggleWatchlist } = useWatchlist();
   const { traderStyle } = useTraderStyle();
@@ -205,6 +196,18 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [showAllRelevantNews, setShowAllRelevantNews] = useState(false);
   const [newsExpanded, setNewsExpanded] = useState(false);
+
+  const [liveNewsEvents, setLiveNewsEvents] = useState<CalendarEvent[]>([]);
+  const [isNewsLoading, setIsNewsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsNewsLoading(true);
+    getLiveCalendarEvents()
+      .then((events) => { if (!cancelled) { setLiveNewsEvents(events); setIsNewsLoading(false); } })
+      .catch(() => { if (!cancelled) setIsNewsLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const quote = useMarketQuote(symbol);
 
@@ -274,18 +277,21 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
       fromCalendar.map((item) => `${item.event.toLowerCase()}|${parseNewsTimeToHHMM(item.time) || item.time}`),
     );
 
-    const extrasRaw = assetNewsEvents[symbol] || [];
-    const extras: NewsPill[] = extrasRaw
-      .filter((item) => {
-        const timeKey = parseNewsTimeToHHMM(item.time) || item.time;
-        const key = `${item.event.toLowerCase()}|${timeKey}`;
+    // Supplement fromCalendar with additional FMP events matching this symbol's currencies,
+    // deduplicating against what the relevance filter already returned.
+    const symbolCurrencies = getSymbolCurrencies(symbol);
+    const extras: NewsPill[] = liveNewsEvents
+      .filter((event) => symbolCurrencies.includes(event.currency))
+      .filter((event) => {
+        const key = `${event.event.toLowerCase()}|${event.time}`;
         return !calendarKeys.has(key);
       })
-      .map((item, index) => ({
-        key: `extra-${symbol}-${index}-${item.event}`,
-        event: item.event,
-        time: item.time,
-        impact: item.impact,
+      .map((event) => ({
+        key: `live-${event.id}`,
+        event: event.event,
+        time: `${event.time} GMT`,
+        impact: toPillImpact(event.impact),
+        calendarEvent: event,
       }));
 
     const combined = [...fromCalendar, ...extras];
@@ -294,7 +300,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
     if (!showAllRelevantNews && filtered.length === 0 && combined.length > 0) return combined;
 
     return filtered;
-  }, [symbol, upcomingRelevantCalendarEvents, showAllRelevantNews]);
+  }, [symbol, upcomingRelevantCalendarEvents, liveNewsEvents, showAllRelevantNews]);
 
   const upcomingNewsItems = useMemo(() => {
     return upcomingRelevantCalendarEvents.slice(0, 3);
@@ -307,6 +313,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
         return;
       }
 
+      // Pill has no attached event — try matching by name + time in relevantCalendarEvents
       const pillTime = parseNewsTimeToHHMM(pill.time);
       const matched = relevantCalendarEvents.find((event) => {
         const sameName = event.event.toLowerCase() === pill.event.toLowerCase();
@@ -319,9 +326,10 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
         return;
       }
 
-      toast.error("No matching calendar event found for this news item yet.");
+      // Safe fallback: open the full calendar page
+      navigate("/calendar");
     },
-    [openCalendarEvent, relevantCalendarEvents],
+    [openCalendarEvent, relevantCalendarEvents, navigate],
   );
 
   const [marketContext, setMarketContext] = useState<MarketContext | null>(null);
@@ -549,6 +557,18 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                       </div>
                     ))}
                   </div>
+
+                  {isNewsLoading && newsImpactPills.length === 0 && (
+                    <div className="mt-5">
+                      <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                        News Impact
+                      </h3>
+                      <div className="space-y-2">
+                        <div className="h-7 rounded-md bg-muted/30 animate-pulse" />
+                        <div className="h-7 rounded-md bg-muted/20 animate-pulse" />
+                      </div>
+                    </div>
+                  )}
 
                   {newsImpactPills.length > 0 && (
                     <div className="mt-5">
