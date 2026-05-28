@@ -59,14 +59,14 @@ function mapCategory(cat: RegistryAsset["category"]): AssetCategory {
   return "FX";
 }
 
-// Hand-curated overrides for assets that had specific mock data
+// Hand-curated overrides for static display fields (spread, volume, news, insight, price).
+// biasDirection, biasConfidence, and sentiment are NOT set here — they are runtime-overridden
+// by the candle engine (getMultiTimeframeBias in candleData.ts). The neutral defaults on each
+// asset are fallbacks only and should never appear in normal operation when candle data loads.
 const manualOverrides: Record<string, Partial<Asset>> = {
   EURUSD: {
     latestPrice: "1.08450",
     priceChange: "+0.45%",
-    biasDirection: "Bullish",
-    biasConfidence: 85,
-    sentiment: 72,
     spread: "0.8",
     volume: "1.2M",
     news: "Today 13:30 – USD CPI (High Impact)",
@@ -75,9 +75,6 @@ const manualOverrides: Record<string, Partial<Asset>> = {
   GBPUSD: {
     latestPrice: "1.26520",
     priceChange: "+0.32%",
-    biasDirection: "Bullish",
-    biasConfidence: 78,
-    sentiment: 68,
     spread: "1.2",
     volume: "980K",
     news: "Today 14:00 – GBP Retail Sales",
@@ -86,9 +83,6 @@ const manualOverrides: Record<string, Partial<Asset>> = {
   USDJPY: {
     latestPrice: "148.250",
     priceChange: "-0.28%",
-    biasDirection: "Bearish",
-    biasConfidence: 82,
-    sentiment: -65,
     spread: "0.9",
     volume: "1.5M",
     news: "Tomorrow 08:00 – JPY GDP",
@@ -97,9 +91,6 @@ const manualOverrides: Record<string, Partial<Asset>> = {
   XAUUSD: {
     latestPrice: "2025.50",
     priceChange: "+1.24%",
-    biasDirection: "Bullish",
-    biasConfidence: 91,
-    sentiment: 88,
     spread: "2.5",
     volume: "850K",
     news: "Today 15:30 – Gold Futures Report",
@@ -108,9 +99,6 @@ const manualOverrides: Record<string, Partial<Asset>> = {
   BTCUSD: {
     latestPrice: "37245.00",
     priceChange: "+2.15%",
-    biasDirection: "Bullish",
-    biasConfidence: 76,
-    sentiment: 65,
     spread: "15.0",
     volume: "2.3M",
     news: "Today 12:00 – BTC ETF Decision",
@@ -119,9 +107,6 @@ const manualOverrides: Record<string, Partial<Asset>> = {
   AUDUSD: {
     latestPrice: "0.65420",
     priceChange: "+0.05%",
-    biasDirection: "Neutral",
-    biasConfidence: 45,
-    sentiment: 12,
     spread: "1.0",
     volume: "620K",
     news: "Tomorrow 10:30 – AUD Employment",
@@ -130,9 +115,6 @@ const manualOverrides: Record<string, Partial<Asset>> = {
   USDCAD: {
     latestPrice: "1.35820",
     priceChange: "-0.18%",
-    biasDirection: "Bearish",
-    biasConfidence: 73,
-    sentiment: -58,
     spread: "1.1",
     volume: "740K",
     news: "Today 16:00 – CAD Inflation",
@@ -141,9 +123,6 @@ const manualOverrides: Record<string, Partial<Asset>> = {
   SPX500: {
     latestPrice: "4587.20",
     priceChange: "+0.85%",
-    biasDirection: "Bullish",
-    biasConfidence: 80,
-    sentiment: 70,
     spread: "0.5",
     volume: "3.1M",
     news: "Today 11:00 – US Market Open",
@@ -152,9 +131,6 @@ const manualOverrides: Record<string, Partial<Asset>> = {
   ETHUSD: {
     latestPrice: "2045.30",
     priceChange: "+0.45%",
-    biasDirection: "Neutral",
-    biasConfidence: 55,
-    sentiment: 15,
     spread: "8.0",
     volume: "1.8M",
     news: "Today 18:00 – ETH Network Update",
@@ -163,9 +139,6 @@ const manualOverrides: Record<string, Partial<Asset>> = {
   NZDUSD: {
     latestPrice: "0.61250",
     priceChange: "-0.12%",
-    biasDirection: "Bearish",
-    biasConfidence: 55,
-    sentiment: -32,
     spread: "1.3",
     volume: "420K",
     news: "Tomorrow 09:00 – NZD Trade Balance",
@@ -174,9 +147,6 @@ const manualOverrides: Record<string, Partial<Asset>> = {
   US30: {
     latestPrice: "37580.00",
     priceChange: "+0.62%",
-    biasDirection: "Bullish",
-    biasConfidence: 75,
-    sentiment: 58,
     spread: "2.0",
     volume: "2.8M",
     news: "Today 11:00 – US Market Open",
@@ -185,9 +155,6 @@ const manualOverrides: Record<string, Partial<Asset>> = {
   NAS100: {
     latestPrice: "16245.00",
     priceChange: "+1.12%",
-    biasDirection: "Bullish",
-    biasConfidence: 83,
-    sentiment: 75,
     spread: "1.5",
     volume: "2.5M",
     news: "Today 11:00 – US Market Open",
@@ -196,9 +163,6 @@ const manualOverrides: Record<string, Partial<Asset>> = {
   XAGUSD: {
     latestPrice: "23.45",
     priceChange: "+0.95%",
-    biasDirection: "Bullish",
-    biasConfidence: 72,
-    sentiment: 62,
     spread: "0.03",
     volume: "520K",
     news: "Today 15:30 – Precious Metals Report",
@@ -207,9 +171,6 @@ const manualOverrides: Record<string, Partial<Asset>> = {
   USOIL: {
     latestPrice: "72.85",
     priceChange: "-0.45%",
-    biasDirection: "Bearish",
-    biasConfidence: 65,
-    sentiment: -42,
     spread: "0.04",
     volume: "1.1M",
     news: "Today 17:00 – EIA Crude Inventories",
@@ -217,23 +178,22 @@ const manualOverrides: Record<string, Partial<Asset>> = {
   },
 };
 
-// Generate placeholder data for registry assets without manual overrides
+// Generate placeholder data for registry assets without manual overrides.
+// biasDirection, biasConfidence, and sentiment are set to neutral fallback defaults here.
+// The candle engine (getMultiTimeframeBias) overrides these at runtime — these values
+// are never shown in normal operation when candle data loads successfully.
 function generatePlaceholder(reg: RegistryAsset): Partial<Asset> {
-  const directions: BiasDirection[] = ["Bullish", "Bearish", "Neutral"];
   const hash = reg.symbol.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-
-  const dir = directions[hash % 3];
-  const confidence = 40 + (hash % 50);
-  const sent = dir === "Bullish" ? hash % 60 : dir === "Bearish" ? -(hash % 60) : (hash % 20) - 10;
-  const sign = dir === "Bearish" ? "-" : "+";
+  const sign = hash % 2 === 0 ? "+" : "-";
   const change = ((hash % 200) / 100).toFixed(2);
 
   return {
     latestPrice: "—",
     priceChange: `${sign}${change}%`,
-    biasDirection: dir,
-    biasConfidence: confidence,
-    sentiment: sent,
+    // Neutral fallback — runtime-overridden by candle engine
+    biasDirection: "Neutral",
+    biasConfidence: 50,
+    sentiment: 0,
     spread: "—",
     volume: "—",
     news: "No scheduled events",

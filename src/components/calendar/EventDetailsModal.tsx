@@ -24,6 +24,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Inbox,
+  AlertCircle,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -401,7 +403,49 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
     [navigate, location, onClose],
   );
 
-  if (!event) return null;
+  if (!event) {
+    return (
+      <DialogPrimitive.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[10000]"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
+          />
+          <DialogPrimitive.Content
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] max-w-sm bg-background border border-border rounded-lg z-[10001] p-0"
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <span className="text-sm font-medium text-muted-foreground">Calendar Event</span>
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
+              <AlertCircle className="h-10 w-10 text-muted-foreground/50" />
+              <h2 className="text-base font-semibold text-foreground">Event not found</h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                This event may have expired or the link is no longer valid. Try browsing the calendar for upcoming
+                events.
+              </p>
+              <Button variant="outline" size="sm" className="mt-2" onClick={onClose}>
+                Close
+              </Button>
+            </div>
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
+    );
+  }
 
   return (
     <DialogPrimitive.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>

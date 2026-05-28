@@ -77,6 +77,8 @@ export interface MarketContext {
   symbol: string;
   biasState: BiasState;
   structureState: StructureState;
+  /** Real confidence from the candle-based MTF engine (0–100). Fallback is 50. */
+  biasConfidence: number;
   levels: KeyLevel[];
   sessionContext: SessionContextItem[];
   overview: string;
@@ -562,9 +564,16 @@ function buildTimeframeContext(
   quote: MarketQuote | null | undefined,
   highImpactSoon: boolean,
   style: TraderStyle,
+  confidence: number,
 ): TimeframeContextItem[] {
   const timeframes = getDefaultTimeframesForStyle(style);
-  const direction = asset.biasDirection;
+  // Derive direction from candle-based biasState — asset.biasDirection is now a neutral fallback only
+  const direction: "Bullish" | "Bearish" | "Neutral" = biasState.startsWith("Bullish")
+    ? "Bullish"
+    : biasState.startsWith("Bearish")
+      ? "Bearish"
+      : "Neutral";
+  const confidenceLabel = confidence >= 75 ? "High confidence" : confidence >= 55 ? "Moderate" : "Low confidence";
   const change = quote?.changePercent ?? 0;
   const weakening = biasState.includes("Weakening");
   const failure = biasState === "Failure Detected";
@@ -594,7 +603,7 @@ function buildTimeframeContext(
         timeframe,
         state: direction === "Bullish" ? "bullish" : "bearish",
         label: "HTF bias intact",
-        detail: `${direction} higher timeframe context remains intact.`,
+        detail: `${confidenceLabel} ${direction.toLowerCase()} higher timeframe context remains intact.`,
       };
     }
 
@@ -639,7 +648,7 @@ function buildTimeframeContext(
         timeframe,
         state: direction === "Bullish" ? "bullish" : "bearish",
         label: direction === "Bullish" ? "Structure holding" : "Structure pressing lower",
-        detail: "Mid-timeframe structure remains aligned with current context.",
+        detail: `${confidenceLabel} — mid-timeframe structure remains aligned with current context.`,
       };
     }
 
@@ -693,7 +702,7 @@ function buildTimeframeContext(
         timeframe,
         state: change < -0.1 ? "weakening" : "bullish",
         label: change < -0.1 ? "Pullback forming" : "Continuation holding",
-        detail: "Short-term price remains inside bullish context.",
+        detail: `${confidenceLabel} — short-term price remains inside bullish context.`,
       };
     }
 
@@ -702,7 +711,7 @@ function buildTimeframeContext(
         timeframe,
         state: change > 0.1 ? "weakening" : "bearish",
         label: change > 0.1 ? "Bounce forming" : "Continuation lower",
-        detail: "Short-term price remains inside bearish context.",
+        detail: `${confidenceLabel} — short-term price remains inside bearish context.`,
       };
     }
 
@@ -731,8 +740,10 @@ export async function buildMarketContext(input: ContextEngineInput): Promise<Mar
 
   let biasState: BiasState;
   let structureState: StructureState;
+  let biasConfidence = 50; // fallback — overridden by candle engine below
   try {
     const mtf = await getMultiTimeframeBias(asset.symbol, traderStyle);
+    biasConfidence = mtf.confidence;
     if (mtf.biasState !== "Neutral / Ranging") {
       biasState = mtf.biasState;
       structureState =
@@ -751,7 +762,15 @@ export async function buildMarketContext(input: ContextEngineInput): Promise<Mar
   }
   const levels = await buildLevels(asset, quote, biasState, traderStyle);
   const sessionContext = deriveSessionContext(asset, biasState, highImpactSoon);
-  const timeframeContext = buildTimeframeContext(asset, biasState, structureState, quote, highImpactSoon, traderStyle);
+  const timeframeContext = buildTimeframeContext(
+    asset,
+    biasState,
+    structureState,
+    quote,
+    highImpactSoon,
+    traderStyle,
+    biasConfidence,
+  );
 
   const overview = buildOverview({
     asset,
@@ -766,6 +785,7 @@ export async function buildMarketContext(input: ContextEngineInput): Promise<Mar
     symbol: asset.symbol,
     biasState,
     structureState,
+    biasConfidence,
     levels,
     sessionContext,
     overview,
