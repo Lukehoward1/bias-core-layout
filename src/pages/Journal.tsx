@@ -763,6 +763,15 @@ export default function Journal() {
 
     const resolvedAccountId = explicitAccountId || viewingAccountId || primaryAccount?.id || undefined;
 
+    const sl = parseFloat(newTrade.stopLoss);
+    let actualR: number | null = null;
+    if (Number.isFinite(sl) && sl !== entry) {
+      const raw = newTrade.type === "Long"
+        ? (exit - entry) / (entry - sl)
+        : (entry - exit) / (sl - entry);
+      actualR = Math.round(raw * 100) / 100;
+    }
+
     const trade: Trade = {
       id: Date.now().toString(),
       date: newTrade.date || (selectedDay ? format(selectedDay, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd")),
@@ -775,6 +784,7 @@ export default function Journal() {
       status: "closed",
       notes: newTrade.notes,
       rating: newTrade.rating,
+      actualR,
       accountId: resolvedAccountId,
       source: "manual",
     };
@@ -1111,6 +1121,7 @@ export default function Journal() {
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Exit</th>
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Lots</th>
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">P&amp;L</th>
+                          <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">R</th>
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Status</th>
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground min-w-[140px]">
                             Notes
@@ -1165,6 +1176,16 @@ export default function Journal() {
                                 >
                                   {trade.pnl >= 0 ? "+" : ""}£{Number(trade.pnl || 0).toLocaleString()}
                                 </span>
+                              </td>
+
+                              <td className="py-3 px-3">
+                                {trade.actualR != null ? (
+                                  <span className={`text-sm font-medium ${trade.actualR >= 0 ? "text-success" : "text-destructive"}`}>
+                                    {trade.actualR >= 0 ? "+" : ""}{trade.actualR}R
+                                  </span>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">—</span>
+                                )}
                               </td>
 
                               <td className="py-3 px-3">
@@ -1421,22 +1442,6 @@ export default function Journal() {
                       />
                     </div>
                   </div>
-
-                  {/* Live R:R preview */}
-                  {(() => {
-                    const entryVal = parseFloat(newTrade.entry);
-                    const slVal = parseFloat(newTrade.stopLoss);
-                    const tpVal = parseFloat(newTrade.takeProfit);
-                    if (Number.isFinite(entryVal) && Number.isFinite(slVal) && Number.isFinite(tpVal) && entryVal !== slVal) {
-                      const rr = Math.abs(tpVal - entryVal) / Math.abs(entryVal - slVal);
-                      return (
-                        <p className="text-sm text-muted-foreground -mt-2">
-                          R:R: <span className="font-medium text-foreground">{rr.toFixed(2)}</span>
-                        </p>
-                      );
-                    }
-                    return null;
-                  })()}
 
                   {/* Date */}
                   <div className="space-y-2">

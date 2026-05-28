@@ -17,6 +17,9 @@ export interface Trade {
   notes?: string;
   rating?: number;
 
+  // Actual R multiple achieved: (exit - entry) / (entry - stopLoss) for Long, sign-flipped for Short
+  actualR?: number | null;
+
   // Which connected account this trade belongs to (undefined => manual/unassigned)
   accountId?: string;
 
