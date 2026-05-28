@@ -146,6 +146,18 @@ function _enqueue<T>(fn: () => Promise<T>, priority: number): Promise<T> {
   });
 }
 
+// ── Symbol whitelist ──────────────────────────────────────────
+// Only these symbols are permitted to call the Twelve Data time_series endpoint.
+// This keeps page-load requests within the free-tier limit (~8 req/min, 800/day).
+// Expand this set when upgrading to a paid API plan.
+
+const CANDLE_API_WHITELIST = new Set([
+  "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "AUDUSD", "USDCAD",
+  "NZDUSD", "EURGBP", "EURJPY", "GBPJPY",
+  "XAUUSD",
+  "NAS100", "US30", "GER40", "UK100",
+]);
+
 // ── Fetch ────────────────────────────────────────────────────
 
 export async function fetchCandles(
@@ -154,6 +166,8 @@ export async function fetchCandles(
   outputsize: number = 10,
 ): Promise<MarketCandle[]> {
   const norm = normalizeSymbol(symbol);
+
+  if (!CANDLE_API_WHITELIST.has(norm)) return [];
   const cacheKey = `${norm}:${interval}:${outputsize}`;
 
   const cached = getCached(cacheKey);
