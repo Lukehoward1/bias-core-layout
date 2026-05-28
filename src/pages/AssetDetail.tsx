@@ -1,5 +1,5 @@
 // src/pages/AssetDetail.tsx
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,8 @@ import { getAllCalendarEvents, getEventDateTime, formatCalendarEventDateLabel } 
 import { buildMarketContext, type KeyLevel, type MarketContext, type SessionContextItem } from "@/services/contextEngine";
 import { setPrioritySymbol } from "@/services/candleData";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
+import { CandlestickChart, type CandlestickChartRef } from "@/components/CandlestickChart";
+import { fetchRealOhlcData, type OhlcDataPoint } from "@/lib/mockOhlcData";
 
 const assetNewsEvents: Record<string, { event: string; time: string; impact: "High" | "Medium" | "Low" }[]> = {
   EURUSD: [
@@ -323,6 +325,24 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
   );
 
   const [marketContext, setMarketContext] = useState<MarketContext | null>(null);
+
+  const [selectedTimeframe, setSelectedTimeframe] = useState("h1");
+  const [chartData, setChartData] = useState<OhlcDataPoint[]>([]);
+  const [isChartLoading, setIsChartLoading] = useState(false);
+  const chartRef = useRef<CandlestickChartRef>(null);
+
+  useEffect(() => {
+    if (!symbol) return;
+    let cancelled = false;
+    setIsChartLoading(true);
+    fetchRealOhlcData(symbol, selectedTimeframe).then((data) => {
+      if (!cancelled) {
+        setChartData(data);
+        setIsChartLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [symbol, selectedTimeframe]);
 
   useEffect(() => {
     setPrioritySymbol(symbol);
@@ -807,6 +827,25 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                 })()}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden">
+          <CardContent className="p-0">
+            <div className="relative h-[420px]">
+              {isChartLoading && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+                  <span className="text-sm text-muted-foreground">Loading chart…</span>
+                </div>
+              )}
+              <CandlestickChart
+                ref={chartRef}
+                data={chartData}
+                pair={symbol.toLowerCase()}
+                timeframe={selectedTimeframe}
+                onTimeframeChange={setSelectedTimeframe}
+              />
+            </div>
           </CardContent>
         </Card>
 

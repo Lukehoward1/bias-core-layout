@@ -479,10 +479,10 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
           style={{ top: TOOLBAR_HEIGHT, right: TOOLBAR_WIDTH }}
         />
 
-        {/* Demo Data Label */}
+        {/* Live Data Label */}
         <div className="absolute bottom-2 left-2 z-20">
-          <span className="text-[10px] text-muted-foreground/50 bg-background/50 backdrop-blur-sm px-1.5 py-0.5 rounded">
-            Demo data – live data coming soon
+          <span className="text-[10px] text-muted-foreground/70 bg-background/50 backdrop-blur-sm border border-border/40 px-1.5 py-0.5 rounded">
+            Live Data
           </span>
         </div>
 

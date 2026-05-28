@@ -1,4 +1,43 @@
-// Mock OHLC data generator - easily replaceable with real API data later
+// Mock OHLC data generator — used as fallback when live data is unavailable
+
+import { fetchCandles } from "@/services/candleData";
+
+// Maps ChartToolbar timeframe keys → Twelve Data interval strings
+const TF_TO_TD: Record<string, string> = {
+  m1: "1min",
+  m5: "5min",
+  m15: "15min",
+  h1: "1h",
+  h4: "4h",
+  d1: "1day",
+};
+
+/**
+ * Fetch real OHLC candles from Twelve Data and map to OhlcDataPoint[].
+ * Returns mock data for symbols not in the API whitelist or when the fetch fails.
+ */
+export async function fetchRealOhlcData(
+  symbol: string,
+  timeframe: string,
+): Promise<OhlcDataPoint[]> {
+  const tdInterval = TF_TO_TD[timeframe] ?? "1h";
+  const candles = await fetchCandles(symbol, tdInterval, 150);
+
+  if (candles.length === 0) {
+    // Symbol not whitelisted or API unavailable — fall back to generated data
+    return generateMockOhlcData(symbol.toLowerCase(), timeframe, 150);
+  }
+
+  // Twelve Data returns newest-first; lightweight-charts requires oldest-first
+  return [...candles].reverse().map((c) => ({
+    time: new Date(c.timestamp).toISOString(),
+    timestamp: Math.floor(c.timestamp / 1000),
+    open: c.open,
+    high: c.high,
+    low: c.low,
+    close: c.close,
+  }));
+}
 
 export interface OhlcDataPoint {
   time: string; // ISO date string for display
