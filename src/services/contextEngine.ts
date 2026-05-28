@@ -3,7 +3,7 @@ import type { Asset } from "@/data/assets";
 import type { MarketQuote } from "@/services/marketData";
 import type { CalendarEvent } from "@/data/calendarEvents";
 import type { TraderStyle } from "@/context/TraderStyleProvider";
-import { getMultiTimeframeBias } from "./candleData";
+import { getMultiTimeframeBias, getRealLevels } from "./candleData";
 
 export type BiasState =
   | "Bullish Active"
@@ -238,17 +238,132 @@ function makeLevel(input: {
   };
 }
 
-function buildLevels(asset: Asset, quote: MarketQuote | null | undefined, biasState: BiasState): KeyLevel[] {
+async function buildLevels(
+  asset: Asset,
+  quote: MarketQuote | null | undefined,
+  biasState: BiasState,
+  traderStyle: TraderStyle,
+): Promise<KeyLevel[]> {
   const ref = toNumber(asset.latestPrice) || toNumber(quote?.last);
   if (!Number.isFinite(ref) || ref <= 0) return [];
 
   const decimals = inferDecimals(ref);
-  const range = getInstrumentRange(asset, ref);
-
   const isBullish = biasState.startsWith("Bullish");
   const isBearish = biasState.startsWith("Bearish");
   const isNeutral = biasState === "Neutral / Ranging";
 
+  // Attempt to use real candle-derived levels
+  const real = isNeutral ? null : await getRealLevels(asset.symbol, traderStyle);
+
+  if (real) {
+    const {
+      prevDayHigh,
+      prevDayLow,
+      recentSwingHigh,
+      recentSwingLow,
+      majorSwingHigh,
+      majorSwingLow,
+      fourHourSwingHigh,
+      fourHourSwingLow,
+    } = real;
+
+    // Nearest real level above/below current price for the directional target
+    const upsideCandidates = [prevDayHigh, recentSwingHigh, fourHourSwingHigh, majorSwingHigh].filter(
+      (l) => l > ref,
+    );
+    const downsideCandidates = [prevDayLow, recentSwingLow, fourHourSwingLow, majorSwingLow].filter(
+      (l) => l < ref,
+    );
+    const nearestAbove = upsideCandidates.length > 0 ? Math.min(...upsideCandidates) : majorSwingHigh;
+    const nearestBelow = downsideCandidates.length > 0 ? Math.max(...downsideCandidates) : majorSwingLow;
+
+    const levels: KeyLevel[] = [];
+
+    levels.push(
+      makeLevel({
+        type: "Swing High",
+        price: prevDayHigh,
+        decimals,
+        tags: ["Tested once", "Possible reaction zone"],
+        reason: "Previous day high — nearest overhead swing area where price may react.",
+        alignedWithBias: isBearish,
+        higherTimeframe: false,
+      }),
+    );
+
+    levels.push(
+      makeLevel({
+        type: "Swing Low",
+        price: prevDayLow,
+        decimals,
+        tags: ["Tested once", "Possible reaction zone"],
+        reason: "Previous day low — nearest downside swing area acting as the closest demand reference.",
+        alignedWithBias: isBullish,
+        higherTimeframe: false,
+      }),
+    );
+
+    levels.push(
+      makeLevel({
+        type: "Strong Reaction Zone",
+        price: isBullish ? majorSwingLow : majorSwingHigh,
+        decimals,
+        tags: ["Strong reaction", "Untested"],
+        reason: isBullish
+          ? "Major 20-day swing low — higher-timeframe demand reference useful as a pullback/invalidation area."
+          : "Major 20-day swing high — higher-timeframe supply reference useful as a bounce/invalidation area.",
+        alignedWithBias: true,
+        higherTimeframe: true,
+      }),
+    );
+
+    levels.push(
+      makeLevel({
+        type: "Nearby Target",
+        price: isBearish ? nearestBelow : nearestAbove,
+        decimals,
+        tags: ["Nearby target", "Untested"],
+        reason: isBearish
+          ? "Closest real downside reference in the current directional context."
+          : "Closest real upside reference in the current directional context.",
+        alignedWithBias: true,
+        higherTimeframe: false,
+      }),
+    );
+
+    levels.push(
+      makeLevel({
+        type: "Break and Retest Zone",
+        price: isBearish ? fourHourSwingHigh : fourHourSwingLow,
+        decimals,
+        tags: ["Retested", "Possible reaction zone"],
+        reason: isBearish
+          ? "4H swing high above price — prior resistance that may act as a retest zone."
+          : "4H swing low below price — prior support that may act as a retest zone.",
+        alignedWithBias: true,
+        higherTimeframe: false,
+      }),
+    );
+
+    levels.push(
+      makeLevel({
+        type: "Liquidity Sweep",
+        price: isBearish ? recentSwingLow : recentSwingHigh,
+        decimals,
+        tags: ["Liquidity swept", "Possible reaction zone"],
+        reason: isBearish
+          ? "Recent 5-day swing low — downside liquidity area; reaction depends on acceptance or reclaim."
+          : "Recent 5-day swing high — upside liquidity area; reaction depends on acceptance or rejection.",
+        alignedWithBias: true,
+        higherTimeframe: false,
+      }),
+    );
+
+    return levels.sort((a, b) => b.score - a.score).slice(0, 6);
+  }
+
+  // Fallback: percentage-offset estimates when candle data is unavailable
+  const range = getInstrumentRange(asset, ref);
   const upside1 = ref + range * 0.75;
   const upside2 = ref + range * 1.45;
   const downside1 = ref - range * 0.75;
@@ -634,7 +749,7 @@ export async function buildMarketContext(input: ContextEngineInput): Promise<Mar
     biasState = deriveBiasState(asset, quote);
     structureState = deriveStructureState(asset, quote);
   }
-  const levels = buildLevels(asset, quote, biasState);
+  const levels = await buildLevels(asset, quote, biasState, traderStyle);
   const sessionContext = deriveSessionContext(asset, biasState, highImpactSoon);
   const timeframeContext = buildTimeframeContext(asset, biasState, structureState, quote, highImpactSoon, traderStyle);
 

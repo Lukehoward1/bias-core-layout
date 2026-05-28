@@ -187,6 +187,49 @@ export async function get4HBias(symbol: string): Promise<TimeframeBias> {
 
 // ── Multi-timeframe combination ──────────────────────────────
 
+// ── Real price levels from candle data ───────────────────────
+
+export interface RealLevels {
+  prevDayHigh: number;
+  prevDayLow: number;
+  recentSwingHigh: number;
+  recentSwingLow: number;
+  majorSwingHigh: number;
+  majorSwingLow: number;
+  fourHourSwingHigh: number;
+  fourHourSwingLow: number;
+}
+
+export async function getRealLevels(symbol: string, _style: TraderStyle): Promise<RealLevels | null> {
+  try {
+    const [dailyCandles, fourHourCandles] = await Promise.all([
+      fetchCandles(symbol, "1day", 20),
+      fetchCandles(symbol, "4h", 20),
+    ]);
+
+    // Need at least 6 daily candles (index 0 = forming, 1..5 = 5 closed)
+    if (dailyCandles.length < 6 || fourHourCandles.length < 10) return null;
+
+    const prevDay = dailyCandles[1]; // last fully closed daily
+    const recentClosed = dailyCandles.slice(1, 6); // 5 closed daily candles
+    const majorClosed = dailyCandles.slice(1); // all closed from the 20 fetched
+    const fourHourSlice = fourHourCandles.slice(0, 10); // last 10 4H candles
+
+    return {
+      prevDayHigh: prevDay.high,
+      prevDayLow: prevDay.low,
+      recentSwingHigh: Math.max(...recentClosed.map((c) => c.high)),
+      recentSwingLow: Math.min(...recentClosed.map((c) => c.low)),
+      majorSwingHigh: Math.max(...majorClosed.map((c) => c.high)),
+      majorSwingLow: Math.min(...majorClosed.map((c) => c.low)),
+      fourHourSwingHigh: Math.max(...fourHourSlice.map((c) => c.high)),
+      fourHourSwingLow: Math.min(...fourHourSlice.map((c) => c.low)),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function getMultiTimeframeBias(
   symbol: string,
   _style: TraderStyle,
