@@ -62,6 +62,7 @@ import { type Trade as JournalTrade } from "@/hooks/use-journal-trades";
 
 // ✅ Instrument-aware P&L
 import { getInstrumentBySymbol, calculateTradePnl } from "@/data/tradingInstruments";
+import { WHITELIST_SYMBOLS } from "@/services/candleData";
 
 /* =======================
    TYPES
@@ -491,7 +492,31 @@ export default function Journal() {
     entry: "",
     exit: "",
     lots: "",
+    stopLoss: "",
+    takeProfit: "",
+    date: "",
+    notes: "",
+    rating: 0,
   });
+  const [pairIsManual, setPairIsManual] = useState(false);
+
+  const openAddTrade = () => {
+    setNewTrade({
+      accountId: UNASSIGNED_ACCOUNT_VALUE,
+      pair: "",
+      type: "Long",
+      entry: "",
+      exit: "",
+      lots: "",
+      stopLoss: "",
+      takeProfit: "",
+      date: selectedDay ? format(selectedDay, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
+      notes: "",
+      rating: 0,
+    });
+    setPairIsManual(false);
+    setIsAddTradeOpen(true);
+  };
 
   // Export selected modal
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -740,7 +765,7 @@ export default function Journal() {
 
     const trade: Trade = {
       id: Date.now().toString(),
-      date: format(selectedDay, "yyyy-MM-dd"),
+      date: newTrade.date || (selectedDay ? format(selectedDay, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd")),
       pair: symbol,
       type: newTrade.type,
       entry,
@@ -748,8 +773,8 @@ export default function Journal() {
       lots,
       pnl,
       status: "closed",
-      notes: "",
-      rating: 0,
+      notes: newTrade.notes,
+      rating: newTrade.rating,
       accountId: resolvedAccountId,
       source: "manual",
     };
@@ -763,7 +788,13 @@ export default function Journal() {
       entry: "",
       exit: "",
       lots: "",
+      stopLoss: "",
+      takeProfit: "",
+      date: "",
+      notes: "",
+      rating: 0,
     });
+    setPairIsManual(false);
     setIsAddTradeOpen(false);
     toast.success("Trade added");
   };
@@ -1060,7 +1091,7 @@ export default function Journal() {
                 <DialogHeader>
                   <div className="flex items-center justify-between pr-8">
                     <DialogTitle>Trades for {selectedDay ? format(selectedDay, "EEEE, MMMM d, yyyy") : ""}</DialogTitle>
-                    <Button size="sm" className="h-8" onClick={() => setIsAddTradeOpen(true)}>
+                    <Button size="sm" className="h-8" onClick={openAddTrade}>
                       <Plus className="h-4 w-4 mr-2" />
                       Add Trade
                     </Button>
@@ -1211,11 +1242,7 @@ export default function Journal() {
                     </table>
                   ) : (
                     <div className="text-center py-8">
-                      <p className="text-sm text-muted-foreground mb-4">No trades for this day</p>
-                      <Button size="sm" onClick={() => setIsAddTradeOpen(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Trade
-                      </Button>
+                      <p className="text-sm text-muted-foreground">No trades for this day</p>
                     </div>
                   )}
                 </div>
@@ -1230,6 +1257,7 @@ export default function Journal() {
                 </DialogHeader>
 
                 <div className="space-y-4 pt-4">
+                  {/* Account */}
                   <div className="space-y-2">
                     <Label htmlFor="account">Account</Label>
                     <Select
@@ -1249,11 +1277,9 @@ export default function Journal() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={UNASSIGNED_ACCOUNT_VALUE}>Use default</SelectItem>
-
                         {primaryAccount && (
                           <SelectItem value={primaryAccount.id}>{primaryAccount.name} (Primary)</SelectItem>
                         )}
-
                         {accounts
                           .filter((a) => a.id !== primaryAccount?.id)
                           .map((a) => (
@@ -1263,39 +1289,77 @@ export default function Journal() {
                           ))}
                       </SelectContent>
                     </Select>
-
                     <p className="text-xs text-muted-foreground">
                       Default = Viewing Account (if selected), otherwise Primary.
                     </p>
                   </div>
 
+                  {/* Pair + Direction */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="pair">Pair</Label>
+                      <Select
+                        value={pairIsManual ? "__manual__" : newTrade.pair}
+                        onValueChange={(value) => {
+                          if (value === "__manual__") {
+                            setPairIsManual(true);
+                            setNewTrade({ ...newTrade, pair: "" });
+                          } else {
+                            setPairIsManual(false);
+                            setNewTrade({ ...newTrade, pair: value });
+                          }
+                        }}
+                      >
+                        <SelectTrigger id="pair">
+                          <SelectValue placeholder="Select pair…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {WHITELIST_SYMBOLS.map((sym) => (
+                            <SelectItem key={sym} value={sym}>{sym}</SelectItem>
+                          ))}
+                          <SelectItem value="__manual__">Enter manually…</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Direction</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={newTrade.type === "Long" ? "default" : "outline"}
+                          className={newTrade.type === "Long" ? "bg-green-600 hover:bg-green-700 border-green-600 text-white" : ""}
+                          onClick={() => setNewTrade({ ...newTrade, type: "Long" })}
+                        >
+                          Long
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={newTrade.type === "Short" ? "default" : "outline"}
+                          className={newTrade.type === "Short" ? "bg-red-600 hover:bg-red-700 border-red-600 text-white" : ""}
+                          onClick={() => setNewTrade({ ...newTrade, type: "Short" })}
+                        >
+                          Short
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Manual symbol input */}
+                  {pairIsManual && (
+                    <div className="space-y-2">
+                      <Label htmlFor="pairManual">Symbol</Label>
                       <Input
-                        id="pair"
+                        id="pairManual"
                         placeholder="e.g. EURUSD"
                         value={newTrade.pair}
                         onChange={(e) => setNewTrade({ ...newTrade, pair: e.target.value })}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="type">Type</Label>
-                      <Select
-                        value={newTrade.type}
-                        onValueChange={(value: "Long" | "Short") => setNewTrade({ ...newTrade, type: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Long">Long</SelectItem>
-                          <SelectItem value="Short">Short</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+                  )}
 
+                  {/* Entry / Exit / Lots */}
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="entry">Entry</Label>
@@ -1330,6 +1394,79 @@ export default function Journal() {
                         onChange={(e) => setNewTrade({ ...newTrade, lots: e.target.value })}
                       />
                     </div>
+                  </div>
+
+                  {/* Stop Loss / Take Profit */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="stopLoss">Stop Loss</Label>
+                      <Input
+                        id="stopLoss"
+                        type="number"
+                        step="0.0001"
+                        placeholder="1.0800"
+                        value={newTrade.stopLoss}
+                        onChange={(e) => setNewTrade({ ...newTrade, stopLoss: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="takeProfit">Take Profit</Label>
+                      <Input
+                        id="takeProfit"
+                        type="number"
+                        step="0.0001"
+                        placeholder="1.0950"
+                        value={newTrade.takeProfit}
+                        onChange={(e) => setNewTrade({ ...newTrade, takeProfit: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Live R:R preview */}
+                  {(() => {
+                    const entryVal = parseFloat(newTrade.entry);
+                    const slVal = parseFloat(newTrade.stopLoss);
+                    const tpVal = parseFloat(newTrade.takeProfit);
+                    if (Number.isFinite(entryVal) && Number.isFinite(slVal) && Number.isFinite(tpVal) && entryVal !== slVal) {
+                      const rr = Math.abs(tpVal - entryVal) / Math.abs(entryVal - slVal);
+                      return (
+                        <p className="text-sm text-muted-foreground -mt-2">
+                          R:R: <span className="font-medium text-foreground">{rr.toFixed(2)}</span>
+                        </p>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* Date */}
+                  <div className="space-y-2">
+                    <Label htmlFor="tradeDate">Date</Label>
+                    <Input
+                      id="tradeDate"
+                      type="date"
+                      value={newTrade.date}
+                      onChange={(e) => setNewTrade({ ...newTrade, date: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Notes */}
+                  <div className="space-y-2">
+                    <Label htmlFor="notes">Notes</Label>
+                    <Input
+                      id="notes"
+                      placeholder="Optional notes…"
+                      value={newTrade.notes}
+                      onChange={(e) => setNewTrade({ ...newTrade, notes: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Rating */}
+                  <div className="space-y-2">
+                    <Label>Rating</Label>
+                    <StarRating
+                      rating={newTrade.rating}
+                      onRatingChange={(rating) => setNewTrade({ ...newTrade, rating })}
+                    />
                   </div>
 
                   <Button className="w-full" onClick={handleAddTrade}>

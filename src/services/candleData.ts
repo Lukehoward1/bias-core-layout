@@ -151,12 +151,14 @@ function _enqueue<T>(fn: () => Promise<T>, priority: number): Promise<T> {
 // This keeps page-load requests within the free-tier limit (~8 req/min, 800/day).
 // Expand this set when upgrading to a paid API plan.
 
-const CANDLE_API_WHITELIST = new Set([
+export const WHITELIST_SYMBOLS = [
   "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "AUDUSD", "USDCAD",
   "NZDUSD", "EURGBP", "EURJPY", "GBPJPY",
   "XAUUSD",
   "NAS100", "US30", "GER40", "UK100",
-]);
+];
+
+const CANDLE_API_WHITELIST = new Set(WHITELIST_SYMBOLS);
 
 // ── Fetch ────────────────────────────────────────────────────
 
