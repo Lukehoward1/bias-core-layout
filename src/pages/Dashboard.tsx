@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { SessionDetailsModal } from "@/components/dashboard/SessionDetailsModal";
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { AssetDetailContent } from "@/pages/AssetDetail";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 import { useWatchlist } from "@/hooks/use-watchlist";
 import { useMarketQuotes } from "@/hooks/use-market-quotes";
@@ -452,7 +453,9 @@ export default function Dashboard() {
           }}
         >
           <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-xl bg-background border border-border shadow-2xl">
-            <AssetDetailContent symbol={selectedAssetSymbol} onRequestClose={closeAssetOverlay} />
+            <ErrorBoundary fallbackMessage="Failed to load asset">
+              <AssetDetailContent symbol={selectedAssetSymbol} onRequestClose={closeAssetOverlay} />
+            </ErrorBoundary>
           </div>
         </div>
       )}
@@ -473,6 +476,15 @@ function DashboardWatchlistCard({
   const displayAssets = useMemo(() => watchlistAssets.slice(0, 5), [watchlistAssets]);
   const symbols = useMemo(() => displayAssets.map((asset) => asset.symbol), [displayAssets]);
   const quotes = useMarketQuotes(symbols);
+
+  // Derive Bullish/Bearish/Neutral from the candle-engine biasState string.
+  // asset.biasDirection is now a neutral fallback only — the real value is in context.biasState.
+  const getBiasDirection = (biasState?: string): "Bullish" | "Bearish" | "Neutral" => {
+    if (!biasState) return "Neutral";
+    if (biasState.startsWith("Bullish")) return "Bullish";
+    if (biasState.startsWith("Bearish")) return "Bearish";
+    return "Neutral";
+  };
 
   const getBiasIcon = (bias: string) => {
     if (bias === "Bullish") return <TrendingUp className="h-4 w-4" />;
@@ -585,10 +597,10 @@ function DashboardWatchlistCard({
                       <span className="font-semibold text-foreground">{asset.symbol}</span>
 
                       <div
-                        className={`flex items-center gap-1 text-xs font-medium ${getBiasColor(asset.biasDirection)}`}
+                        className={`flex items-center gap-1 text-xs font-medium ${getBiasColor(getBiasDirection(context?.biasState))}`}
                       >
-                        {getBiasIcon(asset.biasDirection)}
-                        <span>{asset.biasDirection}</span>
+                        {getBiasIcon(getBiasDirection(context?.biasState))}
+                        <span>{context?.biasState ?? "—"}</span>
                       </div>
 
                       {context?.structureState && (

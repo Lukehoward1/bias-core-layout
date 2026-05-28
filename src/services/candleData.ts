@@ -26,7 +26,7 @@ export interface MultiTimeframeBias {
 
 // ── Cache ────────────────────────────────────────────────────
 
-const CACHE_TTL_MS = 60_000;
+const CACHE_TTL_MS = 300_000; // 5 minutes — reduces repeat API hits across page loads
 
 interface CacheEntry {
   data: MarketCandle[];
@@ -49,6 +49,58 @@ function setCache(key: string, data: MarketCandle[]): void {
   candleCache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
+// ── Request queue ─────────────────────────────────────────────
+// Limits concurrent Twelve Data fetches to MAX_CONCURRENT.
+// Higher-priority tasks (currently-viewed asset) are inserted at the front.
+
+const MAX_CONCURRENT = 6;
+let _active = 0;
+let _prioritySymbol: string | null = null;
+
+interface QueueTask<T> {
+  fn: () => Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason: unknown) => void;
+  priority: number; // higher number = runs first
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const _queue: QueueTask<any>[] = [];
+const _inFlight = new Map<string, Promise<MarketCandle[]>>();
+
+/** Call when the user navigates to an asset detail view so its fetches run first. */
+export function setPrioritySymbol(symbol: string | null): void {
+  _prioritySymbol = symbol ? normalizeSymbol(symbol) : null;
+}
+
+function _drain(): void {
+  while (_active < MAX_CONCURRENT && _queue.length > 0) {
+    const task = _queue.shift()!;
+    _active++;
+    task
+      .fn()
+      .then(task.resolve, task.reject)
+      .finally(() => {
+        _active--;
+        _drain();
+      });
+  }
+}
+
+function _enqueue<T>(fn: () => Promise<T>, priority: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const task: QueueTask<T> = { fn, resolve, reject, priority };
+    // Maintain descending priority order; equal priorities preserve insertion order.
+    const idx = _queue.findIndex((e) => e.priority < priority);
+    if (idx === -1) {
+      _queue.push(task);
+    } else {
+      _queue.splice(idx, 0, task);
+    }
+    _drain();
+  });
+}
+
 // ── Fetch ────────────────────────────────────────────────────
 
 export async function fetchCandles(
@@ -62,42 +114,59 @@ export async function fetchCandles(
   const cached = getCached(cacheKey);
   if (cached) return cached;
 
+  // Return the same promise to any concurrent callers for the same key.
+  const inflight = _inFlight.get(cacheKey);
+  if (inflight) return inflight;
+
   const apiKey = import.meta.env.VITE_TWELVE_DATA_API_KEY;
   if (!apiKey) return [];
 
-  const providerSymbol = toProviderSymbol(norm);
-  const url =
-    `https://api.twelvedata.com/time_series` +
-    `?symbol=${encodeURIComponent(providerSymbol)}` +
-    `&interval=${interval}` +
-    `&outputsize=${outputsize}` +
-    `&apikey=${apiKey}`;
+  const priority = _prioritySymbol === norm ? 1 : 0;
 
-  let json: Record<string, unknown>;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    json = await res.json();
-  } catch {
-    return [];
-  }
+  const promise = _enqueue(async (): Promise<MarketCandle[]> => {
+    // Another request may have populated the cache while we waited in the queue.
+    const cached2 = getCached(cacheKey);
+    if (cached2) return cached2;
 
-  if (json.status === "error" || !Array.isArray(json.values)) return [];
+    const providerSymbol = toProviderSymbol(norm);
+    const url =
+      `https://api.twelvedata.com/time_series` +
+      `?symbol=${encodeURIComponent(providerSymbol)}` +
+      `&interval=${interval}` +
+      `&outputsize=${outputsize}` +
+      `&apikey=${apiKey}`;
 
-  // Twelve Data returns values newest-first — preserve that order.
-  const candles: MarketCandle[] = (json.values as Record<string, string>[]).map((v) => ({
-    symbol: norm,
-    timeframe: interval,
-    timestamp: new Date(v.datetime).getTime(),
-    open: parseFloat(v.open),
-    high: parseFloat(v.high),
-    low: parseFloat(v.low),
-    close: parseFloat(v.close),
-    volume: parseFloat(v.volume ?? "0"),
-  }));
+    let json: Record<string, unknown>;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return [];
+      json = await res.json();
+    } catch {
+      return [];
+    }
 
-  setCache(cacheKey, candles);
-  return candles;
+    if (json.status === "error" || !Array.isArray(json.values)) return [];
+
+    // Twelve Data returns values newest-first — preserve that order.
+    const candles: MarketCandle[] = (json.values as Record<string, string>[]).map((v) => ({
+      symbol: norm,
+      timeframe: interval,
+      timestamp: new Date(v.datetime).getTime(),
+      open: parseFloat(v.open),
+      high: parseFloat(v.high),
+      low: parseFloat(v.low),
+      close: parseFloat(v.close),
+      volume: parseFloat(v.volume ?? "0"),
+    }));
+
+    setCache(cacheKey, candles);
+    return candles;
+  }, priority).finally(() => {
+    _inFlight.delete(cacheKey);
+  });
+
+  _inFlight.set(cacheKey, promise);
+  return promise;
 }
 
 // ── Single-candle helper ─────────────────────────────────────

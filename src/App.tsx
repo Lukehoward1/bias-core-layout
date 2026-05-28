@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, useLocation, useParams } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { SessionLockProvider } from "@/hooks/use-session-lock";
 import { AlertsProvider } from "@/contexts/AlertsContext";
@@ -25,8 +25,18 @@ import Billing from "./pages/Billing";
 import Pricing from "./pages/Pricing";
 import NotFound from "./pages/NotFound";
 import AssetDetail from "./pages/AssetDetail";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const queryClient = new QueryClient();
+
+function AssetDetailWithBoundary() {
+  const { symbol } = useParams<{ symbol: string }>();
+  return (
+    <ErrorBoundary key={symbol} fallbackMessage="Failed to load asset">
+      <AssetDetail />
+    </ErrorBoundary>
+  );
+}
 
 function AppRoutes() {
   const location = useLocation();
@@ -48,8 +58,8 @@ function AppRoutes() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/billing" element={<Billing />} />
 
-          {!backgroundLocation && <Route path="/markets/:symbol" element={<AssetDetail />} />}
-          {!backgroundLocation && <Route path="/asset/:symbol" element={<AssetDetail />} />}
+          {!backgroundLocation && <Route path="/markets/:symbol" element={<AssetDetailWithBoundary />} />}
+          {!backgroundLocation && <Route path="/asset/:symbol" element={<AssetDetailWithBoundary />} />}
         </Route>
 
         <Route path="/pricing" element={<Pricing />} />
@@ -58,8 +68,8 @@ function AppRoutes() {
 
       {backgroundLocation && (
         <Routes>
-          <Route path="/markets/:symbol" element={<AssetDetail />} />
-          <Route path="/asset/:symbol" element={<AssetDetail />} />
+          <Route path="/markets/:symbol" element={<AssetDetailWithBoundary />} />
+          <Route path="/asset/:symbol" element={<AssetDetailWithBoundary />} />
         </Routes>
       )}
     </>

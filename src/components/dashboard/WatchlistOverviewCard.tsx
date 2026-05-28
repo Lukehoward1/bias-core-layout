@@ -125,6 +125,15 @@ export function WatchlistOverviewCard({ isEditMode = false }: WatchlistOverviewC
     };
   }, [displayAssets, traderStyle]); // quotes intentionally omitted — new ref every render would cause infinite loop
 
+  // Derive Bullish/Bearish/Neutral from the candle-engine biasState string.
+  // asset.biasDirection is now a neutral fallback only — the real value is in context.biasState.
+  const getBiasDirection = (biasState?: string): "Bullish" | "Bearish" | "Neutral" => {
+    if (!biasState) return "Neutral";
+    if (biasState.startsWith("Bullish")) return "Bullish";
+    if (biasState.startsWith("Bearish")) return "Bearish";
+    return "Neutral";
+  };
+
   const getBiasIcon = (bias: string) => {
     if (bias === "Bullish") return <TrendingUp className="h-4 w-4" />;
     if (bias === "Bearish") return <TrendingDown className="h-4 w-4" />;
@@ -211,10 +220,10 @@ export function WatchlistOverviewCard({ isEditMode = false }: WatchlistOverviewC
                       <span className="font-semibold text-foreground">{asset.symbol}</span>
 
                       <div
-                        className={`flex items-center gap-1 text-xs font-medium ${getBiasColor(asset.biasDirection)}`}
+                        className={`flex items-center gap-1 text-xs font-medium ${getBiasColor(getBiasDirection(context?.biasState))}`}
                       >
-                        {getBiasIcon(asset.biasDirection)}
-                        <span>{asset.biasDirection}</span>
+                        {getBiasIcon(getBiasDirection(context?.biasState))}
+                        <span>{context?.biasState ?? "—"}</span>
                       </div>
 
                       {context?.structureState && (

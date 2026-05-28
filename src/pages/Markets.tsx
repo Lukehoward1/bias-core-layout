@@ -175,6 +175,15 @@ export default function Markets() {
     };
   }, [watchlistAssets, filteredPairs, traderStyle]); // quotes intentionally omitted — new ref every render would cause infinite loop
 
+  // Derive Bullish/Bearish/Neutral from the candle-engine biasState string.
+  // asset.biasDirection is now a neutral fallback only — the real value is in context.biasState.
+  const getBiasDirection = (biasState?: string): "Bullish" | "Bearish" | "Neutral" => {
+    if (!biasState) return "Neutral";
+    if (biasState.startsWith("Bullish")) return "Bullish";
+    if (biasState.startsWith("Bearish")) return "Bearish";
+    return "Neutral";
+  };
+
   const getBiasIcon = (bias: string) => {
     if (bias === "Bullish") return <TrendingUp className="h-4 w-4" />;
     if (bias === "Bearish") return <TrendingDown className="h-4 w-4" />;
@@ -322,9 +331,9 @@ export default function Markets() {
                         </div>
                       </div>
 
-                      <div className={`flex items-center gap-1 min-w-[120px] ${getBiasColor(asset.biasDirection)}`}>
-                        {getBiasIcon(asset.biasDirection)}
-                        <span className="text-sm">{asset.biasDirection}</span>
+                      <div className={`flex items-center gap-1 min-w-[120px] ${getBiasColor(getBiasDirection(context?.biasState))}`}>
+                        {getBiasIcon(getBiasDirection(context?.biasState))}
+                        <span className="text-sm">{context?.biasState ?? "—"}</span>
                       </div>
 
                       <div className="hidden lg:flex items-center gap-2 flex-1 min-w-0">
@@ -422,9 +431,9 @@ export default function Markets() {
                         <p className="text-xs text-muted-foreground mt-1">{asset.displayName}</p>
                       </div>
 
-                      <div className={`flex items-center gap-1.5 ${getBiasColor(asset.biasDirection)}`}>
-                        {getBiasIcon(asset.biasDirection)}
-                        <span className="text-sm font-medium">{asset.biasDirection}</span>
+                      <div className={`flex items-center gap-1.5 ${getBiasColor(getBiasDirection(context?.biasState))}`}>
+                        {getBiasIcon(getBiasDirection(context?.biasState))}
+                        <span className="text-sm font-medium">{context?.biasState ?? "—"}</span>
                       </div>
                     </div>
 

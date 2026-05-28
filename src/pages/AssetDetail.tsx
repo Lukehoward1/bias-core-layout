@@ -18,6 +18,7 @@ import { getFormattedMarketChange } from "@/services/marketData";
 import type { CalendarEvent } from "@/data/calendarEvents";
 import { getAllCalendarEvents, getEventDateTime, formatCalendarEventDateLabel } from "@/services/calendarData";
 import { buildMarketContext, type KeyLevel, type MarketContext, type SessionContextItem } from "@/services/contextEngine";
+import { setPrioritySymbol } from "@/services/candleData";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
 
 const assetNewsEvents: Record<string, { event: string; time: string; impact: "High" | "Medium" | "Low" }[]> = {
@@ -324,6 +325,11 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
   const [marketContext, setMarketContext] = useState<MarketContext | null>(null);
 
   useEffect(() => {
+    setPrioritySymbol(symbol);
+    return () => setPrioritySymbol(null);
+  }, [symbol]);
+
+  useEffect(() => {
     if (!asset) {
       setMarketContext(null);
       return;
@@ -344,16 +350,38 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
     };
   }, [asset, quote, upcomingRelevantCalendarEvents, traderStyle]);
 
+  // Derive Bullish/Bearish/Neutral from the candle-engine biasState string.
+  // asset.biasDirection is now a neutral fallback only — the real value is in marketContext.biasState.
+  const getBiasDirection = (biasState?: string): "Bullish" | "Bearish" | "Neutral" => {
+    if (!biasState) return "Neutral";
+    if (biasState.startsWith("Bullish")) return "Bullish";
+    if (biasState.startsWith("Bearish")) return "Bearish";
+    return "Neutral";
+  };
+
+  const getBiasColor = (bias: string) => {
+    if (bias === "Bullish") return "text-success";
+    if (bias === "Bearish") return "text-destructive";
+    return "text-muted-foreground";
+  };
+
+  const getBiasIcon = (bias: string) => {
+    if (bias === "Bullish") return <TrendingUp className="h-6 w-6" />;
+    if (bias === "Bearish") return <TrendingDown className="h-6 w-6" />;
+    return <Minus className="h-6 w-6" />;
+  };
+
   const contextSnapshot = useMemo<ContextSnapshotItem[]>(() => {
     if (!asset || !marketContext) return [];
 
     const biasTf = marketContext.timeframes.bias[0] ?? "Higher timeframe";
     const structureTf = marketContext.timeframes.structure[0] ?? "Structure timeframe";
-    const direction = getDirectionalWord(asset.biasDirection);
+    const biasDir = getBiasDirection(marketContext.biasState);
+    const direction = getDirectionalWord(biasDir);
 
     const nearestPullback =
       marketContext.levels.find((level) =>
-        asset.biasDirection === "Bullish"
+        biasDir === "Bullish"
           ? level.type.toLowerCase().includes("low") || level.reason.toLowerCase().includes("demand")
           : level.type.toLowerCase().includes("high") || level.reason.toLowerCase().includes("supply"),
       ) ?? marketContext.levels[0];
@@ -376,9 +404,8 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
         label: "Higher timeframe bias",
         text: isNeutral
           ? `${biasTf} context remains neutral; directional conviction is limited.`
-          : `${biasTf} structure remains ${asset.biasDirection.toLowerCase()}; ${direction} bias is intact.`,
-        accent:
-          asset.biasDirection === "Bullish" ? "success" : asset.biasDirection === "Bearish" ? "destructive" : "muted",
+          : `${biasTf} structure remains ${biasDir.toLowerCase()}; ${direction} bias is intact.`,
+        accent: biasDir === "Bullish" ? "success" : biasDir === "Bearish" ? "destructive" : "muted",
       },
       {
         label: "Current market condition",
@@ -397,7 +424,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
       {
         label: "Invalidation level",
         text: nearestPullback
-          ? `${asset.biasDirection} continuation weakens around ${nearestPullback.price}.`
+          ? `${biasDir} continuation weakens around ${nearestPullback.price}.`
           : "No clear invalidation level available from current context.",
         accent: "destructive",
       },
@@ -414,18 +441,6 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
       },
     ];
   }, [asset, marketContext]);
-
-  const getBiasColor = (bias: string) => {
-    if (bias === "Bullish") return "text-success";
-    if (bias === "Bearish") return "text-destructive";
-    return "text-muted-foreground";
-  };
-
-  const getBiasIcon = (bias: string) => {
-    if (bias === "Bullish") return <TrendingUp className="h-6 w-6" />;
-    if (bias === "Bearish") return <TrendingDown className="h-6 w-6" />;
-    return <Minus className="h-6 w-6" />;
-  };
 
   const getChangeColor = () => {
     if (quote) {
@@ -596,7 +611,9 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
                   <div className="p-3 bg-muted/30 rounded-lg text-center">
                     <span className="text-xs text-muted-foreground block mb-1">Confidence</span>
-                    <span className="text-sm font-semibold text-foreground">{asset.biasConfidence}%</span>
+                    <span className="text-sm font-semibold text-foreground">
+                      {marketContext?.biasConfidence ?? asset.biasConfidence}%
+                    </span>
                   </div>
 
                   <div className="p-3 bg-muted/30 rounded-lg text-center">
@@ -624,40 +641,53 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                     <span className="font-medium text-foreground">{tfLabel}</span>
                   </div>
 
-                  <div className="relative w-72 h-36">
-                    <svg viewBox="0 0 100 50" className="w-full h-full">
-                      <path
-                        d="M 10 45 A 40 40 0 0 1 90 45"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="8"
-                        className="text-muted"
-                      />
-                      <path
-                        d="M 10 45 A 40 40 0 0 1 90 45"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="8"
-                        strokeDasharray={`${(asset.biasConfidence / 100) * 126} 126`}
-                        className={getBiasColor(asset.biasDirection)}
-                      />
-                      <line
-                        x1="50"
-                        y1="45"
-                        x2={50 + 35 * Math.cos((Math.PI * (180 - asset.biasConfidence * 1.8)) / 180)}
-                        y2={45 - 35 * Math.sin((Math.PI * (180 - asset.biasConfidence * 1.8)) / 180)}
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        className="text-foreground"
-                      />
-                      <circle cx="50" cy="45" r="5" fill="currentColor" className="text-foreground" />
-                    </svg>
-                  </div>
+                  {marketContext ? (
+                    <>
+                      <div className="relative w-72 h-36">
+                        <svg viewBox="0 0 100 50" className="w-full h-full">
+                          <path
+                            d="M 10 45 A 40 40 0 0 1 90 45"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="8"
+                            className="text-muted"
+                          />
+                          <path
+                            d="M 10 45 A 40 40 0 0 1 90 45"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="8"
+                            strokeDasharray={`${(marketContext.biasConfidence / 100) * 126} 126`}
+                            className={getBiasColor(getBiasDirection(marketContext.biasState))}
+                          />
+                          <line
+                            x1="50"
+                            y1="45"
+                            x2={50 + 35 * Math.cos((Math.PI * (180 - marketContext.biasConfidence * 1.8)) / 180)}
+                            y2={45 - 35 * Math.sin((Math.PI * (180 - marketContext.biasConfidence * 1.8)) / 180)}
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            className="text-foreground"
+                          />
+                          <circle cx="50" cy="45" r="5" fill="currentColor" className="text-foreground" />
+                        </svg>
+                      </div>
 
-                  <div className={`flex items-center gap-2 mt-6 ${getBiasColor(asset.biasDirection)}`}>
-                    {getBiasIcon(asset.biasDirection)}
-                    <span className="text-3xl font-bold">{asset.biasDirection}</span>
-                  </div>
+                      <div className={`flex items-center gap-2 mt-6 ${getBiasColor(getBiasDirection(marketContext.biasState))}`}>
+                        {getBiasIcon(getBiasDirection(marketContext.biasState))}
+                        <span className="text-3xl font-bold">{marketContext.biasState}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center gap-3 py-6">
+                      <div className="relative w-72 h-36 flex items-center justify-center">
+                        <svg viewBox="0 0 100 50" className="w-full h-full absolute inset-0 opacity-20">
+                          <path d="M 10 45 A 40 40 0 0 1 90 45" fill="none" stroke="currentColor" strokeWidth="8" className="text-muted-foreground" />
+                        </svg>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Loading bias analysis…</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -700,7 +730,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                   const highlight = new Set(styleTfs[traderStyle] ?? styleTfs.intraday);
                   const ctxMap = new Map(marketContext.timeframeContext.map((t) => [t.timeframe, t]));
                   // Derive a coarse state for timeframes not in ctxMap, using bias/structure.
-                  const dir = asset.biasDirection;
+                  const dir = getBiasDirection(marketContext.biasState);
                   const biasState = marketContext.biasState;
                   const structureState = marketContext.structureState;
                   const highImpactSoon = marketContext.highImpactSoon;
