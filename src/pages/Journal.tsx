@@ -31,6 +31,7 @@ import {
   format,
   startOfMonth,
   endOfMonth,
+  endOfDay,
   startOfWeek,
   endOfWeek,
   addDays,
@@ -414,9 +415,9 @@ export default function Journal() {
 
   // Date range filter for reports
   const [dateRange, setDateRange] = useState<DateRange>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
-    label: "This Month",
+    from: subMonths(new Date(), 3),
+    to: endOfDay(new Date()),
+    label: "Last 3 Months",
   });
 
   const { firstTradeDate, lastTradeDate } = useMemo(() => {
