@@ -27,6 +27,7 @@ import { useMarketQuotes } from "@/hooks/use-market-quotes";
 import { getFormattedMarketChange, normalizeSymbol, type MarketQuote } from "@/services/marketData";
 
 import { calendarEvents, type CalendarEvent } from "@/data/calendarEvents";
+import { getLiveCalendarEvents } from "@/services/calendarService";
 import { getEventImpact } from "@/data/eventImpactRules";
 import { buildMarketContext, type MarketContext, type TimeframeState } from "@/services/contextEngine";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
@@ -652,6 +653,27 @@ function DashboardWatchlistCard({
   );
 }
 
+function getUniqueUpcomingFromSource(source: CalendarEvent[]): CalendarEvent[] {
+  const now = Date.now();
+  const nextByEventKey = new Map<string, CalendarEvent>();
+
+  source
+    .filter((event) => getEventTimestamp(event) >= now)
+    .sort((a, b) => getEventTimestamp(a) - getEventTimestamp(b))
+    .forEach((event) => {
+      const key = event.eventKey || `${event.currency}-${event.event}`;
+      if (!nextByEventKey.has(key)) nextByEventKey.set(key, event);
+    });
+
+  return Array.from(nextByEventKey.values()).sort((a, b) => {
+    const timeDiff = getEventTimestamp(a) - getEventTimestamp(b);
+    if (timeDiff !== 0) return timeDiff;
+    const impactDiff = impactRank(b.impact) - impactRank(a.impact);
+    if (impactDiff !== 0) return impactDiff;
+    return a.event.localeCompare(b.event);
+  });
+}
+
 function DashboardUpcomingEventsCard({
   title,
   isEditMode,
@@ -661,7 +683,28 @@ function DashboardUpcomingEventsCard({
   isEditMode: boolean;
   onOpenEvent: (event: CalendarEvent) => void;
 }) {
-  const events = useMemo(() => getUniqueUpcomingEvents().slice(0, 4), []);
+  const [isLoading, setIsLoading] = useState(true);
+  const [liveEvents, setLiveEvents] = useState<CalendarEvent[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getLiveCalendarEvents()
+      .then((data) => {
+        if (!cancelled) setLiveEvents(data.length > 0 ? data : null);
+      })
+      .catch(() => {
+        if (!cancelled) setLiveEvents(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const events = useMemo(() => {
+    const source = liveEvents ?? calendarEvents;
+    return getUniqueUpcomingFromSource(source).slice(0, 4);
+  }, [liveEvents]);
 
   return (
     <Card className="h-full">
@@ -674,7 +717,12 @@ function DashboardUpcomingEventsCard({
 
       <CardContent>
         <div className="space-y-2">
-          {events.length === 0 ? (
+          {isLoading && events.length === 0 ? (
+            <>
+              <div className="h-10 rounded-lg bg-muted/40 animate-pulse" />
+              <div className="h-10 rounded-lg bg-muted/30 animate-pulse" />
+            </>
+          ) : events.length === 0 ? (
             <p className="text-sm text-muted-foreground">No upcoming events found.</p>
           ) : (
             events.map((event) => (
