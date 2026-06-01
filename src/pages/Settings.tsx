@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Link2, ArrowRight, Sparkles, ShieldOff, RefreshCw, Lock, KeyRound, SlidersHorizontal } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useSessionLock } from "@/hooks/use-session-lock";
 import { Badge } from "@/components/ui/badge";
@@ -15,18 +15,67 @@ import { SubscriptionPlan } from "@/types/subscription";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 import { useActiveTradingAccount, ACTIVE_ACCOUNT_ALL } from "@/hooks/use-active-trading-account";
-import { useTraderBiasMode } from "@/hooks/use-trader-style";
+import { useTraderBiasMode, getBiasTimeframesForStyle, type BiasTimeframe } from "@/hooks/use-trader-style";
 
 type TraderStyle = "scalper" | "intraday" | "swing";
 
+const ALL_TIMEFRAMES: { value: BiasTimeframe; label: string }[] = [
+  { value: "1m", label: "1m" },
+  { value: "5m", label: "5m" },
+  { value: "15m", label: "15m" },
+  { value: "30m", label: "30m" },
+  { value: "1h", label: "1H" },
+  { value: "4h", label: "4H" },
+  { value: "1d", label: "D" },
+  { value: "1w", label: "W" },
+];
+
 export default function Settings() {
+  const navigate = useNavigate();
   const { plan, setPlan } = useSubscription();
   const { pinEnabled, setPinEnabled, pinSet, setPin, clearPin } = useSessionLock();
 
   const { accounts, primaryAccount } = useLinkedAccounts();
   const { activeAccountId, setActiveAccountId } = useActiveTradingAccount();
 
-  const { traderStyle, setTraderStyle, traderStyleLabel, biasTimeframes } = useTraderBiasMode();
+  const {
+    traderStyle,
+    setTraderStyle,
+    traderStyleLabel,
+    biasTimeframes,
+    customTimeframes,
+    setCustomTimeframes,
+    clearCustomTimeframes,
+  } = useTraderBiasMode();
+
+  const [pendingTimeframes, setPendingTimeframes] = useState<BiasTimeframe[]>(
+    () => customTimeframes ?? getBiasTimeframesForStyle(traderStyle),
+  );
+
+  // Keep pending in sync with style defaults when no custom override is active
+  useEffect(() => {
+    if (!customTimeframes) {
+      setPendingTimeframes(getBiasTimeframesForStyle(traderStyle));
+    }
+  }, [traderStyle, customTimeframes]);
+
+  const toggleTimeframe = (tf: BiasTimeframe) => {
+    setPendingTimeframes((prev) => (prev.includes(tf) ? prev.filter((t) => t !== tf) : [...prev, tf]));
+  };
+
+  const handleResetToDefaults = () => {
+    clearCustomTimeframes();
+    setPendingTimeframes(getBiasTimeframesForStyle(traderStyle));
+  };
+
+  const handleSave = () => {
+    if (pendingTimeframes.length === 0) {
+      clearCustomTimeframes();
+    } else {
+      setCustomTimeframes(pendingTimeframes);
+    }
+    navigate("/");
+  };
 
   const [lockOverlayDisabled, setLockOverlayDisabled] = useState(() => {
     return localStorage.getItem("dev-disable-lock-overlay") === "true";
@@ -161,6 +210,55 @@ export default function Settings() {
                   <span className="font-medium text-foreground">{biasTimeframes.join(" / ")}</span>
                 </p>
               </div>
+
+              {/* Bias Timeframe Override */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm">Bias Timeframe Override</Label>
+                  {customTimeframes && customTimeframes.length > 0 && (
+                    <>
+                      <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/30">
+                        Custom
+                      </Badge>
+                      <button
+                        type="button"
+                        onClick={handleResetToDefaults}
+                        className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+                      >
+                        Reset to defaults
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {ALL_TIMEFRAMES.map(({ value, label }) => {
+                    const active = pendingTimeframes.includes(value);
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => toggleTimeframe(value)}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                          active
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-transparent text-muted-foreground border-border hover:border-foreground/40 hover:text-foreground"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  Default timeframes for your trader style are used when no override is set.
+                </p>
+              </div>
+
+              <Button className="w-full" onClick={handleSave}>
+                Save Preferences
+              </Button>
             </CardContent>
           </Card>
 
