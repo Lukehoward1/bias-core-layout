@@ -47,48 +47,51 @@ type TradingSession = {
 
 type DashboardSlotType = "wide" | "narrow" | "equal" | "hero" | "kpi" | "wide-narrow" | "three-equal" | "four-equal";
 
-const buildSessions = (): TradingSession[] => [
-  {
-    name: "Sydney",
-    region: "Asia-Pacific",
-    status: "closed",
-    accent: "#2EC4B6",
-    opensAtLabel: "Opens 08:30",
-    closesAtLabel: "—",
-    timeRemainingLabel: "Session opens in",
-    timeRemainingSeconds: 8 * 3600 + 30 * 60,
-  },
-  {
-    name: "Asia",
-    region: "Asia-Pacific Markets",
-    status: "active",
-    accent: "#4361EE",
-    opensAtLabel: "—",
-    closesAtLabel: "Closes 01:23",
-    timeRemainingLabel: "Session closes in",
-    timeRemainingSeconds: 1 * 3600 + 23 * 60 + 45,
-  },
-  {
-    name: "London",
-    region: "European",
-    status: "closed",
-    accent: "#F4D35E",
-    opensAtLabel: "Opens 02:15",
-    closesAtLabel: "—",
-    timeRemainingLabel: "Session opens in",
-    timeRemainingSeconds: 2 * 3600 + 15 * 60 + 30,
-  },
-  {
-    name: "New York",
-    region: "US Markets",
-    status: "closed",
-    accent: "#F77F00",
-    opensAtLabel: "Opens 05:45",
-    closesAtLabel: "—",
-    timeRemainingLabel: "Session opens in",
-    timeRemainingSeconds: 5 * 3600 + 45 * 60 + 12,
-  },
+const SESSION_DEFS: {
+  name: TradingSessionName;
+  region: string;
+  accent: string;
+  openSec: number;
+  closeSec: number;
+}[] = [
+  { name: "Sydney",   region: "Asia-Pacific",        accent: "#2EC4B6", openSec: 21 * 3600, closeSec: 6 * 3600  },
+  { name: "Asia",     region: "Asia-Pacific Markets", accent: "#4361EE", openSec: 0,         closeSec: 9 * 3600  },
+  { name: "London",   region: "European",             accent: "#F4D35E", openSec: 7 * 3600,  closeSec: 16 * 3600 },
+  { name: "New York", region: "US Markets",           accent: "#F77F00", openSec: 12 * 3600, closeSec: 21 * 3600 },
 ];
+
+const getLiveSessionsUTC = (now: Date): TradingSession[] => {
+  const DAY_SEC = 24 * 3600;
+  const nowSec = now.getUTCHours() * 3600 + now.getUTCMinutes() * 60 + now.getUTCSeconds();
+
+  const fmtUtc = (sec: number) => {
+    const h = Math.floor(sec / 3600) % 24;
+    const m = Math.floor((sec % 3600) / 60);
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")} UTC`;
+  };
+
+  return SESSION_DEFS.map(({ name, region, accent, openSec, closeSec }) => {
+    const wraps = openSec > closeSec; // overnight session (e.g. Sydney 21:00-06:00)
+    const isActive = wraps
+      ? nowSec >= openSec || nowSec < closeSec
+      : nowSec >= openSec && nowSec < closeSec;
+
+    const timeRemainingSeconds = isActive
+      ? (closeSec - nowSec + DAY_SEC) % DAY_SEC
+      : (openSec - nowSec + DAY_SEC) % DAY_SEC;
+
+    return {
+      name,
+      region,
+      accent,
+      status: isActive ? ("active" as const) : ("closed" as const),
+      opensAtLabel: isActive ? "—" : `Opens ${fmtUtc(openSec)}`,
+      closesAtLabel: isActive ? `Closes ${fmtUtc(closeSec)}` : "—",
+      timeRemainingLabel: isActive ? "Session closes in" : "Session opens in",
+      timeRemainingSeconds,
+    };
+  });
+};
 
 const impactRank = (impact: "high" | "medium" | "low") => {
   if (impact === "high") return 3;
@@ -207,7 +210,7 @@ export default function Dashboard() {
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
-  const sessions = useMemo(() => buildSessions(), []);
+  const [sessions, setSessions] = useState<TradingSession[]>(() => getLiveSessionsUTC(new Date()));
 
   const selectedSession = useMemo(() => {
     const found = sessions.find((s) => s.name === selectedSessionName);
@@ -215,6 +218,15 @@ export default function Dashboard() {
   }, [sessions, selectedSessionName]);
 
   const [sessionTick, setSessionTick] = useState(0);
+
+  // Refresh session status and countdowns every 60 seconds
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setSessions(getLiveSessionsUTC(new Date()));
+      setSessionTick(0); // reset per-second offset so modal countdown stays accurate
+    }, 60_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (!isSessionModalOpen) return;
