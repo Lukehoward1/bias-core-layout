@@ -388,13 +388,14 @@ function TodaysBiasDashboardCard() {
         : "Mixed Conditions";
 
   const dominantColor =
-    dominantBias === "Bullish"
+    dominantBias === "Bullish Conditions"
       ? "text-success"
-      : dominantBias === "Bearish"
+      : dominantBias === "Bearish Conditions"
         ? "text-destructive"
         : "text-muted-foreground";
 
-  const DominantIcon = dominantBias === "Bullish" ? TrendingUp : dominantBias === "Bearish" ? TrendingDown : Activity;
+  const DominantIcon =
+    dominantBias === "Bullish Conditions" ? TrendingUp : dominantBias === "Bearish Conditions" ? TrendingDown : Activity;
 
   return (
     <Card className="h-full">

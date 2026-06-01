@@ -274,37 +274,34 @@ export function getFormattedMarketChange(quote: MarketQuote | null | undefined):
   };
 }
 
-// ── Twelve Data integration ──────────────────────────────────
+// ── Quote proxy integration ───────────────────────────────────
+// Calls our server-side proxy at /api/quote — the Twelve Data API key
+// never reaches the browser. The proxy adds its own 5-second cache layer.
 
 async function fetchTwelveDataQuote(symbol: string): Promise<MarketQuote | null> {
-  const apiKey = import.meta.env.VITE_TWELVE_DATA_API_KEY;
-  if (!apiKey) return null;
-
-  const providerSymbol = toProviderSymbol(symbol);
-  const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(providerSymbol)}&apikey=${apiKey}`;
+  const url = `/api/quote?symbols=${encodeURIComponent(symbol)}`;
 
   let res: Response;
   try {
     res = await fetch(url);
-  } catch (err) {
-    console.log("[TwelveData] Fetch error:", err);
+  } catch {
     return null;
   }
-  if (!res.ok) {
-    console.log("[TwelveData] HTTP error:", res.status, res.statusText);
-    return null;
-  }
+  if (!res.ok) return null;
 
   const json = await res.json();
-  if (json.status === "error" || !json.close) return null;
+  // Proxy returns { [canonicalSymbol]: quoteData }
+  const quoteData = json[symbol] as Record<string, string> | undefined;
+  if (!quoteData || !quoteData["close"]) return null;
 
-  const last = parseFloat(json.close);
-  const previousClose = parseFloat(json.previous_close);
-  const change = parseFloat(json.change);
-  const changePercent = parseFloat(json.percent_change);
+  const last = parseFloat(quoteData["close"]);
+  const previousClose = parseFloat(quoteData["previous_close"]);
+  const change = parseFloat(quoteData["change"]);
+  const changePercent = parseFloat(quoteData["percent_change"]);
 
   if (!Number.isFinite(last) || last <= 0) return null;
 
+  const providerSymbol = toProviderSymbol(symbol);
   const hs = MOCK_HALF_SPREADS[symbol] ?? defaultHalfSpread(last);
 
   return {

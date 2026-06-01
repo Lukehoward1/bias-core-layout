@@ -21,6 +21,9 @@ export interface Trade {
   // Actual R multiple achieved: (exit - entry) / (entry - stopLoss) for Long, sign-flipped for Short
   actualR?: number | null;
 
+  stopLoss?: number;
+  takeProfit?: number;
+
   // Which connected account this trade belongs to (undefined => manual/unassigned)
   accountId?: string;
 

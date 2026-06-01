@@ -4,7 +4,7 @@
 // Provides single-timeframe and multi-timeframe bias signals.
 // ─────────────────────────────────────────────────────────────
 
-import { toProviderSymbol, normalizeSymbol } from "./marketData";
+import { normalizeSymbol } from "./marketData";
 import type { MarketCandle } from "./marketData";
 import type { BiasState } from "./contextEngine";
 import type { TraderStyle } from "@/context/TraderStyleProvider";
@@ -179,9 +179,6 @@ export async function fetchCandles(
   const inflight = _inFlight.get(cacheKey);
   if (inflight) return inflight;
 
-  const apiKey = import.meta.env.VITE_TWELVE_DATA_API_KEY;
-  if (!apiKey) return [];
-
   const priority = _prioritySymbol === norm ? 1 : 0;
 
   const promise = _enqueue(async (): Promise<MarketCandle[]> => {
@@ -189,15 +186,14 @@ export async function fetchCandles(
     const cached2 = getCached(cacheKey);
     if (cached2) return cached2;
 
-    const providerSymbol = toProviderSymbol(norm);
+    // Call our server-side proxy — API key never leaves the server.
     const url =
-      `https://api.twelvedata.com/time_series` +
-      `?symbol=${encodeURIComponent(providerSymbol)}` +
+      `/api/timeseries` +
+      `?symbol=${encodeURIComponent(norm)}` +
       `&interval=${interval}` +
-      `&outputsize=${outputsize}` +
-      `&apikey=${apiKey}`;
+      `&outputsize=${outputsize}`;
 
-    let json: Record<string, unknown>;
+    let json: { status: string; values?: Record<string, string>[] };
     try {
       const res = await fetch(url);
       if (!res.ok) return [];
