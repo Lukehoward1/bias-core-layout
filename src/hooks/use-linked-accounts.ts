@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSubscription } from "./use-subscription";
 import { canLinkMoreAccounts, getRemainingAccountSlots } from "@/types/subscription";
+import { DEMO_BROKER_ACCOUNT } from "@/data/demoBrokerAccount";
 
 /**
  * Linked accounts are already multi-account.
@@ -243,12 +244,20 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
   const canLinkMore = canLinkMoreAccounts(plan, accountCount);
   const canLinkAccounts = limits.canLinkAccounts;
 
+  // When no real accounts are linked, surface the demo account as a read-only fallback
+  const effectiveAccounts = useMemo(
+    () => (accounts.length === 0 ? [DEMO_BROKER_ACCOUNT] : accounts),
+    [accounts],
+  );
+
   // Get primary account (first connected account if no primary set)
   const primaryAccount = useMemo(() => {
     return (
-      accounts.find((a) => a.id === primaryAccountId && a.isConnected) ?? accounts.find((a) => a.isConnected) ?? null
+      effectiveAccounts.find((a) => a.id === primaryAccountId && a.isConnected) ??
+      effectiveAccounts.find((a) => a.isConnected) ??
+      null
     );
-  }, [accounts, primaryAccountId]);
+  }, [effectiveAccounts, primaryAccountId]);
 
   // ✅ NEW: trades getters/setters
   const getTradesForAccount = useCallback((accountId: string): AccountTrade[] => {
@@ -424,7 +433,7 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
   );
 
   return {
-    accounts,
+    accounts: effectiveAccounts,
     primaryAccount,
     isLoading,
     accountCount,

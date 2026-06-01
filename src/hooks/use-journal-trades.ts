@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { DEMO_TRADES } from "@/data/demoTrades";
 
 /**
  * Canonical trade model used by Journal + Reports.
@@ -151,25 +152,36 @@ export function useJournalTrades(accountIds: string[] = []) {
     window.dispatchEvent(new Event(EVENT_NAME));
   }, []);
 
+  // Demo mode: active when the only account is the virtual demo account and no real
+  // trades (manual or synced) have been recorded yet.
+  const isDemoData = useMemo(() => {
+    const isVirtualDemoSession =
+      accountIds.length === 0 ||
+      (accountIds.length === 1 && accountIds[0] === "demo-account");
+    const hasRealTrades =
+      manualTrades.length > 0 ||
+      Object.values(syncedTradesByAccount).flat().length > 0;
+    return isVirtualDemoSession && !hasRealTrades;
+  }, [accountIds, manualTrades, syncedTradesByAccount]);
+
   // Canonical merged list for the app
   const trades: Trade[] = useMemo(() => {
     const syncedAll = Object.values(syncedTradesByAccount).flat();
 
-    // Ensure sources are set (internal convenience)
     const manual = manualTrades.map((t) => ({ ...t, source: "manual" as const }));
     const synced = syncedAll.map((t) => ({ ...t, source: "synced" as const }));
 
-    // Combine
-    const combined = [...manual, ...synced];
+    // Seed with demo trades when no real data exists; user's own manual trades sit on top
+    const combined = isDemoData
+      ? [...DEMO_TRADES, ...manual]
+      : [...manual, ...synced];
 
-    // Apply overrides
     const withOverrides = applyOverrides(combined, overrides);
 
-    // Default sort: newest date first (same behavior you’ve been using elsewhere)
     withOverrides.sort((a, b) => b.date.localeCompare(a.date));
 
     return withOverrides;
-  }, [manualTrades, syncedTradesByAccount, overrides]);
+  }, [manualTrades, syncedTradesByAccount, overrides, isDemoData]);
 
   /**
    * Manual trade actions (writes to localStorage)
@@ -269,6 +281,9 @@ export function useJournalTrades(accountIds: string[] = []) {
   return {
     // Canonical merged list
     trades,
+
+    // True when demo seed data is active (no real accounts or trades yet)
+    isDemoData,
 
     // Manual-only list (rarely needed, but useful)
     manualTrades,
