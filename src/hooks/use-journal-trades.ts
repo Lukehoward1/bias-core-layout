@@ -24,6 +24,10 @@ export interface Trade {
   stopLoss?: number;
   takeProfit?: number;
 
+  // Trade times in HH:mm 24-hour UTC — optional, used for session and hold-time analysis
+  entryTime?: string;
+  exitTime?: string;
+
   // Which connected account this trade belongs to (undefined => manual/unassigned)
   accountId?: string;
 

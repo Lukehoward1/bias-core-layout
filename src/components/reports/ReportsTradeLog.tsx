@@ -22,6 +22,8 @@ interface Trade {
   status: string;
   notes?: string;
   rating?: number;
+  entryTime?: string;
+  exitTime?: string;
 
   // ✅ Link trades to a connected account (optional for backward compatibility)
   accountId?: string;

@@ -18,6 +18,8 @@ interface Trade {
   status: string;
   notes?: string;
   rating?: number;
+  entryTime?: string;
+  exitTime?: string;
 }
 
 interface PinState {

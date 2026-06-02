@@ -496,6 +496,8 @@ export default function Journal() {
     stopLoss: "",
     takeProfit: "",
     date: "",
+    entryTime: "",
+    exitTime: "",
     notes: "",
     rating: 0,
   });
@@ -512,6 +514,8 @@ export default function Journal() {
       stopLoss: "",
       takeProfit: "",
       date: selectedDay ? format(selectedDay, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
+      entryTime: "",
+      exitTime: "",
       notes: "",
       rating: 0,
     });
@@ -786,6 +790,8 @@ export default function Journal() {
       notes: newTrade.notes,
       rating: newTrade.rating,
       actualR,
+      entryTime: newTrade.entryTime || undefined,
+      exitTime: newTrade.exitTime || undefined,
       accountId: resolvedAccountId,
       source: "manual",
     };
@@ -802,6 +808,8 @@ export default function Journal() {
       stopLoss: "",
       takeProfit: "",
       date: "",
+      entryTime: "",
+      exitTime: "",
       notes: "",
       rating: 0,
     });
@@ -1453,6 +1461,32 @@ export default function Journal() {
                       value={newTrade.date}
                       onChange={(e) => setNewTrade({ ...newTrade, date: e.target.value })}
                     />
+                  </div>
+
+                  {/* Entry / Exit Time */}
+                  <div className="space-y-2">
+                    <Label>Entry / Exit Time (UTC)</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="entryTime" className="text-xs text-muted-foreground">Entry Time</Label>
+                        <Input
+                          id="entryTime"
+                          type="time"
+                          value={newTrade.entryTime}
+                          onChange={(e) => setNewTrade({ ...newTrade, entryTime: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="exitTime" className="text-xs text-muted-foreground">Exit Time</Label>
+                        <Input
+                          id="exitTime"
+                          type="time"
+                          value={newTrade.exitTime}
+                          onChange={(e) => setNewTrade({ ...newTrade, exitTime: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Optional — used for session and hold-time analysis.</p>
                   </div>
 
                   {/* Notes */}
