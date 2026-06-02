@@ -17,6 +17,7 @@ import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButto
 import { toast } from "sonner";
 
 import { calendarEvents, sortCalendarEventsByImpact, type CalendarEvent } from "@/data/calendarEvents";
+import { getLiveCalendarEvents } from "@/services/calendarService";
 import { getEventImpact } from "@/data/eventImpactRules";
 import { getFormattedMarketChange, type MarketQuote } from "@/services/marketData";
 import { buildMarketContext, type MarketContext, type TimeframeState } from "@/services/contextEngine";
@@ -153,6 +154,19 @@ export default function Markets() {
 
   const [contextMap, setContextMap] = useState<Record<string, MarketContext>>({});
 
+  // Live FMP calendar — null until fetched, falls back to static calendarEvents if empty/error
+  const [liveCalendarEvents, setLiveCalendarEvents] = useState<CalendarEvent[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getLiveCalendarEvents()
+      .then((events) => { if (!cancelled) setLiveCalendarEvents(events.length > 0 ? events : null); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  // Whichever source is active for all calendar filtering
+  const activeCalendarEvents = liveCalendarEvents ?? calendarEvents;
+
   useEffect(() => {
     let cancelled = false;
     const allAssets = [...watchlistAssets, ...filteredPairs].filter(
@@ -161,7 +175,7 @@ export default function Markets() {
     Promise.all(
       allAssets.map(async (asset) => {
         const quote = quotes[asset.symbol];
-        const relevantEvents = calendarEvents.filter((event) => isEventRelevantToSymbol(asset.symbol, event));
+        const relevantEvents = activeCalendarEvents.filter((event) => isEventRelevantToSymbol(asset.symbol, event));
         const ctx = await buildMarketContext({ asset, quote, upcomingRelevantEvents: relevantEvents, traderStyle });
         return [asset.symbol, ctx] as const;
       }),
@@ -173,7 +187,7 @@ export default function Markets() {
     return () => {
       cancelled = true;
     };
-  }, [watchlistAssets, filteredPairs, traderStyle]); // quotes intentionally omitted — new ref every render would cause infinite loop
+  }, [watchlistAssets, filteredPairs, traderStyle, liveCalendarEvents]); // quotes intentionally omitted — new ref every render would cause infinite loop
 
   // Derive Bullish/Bearish/Neutral from the candle-engine biasState string.
   // asset.biasDirection is now a neutral fallback only — the real value is in context.biasState.
@@ -393,7 +407,7 @@ export default function Markets() {
             {filteredPairs.map((asset) => {
               const quote = quotes[asset.symbol];
               const relevantEvents = sortRelevantEvents(
-                calendarEvents.filter((event) => isEventRelevantToSymbol(asset.symbol, event)),
+                activeCalendarEvents.filter((event) => isEventRelevantToSymbol(asset.symbol, event)),
               );
               const highImpactRelevant = relevantEvents.filter((event) => event.impact === "high");
               const isExpanded = !!expandedNews[asset.symbol];
