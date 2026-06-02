@@ -357,14 +357,14 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLoc
         </CardFeatureGate>
       </Card>
 
-      {/* Slippage Placeholder */}
+      {/* Slippage — requires broker data */}
       <Card className="opacity-60">
         <CardHeader>
           <CardTitle className="text-muted-foreground">Average Slippage</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Slippage data will be available once broker connection is enabled.
+            Slippage tracking requires broker execution data and will be available with live broker sync.
           </p>
         </CardContent>
       </Card>

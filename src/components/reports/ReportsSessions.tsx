@@ -68,44 +68,50 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = 
     });
   };
 
-  // Session performance data (placeholder - would need trade timestamps)
-  const sessionData = [
-    { 
-      name: 'London', 
-      winRate: 71, 
-      pnl: 8450, 
-      avgRR: 2.3, 
-      trades: 45,
-      hours: '08:00 - 16:00 GMT'
-    },
-    { 
-      name: 'New York', 
-      winRate: 65, 
-      pnl: 5200, 
-      avgRR: 1.9, 
-      trades: 38,
-      hours: '13:00 - 21:00 GMT'
-    },
-    { 
-      name: 'Asian', 
-      winRate: 58, 
-      pnl: 1850, 
-      avgRR: 1.5, 
-      trades: 22,
-      hours: '00:00 - 08:00 GMT'
-    },
+  // Session classification from real entryTime data
+  const SESSION_DEFS = [
+    { name: 'Asia',        hours: '00:00 – 06:59 UTC', min: 0,  max: 6  },
+    { name: 'London',      hours: '07:00 – 11:59 UTC', min: 7,  max: 11 },
+    { name: 'Overlap',     hours: '12:00 – 15:59 UTC', min: 12, max: 15 },
+    { name: 'New York',    hours: '16:00 – 20:59 UTC', min: 16, max: 20 },
+    { name: 'Sydney/Late', hours: '21:00 – 23:59 UTC', min: 21, max: 23 },
   ];
 
-  const strongest = sessionData.reduce((best, s) => 
-    s.pnl > best.pnl ? s : best, sessionData[0]);
-  const weakest = sessionData.reduce((worst, s) => 
-    s.pnl < worst.pnl ? s : worst, sessionData[0]);
+  const timedTrades = trades.filter(t => t.entryTime);
+  const hasTimeData = timedTrades.length > 0;
+
+  const sessionData = SESSION_DEFS.map(def => {
+    const sessionTrades = timedTrades.filter(t => {
+      const hour = parseInt(t.entryTime!.split(':')[0], 10);
+      return hour >= def.min && hour <= def.max;
+    });
+    const wins = sessionTrades.filter(t => t.pnl > 0);
+    const losses = sessionTrades.filter(t => t.pnl < 0);
+    const pnl = sessionTrades.reduce((sum, t) => sum + t.pnl, 0);
+    const avgWin = wins.length > 0 ? wins.reduce((s, t) => s + t.pnl, 0) / wins.length : 0;
+    const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s, t) => s + t.pnl, 0) / losses.length) : 1;
+    return {
+      name: def.name,
+      hours: def.hours,
+      trades: sessionTrades.length,
+      pnl,
+      winRate: sessionTrades.length > 0 ? Math.round((wins.length / sessionTrades.length) * 100) : 0,
+      avgRR: parseFloat((avgLoss > 0 ? avgWin / avgLoss : 0).toFixed(1)),
+    };
+  }).filter(s => s.trades > 0);
+
+  const strongest = sessionData.length > 0
+    ? sessionData.reduce((best, s) => s.pnl > best.pnl ? s : best, sessionData[0])
+    : null;
+  const weakest = sessionData.length > 0
+    ? sessionData.reduce((worst, s) => s.pnl < worst.pnl ? s : worst, sessionData[0])
+    : null;
 
   const chartData = sessionData.map(s => ({
     name: s.name,
     winRate: s.winRate,
     pnl: s.pnl,
-    avgRR: s.avgRR * 100, // scale for visibility
+    avgRR: s.avgRR * 100,
   }));
 
   return (
@@ -116,54 +122,60 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = 
       </div>
 
       {/* Session Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {sessionData.map((session) => (
-          <Card 
-            key={session.name}
-            className={session.name === strongest.name ? 'border-success/50 bg-success/5' : ''}
-          >
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">{session.name} Session</CardTitle>
-                <div className="flex items-center gap-1.5">
-                  {isLocked && <TierBadge requiredPlan="standard" />}
-                  {session.name === strongest.name && !isLocked && (
-                    <Badge className="bg-success/20 text-success text-xs">Strongest</Badge>
-                  )}
-                  {session.name === weakest.name && !isLocked && (
-                    <Badge variant="destructive" className="text-xs">Weakest</Badge>
-                  )}
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">{session.hours}</p>
-            </CardHeader>
-            <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Win Rate</p>
-                    <p className="text-lg font-bold text-foreground">{session.winRate}%</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Total P&L</p>
-                    <p className={`text-lg font-bold ${session.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                      {session.pnl >= 0 ? '+' : ''}£{session.pnl.toLocaleString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Avg R:R</p>
-                    <p className="text-lg font-bold text-foreground">{session.avgRR}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Trades</p>
-                    <p className="text-lg font-bold text-foreground">{session.trades}</p>
+      {!hasTimeData ? (
+        <p className="text-sm text-muted-foreground py-4 text-center">
+          Add entry times to your trades to see session analysis.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {sessionData.map((session) => (
+            <Card
+              key={session.name}
+              className={session.name === strongest?.name ? 'border-success/50 bg-success/5' : ''}
+            >
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">{session.name} Session</CardTitle>
+                  <div className="flex items-center gap-1.5">
+                    {isLocked && <TierBadge requiredPlan="standard" />}
+                    {session.name === strongest?.name && !isLocked && (
+                      <Badge className="bg-success/20 text-success text-xs">Strongest</Badge>
+                    )}
+                    {session.name === weakest?.name && !isLocked && (
+                      <Badge variant="destructive" className="text-xs">Weakest</Badge>
+                    )}
                   </div>
                 </div>
-              </CardContent>
-            </CardFeatureGate>
-          </Card>
-        ))}
-      </div>
+                <p className="text-xs text-muted-foreground">{session.hours}</p>
+              </CardHeader>
+              <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Win Rate</p>
+                      <p className="text-lg font-bold text-foreground">{session.winRate}%</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total P&L</p>
+                      <p className={`text-lg font-bold ${session.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                        {session.pnl >= 0 ? '+' : ''}£{session.pnl.toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Avg R:R</p>
+                      <p className="text-lg font-bold text-foreground">{session.avgRR}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Trades</p>
+                      <p className="text-lg font-bold text-foreground">{session.trades}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </CardFeatureGate>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Comparison Chart - with per-card pin */}
       <Card>
@@ -260,31 +272,37 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = 
         </CardHeader>
         <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 rounded-lg border-success/30 bg-success/5 border">
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingUp className="h-5 w-5 text-success" />
-                  <p className="text-base font-medium">Recommended to Trade More</p>
+            {!strongest || !weakest ? (
+              <p className="text-sm text-muted-foreground">
+                Add entry times to your trades to see session recommendations.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-lg border-success/30 bg-success/5 border">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="h-5 w-5 text-success" />
+                    <p className="text-base font-medium">Recommended to Trade More</p>
+                  </div>
+                  <p className="text-sm text-foreground font-medium">{strongest.name} Session</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Your highest win rate ({strongest.winRate}%) and best P&L (£{strongest.pnl.toLocaleString()}).
+                    Consider increasing position sizes during this session.
+                  </p>
                 </div>
-                <p className="text-sm text-foreground font-medium">{strongest.name} Session</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Your highest win rate ({strongest.winRate}%) and best P&L (£{strongest.pnl.toLocaleString()}).
-                  Consider increasing position sizes during this session.
-                </p>
-              </div>
 
-              <div className="p-4 rounded-lg border-destructive/30 bg-destructive/5 border">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertCircle className="h-5 w-5 text-destructive" />
-                  <p className="text-base font-medium">Consider Reducing Exposure</p>
+                <div className="p-4 rounded-lg border-destructive/30 bg-destructive/5 border">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle className="h-5 w-5 text-destructive" />
+                    <p className="text-base font-medium">Consider Reducing Exposure</p>
+                  </div>
+                  <p className="text-sm text-foreground font-medium">{weakest.name} Session</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Lowest win rate ({weakest.winRate}%) and P&L (£{weakest.pnl.toLocaleString()}).
+                    Review your setups for this session or reduce size.
+                  </p>
                 </div>
-                <p className="text-sm text-foreground font-medium">{weakest.name} Session</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Lowest win rate ({weakest.winRate}%) and P&L (£{weakest.pnl.toLocaleString()}).
-                  Review your setups for this session or reduce size.
-                </p>
               </div>
-            </div>
+            )}
           </CardContent>
         </CardFeatureGate>
       </Card>

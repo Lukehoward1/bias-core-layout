@@ -127,6 +127,50 @@ export function ReportsPsychology({ trades, dateRangeLabel, pinStates, isLocked 
     return "Keep maintaining trading discipline and documenting your thoughts.";
   };
 
+  // Hold-time analysis from entryTime + exitTime
+  const holdTimeTrades = trades
+    .filter(t => t.entryTime && t.exitTime)
+    .map(t => {
+      const [eh, em] = t.entryTime!.split(':').map(Number);
+      const [xh, xm] = t.exitTime!.split(':').map(Number);
+      const entryMins = eh * 60 + em;
+      let exitMins = xh * 60 + xm;
+      if (exitMins < entryMins) exitMins += 24 * 60; // midnight crossing
+      return { ...t, holdMins: exitMins - entryMins };
+    });
+
+  const hasHoldData = holdTimeTrades.length > 0;
+
+  const holdWinners = holdTimeTrades.filter(t => t.pnl > 0);
+  const holdLosers  = holdTimeTrades.filter(t => t.pnl < 0);
+  const avgHoldWinners = holdWinners.length > 0
+    ? holdWinners.reduce((s, t) => s + t.holdMins, 0) / holdWinners.length
+    : 0;
+  const avgHoldLosers = holdLosers.length > 0
+    ? holdLosers.reduce((s, t) => s + t.holdMins, 0) / holdLosers.length
+    : 0;
+
+  const formatMins = (mins: number) => {
+    if (mins < 60) return `${Math.round(mins)}m`;
+    const h = Math.floor(mins / 60);
+    const m = Math.round(mins % 60);
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  };
+
+  const holdBuckets = [
+    { label: 'Scalp',    desc: '< 60 min', trades: holdTimeTrades.filter(t => t.holdMins < 60) },
+    { label: 'Intraday', desc: '1 – 8 h',  trades: holdTimeTrades.filter(t => t.holdMins >= 60 && t.holdMins <= 480) },
+    { label: 'Swing',    desc: '> 8 h',    trades: holdTimeTrades.filter(t => t.holdMins > 480) },
+  ].map(b => ({
+    label: b.label,
+    desc:  b.desc,
+    count: b.trades.length,
+    pnl:   b.trades.reduce((s, t) => s + t.pnl, 0),
+    winRate: b.trades.length > 0
+      ? Math.round((b.trades.filter(t => t.pnl > 0).length / b.trades.length) * 100)
+      : 0,
+  }));
+
   return (
     <div id="reports-psychology" className="space-y-6">
       {/* Header with export */}
@@ -339,6 +383,64 @@ export function ReportsPsychology({ trades, dateRangeLabel, pinStates, isLocked 
               <p className="text-sm text-muted-foreground">
                 Rate your best trades 4-5 stars to track confident winners.
               </p>
+            )}
+          </CardContent>
+        </CardFeatureGate>
+      </Card>
+
+      {/* Hold-Time Analysis */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Hold-Time Analysis</CardTitle>
+            {isLocked && <TierBadge requiredPlan="standard" />}
+          </div>
+        </CardHeader>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            {!hasHoldData ? (
+              <p className="text-sm text-muted-foreground">
+                Add entry and exit times to your trades to see hold-time analysis.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 rounded-lg bg-success/5 border border-success/20">
+                    <p className="text-xs text-muted-foreground">Avg Hold — Winners</p>
+                    <p className="text-xl font-bold text-success">{formatMins(avgHoldWinners)}</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-destructive/5 border border-destructive/20">
+                    <p className="text-xs text-muted-foreground">Avg Hold — Losers</p>
+                    <p className="text-xl font-bold text-destructive">{formatMins(avgHoldLosers)}</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {holdBuckets.filter(b => b.count > 0).map(b => (
+                    <div key={b.label} className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border">
+                      <div>
+                        <span className="text-sm font-medium">{b.label}</span>
+                        <span className="text-xs text-muted-foreground ml-2">{b.desc}</span>
+                      </div>
+                      <div className="flex items-center gap-4 text-right">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Trades</p>
+                          <p className="text-sm font-medium">{b.count}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Win Rate</p>
+                          <p className="text-sm font-medium">{b.winRate}%</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">P&L</p>
+                          <p className={`text-sm font-medium ${b.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                            {b.pnl >= 0 ? '+' : ''}£{b.pnl.toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </CardContent>
         </CardFeatureGate>
