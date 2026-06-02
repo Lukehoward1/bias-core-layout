@@ -1,11 +1,12 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FlaskConical, Clock, Calendar, TrendingUp, AlertTriangle, Radio, Bell, Zap, Target } from "lucide-react";
 import type { AlertItem } from "@/types/alerts";
 import { useAlertsContext } from "@/contexts/AlertsContext";
-import { calendarEvents } from "@/data/calendarEvents";
+import { calendarEvents, type CalendarEvent } from "@/data/calendarEvents";
+import { getLiveCalendarEvents } from "@/services/calendarService";
 
 interface TestAlertsPanelProps {
   onTriggerAlert: (alert: Omit<AlertItem, "id" | "timestamp" | "read" | "status" | "triggeredAt">) => void;
@@ -14,13 +15,27 @@ interface TestAlertsPanelProps {
 export function TestAlertsPanel({ onTriggerAlert }: TestAlertsPanelProps) {
   const { watchlist } = useAlertsContext();
 
+  const [allEvents, setAllEvents] = useState<CalendarEvent[]>(calendarEvents);
+
+  useEffect(() => {
+    getLiveCalendarEvents()
+      .then((events) => { if (events.length > 0) setAllEvents(events); })
+      .catch(() => {});
+  }, []);
+
   const biasSymbol = useMemo(() => {
     return (watchlist?.[0] || "EURUSD").toUpperCase();
   }, [watchlist]);
 
-  const usCpiEvent = useMemo(() => calendarEvents.find((event) => event.event === "US CPI"), []);
+  const usCpiEvent = useMemo(
+    () => allEvents.find((event) => event.event === "US CPI"),
+    [allEvents],
+  );
 
-  const nfpEvent = useMemo(() => calendarEvents.find((event) => event.event === "Non-Farm Payrolls"), []);
+  const nfpEvent = useMemo(
+    () => allEvents.find((event) => event.event === "Non-Farm Payrolls"),
+    [allEvents],
+  );
 
   const testAlerts: Array<{
     label: string;

@@ -515,6 +515,14 @@ function DashboardWatchlistCard({
     return quotes[normalizeSymbol(symbol)];
   };
 
+  const [calendarSource, setCalendarSource] = useState<CalendarEvent[]>(calendarEvents);
+
+  useEffect(() => {
+    getLiveCalendarEvents()
+      .then((events) => { if (events.length > 0) setCalendarSource(events); })
+      .catch(() => {});
+  }, []);
+
   const [contextMap, setContextMap] = useState<Record<string, MarketContext>>({});
 
   useEffect(() => {
@@ -522,7 +530,7 @@ function DashboardWatchlistCard({
     Promise.all(
       displayAssets.map(async (asset) => {
         const quote = quotes[normalizeSymbol(asset.symbol)];
-        const relevantEvents = calendarEvents.filter((event) => isEventRelevantToSymbol(asset.symbol, event));
+        const relevantEvents = calendarSource.filter((event) => isEventRelevantToSymbol(asset.symbol, event));
         const ctx = await buildMarketContext({ asset, quote, upcomingRelevantEvents: relevantEvents, traderStyle });
         return [asset.symbol, ctx] as const;
       }),
@@ -534,7 +542,7 @@ function DashboardWatchlistCard({
     return () => {
       cancelled = true;
     };
-  }, [displayAssets, traderStyle]); // quotes intentionally omitted — new ref every render would cause infinite loop
+  }, [displayAssets, traderStyle, calendarSource]); // quotes intentionally omitted — new ref every render would cause infinite loop
 
   const getChangeColor = (quote: MarketQuote | undefined, fallbackChange?: string) => {
     if (quote) {

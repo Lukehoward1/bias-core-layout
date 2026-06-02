@@ -234,10 +234,10 @@ export function getNextEventByEventKey(eventKey: string): CalendarEvent | undefi
 }
 
 export function getFilteredKeyEvents(filters: CalendarFilters = {}, limit = 4): CalendarEvent[] {
-  const keyIds = new Set(keyEvents.map((event) => event.id));
+  const keyEventKeys = new Set(keyEvents.map((event) => event.eventKey));
 
   return filterCalendarEvents(
-    calendarEvents.filter((event) => keyIds.has(event.id)),
+    _getSource().filter((event) => keyEventKeys.has(event.eventKey)),
     filters,
   ).slice(0, limit);
 }

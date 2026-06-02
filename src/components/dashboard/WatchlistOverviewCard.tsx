@@ -11,6 +11,7 @@ import { useMarketQuotes } from "@/hooks/use-market-quotes";
 import { getFormattedMarketChange, normalizeSymbol, type MarketQuote } from "@/services/marketData";
 
 import { calendarEvents, type CalendarEvent } from "@/data/calendarEvents";
+import { getLiveCalendarEvents } from "@/services/calendarService";
 import { getEventImpact } from "@/data/eventImpactRules";
 import { buildMarketContext, type MarketContext, type TimeframeState } from "@/services/contextEngine";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
@@ -104,6 +105,14 @@ export function WatchlistOverviewCard({ isEditMode = false }: WatchlistOverviewC
     [isEditMode, navigate, location],
   );
 
+  const [calendarSource, setCalendarSource] = useState<CalendarEvent[]>(calendarEvents);
+
+  useEffect(() => {
+    getLiveCalendarEvents()
+      .then((events) => { if (events.length > 0) setCalendarSource(events); })
+      .catch(() => {});
+  }, []);
+
   const [contextMap, setContextMap] = useState<Record<string, MarketContext>>({});
 
   useEffect(() => {
@@ -111,7 +120,7 @@ export function WatchlistOverviewCard({ isEditMode = false }: WatchlistOverviewC
     Promise.all(
       displayAssets.map(async (asset) => {
         const quote = quotes[normalizeSymbol(asset.symbol)];
-        const relevantEvents = calendarEvents.filter((event) => isEventRelevantToSymbol(asset.symbol, event));
+        const relevantEvents = calendarSource.filter((event) => isEventRelevantToSymbol(asset.symbol, event));
         const ctx = await buildMarketContext({ asset, quote, upcomingRelevantEvents: relevantEvents, traderStyle });
         return [asset.symbol, ctx] as const;
       }),
@@ -123,7 +132,7 @@ export function WatchlistOverviewCard({ isEditMode = false }: WatchlistOverviewC
     return () => {
       cancelled = true;
     };
-  }, [displayAssets, traderStyle]); // quotes intentionally omitted — new ref every render would cause infinite loop
+  }, [displayAssets, traderStyle, calendarSource]); // quotes intentionally omitted — new ref every render would cause infinite loop
 
   // Derive Bullish/Bearish/Neutral from the candle-engine biasState string.
   // asset.biasDirection is now a neutral fallback only — the real value is in context.biasState.
