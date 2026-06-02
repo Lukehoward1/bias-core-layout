@@ -9,6 +9,8 @@ import { useAssets } from "@/hooks/use-watchlist";
 import { useAlertsContext } from "@/contexts/AlertsContext";
 import type { CalendarEvent } from "@/data/calendarEvents";
 import { getEventDateTime, formatCalendarEventDateLabel } from "@/services/calendarData";
+import { getLiveCalendarEvents } from "@/services/calendarService";
+import { HistoricalTrendChart } from "./HistoricalTrendChart";
 
 import {
   TrendingUp,
@@ -21,8 +23,6 @@ import {
   Lightbulb,
   MessageSquare,
   Minus,
-  ChevronLeft,
-  ChevronRight,
   Inbox,
   AlertCircle,
   X,
@@ -36,45 +36,20 @@ interface EventDetailsModalProps {
   openedFromAlert?: boolean;
 }
 
-type HistoricalDataPoint = {
-  month: string;
-  actual: number | null;
-  forecast: number;
-};
+const PERIOD_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-type HistoricalDataByYear = Record<number, HistoricalDataPoint[]>;
+function parseEventValue(s: string | null | undefined): number | null {
+  if (!s || s === "—") return null;
+  const n = parseFloat(s.replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(n) ? n : null;
+}
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-const buildYearData = (eventKey: string, year: number): HistoricalDataPoint[] => {
-  const seed = eventKey.length + year;
-  const baseValues = [185, 225, 165, 253, 281, 209, 187, 227, 246, 212, 198, 238];
-
-  return MONTHS.map((month, index) => {
-    const base = baseValues[index] ?? 200;
-    const forecast = base + ((seed + index) % 9) - 4;
-    const actual =
-      index === new Date().getMonth() && year === new Date().getFullYear()
-        ? null
-        : base + ((seed + index * 2) % 13) - 6;
-
-    return {
-      month,
-      actual,
-      forecast,
-    };
-  });
-};
-
-const getHistoricalDataByYear = (eventKey: string): HistoricalDataByYear => {
-  const currentYear = new Date().getFullYear();
-
-  return {
-    [currentYear - 2]: buildYearData(eventKey, currentYear - 2),
-    [currentYear - 1]: buildYearData(eventKey, currentYear - 1),
-    [currentYear]: buildYearData(eventKey, currentYear),
-  };
-};
+function formatPeriod(dateStr: string): string {
+  const parts = dateStr.split("-");
+  const mm = parseInt(parts[1] ?? "1", 10);
+  const dd = parseInt(parts[2] ?? "1", 10);
+  return `${PERIOD_MONTHS[mm - 1] ?? ""} ${dd}`;
+}
 
 const getMarketInterpretation = (eventName: string, currency: string) => {
   const interpretations: Record<
@@ -184,7 +159,13 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
   const { alerts, recurringSubscriptions, addAlert, scheduleAlert, addRecurringSubscription } = useAlertsContext();
 
   const [alertMode, setAlertMode] = useState<"once" | "event-series">("once");
-  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [liveEvents, setLiveEvents] = useState<CalendarEvent[]>([]);
+
+  useEffect(() => {
+    getLiveCalendarEvents()
+      .then((events) => setLiveEvents(events))
+      .catch(() => {});
+  }, []);
 
   const safeEvent = useMemo<CalendarEvent>(
     () =>
@@ -208,42 +189,17 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
   const isValidEventDate = !Number.isNaN(eventDateTime.getTime());
   const isReleased = safeEvent.actual !== "—" || (isValidEventDate && eventDateTime.getTime() <= Date.now());
 
-  const historicalDataByYear = useMemo(() => getHistoricalDataByYear(safeEvent.eventKey), [safeEvent.eventKey]);
+  const chartData = useMemo(() => {
+    const filtered = liveEvents
+      .filter((e) => e.event === safeEvent.event && e.actual !== "—")
+      .sort((a, b) => a.date.localeCompare(b.date));
 
-  const availableYears = useMemo(() => {
-    return Object.keys(historicalDataByYear)
-      .map(Number)
-      .sort((a, b) => a - b);
-  }, [historicalDataByYear]);
-
-  useEffect(() => {
-    if (availableYears.length === 0) {
-      setSelectedYear(null);
-      return;
-    }
-
-    setSelectedYear((current) => {
-      if (current && availableYears.includes(current)) return current;
-      return availableYears[availableYears.length - 1];
-    });
-  }, [safeEvent.eventKey, availableYears]);
-
-  const historicalData = useMemo(() => {
-    if (!selectedYear) return [];
-    return historicalDataByYear[selectedYear] ?? [];
-  }, [historicalDataByYear, selectedYear]);
-
-  const maxValue = useMemo(() => {
-    return Math.max(...historicalData.map((item) => item.actual || item.forecast || 0), 1);
-  }, [historicalData]);
-
-  const currentYearIndex = useMemo(() => {
-    if (!selectedYear) return -1;
-    return availableYears.findIndex((year) => year === selectedYear);
-  }, [availableYears, selectedYear]);
-
-  const canGoPrevYear = currentYearIndex > 0;
-  const canGoNextYear = currentYearIndex >= 0 && currentYearIndex < availableYears.length - 1;
+    return filtered.map((e) => ({
+      period: formatPeriod(e.date),
+      actual: parseEventValue(e.actual),
+      forecast: parseEventValue(e.forecast) ?? undefined,
+    }));
+  }, [liveEvents, safeEvent.event]);
 
   const interpretation = useMemo(
     () => getMarketInterpretation(safeEvent.event, safeEvent.currency),
@@ -375,16 +331,6 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
     if (bias === "bullish") return "text-success";
     if (bias === "bearish") return "text-destructive";
     return "text-warning";
-  };
-
-  const goToPrevYear = () => {
-    if (!canGoPrevYear || currentYearIndex <= 0) return;
-    setSelectedYear(availableYears[currentYearIndex - 1]);
-  };
-
-  const goToNextYear = () => {
-    if (!canGoNextYear || currentYearIndex < 0) return;
-    setSelectedYear(availableYears[currentYearIndex + 1]);
   };
 
   const goToAsset = useCallback(
@@ -675,83 +621,7 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
               </Card>
             </div>
 
-            <Card className="bg-card border-border">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-primary" />
-                    <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">Historical Trend</h3>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={goToPrevYear}
-                      disabled={!canGoPrevYear}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-
-                    <div className="min-w-[88px] text-center text-sm font-semibold text-foreground">
-                      {selectedYear ?? "—"}
-                    </div>
-
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={goToNextYear}
-                      disabled={!canGoNextYear}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="h-48 flex items-end justify-between gap-3 px-2">
-                  {historicalData.map((item, index) => {
-                    const actualHeight = item.actual ? (item.actual / maxValue) * 100 : 0;
-                    const forecastHeight = (item.forecast / maxValue) * 100;
-                    const isForecastOnly = item.actual === null;
-
-                    return (
-                      <div
-                        key={`${selectedYear}-${item.month}-${index}`}
-                        className="flex-1 flex flex-col items-center gap-2"
-                      >
-                        <div className="w-full h-40 flex items-end justify-center gap-1">
-                          {!isForecastOnly && (
-                            <div
-                              className="w-full max-w-[24px] bg-primary rounded-t transition-all duration-300 hover:bg-primary/80"
-                              style={{ height: `${actualHeight}%` }}
-                              title={`Actual: ${item.actual}`}
-                            />
-                          )}
-
-                          <div
-                            className={`w-full max-w-[24px] rounded-t transition-all duration-300 ${
-                              isForecastOnly
-                                ? "border-2 border-dashed border-muted-foreground bg-muted/30"
-                                : "border-2 border-dashed border-muted-foreground/50 bg-transparent"
-                            }`}
-                            style={{ height: `${forecastHeight}%` }}
-                            title={`Forecast: ${item.forecast}`}
-                          />
-                        </div>
-
-                        <span className="text-xs text-muted-foreground">{item.month}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-4 text-center">
-                  <span className="text-sm font-medium text-muted-foreground">{selectedYear ?? "—"}</span>
-                </div>
-              </CardContent>
-            </Card>
+            <HistoricalTrendChart data={chartData} />
 
             <Card className="bg-card border-border">
               <CardContent className="p-6">

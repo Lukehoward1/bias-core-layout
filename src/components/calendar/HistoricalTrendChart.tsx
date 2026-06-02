@@ -1,36 +1,48 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, Info } from "lucide-react";
 
-// Mock historical data for demo
-const historicalData = [
-  { period: "Jan 23", actual: 185 },
-  { period: "Feb 23", actual: 225 },
-  { period: "Mar 23", actual: 165 },
-  { period: "Apr 23", actual: 253 },
-  { period: "May 23", actual: 281 },
-  { period: "Jun 23", actual: 209 },
-  { period: "Jul 23", actual: 187 },
-  { period: "Aug 23", actual: 227 },
-  { period: "Sep 23", actual: 336 },
-  { period: "Oct 23", actual: 150 },
-  { period: "Nov 23", actual: 199 },
-  { period: "Dec 23", actual: null, forecast: 190 }, // Upcoming with forecast
-];
+export interface ChartDataPoint {
+  period: string;
+  actual: number | null;
+  forecast?: number;
+}
 
-// Calculate max value for scaling
-const maxValue = Math.max(...historicalData.map(d => d.actual || d.forecast || 0));
+interface HistoricalTrendChartProps {
+  data: ChartDataPoint[];
+}
 
-export function HistoricalTrendChart() {
+export function HistoricalTrendChart({ data }: HistoricalTrendChartProps) {
+  const pastPoints = data.filter((d) => d.actual !== null);
+
+  if (pastPoints.length < 2) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            <CardTitle>Historical Trend</CardTitle>
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">Performance trend based on previous releases</p>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <p className="text-sm text-muted-foreground text-center py-8">
+            Not enough historical data to display a trend yet.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const maxValue = Math.max(...data.map((d) => d.actual ?? d.forecast ?? 0), 1);
+
   return (
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center gap-2">
           <TrendingUp className="h-5 w-5 text-primary" />
-          <CardTitle>Historical Trend (demo)</CardTitle>
+          <CardTitle>Historical Trend</CardTitle>
         </div>
-        <p className="text-sm text-muted-foreground mt-1">
-          Annual performance trend based on previous releases (demo)
-        </p>
+        <p className="text-sm text-muted-foreground mt-1">Performance trend based on previous releases</p>
       </CardHeader>
       <CardContent className="pt-4">
         {/* Chart Container - Scrollable on mobile */}
@@ -47,22 +59,21 @@ export function HistoricalTrendChart() {
                 >
                   {percent > 0 && (
                     <span className="absolute -left-1 -translate-x-full text-[10px] text-muted-foreground -translate-y-1/2">
-                      {Math.round((maxValue * percent) / 100)}K
+                      {Math.round((maxValue * percent) / 100)}
                     </span>
                   )}
                 </div>
               ))}
-              
+
               {/* Bars container */}
               <div className="absolute inset-0 flex items-end justify-between gap-2 px-2 pb-0">
-                {historicalData.map((item, index) => {
-                  const value = item.actual || item.forecast || 0;
-                  const heightPercent = (value / maxValue) * 100;
+                {data.map((item, index) => {
+                  const value = item.actual ?? item.forecast ?? 0;
+                  const heightPercent = maxValue > 0 ? (value / maxValue) * 100 : 0;
                   const isForecast = item.actual === null;
-                  
+
                   return (
                     <div key={index} className="flex-1 flex flex-col items-center">
-                      {/* Bar */}
                       <div
                         className={`w-full max-w-[40px] rounded-t transition-all duration-300 ${
                           isForecast
@@ -70,30 +81,30 @@ export function HistoricalTrendChart() {
                             : "bg-primary hover:bg-primary/80"
                         }`}
                         style={{ height: `${heightPercent}%`, minHeight: value > 0 ? "4px" : "0" }}
-                        title={`${item.period}: ${value}K${isForecast ? " (Forecast)" : ""}`}
+                        title={`${item.period}: ${value}${isForecast ? " (Forecast)" : ""}`}
                       />
                     </div>
                   );
                 })}
               </div>
             </div>
-            
+
             {/* X-axis labels */}
             <div className="flex justify-between gap-2 px-2 mt-2">
-              {historicalData.map((item, index) => (
+              {data.map((item, index) => (
                 <div key={index} className="flex-1 text-center">
-                  <span className={`text-[10px] ${item.actual === null ? "text-primary font-medium" : "text-muted-foreground"}`}>
+                  <span
+                    className={`text-[10px] ${item.actual === null ? "text-primary font-medium" : "text-muted-foreground"}`}
+                  >
                     {item.period}
                   </span>
-                  {item.actual === null && (
-                    <div className="text-[8px] text-primary/70 mt-0.5">Forecast</div>
-                  )}
+                  {item.actual === null && <div className="text-[8px] text-primary/70 mt-0.5">Forecast</div>}
                 </div>
               ))}
             </div>
           </div>
         </div>
-        
+
         {/* Legend */}
         <div className="flex items-center gap-4 mt-4 pt-3 border-t border-border/50">
           <div className="flex items-center gap-2">
@@ -102,10 +113,10 @@ export function HistoricalTrendChart() {
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-sm border-2 border-dashed border-primary/60 bg-primary/10" />
-            <span className="text-xs text-muted-foreground">Forecast (demo)</span>
+            <span className="text-xs text-muted-foreground">Forecast</span>
           </div>
         </div>
-        
+
         {/* Interpretation bullets */}
         <div className="mt-4 pt-3 border-t border-border/50">
           <div className="flex items-center gap-1.5 mb-2">
