@@ -1,11 +1,13 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Shield, AlertTriangle, TrendingDown } from "lucide-react";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
+import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 import { cn } from "@/lib/utils";
 
 interface MaxDrawdownGuardProps {
@@ -16,8 +18,7 @@ interface MaxDrawdownGuardProps {
 }
 
 /**
- * ✅ Allow empty numeric inputs (show blank, treat as 0 for calculations)
- * This avoids the "forced 0" look when clearing fields.
+ * Allow empty numeric inputs (show blank, treat as 0 for calculations)
  */
 const parseNumberOrNull = (raw: string): number | null => {
   const t = raw.trim();
@@ -29,27 +30,43 @@ const parseNumberOrNull = (raw: string): number | null => {
 const toNumber = (n: number | null, fallback = 0) => (n === null ? fallback : n);
 
 export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: MaxDrawdownGuardProps) {
+  // ── Account awareness ────────────────────────────────────────────────────
+  const { primaryAccount, isLoading: isAccountLoading } = useLinkedAccounts();
+  const activeAccount = primaryAccount;
+  const currency = activeAccount?.currency ?? "GBP";
+  const currencySymbol = currency === "GBP" ? "£" : "$";
+  const isLinked = activeAccount?.isConnected ?? false;
+  const mode = isLinked ? "Linked" : "Manual";
+
   const [limitType, setLimitType] = useState<"percent" | "cash">("percent");
 
-  // ✅ store as number|null so inputs can be blank
   const [maxDrawdown, setMaxDrawdown] = useState<number | null>(10);
   const [startingBalance, setStartingBalance] = useState<number | null>(10000);
-  const [currentBalance, setCurrentBalance] = useState<number | null>(9400);
+  const [currentBalance, setCurrentBalance] = useState<number | null>(null);
 
-  // Load saved settings
+  // Populate both balances from account once on first load; user edits are sticky after that.
+  // Starting balance defaults to the account's current balance (user adjusts to their period start).
+  const balancesInitRef = useRef(false);
+  useEffect(() => {
+    if (!balancesInitRef.current && activeAccount && !isAccountLoading) {
+      setCurrentBalance(activeAccount.balance);
+      setStartingBalance(activeAccount.balance);
+      balancesInitRef.current = true;
+    }
+  }, [activeAccount, isAccountLoading]);
+
+  // Load saved drawdown setting
   useEffect(() => {
     const saved = localStorage.getItem("maxDrawdownSettings");
     if (saved) {
       const data = JSON.parse(saved);
       setLimitType(data.type || "percent");
-
-      // Persisted values might be undefined/null/strings — normalize safely
       const savedLimit = typeof data.limit === "number" && Number.isFinite(data.limit) ? data.limit : undefined;
       setMaxDrawdown(savedLimit ?? 10);
     }
   }, []);
 
-  // Save settings (only store the drawdown setting like before)
+  // Save drawdown setting
   useEffect(() => {
     localStorage.setItem("maxDrawdownSettings", JSON.stringify({ type: limitType, limit: toNumber(maxDrawdown, 0) }));
   }, [limitType, maxDrawdown]);
@@ -113,7 +130,7 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
           <div className="space-y-1.5">
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>Limit: {results.limitPercent}%</span>
-              <span>${results.remainingCash} left</span>
+              <span>{currencySymbol}{results.remainingCash} left</span>
             </div>
             <Progress value={parseFloat(results.percentOfLimit)} className="h-2" />
           </div>
@@ -126,9 +143,12 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
     <Card className="h-full">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Shield className="h-5 w-5 text-primary" />
             <CardTitle>Max Drawdown Guard</CardTitle>
+            <Badge variant="secondary" className="text-xs font-normal">
+              Mode: {mode}
+            </Badge>
           </div>
           {onAdd && onRemove && <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />}
         </div>
@@ -161,7 +181,9 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
 
             {/* Max Drawdown */}
             <div className="space-y-2">
-              <Label className="text-sm">Max Drawdown {limitType === "percent" ? "(%)" : "($)"}</Label>
+              <Label className="text-sm">
+                Max Drawdown {limitType === "percent" ? "(%)" : `(${currencySymbol})`}
+              </Label>
               <Input
                 type="number"
                 value={maxDrawdown ?? ""}
@@ -174,7 +196,7 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
 
             {/* Starting Balance */}
             <div className="space-y-2">
-              <Label className="text-sm">Starting Balance ($)</Label>
+              <Label className="text-sm">Starting Balance ({currencySymbol})</Label>
               <Input
                 type="number"
                 value={startingBalance ?? ""}
@@ -182,18 +204,20 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
                 className="h-9"
                 placeholder="10000"
               />
-              <p className="text-xs text-muted-foreground">Your account balance at the start of the period</p>
+              <p className="text-xs text-muted-foreground">
+                Your account balance at the start of the period
+              </p>
             </div>
 
             {/* Current Balance */}
             <div className="space-y-2">
-              <Label className="text-sm">Current Balance ($)</Label>
+              <Label className="text-sm">Current Balance ({currencySymbol})</Label>
               <Input
                 type="number"
                 value={currentBalance ?? ""}
                 onChange={(e) => setCurrentBalance(parseNumberOrNull(e.target.value))}
                 className="h-9"
-                placeholder="9400"
+                placeholder="10000"
               />
             </div>
           </div>
@@ -227,7 +251,9 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
                   >
                     {results.drawdownPercent}%
                   </p>
-                  <p className="text-sm text-muted-foreground mt-1">${results.drawdownCash} loss</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {currencySymbol}{results.drawdownCash} loss
+                  </p>
                 </div>
 
                 {/* Progress to Limit */}
@@ -248,7 +274,9 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs text-muted-foreground">Max Limit</p>
-                    <p className="text-lg font-bold text-foreground">${results.limitCash}</p>
+                    <p className="text-lg font-bold text-foreground">
+                      {currencySymbol}{results.limitCash}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Remaining</p>
@@ -258,7 +286,7 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
                         parseFloat(results.remainingCash) <= 0 ? "text-destructive" : "text-success",
                       )}
                     >
-                      ${results.remainingCash}
+                      {currencySymbol}{results.remainingCash}
                     </p>
                   </div>
                 </div>

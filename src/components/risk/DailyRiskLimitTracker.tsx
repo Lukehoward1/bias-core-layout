@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ShieldCheck, AlertTriangle } from "lucide-react";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
+import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
+import { useJournalTrades } from "@/hooks/use-journal-trades";
 import { cn } from "@/lib/utils";
 
 interface DailyRiskLimitTrackerProps {
@@ -16,6 +19,8 @@ interface DailyRiskLimitTrackerProps {
   compact?: boolean;
 }
 
+const MANUAL_TRADES_KEY = "journalManualTrades:v1";
+
 /** Allow empty inputs visually, but treat empty as 0 for maths */
 const toNumberOrZero = (v: string) => {
   if (v.trim() === "") return 0;
@@ -23,13 +28,61 @@ const toNumberOrZero = (v: string) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+/** Read today's realized losses synchronously from localStorage. Avoids async timing issues. */
+function readTodayLossFromStorage(): string {
+  try {
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    const raw = localStorage.getItem(MANUAL_TRADES_KEY);
+    if (!raw) return "0";
+    const stored = JSON.parse(raw) as Array<{ date: string; pnl?: number; status?: string }>;
+    const total = stored
+      .filter((t) => t.date === todayStr && t.status === "closed" && (t.pnl ?? 0) < 0)
+      .reduce((sum, t) => sum + Math.abs(t.pnl ?? 0), 0);
+    return total.toFixed(2);
+  } catch {
+    return "0";
+  }
+}
+
 export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = false }: DailyRiskLimitTrackerProps) {
+  // ── Account awareness ────────────────────────────────────────────────────
+  const { primaryAccount, accounts, isLoading: isAccountLoading } = useLinkedAccounts();
+  const accountIds = useMemo(() => accounts.map((a) => a.id), [accounts]);
+  const { trades } = useJournalTrades(accountIds);
+
+  const activeAccount = primaryAccount;
+  const currency = activeAccount?.currency ?? "GBP";
+  const currencySymbol = currency === "GBP" ? "£" : "$";
+  const isLinked = activeAccount?.isConnected ?? false;
+  const mode = isLinked ? "Linked" : "Manual";
+
   const [limitType, setLimitType] = useState<"percent" | "cash">("percent");
 
-  // ✅ keep inputs as strings so they can be blank
   const [dailyLimitInput, setDailyLimitInput] = useState<string>("5");
   const [accountBalanceInput, setAccountBalanceInput] = useState<string>("10000");
-  const [lossTodayInput, setLossTodayInput] = useState<string>("150");
+  // Initialize today's loss synchronously from localStorage so it's ready on first render
+  const [lossTodayInput, setLossTodayInput] = useState<string>(() => readTodayLossFromStorage());
+
+  // Populate balance from account once on first load; user edits are sticky after that
+  const balanceInitRef = useRef(false);
+  useEffect(() => {
+    if (!balanceInitRef.current && activeAccount && !isAccountLoading) {
+      setAccountBalanceInput(activeAccount.balance.toString());
+      balanceInitRef.current = true;
+    }
+  }, [activeAccount, isAccountLoading]);
+
+  // Refresh today's loss once trades are loaded (covers synced/broker trades not in localStorage)
+  const lossInitRef = useRef(false);
+  useEffect(() => {
+    if (lossInitRef.current || isAccountLoading) return;
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    const total = trades
+      .filter((t) => t.date === todayStr && t.status === "closed" && (t.pnl || 0) < 0)
+      .reduce((sum, t) => sum + Math.abs(t.pnl || 0), 0);
+    setLossTodayInput(total.toFixed(2));
+    lossInitRef.current = true;
+  }, [trades, isAccountLoading]);
 
   // Numeric values for calculations (blank => 0)
   const dailyLimit = useMemo(() => toNumberOrZero(dailyLimitInput), [dailyLimitInput]);
@@ -43,8 +96,6 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
       try {
         const data = JSON.parse(saved);
         setLimitType(data.type === "cash" ? "cash" : "percent");
-
-        // keep as string so user can still blank it later
         const n = Number(data.limit);
         setDailyLimitInput(Number.isFinite(n) ? String(n) : "5");
       } catch {
@@ -101,7 +152,7 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
                   results.isAtLimit ? "text-destructive" : results.isNearLimit ? "text-warning" : "text-success",
                 )}
               >
-                ${results.remaining} left
+                {currencySymbol}{results.remaining} left
               </span>
             </div>
             <Progress value={parseFloat(results.percentUsed)} className="h-2" />
@@ -121,9 +172,12 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
     <Card className="h-full">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <ShieldCheck className="h-5 w-5 text-primary" />
             <CardTitle>Daily Risk Limit Tracker</CardTitle>
+            <Badge variant="secondary" className="text-xs font-normal">
+              Mode: {mode}
+            </Badge>
           </div>
           {onAdd && onRemove && <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />}
         </div>
@@ -157,7 +211,9 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
 
             {/* Daily Limit */}
             <div className="space-y-2">
-              <Label className="text-sm">Daily Loss Limit {limitType === "percent" ? "(%)" : "($)"}</Label>
+              <Label className="text-sm">
+                Daily Loss Limit {limitType === "percent" ? "(%)" : `(${currencySymbol})`}
+              </Label>
               <Input
                 type="number"
                 value={dailyLimitInput}
@@ -171,7 +227,7 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
 
             {/* Account Balance */}
             <div className="space-y-2">
-              <Label className="text-sm">Account Balance ($)</Label>
+              <Label className="text-sm">Account Balance ({currencySymbol})</Label>
               <Input
                 type="number"
                 value={accountBalanceInput}
@@ -184,7 +240,7 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
 
             {/* Today's Loss */}
             <div className="space-y-2">
-              <Label className="text-sm">Today's Loss ($)</Label>
+              <Label className="text-sm">Today's Loss ({currencySymbol})</Label>
               <Input
                 type="number"
                 value={lossTodayInput}
@@ -193,7 +249,9 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
                 placeholder="0"
                 min={0}
               />
-              <p className="text-xs text-muted-foreground">Enter your realized losses for today</p>
+              <p className="text-xs text-muted-foreground">
+                Auto-filled from today's closed trades — edit to override
+              </p>
             </div>
           </div>
 
@@ -221,7 +279,9 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs text-muted-foreground">Daily Limit</p>
-                    <p className="text-lg font-bold text-foreground">${results.limitCash}</p>
+                    <p className="text-lg font-bold text-foreground">
+                      {currencySymbol}{results.limitCash}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Remaining</p>
@@ -231,7 +291,7 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
                         parseFloat(results.remaining) <= 0 ? "text-destructive" : "text-success",
                       )}
                     >
-                      ${results.remaining}
+                      {currencySymbol}{results.remaining}
                     </p>
                   </div>
                 </div>

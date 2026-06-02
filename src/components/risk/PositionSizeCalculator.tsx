@@ -1,12 +1,14 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Ruler } from "lucide-react";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { getFXInstruments, getFuturesInstruments, getInstrumentBySymbol } from "@/data/tradingInstruments";
 import { useMarketQuote } from "@/hooks/use-market-quotes";
+import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 
 interface PositionSizeCalculatorProps {
   isAdded?: boolean;
@@ -45,6 +47,14 @@ const formatPriceNoCommas = (raw: string | number) => {
 };
 
 export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = false }: PositionSizeCalculatorProps) {
+  // ── Account awareness ────────────────────────────────────────────────────
+  const { primaryAccount, isLoading: isAccountLoading } = useLinkedAccounts();
+  const activeAccount = primaryAccount;
+  const currency = activeAccount?.currency ?? "GBP";
+  const currencySymbol = currency === "GBP" ? "£" : "$";
+  const isLinked = activeAccount?.isConnected ?? false;
+  const mode = isLinked ? "Linked" : "Manual";
+
   const [assetCategory, setAssetCategory] = useState<"FX" | "Futures">("FX");
   const [instrument, setInstrument] = useState<string>("EURUSD");
 
@@ -55,6 +65,15 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
   const [takeProfitInput, setTakeProfitInput] = useState<string>("1.0910");
 
   const [hasManualEntryEdit, setHasManualEntryEdit] = useState<boolean>(false);
+
+  // Populate balance from account once on first load; user edits are sticky after that
+  const balanceInitRef = useRef(false);
+  useEffect(() => {
+    if (!balanceInitRef.current && activeAccount && !isAccountLoading) {
+      setAccountBalanceInput(activeAccount.balance.toString());
+      balanceInitRef.current = true;
+    }
+  }, [activeAccount, isAccountLoading]);
 
   const instruments = useMemo(() => {
     return assetCategory === "FX" ? getFXInstruments() : getFuturesInstruments();
@@ -186,9 +205,12 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
     <Card className="h-full">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Ruler className="h-5 w-5 text-primary" />
             <CardTitle>Position Size Calculator</CardTitle>
+            <Badge variant="secondary" className="text-xs font-normal">
+              Mode: {mode}
+            </Badge>
           </div>
           {onAdd && onRemove && <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />}
         </div>
@@ -240,7 +262,7 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm">Account Size (£)</Label>
+              <Label className="text-sm">Account Size ({currencySymbol})</Label>
               <Input
                 type="number"
                 value={accountBalanceInput}
@@ -329,12 +351,16 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
 
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Risk Amount</span>
-                  <span className="text-lg font-bold text-destructive">£{results.riskAmount}</span>
+                  <span className="text-lg font-bold text-destructive">
+                    {currencySymbol}{results.riskAmount}
+                  </span>
                 </div>
 
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Reward Amount</span>
-                  <span className="text-lg font-bold text-success">£{results.rewardAmount}</span>
+                  <span className="text-lg font-bold text-success">
+                    {currencySymbol}{results.rewardAmount}
+                  </span>
                 </div>
 
                 <div className="flex justify-between items-center pt-3 border-t border-border">
@@ -392,7 +418,9 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
                     <span className="text-muted-foreground">
                       {currentInstrument.type === "Futures" ? "Tick Value" : "Pip Value"}
                     </span>
-                    <p className="font-medium text-foreground">£{currentInstrument.pipValue.toFixed(2)}</p>
+                    <p className="font-medium text-foreground">
+                      {currencySymbol}{currentInstrument.pipValue.toFixed(2)}
+                    </p>
                   </div>
                   <div>
                     <span className="text-muted-foreground">
