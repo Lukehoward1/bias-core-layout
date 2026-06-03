@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CourseDetailModal } from "@/components/education/CourseDetailModal";
 import { CertificateModal } from "@/components/education/CertificateModal";
+import { EducationContentModal } from "@/components/education/EducationContentModal";
 import { useEducationProgress } from "@/hooks/use-education-progress";
 import { generateCertificatePdf } from "@/lib/generateCertificatePdf";
 import { toast } from "@/hooks/use-toast";
+import { articles, tips } from "@/data/educationContent";
 import {
   Clock,
   BookOpen,
@@ -23,6 +25,9 @@ import {
   ChevronRight,
   Check,
 } from "lucide-react";
+
+// Set to true to re-enable the Courses section in the landing menu
+const SHOW_COURSES = false;
 
 // Types
 interface Lesson {
@@ -46,19 +51,20 @@ interface Course {
   lessons: Lesson[];
 }
 
-interface QuickResource {
-  id: string;
-  title: string;
-  description: string;
-  readTime: string;
-  tags: string[];
-}
-
 interface Certificate {
   id: string;
   courseName: string;
   completedDate: string;
 }
+
+type ContentModalPayload = {
+  title: string;
+  type: "article" | "tip" | "resource";
+  level?: "Beginner" | "Intermediate" | "Advanced";
+  readTime?: string;
+  tags?: string[];
+  content: string;
+};
 
 // Demo data
 const courses: Course[] = [
@@ -188,68 +194,6 @@ const courses: Course[] = [
   },
 ];
 
-const articles: QuickResource[] = [
-  {
-    id: "a1",
-    title: "Understanding Market Structure",
-    description: "The foundation of all technical analysis.",
-    readTime: "6 min",
-    tags: ["Technical", "Beginner"],
-  },
-  {
-    id: "a2",
-    title: "The Psychology of Drawdowns",
-    description: "How to navigate losing streaks.",
-    readTime: "8 min",
-    tags: ["Psychology"],
-  },
-  {
-    id: "a3",
-    title: "Session Trading 101",
-    description: "Maximize the London-NY overlap.",
-    readTime: "5 min",
-    tags: ["Strategy"],
-  },
-  {
-    id: "a4",
-    title: "Order Flow Basics",
-    description: "Reading institutional footprints.",
-    readTime: "10 min",
-    tags: ["Advanced"],
-  },
-];
-
-const tips: QuickResource[] = [
-  {
-    id: "t1",
-    title: "Always set your stop loss first",
-    description: "Define risk before profit.",
-    readTime: "1 min",
-    tags: ["Risk"],
-  },
-  {
-    id: "t2",
-    title: "Wait for candle close",
-    description: "A wick can become a body.",
-    readTime: "1 min",
-    tags: ["Execution"],
-  },
-  {
-    id: "t3",
-    title: "Trade the overlap",
-    description: "Best liquidity 8-12 EST.",
-    readTime: "1 min",
-    tags: ["Sessions"],
-  },
-  {
-    id: "t4",
-    title: "Journal every trade",
-    description: "Review to improve.",
-    readTime: "1 min",
-    tags: ["Psychology"],
-  },
-];
-
 const demoCertificates: Certificate[] = [
   { id: "c1", courseName: "Advanced Price Action", completedDate: "Nov 28, 2024" },
   { id: "c2", courseName: "Session Trading Strategies", completedDate: "Nov 15, 2024" },
@@ -259,10 +203,11 @@ const demoCertificates: Certificate[] = [
 type ViewMode = "landing" | "courses" | "articles" | "tips";
 
 export default function Education() {
-  const [viewMode, setViewMode] = useState<ViewMode>("tips");
+  const [viewMode, setViewMode] = useState<ViewMode>("articles");
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [certificateCourse, setCertificateCourse] = useState<Course | null>(null);
+  const [selectedContent, setSelectedContent] = useState<ContentModalPayload | null>(null);
 
   const { getCourseProgress, requestCertificate, issueCertificate } = useEducationProgress();
 
@@ -362,26 +307,32 @@ export default function Education() {
             </div>
 
             {/* Category Cards Grid */}
-            <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-              {/* Courses */}
-              <Card
-                className="bg-card border-border hover:border-primary/50 transition-all duration-200 cursor-pointer group"
-                onClick={() => setViewMode("courses")}
-              >
-                <CardContent className="p-6 sm:p-8 flex flex-col items-center text-center">
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 sm:mb-6 group-hover:bg-primary/20 group-hover:scale-105 transition-all">
-                    <GraduationCap className="h-7 w-7 sm:h-8 sm:w-8 text-primary" />
-                  </div>
-                  <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-2">Courses</h2>
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-6 leading-relaxed">
-                    Full learning programs with tracked progress and certificates.
-                  </p>
-                  <Button className="w-full group-hover:bg-primary/90 text-sm">
-                    Browse Courses
-                    <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </CardContent>
-              </Card>
+            <div
+              className={`max-w-7xl mx-auto grid grid-cols-1 gap-4 sm:gap-6 ${
+                SHOW_COURSES ? "md:grid-cols-3" : "md:grid-cols-2"
+              }`}
+            >
+              {/* Courses — hidden until SHOW_COURSES = true */}
+              {SHOW_COURSES && (
+                <Card
+                  className="bg-card border-border hover:border-primary/50 transition-all duration-200 cursor-pointer group"
+                  onClick={() => setViewMode("courses")}
+                >
+                  <CardContent className="p-6 sm:p-8 flex flex-col items-center text-center">
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 sm:mb-6 group-hover:bg-primary/20 group-hover:scale-105 transition-all">
+                      <GraduationCap className="h-7 w-7 sm:h-8 sm:w-8 text-primary" />
+                    </div>
+                    <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-2">Courses</h2>
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-6 leading-relaxed">
+                      Full learning programs with tracked progress and certificates.
+                    </p>
+                    <Button className="w-full group-hover:bg-primary/90 text-sm">
+                      Browse Courses
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Articles & Guides */}
               <Card
@@ -429,7 +380,7 @@ export default function Education() {
     );
   }
 
-  // Courses View
+  // Courses View (kept intact — re-enable via SHOW_COURSES = true)
   if (viewMode === "courses") {
     return (
       <div className="flex-1 overflow-y-auto bg-background">
@@ -638,6 +589,16 @@ export default function Education() {
                 <Card
                   key={article.id}
                   className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group flex flex-col"
+                  onClick={() =>
+                    setSelectedContent({
+                      title: article.title,
+                      type: "article",
+                      level: article.level,
+                      readTime: article.readTime,
+                      tags: article.tags,
+                      content: article.content,
+                    })
+                  }
                 >
                   <CardContent className="p-4 flex flex-col flex-1">
                     <h3 className="font-medium text-foreground group-hover:text-primary transition-colors mb-1 text-sm sm:text-base">
@@ -648,7 +609,10 @@ export default function Education() {
                     <div className="flex-1" />
 
                     <div className="flex items-center justify-between pt-3 border-t border-border/50">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Badge variant="outline" className={`text-[10px] ${getLevelColor(article.level)}`}>
+                          {article.level}
+                        </Badge>
                         <Badge variant="secondary" className="text-[10px] gap-1">
                           <Clock className="h-3 w-3" />
                           {article.readTime} read
@@ -659,7 +623,12 @@ export default function Education() {
                           </Badge>
                         ))}
                       </div>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-primary shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <Bookmark className="h-4 w-4" />
                       </Button>
                     </div>
@@ -669,6 +638,12 @@ export default function Education() {
             </div>
           </div>
         </div>
+
+        <EducationContentModal
+          isOpen={!!selectedContent}
+          onClose={() => setSelectedContent(null)}
+          content={selectedContent}
+        />
       </div>
     );
   }
@@ -681,11 +656,22 @@ export default function Education() {
           <AppHeader title="Education" />
 
           <div className="p-4 sm:p-6">
-            <div className="mb-6">
-              <h1 className="text-xl sm:text-2xl font-bold text-foreground">Tips & Insights</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground">
-                Quick execution and improvement techniques for serious traders.
-              </p>
+            <div className="flex items-center gap-4 mb-6">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewMode("landing")}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back
+              </Button>
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-foreground">Tips & Insights</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Quick execution and improvement techniques for serious traders.
+                </p>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -693,6 +679,16 @@ export default function Education() {
                 <Card
                   key={tip.id}
                   className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group flex flex-col"
+                  onClick={() =>
+                    setSelectedContent({
+                      title: tip.title,
+                      type: "tip",
+                      level: "Beginner",
+                      readTime: tip.readTime,
+                      tags: tip.tags,
+                      content: tip.content,
+                    })
+                  }
                 >
                   <CardContent className="p-4 flex flex-col flex-1">
                     <h3 className="font-medium text-foreground group-hover:text-primary transition-colors mb-1 text-sm sm:text-base">
@@ -703,6 +699,10 @@ export default function Education() {
                     <div className="flex-1" />
 
                     <div className="flex items-center gap-2 pt-3 border-t border-border/50">
+                      <Badge variant="secondary" className="text-[10px] gap-1">
+                        <Clock className="h-3 w-3" />
+                        {tip.readTime} read
+                      </Badge>
                       {tip.tags.map((tag) => (
                         <Badge key={tag} variant="secondary" className="text-[10px]">
                           {tag}
@@ -715,6 +715,12 @@ export default function Education() {
             </div>
           </div>
         </div>
+
+        <EducationContentModal
+          isOpen={!!selectedContent}
+          onClose={() => setSelectedContent(null)}
+          content={selectedContent}
+        />
       </div>
     );
   }
