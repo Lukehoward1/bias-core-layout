@@ -5,7 +5,8 @@ import {
   Bell,
   Calculator,
   BookOpen,
-  GraduationCap,
+  FileText,
+  Lightbulb,
   Settings,
   CreditCard,
   Moon,
@@ -34,7 +35,10 @@ const mainItems: Item[] = [
   { title: "Journal", url: "/journal", icon: BookOpen },
 ];
 
-const learningItems: Item[] = [{ title: "Education", url: "/education", icon: GraduationCap }];
+const learningItems: Item[] = [
+  { title: "Guides", url: "/education", icon: FileText },
+  { title: "Trading Tips", url: "/education?view=tips", icon: Lightbulb },
+];
 
 const accountItems: Item[] = [
   { title: "Settings", url: "/settings", icon: Settings },
@@ -87,7 +91,21 @@ export function AppSidebar() {
 
       <div className="space-y-0.5">
         {items.map((item) => {
-          const isActive = currentPath === item.url || (item.url !== "/" && currentPath.startsWith(item.url));
+          const isActive = (() => {
+            if (item.url.includes('?')) {
+              // Item URL has query params — match both path and those params
+              const [path, qs] = item.url.split('?');
+              if (currentPath !== path) return false;
+              const needed = new URLSearchParams(qs);
+              const actual = new URLSearchParams(location.search);
+              let ok = true;
+              needed.forEach((v, k) => { if (actual.get(k) !== v) ok = false; });
+              return ok;
+            }
+            // Plain path item — skip if a more-specific (query-param) sibling already matches
+            if (location.search && currentPath === item.url) return false;
+            return currentPath === item.url || (item.url !== "/" && currentPath.startsWith(item.url));
+          })();
           const Icon = item.icon;
 
           const btn = (

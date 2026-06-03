@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,16 +18,12 @@ import {
   Award,
   FileText,
   Video,
-  GraduationCap,
   Bookmark,
   Layers,
-  Lightbulb,
-  ArrowLeft,
-  ChevronRight,
   Check,
 } from "lucide-react";
 
-// Set to true to re-enable the Courses section in the landing menu
+// Set to true to re-enable the Courses section (wire ?view=courses in the sidebar)
 const SHOW_COURSES = false;
 
 // Types
@@ -66,7 +63,7 @@ type ContentModalPayload = {
   content: string;
 };
 
-// Demo data
+// Course data — kept for when SHOW_COURSES is re-enabled
 const courses: Course[] = [
   {
     id: "1",
@@ -200,17 +197,18 @@ const demoCertificates: Certificate[] = [
   { id: "c3", courseName: "Algorithmic Trading Basics", completedDate: "Oct 22, 2024" },
 ];
 
-type ViewMode = "landing" | "courses" | "articles" | "tips";
-
 export default function Education() {
-  const [viewMode, setViewMode] = useState<ViewMode>("articles");
+  const [searchParams] = useSearchParams();
+  const showTips = searchParams.get("view") === "tips";
+
+  const [selectedContent, setSelectedContent] = useState<ContentModalPayload | null>(null);
+
+  // Course-related state — kept for when SHOW_COURSES is re-enabled
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [certificateCourse, setCertificateCourse] = useState<Course | null>(null);
-  const [selectedContent, setSelectedContent] = useState<ContentModalPayload | null>(null);
 
   const { getCourseProgress, requestCertificate, issueCertificate } = useEducationProgress();
-
   const studentName = "John Doe";
 
   const getLevelColor = (level: string) => {
@@ -239,9 +237,8 @@ export default function Education() {
     }
   };
 
-  const handleCourseClick = (course: Course) => {
-    setSelectedCourse(course);
-  };
+  // Course handlers — kept for when SHOW_COURSES is re-enabled
+  const handleCourseClick = (course: Course) => setSelectedCourse(course);
 
   const handleViewCertificate = () => {
     if (selectedCourse) {
@@ -254,10 +251,7 @@ export default function Education() {
   const handleRequestCertificate = () => {
     if (certificateCourse) {
       requestCertificate(certificateCourse.id);
-      toast({
-        title: "Certificate Requested",
-        description: "Your certificate request has been submitted.",
-      });
+      toast({ title: "Certificate Requested", description: "Your certificate request has been submitted." });
     }
   };
 
@@ -271,407 +265,30 @@ export default function Education() {
           completedAt: courseProgress?.completedAt || new Date().toISOString(),
         });
         issueCertificate(certificateCourse.id);
-        toast({
-          title: "Certificate Downloaded",
-          description: "Your certificate PDF has been generated.",
-        });
+        toast({ title: "Certificate Downloaded", description: "Your certificate PDF has been generated." });
       } catch {
-        toast({
-          title: "Error",
-          description: "Failed to generate certificate.",
-          variant: "destructive",
-        });
+        toast({ title: "Error", description: "Failed to generate certificate.", variant: "destructive" });
       }
     }
   };
 
   const getCompletedLessonsForCourse = (courseId: string) => {
-    const courseProgress = getCourseProgress(courseId);
-    return courseProgress?.completedLessons || [];
+    return getCourseProgress(courseId)?.completedLessons || [];
   };
 
-  // Landing Page View
-  if (viewMode === "landing") {
+  // ── Trading Tips view ────────────────────────────────────────────────────────
+  if (showTips) {
     return (
       <div className="flex-1 overflow-y-auto bg-background">
         <div className="flex flex-col min-h-0">
-          <AppHeader title="Education" />
+          <AppHeader title="Trading Tips" />
 
           <div className="p-4 sm:p-6">
-            {/* Page Header - Centered */}
-            <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-16 pt-4 sm:pt-8">
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-3">Education</h1>
-              <p className="text-muted-foreground text-base sm:text-lg">
-                Curated training for serious traders – strategies, risk, and psychology.
+            <div className="mb-6">
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">Trading Tips</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                Quick execution and improvement techniques for serious traders.
               </p>
-            </div>
-
-            {/* Category Cards Grid */}
-            <div
-              className={`max-w-7xl mx-auto grid grid-cols-1 gap-4 sm:gap-6 ${
-                SHOW_COURSES ? "md:grid-cols-3" : "md:grid-cols-2"
-              }`}
-            >
-              {/* Courses — hidden until SHOW_COURSES = true */}
-              {SHOW_COURSES && (
-                <Card
-                  className="bg-card border-border hover:border-primary/50 transition-all duration-200 cursor-pointer group"
-                  onClick={() => setViewMode("courses")}
-                >
-                  <CardContent className="p-6 sm:p-8 flex flex-col items-center text-center">
-                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 sm:mb-6 group-hover:bg-primary/20 group-hover:scale-105 transition-all">
-                      <GraduationCap className="h-7 w-7 sm:h-8 sm:w-8 text-primary" />
-                    </div>
-                    <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-2">Courses</h2>
-                    <p className="text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-6 leading-relaxed">
-                      Full learning programs with tracked progress and certificates.
-                    </p>
-                    <Button className="w-full group-hover:bg-primary/90 text-sm">
-                      Browse Courses
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Articles & Guides */}
-              <Card
-                className="bg-card border-border hover:border-primary/50 transition-all duration-200 cursor-pointer group"
-                onClick={() => setViewMode("articles")}
-              >
-                <CardContent className="p-6 sm:p-8 flex flex-col items-center text-center">
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 sm:mb-6 group-hover:bg-primary/20 group-hover:scale-105 transition-all">
-                    <FileText className="h-7 w-7 sm:h-8 sm:w-8 text-primary" />
-                  </div>
-                  <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-2">Articles & Guides</h2>
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-6 leading-relaxed">
-                    Short-form breakdowns of market concepts, psychology and strategies.
-                  </p>
-                  <Button className="w-full group-hover:bg-primary/90 text-sm">
-                    Browse Articles
-                    <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Trading Tips */}
-              <Card
-                className="bg-card border-border hover:border-primary/50 transition-all duration-200 cursor-pointer group"
-                onClick={() => setViewMode("tips")}
-              >
-                <CardContent className="p-6 sm:p-8 flex flex-col items-center text-center">
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 sm:mb-6 group-hover:bg-primary/20 group-hover:scale-105 transition-all">
-                    <Lightbulb className="h-7 w-7 sm:h-8 sm:w-8 text-primary" />
-                  </div>
-                  <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-2">Trading Tips</h2>
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-6 leading-relaxed">
-                    Quick execution and improvement techniques for serious traders.
-                  </p>
-                  <Button className="w-full group-hover:bg-primary/90 text-sm">
-                    Browse Tips
-                    <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Courses View (kept intact — re-enable via SHOW_COURSES = true)
-  if (viewMode === "courses") {
-    return (
-      <div className="flex-1 overflow-y-auto bg-background">
-        <div className="flex flex-col min-h-0">
-          <AppHeader title="Education" />
-
-          <div className="p-4 sm:p-6">
-            {/* Back Button & Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-              <div className="flex items-center gap-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setViewMode("landing")}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <ArrowLeft className="h-4 w-4 mr-1" />
-                  Back
-                </Button>
-                <div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-foreground">Structured Courses</h1>
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    Deep-dive programs with progress tracking & certificates.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Courses Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {courses.map((course) => (
-                <Card
-                  key={course.id}
-                  className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group flex flex-col"
-                  onClick={() => handleCourseClick(course)}
-                >
-                  <CardContent className="p-4 flex flex-col flex-1">
-                    <h3 className="font-medium text-foreground group-hover:text-primary transition-colors mb-1 text-sm sm:text-base">
-                      {course.title}
-                    </h3>
-                    <p className="text-xs sm:text-sm text-muted-foreground mb-3 line-clamp-2">{course.description}</p>
-
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <Badge variant="outline" className={`text-[10px] ${getLevelColor(course.level)}`}>
-                        {course.level}
-                      </Badge>
-                      <Badge variant="secondary" className="text-[10px] gap-1">
-                        {getFormatIcon(course.format)}
-                        {course.format}
-                      </Badge>
-                      <Badge variant="secondary" className="text-[10px] gap-1">
-                        <Clock className="h-3 w-3" />
-                        {course.duration}
-                      </Badge>
-                      <Badge variant="secondary" className="text-[10px] gap-1">
-                        <BookOpen className="h-3 w-3" />
-                        {course.lessonsCount} lessons
-                      </Badge>
-                      {course.hasCertificate && (
-                        <Badge variant="secondary" className="text-[10px] gap-1 text-primary border-primary/30">
-                          <Award className="h-3 w-3" />
-                          Certificate
-                        </Badge>
-                      )}
-                    </div>
-
-                    <div className="flex-1" />
-
-                    {course.progressPercent > 0 && (
-                      <div className="flex items-center justify-between pt-3 mt-3 border-t border-border/50">
-                        <div className="flex items-center gap-2 flex-1 mr-3">
-                          <span
-                            className={`text-[10px] sm:text-xs flex items-center gap-1 ${
-                              course.progressPercent === 100 ? "text-success" : "text-muted-foreground"
-                            }`}
-                          >
-                            {course.progressPercent === 100 && <Check className="h-3 w-3" />}
-                            {course.progressPercent === 100 ? "Completed" : `In progress – ${course.progressPercent}%`}
-                          </span>
-                          <Progress value={course.progressPercent} className="h-1 flex-1 max-w-24" />
-                        </div>
-                        <Button
-                          size="sm"
-                          className="text-xs h-7"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCourseClick(course);
-                          }}
-                        >
-                          {course.progressPercent === 100 ? "Review" : "Continue"}
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {/* Certificates Section */}
-            {demoCertificates.length > 0 && (
-              <div className="mt-8 pt-6 border-t border-border/50">
-                <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-                  <Award className="h-4 w-4" />
-                  Your Certificates
-                </h3>
-                <div className="flex flex-wrap gap-3">
-                  {demoCertificates.map((cert) => (
-                    <div
-                      key={cert.id}
-                      className="flex items-center gap-3 px-3 py-2 bg-card/50 border border-border/50 rounded-lg"
-                    >
-                      <Award className="h-4 w-4 text-primary" />
-                      <div>
-                        <p className="text-xs sm:text-sm font-medium text-foreground">{cert.courseName}</p>
-                        <p className="text-[10px] sm:text-xs text-muted-foreground">{cert.completedDate}</p>
-                      </div>
-                      <Button variant="ghost" size="sm" className="text-xs h-7">
-                        Download
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Course Detail Modal */}
-          <CourseDetailModal
-            isOpen={!!selectedCourse}
-            onClose={() => setSelectedCourse(null)}
-            course={
-              selectedCourse
-                ? { ...selectedCourse, type: "course" as const }
-                : {
-                    id: "",
-                    title: "",
-                    description: "",
-                    duration: "",
-                    level: "Beginner" as const,
-                    type: "course" as const,
-                    lessons: [],
-                  }
-            }
-            completedLessons={selectedCourse ? getCompletedLessonsForCourse(selectedCourse.id) : []}
-            isCompleted={selectedCourse?.progress === "completed"}
-            onToggleLesson={() => {}}
-            onViewCertificate={handleViewCertificate}
-          />
-
-          {/* Certificate Modal */}
-          <CertificateModal
-            isOpen={showCertificateModal && !!certificateCourse}
-            onClose={() => {
-              setShowCertificateModal(false);
-              setCertificateCourse(null);
-            }}
-            courseName={certificateCourse?.title || ""}
-            studentName={studentName}
-            completedAt={
-              certificateCourse
-                ? getCourseProgress(certificateCourse.id)?.completedAt || new Date().toISOString()
-                : new Date().toISOString()
-            }
-            certificateRequested={
-              certificateCourse ? getCourseProgress(certificateCourse.id)?.certificateRequested || false : false
-            }
-            certificateIssued={
-              certificateCourse ? getCourseProgress(certificateCourse.id)?.certificateIssued || false : false
-            }
-            onRequestCertificate={handleRequestCertificate}
-            onGeneratePdf={handleGeneratePdf}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // Articles View
-  if (viewMode === "articles") {
-    return (
-      <div className="flex-1 overflow-y-auto bg-background">
-        <div className="flex flex-col min-h-0">
-          <AppHeader title="Education" />
-
-          <div className="p-4 sm:p-6">
-            <div className="flex items-center gap-4 mb-6">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setViewMode("landing")}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back
-              </Button>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-foreground">Articles & Guides</h1>
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  Short-form breakdowns of market concepts, psychology and platform usage.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {articles.map((article) => (
-                <Card
-                  key={article.id}
-                  className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group flex flex-col"
-                  onClick={() =>
-                    setSelectedContent({
-                      title: article.title,
-                      type: "article",
-                      level: article.level,
-                      readTime: article.readTime,
-                      tags: article.tags,
-                      content: article.content,
-                    })
-                  }
-                >
-                  <CardContent className="p-4 flex flex-col flex-1">
-                    <h3 className="font-medium text-foreground group-hover:text-primary transition-colors mb-1 text-sm sm:text-base">
-                      {article.title}
-                    </h3>
-                    <p className="text-xs sm:text-sm text-muted-foreground mb-3 line-clamp-2">{article.description}</p>
-
-                    <div className="flex-1" />
-
-                    <div className="flex items-center justify-between pt-3 border-t border-border/50">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <Badge variant="outline" className={`text-[10px] ${getLevelColor(article.level)}`}>
-                          {article.level}
-                        </Badge>
-                        <Badge variant="secondary" className="text-[10px] gap-1">
-                          <Clock className="h-3 w-3" />
-                          {article.readTime} read
-                        </Badge>
-                        {article.tags.map((tag) => (
-                          <Badge key={tag} variant="secondary" className="text-[10px]">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-primary shrink-0"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Bookmark className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <EducationContentModal
-          isOpen={!!selectedContent}
-          onClose={() => setSelectedContent(null)}
-          content={selectedContent}
-        />
-      </div>
-    );
-  }
-
-  // Tips View
-  if (viewMode === "tips") {
-    return (
-      <div className="flex-1 overflow-y-auto bg-background">
-        <div className="flex flex-col min-h-0">
-          <AppHeader title="Education" />
-
-          <div className="p-4 sm:p-6">
-            <div className="flex items-center gap-4 mb-6">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setViewMode("landing")}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back
-              </Button>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-foreground">Tips & Insights</h1>
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  Quick execution and improvement techniques for serious traders.
-                </p>
-              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -698,7 +315,7 @@ export default function Education() {
 
                     <div className="flex-1" />
 
-                    <div className="flex items-center gap-2 pt-3 border-t border-border/50">
+                    <div className="flex flex-wrap items-center gap-1.5 pt-3 border-t border-border/50">
                       <Badge variant="secondary" className="text-[10px] gap-1">
                         <Clock className="h-3 w-3" />
                         {tip.readTime} read
@@ -725,5 +342,121 @@ export default function Education() {
     );
   }
 
-  return null;
+  // ── Guides view (default) ────────────────────────────────────────────────────
+  return (
+    <div className="flex-1 overflow-y-auto bg-background">
+      <div className="flex flex-col min-h-0">
+        <AppHeader title="Guides" />
+
+        <div className="p-4 sm:p-6">
+          <div className="mb-6">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">Guides</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Short-form breakdowns of market concepts, psychology and platform usage.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {articles.map((article) => (
+              <Card
+                key={article.id}
+                className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group flex flex-col"
+                onClick={() =>
+                  setSelectedContent({
+                    title: article.title,
+                    type: "article",
+                    level: article.level,
+                    readTime: article.readTime,
+                    tags: article.tags,
+                    content: article.content,
+                  })
+                }
+              >
+                <CardContent className="p-4 flex flex-col flex-1">
+                  <h3 className="font-medium text-foreground group-hover:text-primary transition-colors mb-1 text-sm sm:text-base">
+                    {article.title}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-3 line-clamp-2">{article.description}</p>
+
+                  <div className="flex-1" />
+
+                  <div className="flex items-center justify-between pt-3 border-t border-border/50">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge variant="outline" className={`text-[10px] ${getLevelColor(article.level)}`}>
+                        {article.level}
+                      </Badge>
+                      <Badge variant="secondary" className="text-[10px] gap-1">
+                        <Clock className="h-3 w-3" />
+                        {article.readTime} read
+                      </Badge>
+                      {article.tags.map((tag) => (
+                        <Badge key={tag} variant="secondary" className="text-[10px]">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-primary shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Bookmark className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <EducationContentModal
+        isOpen={!!selectedContent}
+        onClose={() => setSelectedContent(null)}
+        content={selectedContent}
+      />
+
+      {/* Course modals — kept for when SHOW_COURSES is re-enabled */}
+      {SHOW_COURSES && (
+        <>
+          <CourseDetailModal
+            isOpen={!!selectedCourse}
+            onClose={() => setSelectedCourse(null)}
+            course={
+              selectedCourse
+                ? { ...selectedCourse, type: "course" as const }
+                : { id: "", title: "", description: "", duration: "", level: "Beginner" as const, type: "course" as const, lessons: [] }
+            }
+            completedLessons={selectedCourse ? getCompletedLessonsForCourse(selectedCourse.id) : []}
+            isCompleted={selectedCourse?.progress === "completed"}
+            onToggleLesson={() => {}}
+            onViewCertificate={handleViewCertificate}
+          />
+          <CertificateModal
+            isOpen={showCertificateModal && !!certificateCourse}
+            onClose={() => { setShowCertificateModal(false); setCertificateCourse(null); }}
+            courseName={certificateCourse?.title || ""}
+            studentName={studentName}
+            completedAt={
+              certificateCourse
+                ? getCourseProgress(certificateCourse.id)?.completedAt || new Date().toISOString()
+                : new Date().toISOString()
+            }
+            certificateRequested={certificateCourse ? getCourseProgress(certificateCourse.id)?.certificateRequested || false : false}
+            certificateIssued={certificateCourse ? getCourseProgress(certificateCourse.id)?.certificateIssued || false : false}
+            onRequestCertificate={handleRequestCertificate}
+            onGeneratePdf={handleGeneratePdf}
+          />
+        </>
+      )}
+
+      {/* Suppress unused-variable warnings for course data kept for future re-enable */}
+      {SHOW_COURSES && courses.length > 0 && demoCertificates.length > 0 && (
+        courses.map(c => (
+          <button key={c.id} type="button" style={{ display: 'none' }} onClick={() => handleCourseClick(c)} />
+        ))
+      )}
+    </div>
+  );
 }
