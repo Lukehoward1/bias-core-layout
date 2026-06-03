@@ -17,6 +17,12 @@ export interface EducationTip {
   content: string;
 }
 
+export function calculateReadTime(content: string): string {
+  const words = content.trim().split(/\s+/).length;
+  const mins = Math.max(1, Math.ceil(words / 200));
+  return `${mins} min`;
+}
+
 export const articles: EducationArticle[] = [
   {
     id: "a1",
@@ -52,7 +58,7 @@ Market structure alone won't make you a great trader, but ignoring it will guara
     description: "Losing streaks are inevitable. What separates professionals is how they respond.",
     readTime: "8 min",
     level: "Intermediate",
-    tags: ["Psychology", "Mindset"],
+    tags: ["Psychology"],
     content: `Every trader, regardless of their win rate, will experience drawdowns. A drawdown is simply the decline from a peak equity level to a subsequent trough. Understanding them psychologically is just as important as managing them mathematically.
 
 WHY DRAWDOWNS HIT HARDER THAN WINS FEEL GOOD
@@ -147,7 +153,7 @@ Order flow analysis is not a guarantee — it's a probability framework. The goa
     description: "Why the ratio matters more than your win rate — and how to use it correctly.",
     readTime: "5 min",
     level: "Beginner",
-    tags: ["Risk Management", "Fundamentals"],
+    tags: ["Risk", "Fundamentals"],
     content: `Most new traders focus on win rate. Professionals focus on expectancy — a function of both win rate and risk/reward ratio. Understanding this distinction is one of the most important mindset shifts in trading.
 
 WHAT IS RISK/REWARD RATIO?
@@ -178,7 +184,7 @@ Every trade should have a defined stop loss and target before entry. Write down 
     description: "Turn news events from threats into opportunities with a structured approach.",
     readTime: "7 min",
     level: "Intermediate",
-    tags: ["Fundamental", "Risk Management"],
+    tags: ["Fundamentals", "Risk"],
     content: `Economic data releases move markets. The question is whether you treat them as threats — unpredictable volatility to avoid — or as structured events with repeatable patterns.
 
 THE KEY RELEASES (UK/US FOCUSED)
@@ -248,7 +254,7 @@ The lower timeframe is more exciting. More movement, more "action," more apparen
     description: "Bad stop placement is as damaging as a bad entry. Here's how to place them correctly.",
     readTime: "6 min",
     level: "Beginner",
-    tags: ["Risk Management", "Technical"],
+    tags: ["Risk", "Technical"],
     content: `The stop loss is not an afterthought — it's the most important part of the trade setup. Its placement determines your risk, affects your R:R, and tells you whether a trade idea is invalidated.
 
 PRINCIPLE: STOP BEHIND STRUCTURE
@@ -286,7 +292,7 @@ THE RIGHT WORKFLOW
     description: "How to manage open trades to maximise profit while protecting your initial gain.",
     readTime: "7 min",
     level: "Advanced",
-    tags: ["Strategy", "Risk Management"],
+    tags: ["Strategy", "Risk"],
     content: `Taking a full position size to full target works statistically over a large sample — but it can create significant drawdown in the middle of a trade. Scaling out is a method of managing this by taking partial profits at interim levels while letting the remainder run.
 
 WHAT IS SCALING OUT?
@@ -371,7 +377,7 @@ Pick an approach per setup type and stick to it. Consistency in entry logic crea
     description: "Never guess your lot size again — calculate it from your account risk every time.",
     readTime: "5 min",
     level: "Beginner",
-    tags: ["Risk Management", "Fundamentals"],
+    tags: ["Risk", "Fundamentals"],
     content: `Position sizing is the bridge between your stop loss placement and your account risk management. Getting it wrong is one of the fastest ways to blow an account. Getting it right creates mathematical consistency regardless of what the market does.
 
 THE CORE PRINCIPLE
@@ -413,7 +419,7 @@ The math doesn't change. Always start with account risk, not with lot preference
     description: "What professional traders do before markets open — and why it changes everything.",
     readTime: "6 min",
     level: "Beginner",
-    tags: ["Mindset", "Process"],
+    tags: ["Psychology", "Process"],
     content: `Preparation separates traders who react from traders who execute a plan. A consistent weekly prep routine reduces in-session cognitive load, improves decision quality, and ensures you're trading with context rather than impulse.
 
 SUNDAY EVENING: THE WEEKLY SETUP (30–45 minutes)
@@ -462,7 +468,7 @@ export const tips: EducationTip[] = [
     title: "Always set your stop loss first",
     description: "Define your risk before you think about profit.",
     readTime: "1 min",
-    tags: ["Risk Management"],
+    tags: ["Risk"],
     content: `Before you enter any trade, define your stop loss level — not after you're in, not "approximately," not "I'll set it when I get in." Before.
 
 WHY THIS MATTERS
@@ -534,7 +540,7 @@ Most traders know they should journal. Almost none do it consistently. This is o
     title: "Size down during losing streaks",
     description: "Protect your capital and your mindset when variance goes against you.",
     readTime: "1 min",
-    tags: ["Risk Management", "Psychology"],
+    tags: ["Risk", "Psychology"],
     content: `When you experience consecutive losses — regardless of whether those losses were strategy violations or simply variance — the correct response is to reduce position size, not maintain or increase it.
 
 WHY THIS WORKS MECHANICALLY

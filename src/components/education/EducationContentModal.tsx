@@ -1,3 +1,4 @@
+import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,70 @@ interface EducationContentModalProps {
     tags?: string[];
     content: string;
   } | null;
+}
+
+function renderContent(text: string) {
+  const isHeading = (s: string) => {
+    const letters = s.replace(/[^a-zA-Z]/g, '');
+    return letters.length >= 2 && s.length >= 4 &&
+      (letters.match(/[A-Z]/g) ?? []).length / letters.length >= 0.8;
+  };
+  const lines = text.split('\n');
+  const out: React.ReactNode[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i].trim();
+    if (!line) { i++; continue; }
+    if (isHeading(line)) {
+      out.push(
+        <h3 key={i} className="text-xs font-bold text-foreground/70 mt-6 mb-2 tracking-widest uppercase">
+          {line}
+        </h3>
+      );
+      i++;
+      continue;
+    }
+    if (/^\d+\./.test(line)) {
+      const start = i;
+      const items: string[] = [];
+      while (i < lines.length && /^\d+\./.test(lines[i].trim())) {
+        items.push(lines[i].trim().replace(/^\d+\.\s*/, ''));
+        i++;
+      }
+      out.push(
+        <ol key={start} className="my-3 pl-5 space-y-1.5 list-decimal">
+          {items.map((item, j) => (
+            <li key={j} className="text-sm text-foreground leading-relaxed">{item}</li>
+          ))}
+        </ol>
+      );
+      continue;
+    }
+    if (line.startsWith('•')) {
+      const start = i;
+      const items: string[] = [];
+      while (i < lines.length && lines[i].trim().startsWith('•')) {
+        items.push(lines[i].trim().slice(1).trim());
+        i++;
+      }
+      out.push(
+        <ul key={start} className="my-3 space-y-1.5">
+          {items.map((item, j) => (
+            <li key={j} className="flex gap-2 items-start text-sm text-foreground leading-relaxed">
+              <span className="mt-2 h-1.5 w-1.5 rounded-full bg-primary/50 flex-shrink-0" />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      );
+      continue;
+    }
+    out.push(
+      <p key={i} className="text-sm text-foreground leading-relaxed my-3">{line}</p>
+    );
+    i++;
+  }
+  return <>{out}</>;
 }
 
 export function EducationContentModal({ isOpen, onClose, content }: EducationContentModalProps) {
@@ -96,10 +161,8 @@ export function EducationContentModal({ isOpen, onClose, content }: EducationCon
 
         {/* Content */}
         <div className="px-8 py-8">
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            <div className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
-              {content.content}
-            </div>
+          <div className="max-w-2xl mx-auto">
+            {renderContent(content.content)}
           </div>
         </div>
       </DialogContent>

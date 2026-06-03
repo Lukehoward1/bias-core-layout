@@ -11,7 +11,7 @@ import { EducationContentModal } from "@/components/education/EducationContentMo
 import { useEducationProgress } from "@/hooks/use-education-progress";
 import { generateCertificatePdf } from "@/lib/generateCertificatePdf";
 import { toast } from "@/hooks/use-toast";
-import { articles, tips } from "@/data/educationContent";
+import { articles, tips, calculateReadTime } from "@/data/educationContent";
 import {
   Clock,
   BookOpen,
@@ -25,6 +25,7 @@ import {
 
 // Set to true to re-enable the Courses section (wire ?view=courses in the sidebar)
 const SHOW_COURSES = false;
+const LEVEL_ORDER: Record<string, number> = { Beginner: 0, Intermediate: 1, Advanced: 2 };
 
 // Types
 interface Lesson {
@@ -202,6 +203,11 @@ export default function Education() {
   const showTips = searchParams.get("view") === "tips";
 
   const [selectedContent, setSelectedContent] = useState<ContentModalPayload | null>(null);
+  const [levelFilter, setLevelFilter] = useState("All");
+
+  const sortedFilteredArticles = [...articles]
+    .sort((a, b) => LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level])
+    .filter(a => levelFilter === "All" || a.level === levelFilter);
 
   // Course-related state — kept for when SHOW_COURSES is re-enabled
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -301,7 +307,7 @@ export default function Education() {
                       title: tip.title,
                       type: "tip",
                       level: "Beginner",
-                      readTime: tip.readTime,
+                      readTime: calculateReadTime(tip.content),
                       tags: tip.tags,
                       content: tip.content,
                     })
@@ -318,7 +324,7 @@ export default function Education() {
                     <div className="flex flex-wrap items-center gap-1.5 pt-3 border-t border-border/50">
                       <Badge variant="secondary" className="text-[10px] gap-1">
                         <Clock className="h-3 w-3" />
-                        {tip.readTime} read
+                        {calculateReadTime(tip.content)} read
                       </Badge>
                       {tip.tags.map((tag) => (
                         <Badge key={tag} variant="secondary" className="text-[10px]">
@@ -356,8 +362,29 @@ export default function Education() {
             </p>
           </div>
 
+          <div className="flex gap-2 mb-4 flex-wrap">
+            {(["All", "Beginner", "Intermediate", "Advanced"] as const).map((level) => (
+              <button
+                key={level}
+                type="button"
+                onClick={() => setLevelFilter(level)}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  levelFilter === level
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border text-muted-foreground hover:border-primary/50"
+                }`}
+              >
+                {level}
+              </button>
+            ))}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {articles.map((article) => (
+            {sortedFilteredArticles.length === 0 ? (
+              <p className="text-sm text-muted-foreground col-span-2 py-8 text-center">
+                No guides in this category yet.
+              </p>
+            ) : sortedFilteredArticles.map((article) => (
               <Card
                 key={article.id}
                 className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group flex flex-col"
@@ -366,7 +393,7 @@ export default function Education() {
                     title: article.title,
                     type: "article",
                     level: article.level,
-                    readTime: article.readTime,
+                    readTime: calculateReadTime(article.content),
                     tags: article.tags,
                     content: article.content,
                   })
@@ -387,7 +414,7 @@ export default function Education() {
                       </Badge>
                       <Badge variant="secondary" className="text-[10px] gap-1">
                         <Clock className="h-3 w-3" />
-                        {article.readTime} read
+                        {calculateReadTime(article.content)} read
                       </Badge>
                       {article.tags.map((tag) => (
                         <Badge key={tag} variant="secondary" className="text-[10px]">
