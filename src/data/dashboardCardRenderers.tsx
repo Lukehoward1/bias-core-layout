@@ -33,6 +33,7 @@ import { normalizeSymbol } from "@/services/marketData";
 import { buildMarketContext, type MarketContext } from "@/services/contextEngine";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
 import { useTradingData } from "@/hooks/use-trading-data";
+import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 
 export interface CardRenderContext {
   slotType: "wide" | "narrow" | "equal" | "hero" | "kpi" | "wide-narrow" | "three-equal" | "four-equal";
@@ -906,59 +907,40 @@ function RiskSnapshotCard() {
   );
 }
 
-function ReportsKpiLiveCard() {
-  const { viewTrades, primaryAccount } = useTradingData();
-  const sym = currencySymbol(primaryAccount?.currency);
+function ReportsKpiLiveCard({ metric }: { metric: "pnl" | "rr" | "winrate" | "expectancy" }) {
+  const { viewTrades } = useTradingData();
+  const { activeAccount } = useLinkedAccounts();
+  const sym = activeAccount?.currency === "GBP" ? "£" : "$";
+  const closed = viewTrades.filter((t) => t.status === "closed");
+  const winners = closed.filter((t) => (t.pnl ?? 0) > 0);
+  const totalPnl = closed.reduce((s, t) => s + (t.pnl ?? 0), 0);
+  const winRate = closed.length > 0 ? ((winners.length / closed.length) * 100).toFixed(1) : "0.0";
+  const rTrades = closed.filter((t) => t.actualR != null);
+  const avgRR = rTrades.length > 0
+    ? (rTrades.reduce((s, t) => s + (t.actualR ?? 0), 0) / rTrades.length).toFixed(2)
+    : "—";
+  const expectancy = closed.length > 0 ? (totalPnl / closed.length).toFixed(0) : "0";
+  const fmtPnl = `${totalPnl >= 0 ? "+" : ""}${sym}${Math.abs(totalPnl).toLocaleString("en-GB", { maximumFractionDigits: 0 })}`;
 
-  const kpis = useMemo(() => {
-    const closed = viewTrades.filter((t) => t.status === "closed");
-    const total = closed.length;
-    const totalPnl = closed.reduce((s, t) => s + (t.pnl ?? 0), 0);
-    const winners = closed.filter((t) => (t.pnl ?? 0) > 0).length;
-    const winRate = total > 0 ? (winners / total) * 100 : null;
-    const withR = closed.filter((t) => t.actualR != null);
-    const avgRR = withR.length > 0 ? withR.reduce((s, t) => s + (t.actualR ?? 0), 0) / withR.length : null;
-    const expectancy = total > 0 ? totalPnl / total : null;
-    return { totalPnl, winRate, avgRR, expectancy, total };
-  }, [viewTrades]);
-
-  const fmtPnl = (v: number) =>
-    `${v >= 0 ? "+" : ""}${sym}${Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  const configs = {
+    pnl: { title: "Total P&L", value: fmtPnl, color: totalPnl >= 0 ? "text-success" : "text-destructive" },
+    rr: { title: "Avg R:R", value: avgRR, color: "text-foreground" },
+    winrate: { title: "Win Rate", value: `${winRate}%`, color: "text-foreground" },
+    expectancy: {
+      title: "Avg Expectancy",
+      value: `${sym}${parseInt(expectancy).toLocaleString()}/trade`,
+      color: parseInt(expectancy) >= 0 ? "text-success" : "text-destructive",
+    },
+  };
+  const { title, value, color } = configs[metric];
 
   return (
     <Card className="h-full">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">Performance KPIs</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="p-3 rounded-lg bg-muted/50 border border-border">
-            <p className="text-xs text-muted-foreground">Total P&amp;L</p>
-            <p className={`text-xl font-bold ${kpis.totalPnl >= 0 ? "text-success" : "text-destructive"}`}>
-              {kpis.total > 0 ? fmtPnl(kpis.totalPnl) : <span className="text-muted-foreground">—</span>}
-            </p>
-          </div>
-          <div className="p-3 rounded-lg bg-muted/50 border border-border">
-            <p className="text-xs text-muted-foreground">Avg R:R</p>
-            <p className="text-xl font-bold text-foreground">
-              {kpis.avgRR != null ? kpis.avgRR.toFixed(2) : "—"}
-            </p>
-          </div>
-          <div className="p-3 rounded-lg bg-muted/50 border border-border">
-            <p className="text-xs text-muted-foreground">Win Rate</p>
-            <p className="text-xl font-bold text-foreground">
-              {kpis.winRate != null ? `${kpis.winRate.toFixed(1)}%` : "—"}
-            </p>
-          </div>
-          <div className="p-3 rounded-lg bg-muted/50 border border-border">
-            <p className="text-xs text-muted-foreground">Expectancy</p>
-            <p className={`text-xl font-bold ${kpis.expectancy == null ? "text-muted-foreground" : kpis.expectancy >= 0 ? "text-success" : "text-destructive"}`}>
-              {kpis.expectancy != null
-                ? `${sym}${Math.abs(kpis.expectancy).toLocaleString(undefined, { maximumFractionDigits: 0 })}/trade`
-                : "—"}
-            </p>
-          </div>
-        </div>
+        <p className={`text-2xl font-bold ${color}`}>{value}</p>
       </CardContent>
     </Card>
   );
@@ -1133,10 +1115,10 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
 
   "pinned-journal-equity": ({ slotType }) => <LiveEquityCard slotType={slotType} />,
 
-  "reports-kpi-total-pnl": () => <ReportsKpiLiveCard />,
-  "reports-kpi-avg-rr": () => <ReportsKpiLiveCard />,
-  "reports-kpi-win-rate": () => <ReportsKpiLiveCard />,
-  "reports-kpi-expectancy": () => <ReportsKpiLiveCard />,
+  "reports-kpi-total-pnl": () => <ReportsKpiLiveCard metric="pnl" />,
+  "reports-kpi-avg-rr": () => <ReportsKpiLiveCard metric="rr" />,
+  "reports-kpi-win-rate": () => <ReportsKpiLiveCard metric="winrate" />,
+  "reports-kpi-expectancy": () => <ReportsKpiLiveCard metric="expectancy" />,
 
   "reports-overview-best-day": () => <BestWorstDayCard type="best" />,
   "reports-overview-worst-day": () => <BestWorstDayCard type="worst" />,
