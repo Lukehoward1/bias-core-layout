@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useId, useMemo, useState, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,37 +33,6 @@ import { normalizeSymbol } from "@/services/marketData";
 import { buildMarketContext, type MarketContext } from "@/services/contextEngine";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
 import { useTradingData } from "@/hooks/use-trading-data";
-
-/* =======================
-   SHARED DATA
-======================= */
-
-const getSampleEquityData = () => {
-  const sampleTrades = [
-    { date: "2025-01-03", pnl: 450 },
-    { date: "2025-01-06", pnl: 300 },
-    { date: "2025-01-08", pnl: -400 },
-    { date: "2025-01-10", pnl: 480 },
-    { date: "2025-01-12", pnl: -400 },
-    { date: "2025-01-13", pnl: -73 },
-    { date: "2025-01-14", pnl: 1350 },
-    { date: "2025-01-15", pnl: 600 },
-  ];
-
-  let cumulative = 0;
-
-  return sampleTrades.map((trade) => {
-    cumulative += trade.pnl;
-
-    return {
-      date: trade.date,
-      equity: cumulative,
-      formattedDate: trade.date.split("-").slice(1).join("/"),
-    };
-  });
-};
-
-const equityData = getSampleEquityData();
 
 export interface CardRenderContext {
   slotType: "wide" | "narrow" | "equal" | "hero" | "kpi" | "wide-narrow" | "three-equal" | "four-equal";
@@ -782,7 +751,7 @@ function ActiveTradesCard() {
       </CardHeader>
       <CardContent>
         <p className="text-2xl font-bold text-foreground">{openCount}</p>
-        <p className="text-xs text-muted-foreground mt-1">Currently open positions</p>
+        <p className="text-xs text-muted-foreground mt-1">open positions</p>
       </CardContent>
     </Card>
   );
@@ -937,6 +906,203 @@ function RiskSnapshotCard() {
   );
 }
 
+function ReportsKpiLiveCard() {
+  const { viewTrades, primaryAccount } = useTradingData();
+  const sym = currencySymbol(primaryAccount?.currency);
+
+  const kpis = useMemo(() => {
+    const closed = viewTrades.filter((t) => t.status === "closed");
+    const total = closed.length;
+    const totalPnl = closed.reduce((s, t) => s + (t.pnl ?? 0), 0);
+    const winners = closed.filter((t) => (t.pnl ?? 0) > 0).length;
+    const winRate = total > 0 ? (winners / total) * 100 : null;
+    const withR = closed.filter((t) => t.actualR != null);
+    const avgRR = withR.length > 0 ? withR.reduce((s, t) => s + (t.actualR ?? 0), 0) / withR.length : null;
+    const expectancy = total > 0 ? totalPnl / total : null;
+    return { totalPnl, winRate, avgRR, expectancy, total };
+  }, [viewTrades]);
+
+  const fmtPnl = (v: number) =>
+    `${v >= 0 ? "+" : ""}${sym}${Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+
+  return (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Performance KPIs</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+            <p className="text-xs text-muted-foreground">Total P&amp;L</p>
+            <p className={`text-xl font-bold ${kpis.totalPnl >= 0 ? "text-success" : "text-destructive"}`}>
+              {kpis.total > 0 ? fmtPnl(kpis.totalPnl) : <span className="text-muted-foreground">—</span>}
+            </p>
+          </div>
+          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+            <p className="text-xs text-muted-foreground">Avg R:R</p>
+            <p className="text-xl font-bold text-foreground">
+              {kpis.avgRR != null ? kpis.avgRR.toFixed(2) : "—"}
+            </p>
+          </div>
+          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+            <p className="text-xs text-muted-foreground">Win Rate</p>
+            <p className="text-xl font-bold text-foreground">
+              {kpis.winRate != null ? `${kpis.winRate.toFixed(1)}%` : "—"}
+            </p>
+          </div>
+          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+            <p className="text-xs text-muted-foreground">Expectancy</p>
+            <p className={`text-xl font-bold ${kpis.expectancy == null ? "text-muted-foreground" : kpis.expectancy >= 0 ? "text-success" : "text-destructive"}`}>
+              {kpis.expectancy != null
+                ? `${sym}${Math.abs(kpis.expectancy).toLocaleString(undefined, { maximumFractionDigits: 0 })}/trade`
+                : "—"}
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BestWorstDayCard({ type }: { type: "best" | "worst" }) {
+  const { viewTrades, primaryAccount } = useTradingData();
+  const sym = currencySymbol(primaryAccount?.currency);
+
+  const { amount, date } = useMemo(() => {
+    const byDay = new Map<string, number>();
+    for (const t of viewTrades.filter((t) => t.status === "closed")) {
+      byDay.set(t.date, (byDay.get(t.date) ?? 0) + (t.pnl ?? 0));
+    }
+    if (byDay.size === 0) return { amount: null as number | null, date: null as string | null };
+    const entries: [string, number][] = Array.from(byDay.entries());
+    const best = type === "best"
+      ? entries.reduce((a, b) => b[1] > a[1] ? b : a)
+      : entries.reduce((a, b) => b[1] < a[1] ? b : a);
+    return { amount: best[1], date: best[0] };
+  }, [viewTrades, type]);
+
+  const fmtAmt = (v: number) =>
+    `${v >= 0 ? "+" : ""}${sym}${Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+
+  if (type === "best") {
+    return (
+      <Card className="h-full bg-success/5 border-success/20">
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-success" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Best Winning Day</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {amount == null ? (
+            <p className="text-sm text-muted-foreground">No data</p>
+          ) : (
+            <>
+              <p className="text-2xl font-bold text-success">{fmtAmt(amount)}</p>
+              <p className="text-xs text-muted-foreground mt-1">{date}</p>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="h-full bg-destructive/5 border-destructive/20">
+      <CardHeader className="pb-2">
+        <div className="flex items-center gap-2">
+          <TrendingDown className="h-4 w-4 text-destructive" />
+          <CardTitle className="text-sm font-medium text-muted-foreground">Lowest Realised P&L Day</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {amount == null ? (
+          <p className="text-sm text-muted-foreground">No data</p>
+        ) : (
+          <>
+            <p className={`text-2xl font-bold ${amount >= 0 ? "text-success" : "text-destructive"}`}>
+              {fmtAmt(amount)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">{date}</p>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function LiveEquityCard({ slotType }: { slotType: string }) {
+  const { viewTrades, primaryAccount, stats } = useTradingData();
+  const sym = currencySymbol(primaryAccount?.currency);
+  const chartHeight = slotType === "hero" ? "h-64" : "h-40";
+  const rawId = useId();
+  const gradId = `equityGrad${rawId.replace(/:/g, "")}`;
+
+  const equityData = useMemo(() => {
+    const balance = primaryAccount?.balance ?? 100_000;
+    const startBalance = balance - stats.totalPnl;
+    const closed = [...viewTrades]
+      .filter((t) => t.status === "closed")
+      .sort((a, b) => a.date.localeCompare(b.date));
+    let running = startBalance;
+    return closed.map((t) => {
+      running += t.pnl ?? 0;
+      return {
+        date: t.date,
+        equity: Math.round(running),
+        formattedDate: t.date.slice(5).replace("-", "/"),
+      };
+    });
+  }, [viewTrades, primaryAccount, stats.totalPnl]);
+
+  return (
+    <Card className="h-full">
+      <CardHeader>
+        <CardTitle className="text-sm font-medium">Equity Curve</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {equityData.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No closed trades yet.</p>
+        ) : (
+          <div className={chartHeight}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={equityData}>
+                <defs>
+                  <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="formattedDate" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                <YAxis
+                  tick={{ fontSize: 10 }}
+                  stroke="hsl(var(--muted-foreground))"
+                  tickFormatter={(v) => `${sym}${v.toLocaleString()}`}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "8px",
+                  }}
+                  formatter={(value: number) => [`${sym}${value.toLocaleString()}`, "Equity"]}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="equity"
+                  stroke="hsl(var(--primary))"
+                  fill={`url(#${gradId})`}
+                  strokeWidth={2}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 /* =======================
    CARD RENDERERS
 ======================= */
@@ -965,203 +1131,18 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
 
   "risk-snapshot": () => <RiskSnapshotCard />,
 
-  "pinned-journal-equity": ({ slotType }) => {
-    const chartHeight = slotType === "hero" ? "h-64" : "h-40";
+  "pinned-journal-equity": ({ slotType }) => <LiveEquityCard slotType={slotType} />,
 
-    return (
-      <Card className="h-full">
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Journal Equity Curve</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className={chartHeight}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={equityData}>
-                <defs>
-                  <linearGradient id="pinnedEquityGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="formattedDate" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `£${v}`} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                  }}
-                  formatter={(value: number) => [`£${value.toLocaleString()}`, "Equity"]}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="equity"
-                  stroke="hsl(var(--primary))"
-                  fill="url(#pinnedEquityGradient)"
-                  strokeWidth={2}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  },
+  "reports-kpi-total-pnl": () => <ReportsKpiLiveCard />,
+  "reports-kpi-avg-rr": () => <ReportsKpiLiveCard />,
+  "reports-kpi-win-rate": () => <ReportsKpiLiveCard />,
+  "reports-kpi-expectancy": () => <ReportsKpiLiveCard />,
 
-  "reports-kpi-total-pnl": () => (
-    <Card className="h-full">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">Total P&amp;L</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-2xl font-bold text-success">+£2,307</p>
-      </CardContent>
-    </Card>
-  ),
+  "reports-overview-best-day": () => <BestWorstDayCard type="best" />,
+  "reports-overview-worst-day": () => <BestWorstDayCard type="worst" />,
 
-  "reports-kpi-avg-rr": () => (
-    <Card className="h-full">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">Avg R:R</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-2xl font-bold text-foreground">1.85</p>
-      </CardContent>
-    </Card>
-  ),
-
-  "reports-kpi-win-rate": () => (
-    <Card className="h-full">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate Estimate</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-2xl font-bold text-foreground">66.7%</p>
-      </CardContent>
-    </Card>
-  ),
-
-  "reports-kpi-expectancy": () => (
-    <Card className="h-full">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">Avg Expectancy</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-2xl font-bold text-success">£256/trade</p>
-      </CardContent>
-    </Card>
-  ),
-
-  "reports-overview-best-day": () => (
-    <Card className="h-full bg-success/5 border-success/20">
-      <CardHeader className="pb-2">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-success" />
-          <CardTitle className="text-sm font-medium text-muted-foreground">Best Winning Day</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <p className="text-2xl font-bold text-success">+£1,200</p>
-        <p className="text-xs text-muted-foreground mt-1">2025-01-14</p>
-      </CardContent>
-    </Card>
-  ),
-
-  "reports-overview-worst-day": () => (
-    <Card className="h-full bg-destructive/5 border-destructive/20">
-      <CardHeader className="pb-2">
-        <div className="flex items-center gap-2">
-          <TrendingDown className="h-4 w-4 text-destructive" />
-          <CardTitle className="text-sm font-medium text-muted-foreground">Lowest Realised P&L Day</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <p className="text-2xl font-bold text-destructive">-£400</p>
-        <p className="text-xs text-muted-foreground mt-1">2025-01-12</p>
-      </CardContent>
-    </Card>
-  ),
-
-  "reports-overview-equity": ({ slotType }) => {
-    const chartHeight = slotType === "hero" ? "h-64" : "h-40";
-
-    return (
-      <Card className="h-full">
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Equity Curve</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className={chartHeight}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={equityData}>
-                <defs>
-                  <linearGradient id="overviewEquityGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="formattedDate" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `£${v}`} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                  }}
-                  formatter={(value: number) => [`£${value.toLocaleString()}`, "Equity"]}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="equity"
-                  stroke="hsl(var(--primary))"
-                  fill="url(#overviewEquityGradient)"
-                  strokeWidth={2}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  },
-
-  "reports-overview-rolling30": ({ slotType }) => {
-    const chartHeight = slotType === "hero" ? "h-64" : "h-40";
-
-    return (
-      <Card className="h-full">
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Rolling 30-Day</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className={chartHeight}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={equityData}>
-                <XAxis dataKey="formattedDate" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `£${v}`} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                  }}
-                  formatter={(value: number) => [`£${value.toLocaleString()}`, "Cumulative P&L"]}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="equity"
-                  stroke="hsl(var(--success))"
-                  fill="hsl(var(--success))"
-                  fillOpacity={0.2}
-                  strokeWidth={2}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  },
+  "reports-overview-equity": ({ slotType }) => <LiveEquityCard slotType={slotType} />,
+  "reports-overview-rolling30": ({ slotType }) => <LiveEquityCard slotType={slotType} />,
 
   "alerts-my-alerts-timers": () => (
     <Card className="h-full">
