@@ -32,6 +32,7 @@ import { useMarketQuotes } from "@/hooks/use-market-quotes";
 import { normalizeSymbol } from "@/services/marketData";
 import { buildMarketContext, type MarketContext } from "@/services/contextEngine";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
+import { useTradingData } from "@/hooks/use-trading-data";
 
 /* =======================
    SHARED DATA
@@ -757,35 +758,194 @@ function CalendarEventsDashboardCard() {
 }
 
 /* =======================
+   LIVE KPI HELPERS
+======================= */
+
+function currencySymbol(code?: string): string {
+  if (code === "USD") return "$";
+  if (code === "EUR") return "€";
+  if (code === "JPY") return "¥";
+  return "£";
+}
+
+/* =======================
+   LIVE KPI CARDS
+======================= */
+
+function ActiveTradesCard() {
+  const { viewTrades } = useTradingData();
+  const openCount = viewTrades.filter((t) => t.status === "open").length;
+  return (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Active Trades</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-2xl font-bold text-foreground">{openCount}</p>
+        <p className="text-xs text-muted-foreground mt-1">Currently open positions</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function NextSessionCard() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const { sessionName, label, isLive } = useMemo(() => {
+    const sessions = SESSION_CONFIGS.map((c) => buildSessionCard(c, now));
+    const live = sessions.find((s) => s.status === "open");
+    if (live) return { sessionName: live.name, label: "Live Now", isLive: true };
+
+    let best = sessions[0];
+    let bestSec = Infinity;
+    for (const s of sessions) {
+      const m = s.time.match(/(\d+):(\d+):(\d+)/);
+      if (m) {
+        const sec = Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);
+        if (sec < bestSec) { bestSec = sec; best = s; }
+      }
+    }
+    const h = Math.floor(bestSec / 3600);
+    const mins = Math.floor((bestSec % 3600) / 60);
+    const countdownLabel = h > 0 ? `Opens in ${h}h ${mins}m` : `Opens in ${mins}m`;
+    return { sessionName: best.name, label: countdownLabel, isLive: false };
+  }, [now]);
+
+  return (
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">Next Session</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-2xl font-bold text-foreground">{sessionName}</p>
+        <p className={`text-xs mt-1 ${isLive ? "text-success" : "text-muted-foreground"}`}>{label}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PerformanceOverviewCard() {
+  const { viewTrades, primaryAccount } = useTradingData();
+  const sym = currencySymbol(primaryAccount?.currency);
+
+  const { weekPnl, monthPnl } = useMemo(() => {
+    const now = Date.now();
+    const closed = viewTrades.filter((t) => t.status === "closed");
+    const weekPnl = closed.reduce((s, t) =>
+      now - new Date(t.date).getTime() <= 7 * 86_400_000 ? s + (t.pnl ?? 0) : s, 0);
+    const monthPnl = closed.reduce((s, t) =>
+      now - new Date(t.date).getTime() <= 30 * 86_400_000 ? s + (t.pnl ?? 0) : s, 0);
+    return { weekPnl, monthPnl };
+  }, [viewTrades]);
+
+  const fmtPnl = (v: number) =>
+    v === 0
+      ? `${sym}0`
+      : `${v > 0 ? "+" : ""}${sym}${Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  const pnlColor = (v: number) => v > 0 ? "text-success" : v < 0 ? "text-destructive" : "text-muted-foreground";
+
+  return (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <PieChart className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Performance Overview</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+            <p className="text-xs text-muted-foreground">Weekly</p>
+            <p className={`text-lg font-bold ${pnlColor(weekPnl)}`}>{fmtPnl(weekPnl)}</p>
+          </div>
+          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+            <p className="text-xs text-muted-foreground">Monthly</p>
+            <p className={`text-lg font-bold ${pnlColor(monthPnl)}`}>{fmtPnl(monthPnl)}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RiskSnapshotCard() {
+  const { viewTrades, primaryAccount } = useTradingData();
+
+  const { dailyRisk, openExposurePct, drawdownPct } = useMemo(() => {
+    const balance = primaryAccount?.balance ?? 100_000;
+    const today = new Date().toLocaleDateString("sv"); // YYYY-MM-DD local
+
+    const todayLosses = viewTrades
+      .filter((t) => t.date === today && (t.pnl ?? 0) < 0)
+      .reduce((s, t) => s + Math.abs(t.pnl ?? 0), 0);
+    const dailyRisk = balance > 0 ? (todayLosses / balance) * 100 : 0;
+
+    const openCount = viewTrades.filter((t) => t.status === "open").length;
+    const openExposurePct = viewTrades.length > 0 ? (openCount / viewTrades.length) * 100 : 0;
+
+    const closed = [...viewTrades]
+      .filter((t) => t.status === "closed")
+      .sort((a, b) => a.date.localeCompare(b.date));
+    let peak = balance;
+    let running = balance;
+    for (const t of closed) {
+      running += t.pnl ?? 0;
+      if (running > peak) peak = running;
+    }
+    const drawdownPct = peak > 0 ? Math.max(0, ((peak - running) / peak) * 100) : 0;
+
+    return { dailyRisk, openExposurePct, drawdownPct };
+  }, [viewTrades, primaryAccount]);
+
+  const fmtPct = (v: number) => `${v.toFixed(1)}%`;
+
+  return (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Shield className="h-4 w-4 text-primary" />
+          <CardTitle className="text-sm font-medium">Risk Snapshot</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+            <span className="text-sm text-foreground">Daily Risk Used</span>
+            <span className={`text-sm font-medium ${dailyRisk === 0 ? "text-muted-foreground" : dailyRisk > 2 ? "text-destructive" : "text-warning"}`}>
+              {dailyRisk === 0 ? "0%" : fmtPct(dailyRisk)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+            <span className="text-sm text-foreground">Open Exposure</span>
+            <span className={`text-sm font-medium ${openExposurePct === 0 ? "text-muted-foreground" : "text-foreground"}`}>
+              {openExposurePct === 0 ? "0%" : fmtPct(openExposurePct)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+            <span className="text-sm text-foreground">Drawdown</span>
+            <span className={`text-sm font-medium ${drawdownPct === 0 ? "text-success" : drawdownPct > 5 ? "text-destructive" : "text-warning"}`}>
+              {drawdownPct === 0 ? "0%" : `-${fmtPct(drawdownPct)}`}
+            </span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* =======================
    CARD RENDERERS
 ======================= */
 
 export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.ReactNode> = {
   "todays-bias": () => <TodaysBiasDashboardCard />,
 
-  "active-trades": () => (
-    <Card className="h-full">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">Active Trades</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-2xl font-bold text-foreground">3</p>
-        <p className="text-xs text-muted-foreground mt-1">Directional exposure overview</p>
-      </CardContent>
-    </Card>
-  ),
-
-  "next-session": () => (
-    <Card className="h-full">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">Next Session</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-2xl font-bold text-foreground">London</p>
-        <p className="text-xs text-muted-foreground mt-1">Click session for details</p>
-      </CardContent>
-    </Card>
-  ),
+  "active-trades": () => <ActiveTradesCard />,
+  "next-session": () => <NextSessionCard />,
 
   "high-impact-events": () => <HighImpactEventsDashboardCard />,
   "watchlist-overview": ({ slotType }) => <WatchlistOverviewCard slotType={normalizeWatchlistSlotType(slotType)} />,
@@ -801,55 +961,9 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
   "daily-risk-limit": () => <DailyRiskLimitTracker compact />,
   "max-drawdown-guard": () => <MaxDrawdownGuard compact />,
 
-  "performance-overview": () => (
-    <Card className="h-full">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <PieChart className="h-4 w-4 text-primary" />
-          <CardTitle className="text-sm font-medium">Performance Overview</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="p-3 rounded-lg bg-muted/50 border border-border">
-            <p className="text-xs text-muted-foreground">Weekly</p>
-            <p className="text-lg font-bold text-success">+£842</p>
-          </div>
-          <div className="p-3 rounded-lg bg-muted/50 border border-border">
-            <p className="text-xs text-muted-foreground">Monthly</p>
-            <p className="text-lg font-bold text-success">+£2,307</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  ),
+  "performance-overview": () => <PerformanceOverviewCard />,
 
-  "risk-snapshot": () => (
-    <Card className="h-full">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <Shield className="h-4 w-4 text-primary" />
-          <CardTitle className="text-sm font-medium">Risk Snapshot</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-            <span className="text-sm text-foreground">Daily Risk Used</span>
-            <span className="text-sm font-medium text-foreground">42%</span>
-          </div>
-          <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-            <span className="text-sm text-foreground">Open Exposure</span>
-            <span className="text-sm font-medium text-foreground">1.8%</span>
-          </div>
-          <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-            <span className="text-sm text-foreground">Drawdown</span>
-            <span className="text-sm font-medium text-warning">-2.4%</span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  ),
+  "risk-snapshot": () => <RiskSnapshotCard />,
 
   "pinned-journal-equity": ({ slotType }) => {
     const chartHeight = slotType === "hero" ? "h-64" : "h-40";
