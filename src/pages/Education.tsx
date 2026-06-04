@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent } from "@/components/ui/card";
@@ -204,6 +204,19 @@ export default function Education() {
 
   const [selectedContent, setSelectedContent] = useState<ContentModalPayload | null>(null);
   const [levelFilter, setLevelFilter] = useState("All");
+
+  // Deep-link support: open reader modal when ?article= or ?tip= param is present
+  useEffect(() => {
+    const articleId = searchParams.get("article");
+    const tipId = searchParams.get("tip");
+    if (articleId) {
+      const a = articles.find(x => x.id === articleId);
+      if (a) setSelectedContent({ title: a.title, type: "article", level: a.level, readTime: calculateReadTime(a.content), tags: a.tags, content: a.content });
+    } else if (tipId) {
+      const t = tips.find(x => x.id === tipId);
+      if (t) setSelectedContent({ title: t.title, type: "tip", level: "Beginner", readTime: calculateReadTime(t.content), tags: t.tags, content: t.content });
+    }
+  }, [searchParams]);
 
   const sortedFilteredArticles = [...articles]
     .sort((a, b) => LEVEL_ORDER[a.level] - LEVEL_ORDER[b.level])
