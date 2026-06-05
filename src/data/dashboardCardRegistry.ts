@@ -24,7 +24,6 @@ export interface DashboardCardDefinition {
  * - Strategy Tester
  * - Education / Webinars
  * - Brokerage / Broker discovery
- * - Community
  */
 export const DASHBOARD_CARD_REGISTRY: DashboardCardDefinition[] = [
   // ============ KPI Cards (fixed top row) ============
