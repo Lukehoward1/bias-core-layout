@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -8,11 +8,12 @@ import { supabase } from "@/lib/supabase";
 import sbLogo from "@/assets/sb-logo.svg";
 
 export default function Register() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -23,12 +24,16 @@ export default function Register() {
       return;
     }
     setIsLoading(true);
-    const { error: authError } = await supabase.auth.signUp({ email, password });
+    const { data, error: authError } = await supabase.auth.signUp({ email, password });
     setIsLoading(false);
     if (authError) {
       setError(authError.message);
+    } else if (data.user?.confirmed_at) {
+      // Email confirmation disabled — user is already confirmed, go straight in
+      navigate("/");
     } else {
-      setSuccess(true);
+      // Email confirmation required
+      setNeedsConfirmation(true);
     }
   }
 
@@ -46,7 +51,7 @@ export default function Register() {
             <CardDescription>Start your StreamBias journey</CardDescription>
           </CardHeader>
           <CardContent>
-            {success ? (
+            {needsConfirmation ? (
               <div className="space-y-4">
                 <p className="text-sm text-success bg-success/10 rounded-md px-3 py-3 text-center">
                   Check your email to confirm your account.
@@ -106,7 +111,7 @@ export default function Register() {
               </form>
             )}
 
-            {!success && (
+            {!needsConfirmation && (
               <p className="mt-4 text-center text-sm text-muted-foreground">
                 Already have an account?{" "}
                 <Link to="/login" className="text-primary hover:underline font-medium">

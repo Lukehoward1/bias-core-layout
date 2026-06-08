@@ -7,33 +7,141 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import sbLogo from "@/assets/sb-logo.svg";
 
+type View = "signin" | "forgot" | "forgot-sent";
+
 export default function Login() {
   const navigate = useNavigate();
+  const [view, setView] = useState<View>("signin");
+
+  // Sign-in state
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [signInError, setSignInError] = useState<string | null>(null);
+  const [signInLoading, setSignInLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  // Forgot password state
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetLoading, setResetLoading] = useState(false);
+
+  async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    setIsLoading(true);
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-    setIsLoading(false);
-    if (authError) {
-      setError(authError.message);
+    setSignInError(null);
+    setSignInLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setSignInLoading(false);
+    if (error) {
+      setSignInError(error.message);
     } else {
       navigate("/");
     }
   }
 
+  async function handleForgot(e: React.FormEvent) {
+    e.preventDefault();
+    setResetError(null);
+    setResetLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setResetLoading(false);
+    if (error) {
+      setResetError(error.message);
+    } else {
+      setView("forgot-sent");
+    }
+  }
+
+  const logo = (
+    <div className="flex flex-col items-center gap-3">
+      <img src={sbLogo} alt="StreamBias" className="h-12 w-auto" />
+      <span className="text-2xl font-bold text-foreground">StreamBias</span>
+    </div>
+  );
+
+  if (view === "forgot-sent") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-sm space-y-6">
+          {logo}
+          <Card>
+            <CardHeader className="space-y-1 pb-4">
+              <CardTitle className="text-xl">Check your email</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-success bg-success/10 rounded-md px-3 py-3 text-center">
+                Password reset link sent — check your email.
+              </p>
+              <p className="text-center text-sm text-muted-foreground">
+                <button
+                  type="button"
+                  onClick={() => setView("signin")}
+                  className="text-primary hover:underline font-medium"
+                >
+                  Back to sign in
+                </button>
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "forgot") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-sm space-y-6">
+          {logo}
+          <Card>
+            <CardHeader className="space-y-1 pb-4">
+              <CardTitle className="text-xl">Reset password</CardTitle>
+              <CardDescription>Enter your email and we&apos;ll send a reset link</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleForgot} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="reset-email">Email</Label>
+                  <Input
+                    id="reset-email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                  />
+                </div>
+
+                {resetError && (
+                  <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{resetError}</p>
+                )}
+
+                <Button type="submit" className="w-full" disabled={resetLoading}>
+                  {resetLoading ? "Sending…" : "Send reset link"}
+                </Button>
+              </form>
+
+              <p className="mt-4 text-center text-sm text-muted-foreground">
+                <button
+                  type="button"
+                  onClick={() => setView("signin")}
+                  className="text-primary hover:underline font-medium"
+                >
+                  Back to sign in
+                </button>
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-6">
-        <div className="flex flex-col items-center gap-3">
-          <img src={sbLogo} alt="StreamBias" className="h-12 w-auto" />
-          <span className="text-2xl font-bold text-foreground">StreamBias</span>
-        </div>
+        {logo}
 
         <Card>
           <CardHeader className="space-y-1 pb-4">
@@ -41,7 +149,7 @@ export default function Login() {
             <CardDescription>Enter your credentials to access your account</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSignIn} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -55,7 +163,16 @@ export default function Login() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <button
+                    type="button"
+                    onClick={() => { setResetEmail(email); setView("forgot"); }}
+                    className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
                 <Input
                   id="password"
                   type="password"
@@ -67,12 +184,12 @@ export default function Login() {
                 />
               </div>
 
-              {error && (
-                <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{error}</p>
+              {signInError && (
+                <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{signInError}</p>
               )}
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Signing in…" : "Sign In"}
+              <Button type="submit" className="w-full" disabled={signInLoading}>
+                {signInLoading ? "Signing in…" : "Sign In"}
               </Button>
             </form>
 

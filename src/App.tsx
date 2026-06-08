@@ -17,6 +17,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Markets from "./pages/Markets";
 import Calendar from "./pages/Calendar";
@@ -53,6 +54,7 @@ function AppRoutes() {
       <Routes location={backgroundLocation || location}>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/pricing" element={<Pricing />} />
 
         <Route element={<ProtectedRoute />}>
