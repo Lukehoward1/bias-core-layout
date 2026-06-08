@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { AreaChart, Area, ResponsiveContainer, XAxis } from "recharts";
@@ -15,14 +15,15 @@ const EQUITY_DATA = [
   { d: "Oct", v: 13050 }, { d: "Nov", v: 13480 }, { d: "Dec", v: 14200 },
 ];
 
+// mx/my: pixel offset applied at the extreme edges of the viewport (x=0 or x=1)
 const ORB_CONFIGS = [
-  { top: "10%",  left: "8%",  size: "clamp(220px,32vw,520px)", color: "hsl(195,100%,50%)", opacity: 0.22, anim: "sb-orb-1", dur: "13s", mx: 45, my: 35 },
-  { top: "4%",   left: "60%", size: "clamp(180px,25vw,380px)", color: "hsl(210,100%,45%)", opacity: 0.16, anim: "sb-orb-2", dur: "10s", mx: -35, my: 28 },
-  { top: "55%",  left: "3%",  size: "clamp(160px,22vw,340px)", color: "hsl(180,80%,42%)",  opacity: 0.18, anim: "sb-orb-3", dur: "15s", mx: 38,  my: -22 },
-  { top: "48%",  left: "68%", size: "clamp(200px,28vw,430px)", color: "hsl(220,90%,48%)",  opacity: 0.14, anim: "sb-orb-2", dur: "11s", mx: -28, my: 38 },
+  { top: "10%", left: "8%",  size: "clamp(220px,32vw,520px)", color: "hsl(195,100%,50%)", opacity: 0.22, anim: "sb-orb-1", dur: "13s", mx:  70, my:  55 },
+  { top: "4%",  left: "60%", size: "clamp(180px,25vw,380px)", color: "hsl(210,100%,45%)", opacity: 0.16, anim: "sb-orb-2", dur: "10s", mx: -55, my:  45 },
+  { top: "55%", left: "3%",  size: "clamp(160px,22vw,340px)", color: "hsl(180,80%,42%)",  opacity: 0.18, anim: "sb-orb-3", dur: "15s", mx:  60, my: -38 },
+  { top: "48%", left: "68%", size: "clamp(200px,28vw,430px)", color: "hsl(220,90%,48%)",  opacity: 0.14, anim: "sb-orb-2", dur: "11s", mx: -45, my:  62 },
 ] as const;
 
-// ── CSS keyframes ──────────────────────────────────────────────────────────────
+// ── CSS keyframes (drift is the base; mouse offset compounds on top) ───────────
 
 const ORB_STYLES = `
 @keyframes sb-orb-1 {
@@ -98,16 +99,10 @@ function BiasGauge() {
   return (
     <div ref={ref} className="w-full max-w-xs mx-auto select-none">
       <svg viewBox="0 0 200 120" width="100%">
-        {/* Background track */}
         <path d="M 25,100 A 75,75 0 0 1 175,100" stroke="hsl(215,25%,15%)" strokeWidth="14" fill="none" strokeLinecap="round" />
-        {/* Bearish */}
         <path d="M 25,100 A 75,75 0 0 1 62.5,35.05" stroke="hsl(0,60%,42%)" strokeWidth="14" fill="none" strokeLinecap="butt" />
-        {/* Neutral */}
         <path d="M 62.5,35.05 A 75,75 0 0 1 137.5,35.05" stroke="hsl(40,65%,42%)" strokeWidth="14" fill="none" strokeLinecap="butt" />
-        {/* Bullish */}
         <path d="M 137.5,35.05 A 75,75 0 0 1 175,100" stroke="hsl(195,100%,38%)" strokeWidth="14" fill="none" strokeLinecap="butt" />
-
-        {/* Needle */}
         <g style={{
           transformOrigin: "100px 100px",
           transform: `rotate(${rotation}deg)`,
@@ -115,25 +110,18 @@ function BiasGauge() {
         }}>
           <line x1="100" y1="100" x2="100" y2="36" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
         </g>
-
-        {/* Centre dot */}
         <circle cx="100" cy="100" r="7" fill="hsl(215,25%,13%)" stroke="hsl(215,25%,25%)" strokeWidth="2" />
         <circle cx="100" cy="100" r="3.5" fill="hsl(195,100%,50%)" />
-
-        <text x="18" y="114" fill="hsl(0,60%,62%)" fontSize="8.5" textAnchor="middle" fontFamily="sans-serif">Bearish</text>
-        <text x="100" y="19" fill="hsl(40,65%,62%)" fontSize="8.5" textAnchor="middle" fontFamily="sans-serif">Neutral</text>
+        <text x="18"  y="114" fill="hsl(0,60%,62%)"   fontSize="8.5" textAnchor="middle" fontFamily="sans-serif">Bearish</text>
+        <text x="100" y="19"  fill="hsl(40,65%,62%)"  fontSize="8.5" textAnchor="middle" fontFamily="sans-serif">Neutral</text>
         <text x="182" y="114" fill="hsl(195,100%,50%)" fontSize="8.5" textAnchor="middle" fontFamily="sans-serif">Bullish</text>
       </svg>
-
       <div className="text-center -mt-1">
         <p className="text-2xl font-bold text-primary">Bullish Active</p>
         <p className="text-sm text-muted-foreground mt-1">EURUSD · H1 · H4 · D1</p>
         <div className="flex justify-center gap-2 mt-3 flex-wrap">
           {["M15", "H1", "H4", "D1"].map((tf, i) => (
-            <span
-              key={tf}
-              className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${i < 3 ? "bg-primary/20 text-primary" : "bg-muted/50 text-muted-foreground"}`}
-            >
+            <span key={tf} className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${i < 3 ? "bg-primary/20 text-primary" : "bg-muted/50 text-muted-foreground"}`}>
               {tf}
             </span>
           ))}
@@ -157,7 +145,6 @@ function EquityMockup() {
         transition: "opacity 0.7s ease, transform 0.7s ease",
       }}
     >
-      {/* Browser chrome */}
       <div className="bg-card/80 border-b border-border px-4 py-2.5 flex items-center gap-3">
         <div className="flex gap-1.5">
           <div className="w-2.5 h-2.5 rounded-full" style={{ background: "hsl(0,65%,55%)" }} />
@@ -168,7 +155,6 @@ function EquityMockup() {
           <span className="text-[10px] text-muted-foreground">app.streambias.com/journal</span>
         </div>
       </div>
-      {/* Content */}
       <div className="bg-card p-5">
         <div className="flex items-start justify-between mb-4">
           <div>
@@ -176,16 +162,14 @@ function EquityMockup() {
             <p className="text-2xl font-bold text-success">+£4,200</p>
             <p className="text-xs text-muted-foreground mt-0.5">Dec 2025 – Dec 2026</p>
           </div>
-          <span className="text-xs px-2.5 py-1 rounded-full bg-success/10 text-success font-semibold border border-success/20">
-            +42.0%
-          </span>
+          <span className="text-xs px-2.5 py-1 rounded-full bg-success/10 text-success font-semibold border border-success/20">+42.0%</span>
         </div>
         <div className="h-44">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={EQUITY_DATA} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="landing-eq-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(195,100%,50%)" stopOpacity={0.35} />
+                  <stop offset="5%"  stopColor="hsl(195,100%,50%)" stopOpacity={0.35} />
                   <stop offset="95%" stopColor="hsl(195,100%,50%)" stopOpacity={0} />
                 </linearGradient>
               </defs>
@@ -227,11 +211,10 @@ function RiskCalculatorMockup() {
           <p className="text-sm font-semibold text-foreground">Position Size Calculator</p>
           <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-success/10 text-success border border-success/20">Linked</span>
         </div>
-
         {[
           { label: "Account Balance", value: "£10,000", note: "IG Demo Account" },
-          { label: "Risk per trade", value: "1.0%", note: "£100 max loss" },
-          { label: "Stop loss", value: "25 pips", note: "EURUSD" },
+          { label: "Risk per trade",  value: "1.0%",    note: "£100 max loss" },
+          { label: "Stop loss",       value: "25 pips", note: "EURUSD" },
         ].map(({ label, value, note }) => (
           <div key={label} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border">
             <div>
@@ -241,12 +224,9 @@ function RiskCalculatorMockup() {
             <p className="text-[11px] text-muted-foreground">{note}</p>
           </div>
         ))}
-
         <div className="p-4 rounded-lg bg-primary/10 border border-primary/30">
           <p className="text-xs text-primary font-medium mb-1.5">Recommended Position Size</p>
-          <p className="text-3xl font-bold text-primary">
-            0.40 <span className="text-base font-normal text-primary/70">lots</span>
-          </p>
+          <p className="text-3xl font-bold text-primary">0.40 <span className="text-base font-normal text-primary/70">lots</span></p>
           <div className="flex gap-4 mt-2">
             <p className="text-xs text-muted-foreground">Max risk: <span className="text-foreground">£100</span></p>
             <p className="text-xs text-muted-foreground">Margin: <span className="text-foreground">~£400</span></p>
@@ -264,7 +244,7 @@ function GuideCard({ title, level, readTime }: { title: string; level: string; r
     ? "bg-success/10 text-success border-success/20"
     : "bg-primary/10 text-primary border-primary/20";
   return (
-    <div className="bg-card border border-border rounded-xl p-5 flex flex-col gap-3 hover:border-primary/40 transition-colors">
+    <div className="bg-card border border-border rounded-xl p-5 flex flex-col gap-3 hover:border-primary/40 transition-colors h-full">
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-semibold text-foreground leading-snug">{title}</p>
         <span className={`text-[10px] px-2 py-0.5 rounded-full border shrink-0 font-medium ${levelColor}`}>{level}</span>
@@ -297,11 +277,11 @@ function NavBar({ onNavigate }: { onNavigate: (path: string) => void }) {
 
   return (
     <nav
-      className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 md:px-12 h-16 border-b border-border/50"
+      className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 md:px-12 h-16"
       style={{
         backdropFilter: "blur(12px)",
         background: scrolled ? "hsl(var(--background)/0.85)" : "transparent",
-        borderColor: scrolled ? "hsl(var(--border)/0.5)" : "transparent",
+        borderBottom: scrolled ? "1px solid hsl(var(--border)/0.5)" : "1px solid transparent",
         transform: visible ? "translateY(0)" : "translateY(-100%)",
         transition: "transform 0.3s ease, background 0.3s ease, border-color 0.3s ease",
       }}
@@ -314,7 +294,6 @@ function NavBar({ onNavigate }: { onNavigate: (path: string) => void }) {
         <img src={sbLogo} alt="StreamBias" className="h-8 w-auto" />
         <span className="text-lg font-bold text-foreground">StreamBias</span>
       </button>
-
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={() => onNavigate("/login")}>Sign in</Button>
         <Button size="sm" onClick={() => onNavigate("/register")}>Start Free</Button>
@@ -329,29 +308,28 @@ export default function Landing() {
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
 
-  // Redirect authenticated users straight to the app
   useEffect(() => {
     if (!isLoading && user) navigate("/dashboard", { replace: true });
   }, [user, isLoading, navigate]);
 
-  // Mouse-following orbs (direct DOM updates — no React re-render)
+  // Orb mouse tracking — window mousemove, direct DOM updates, zero re-renders
   const orbInnerRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const heroRef = useRef<HTMLDivElement>(null);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = heroRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const x = (e.clientX - rect.left - rect.width / 2) / (rect.width / 2);
-    const y = (e.clientY - rect.top - rect.height / 2) / (rect.height / 2);
-    ORB_CONFIGS.forEach((cfg, i) => {
-      const el = orbInnerRefs.current[i];
-      if (el) el.style.transform = `translate(${x * cfg.mx}px, ${y * cfg.my}px)`;
-    });
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      const x = e.clientX / window.innerWidth;
+      const y = e.clientY / window.innerHeight;
+      ORB_CONFIGS.forEach((cfg, i) => {
+        const el = orbInnerRefs.current[i];
+        if (el) el.style.transform = `translate(${x * cfg.mx}px, ${y * cfg.my}px)`;
+      });
+    };
+    window.addEventListener("mousemove", onMouseMove, { passive: true });
+    return () => window.removeEventListener("mousemove", onMouseMove);
   }, []);
 
-  const scrollToFeatures = () => {
+  const scrollToFeatures = () =>
     document.getElementById("features")?.scrollIntoView({ behavior: "smooth" });
-  };
 
   return (
     <>
@@ -360,12 +338,8 @@ export default function Landing() {
       <NavBar onNavigate={navigate} />
 
       {/* ── HERO ──────────────────────────────────────────────────────────── */}
-      <section
-        ref={heroRef}
-        onMouseMove={handleMouseMove}
-        className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-background px-6 text-center"
-      >
-        {/* Orbs */}
+      <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-background px-6 text-center">
+        {/* Orbs — outer div carries CSS drift, inner div carries mouse offset */}
         {ORB_CONFIGS.map((cfg, i) => (
           <div
             key={i}
@@ -386,13 +360,12 @@ export default function Landing() {
                 background: cfg.color,
                 opacity: cfg.opacity,
                 filter: "blur(80px)",
-                transition: "transform 2s ease",
+                transition: "transform 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
               }}
             />
           </div>
         ))}
 
-        {/* Hero content */}
         <div className="relative z-10 max-w-4xl mx-auto flex flex-col items-center gap-6">
           <div className="flex items-center gap-3 mb-2">
             <img src={sbLogo} alt="StreamBias" className="h-12 w-auto" />
@@ -421,7 +394,6 @@ export default function Landing() {
           <p className="text-xs text-muted-foreground mt-2">No credit card required · Free to start</p>
         </div>
 
-        {/* Scroll indicator */}
         <button
           type="button"
           onClick={scrollToFeatures}
@@ -449,9 +421,8 @@ export default function Landing() {
       </AnimatedSection>
 
       {/* ── FEATURE 1: BIAS ENGINE ────────────────────────────────────────── */}
-      <section id="features" className="py-24 px-6 bg-background">
+      <section id="features" className="py-20 px-6 bg-background">
         <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16 items-center">
-          {/* Text */}
           <AnimatedSection className="flex flex-col gap-5">
             <span className="text-xs font-bold tracking-widest uppercase text-primary">Bias Engine</span>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground leading-tight">
@@ -468,7 +439,6 @@ export default function Landing() {
             </div>
           </AnimatedSection>
 
-          {/* Gauge */}
           <AnimatedSection delay={150} className="flex justify-center">
             <div className="w-full max-w-xs bg-card border border-border rounded-2xl p-8 shadow-xl">
               <BiasGauge />
@@ -478,14 +448,12 @@ export default function Landing() {
       </section>
 
       {/* ── FEATURE 2: JOURNAL ────────────────────────────────────────────── */}
-      <section className="py-24 px-6" style={{ background: "hsl(var(--card)/0.4)" }}>
+      <section className="py-20 px-6" style={{ background: "hsl(var(--card)/0.4)" }}>
         <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16 items-center">
-          {/* Chart (left) */}
           <AnimatedSection delay={100}>
             <EquityMockup />
           </AnimatedSection>
 
-          {/* Text (right) */}
           <AnimatedSection delay={200} className="flex flex-col gap-5">
             <span className="text-xs font-bold tracking-widest uppercase text-primary">Trading Journal</span>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground leading-tight">
@@ -505,9 +473,8 @@ export default function Landing() {
       </section>
 
       {/* ── FEATURE 3: RISK TOOLS ─────────────────────────────────────────── */}
-      <section className="py-24 px-6 bg-background">
+      <section className="py-20 px-6 bg-background">
         <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16 items-center">
-          {/* Text (left) */}
           <AnimatedSection className="flex flex-col gap-5">
             <span className="text-xs font-bold tracking-widest uppercase text-primary">Risk Management</span>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground leading-tight">
@@ -524,17 +491,61 @@ export default function Landing() {
             </div>
           </AnimatedSection>
 
-          {/* Calculator mockup (right) */}
           <AnimatedSection delay={150}>
             <RiskCalculatorMockup />
           </AnimatedSection>
         </div>
       </section>
 
+      {/* ── TESTIMONIALS ──────────────────────────────────────────────────── */}
+      <section className="py-20 px-6" style={{ background: "hsl(var(--card)/0.4)" }}>
+        <div className="max-w-6xl mx-auto">
+          <AnimatedSection className="text-center mb-10 flex flex-col items-center gap-2">
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground">What traders are saying.</h2>
+            <p className="text-muted-foreground">Real feedback from our beta traders.</p>
+          </AnimatedSection>
+
+          <div className="grid sm:grid-cols-3 gap-5">
+            {[
+              {
+                initials: "JM", name: "James M.", role: "FX Day Trader",
+                quote: "StreamBias completely changed how I approach my morning prep. The bias engine tells me exactly what I need to know before the London open.",
+              },
+              {
+                initials: "SR", name: "Sarah R.", role: "Swing Trader",
+                quote: "The journal reports showed me I was consistently losing on Fridays. I had no idea. That insight alone paid for the subscription.",
+              },
+              {
+                initials: "TK", name: "Tom K.", role: "Prop Trader",
+                quote: "Having bias, news, and my journal all in one place means I spend less time switching between tools and more time actually trading.",
+              },
+            ].map((t, i) => (
+              <AnimatedSection key={t.name} delay={i * 100}>
+                <div className="bg-card border border-border rounded-xl p-6 flex flex-col gap-4 h-full">
+                  <div className="flex gap-0.5 text-yellow-400 text-base">
+                    {"★★★★★".split("").map((star, j) => <span key={j}>{star}</span>)}
+                  </div>
+                  <p className="text-muted-foreground text-sm leading-relaxed flex-1">"{t.quote}"</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                      {t.initials}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{t.name}</p>
+                      <p className="text-xs text-muted-foreground">{t.role}</p>
+                    </div>
+                  </div>
+                </div>
+              </AnimatedSection>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── FEATURE 4: EDUCATION ──────────────────────────────────────────── */}
-      <section className="py-24 px-6" style={{ background: "hsl(var(--muted)/0.2)" }}>
+      <section className="py-20 px-6" style={{ background: "hsl(var(--muted)/0.2)" }}>
         <div className="max-w-4xl mx-auto">
-          <AnimatedSection className="text-center mb-12 flex flex-col items-center gap-4">
+          <AnimatedSection className="text-center mb-10 flex flex-col items-center gap-4">
             <span className="text-xs font-bold tracking-widest uppercase text-primary">Education</span>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground">Learn while you trade.</h2>
             <p className="text-muted-foreground max-w-xl leading-relaxed">
@@ -545,9 +556,9 @@ export default function Landing() {
 
           <div className="grid sm:grid-cols-3 gap-4">
             {[
-              { title: "Understanding Market Structure", level: "Beginner", readTime: "4 min" },
+              { title: "Understanding Market Structure",   level: "Beginner",     readTime: "4 min" },
               { title: "The Psychology of Trading Losses", level: "Intermediate", readTime: "6 min" },
-              { title: "Risk Management: The 1% Rule", level: "Beginner", readTime: "3 min" },
+              { title: "Risk Management: The 1% Rule",     level: "Beginner",     readTime: "3 min" },
             ].map((guide, i) => (
               <AnimatedSection key={guide.title} delay={i * 100}>
                 <GuideCard {...guide} />
@@ -557,24 +568,71 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ── FOUNDING MEMBER ───────────────────────────────────────────────── */}
+      <section className="py-20 px-6 bg-background">
+        <div className="max-w-2xl mx-auto">
+          <AnimatedSection>
+            <div
+              className="border border-primary/20 rounded-2xl p-8 md:p-12 text-center flex flex-col items-center gap-5"
+              style={{
+                background: "radial-gradient(ellipse at top, hsl(195 100% 50% / 0.07) 0%, transparent 70%)",
+                boxShadow: "0 0 60px hsl(195 100% 50% / 0.06)",
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                <span className="text-xs font-bold tracking-widest uppercase text-primary">Limited Offer</span>
+              </div>
+
+              <h2 className="text-3xl md:text-4xl font-bold text-foreground">Become a Founding Member.</h2>
+
+              <p className="text-muted-foreground max-w-md leading-relaxed">
+                Lock in 50% off Pro — forever. Only available to the first 100 members.
+                This offer disappears when we launch publicly.
+              </p>
+
+              <div className="w-full max-w-sm space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">67 of 100 spots remaining</span>
+                  <span className="text-xs text-primary font-semibold">33% claimed</span>
+                </div>
+                <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-primary rounded-full transition-all" style={{ width: "33%" }} />
+                </div>
+              </div>
+
+              <Button
+                size="lg"
+                className="h-12 px-10 text-base font-semibold mt-1"
+                onClick={() => navigate("/register")}
+              >
+                Claim Your Spot
+              </Button>
+
+              <p className="text-xs text-muted-foreground">Cancel anytime. No credit card required to start.</p>
+            </div>
+          </AnimatedSection>
+        </div>
+      </section>
+
       {/* ── FINAL CTA ─────────────────────────────────────────────────────── */}
-      <section className="relative py-32 px-6 overflow-hidden bg-background flex flex-col items-center justify-center text-center">
-        {/* Subtle orbs */}
+      <section className="relative py-20 px-6 overflow-hidden bg-background flex flex-col items-center justify-center text-center">
+        {/* Orbs */}
         <div
           style={{
-            position: "absolute", top: "20%", left: "20%",
-            width: "clamp(200px,30vw,400px)", height: "clamp(200px,30vw,400px)",
+            position: "absolute", top: "15%", left: "15%",
+            width: "clamp(160px,24vw,320px)", height: "clamp(160px,24vw,320px)",
             borderRadius: "50%", background: "hsl(195,100%,50%)",
-            opacity: 0.12, filter: "blur(80px)", pointerEvents: "none",
+            opacity: 0.10, filter: "blur(70px)", pointerEvents: "none",
             animation: "sb-orb-1 14s ease-in-out infinite",
           }}
         />
         <div
           style={{
-            position: "absolute", top: "30%", right: "15%",
-            width: "clamp(160px,22vw,300px)", height: "clamp(160px,22vw,300px)",
+            position: "absolute", top: "25%", right: "12%",
+            width: "clamp(130px,18vw,260px)", height: "clamp(130px,18vw,260px)",
             borderRadius: "50%", background: "hsl(220,90%,48%)",
-            opacity: 0.1, filter: "blur(80px)", pointerEvents: "none",
+            opacity: 0.09, filter: "blur(70px)", pointerEvents: "none",
             animation: "sb-orb-2 11s ease-in-out infinite",
           }}
         />
@@ -583,9 +641,7 @@ export default function Landing() {
           <h2 className="text-4xl md:text-5xl font-bold text-foreground leading-tight">
             Ready to trade with conviction?
           </h2>
-          <p className="text-lg text-muted-foreground">
-            Join StreamBias free. No credit card required.
-          </p>
+          <p className="text-lg text-muted-foreground">Join StreamBias free. No credit card required.</p>
           <Button
             size="lg"
             className="h-14 px-10 text-lg font-semibold mt-2"
