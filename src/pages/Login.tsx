@@ -33,7 +33,7 @@ export default function Login() {
     if (error) {
       setSignInError(error.message);
     } else {
-      navigate("/");
+      navigate("/dashboard");
     }
   }
 

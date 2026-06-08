@@ -30,7 +30,7 @@ export default function Register() {
       setError(authError.message);
     } else if (data.user?.confirmed_at) {
       // Email confirmation disabled — user is already confirmed, go straight in
-      navigate("/");
+      navigate("/dashboard");
     } else {
       // Email confirmation required
       setNeedsConfirmation(true);

@@ -35,7 +35,7 @@ type SearchResult = AssetResult | GuideResult | PageResult;
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const PAGES: { label: string; path: string }[] = [
-  { label: "Dashboard",  path: "/" },
+  { label: "Dashboard",  path: "/dashboard" },
   { label: "Markets",    path: "/markets" },
   { label: "Journal",    path: "/journal" },
   { label: "Risk Tools", path: "/risk-tools" },

@@ -18,6 +18,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ResetPassword from "./pages/ResetPassword";
+import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import Markets from "./pages/Markets";
 import Calendar from "./pages/Calendar";
@@ -52,6 +53,7 @@ function AppRoutes() {
   return (
     <>
       <Routes location={backgroundLocation || location}>
+        <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/reset-password" element={<ResetPassword />} />
@@ -59,7 +61,7 @@ function AppRoutes() {
 
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/markets" element={<Markets />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/alerts" element={<Alerts />} />

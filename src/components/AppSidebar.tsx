@@ -27,7 +27,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 type Item = { title: string; url: string; icon: any };
 
 const mainItems: Item[] = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Markets", url: "/markets", icon: TrendingUp },
   { title: "Alerts", url: "/alerts", icon: Bell },
   { title: "Calendar", url: "/calendar", icon: Calendar },

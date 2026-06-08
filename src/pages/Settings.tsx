@@ -74,7 +74,7 @@ export default function Settings() {
     } else {
       setCustomTimeframes(pendingTimeframes);
     }
-    navigate("/");
+    navigate("/dashboard");
   };
 
   const [lockOverlayDisabled, setLockOverlayDisabled] = useState(() => {
