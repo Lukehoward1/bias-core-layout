@@ -34,6 +34,13 @@
 - Grouped dropdown results, keyboard navigation, click-outside close
 - Education page handles ?article=ID and ?view=tips&tip=ID to open specific content
 
+### Auth
+- Supabase Auth fully implemented: login, register, forgot password, reset password pages
+- Protected routes — all app routes require authentication, /login and /register are public
+- Resend SMTP configured for reliable transactional emails (no rate limit issues)
+- AuthContext with useAuth() hook, session persistence via onAuthStateChange
+- AppHeader shows logged-in user email and sign out button
+
 ### Infrastructure
 - Deployed on Vercel with auto-deploy on push to main
 - vercel.json configured for SPA routing + /api/* serverless functions
@@ -46,7 +53,6 @@
 ## Remaining — Pre-Launch
 - Community page: currently static placeholder trade ideas — needs real structure
 - Custom domain setup on Vercel
-- Auth / real user accounts
 - Real broker integration (currently demo only)
 - Billing/Stripe (plan toggle is a dev switch)
 - Smart Search Tier 2: AI-generated explanations for concepts
