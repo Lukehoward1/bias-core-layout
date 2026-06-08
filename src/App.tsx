@@ -12,7 +12,11 @@ import { AppLayout } from "@/layouts/AppLayout";
 
 import { ActiveTradingAccountProvider } from "@/context/ActiveTradingAccountProvider";
 import { TraderStyleProvider } from "@/context/TraderStyleProvider";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 
+import Login from "./pages/Login";
+import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Markets from "./pages/Markets";
 import Calendar from "./pages/Calendar";
@@ -47,22 +51,27 @@ function AppRoutes() {
   return (
     <>
       <Routes location={backgroundLocation || location}>
-        <Route element={<AppLayout />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/markets" element={<Markets />} />
-          <Route path="/calendar" element={<Calendar />} />
-          <Route path="/alerts" element={<Alerts />} />
-          <Route path="/risk-tools" element={<RiskTools />} />
-          <Route path="/journal" element={<Journal />} />
-          <Route path="/education" element={<Education />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/billing" element={<Billing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/pricing" element={<Pricing />} />
 
-          {!backgroundLocation && <Route path="/markets/:symbol" element={<AssetDetailWithBoundary />} />}
-          {!backgroundLocation && <Route path="/asset/:symbol" element={<AssetDetailWithBoundary />} />}
+        <Route element={<ProtectedRoute />}>
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/markets" element={<Markets />} />
+            <Route path="/calendar" element={<Calendar />} />
+            <Route path="/alerts" element={<Alerts />} />
+            <Route path="/risk-tools" element={<RiskTools />} />
+            <Route path="/journal" element={<Journal />} />
+            <Route path="/education" element={<Education />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/billing" element={<Billing />} />
+
+            {!backgroundLocation && <Route path="/markets/:symbol" element={<AssetDetailWithBoundary />} />}
+            {!backgroundLocation && <Route path="/asset/:symbol" element={<AssetDetailWithBoundary />} />}
+          </Route>
         </Route>
 
-        <Route path="/pricing" element={<Pricing />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
 
@@ -81,18 +90,20 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
-          <AlertsProvider>
-            <SessionLockProvider>
-              <TraderStyleProvider>
-                <ActiveTradingAccountProvider>
-                  <GlobalNotifications />
-                  <Toaster />
-                  <Sonner />
-                  <AppRoutes />
-                </ActiveTradingAccountProvider>
-              </TraderStyleProvider>
-            </SessionLockProvider>
-          </AlertsProvider>
+          <AuthProvider>
+            <AlertsProvider>
+              <SessionLockProvider>
+                <TraderStyleProvider>
+                  <ActiveTradingAccountProvider>
+                    <GlobalNotifications />
+                    <Toaster />
+                    <Sonner />
+                    <AppRoutes />
+                  </ActiveTradingAccountProvider>
+                </TraderStyleProvider>
+              </SessionLockProvider>
+            </AlertsProvider>
+          </AuthProvider>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

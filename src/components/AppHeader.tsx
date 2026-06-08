@@ -18,6 +18,7 @@ import {
   LayoutDashboard, BarChart2, BookText, Shield, Calendar as CalendarIcon, Settings as SettingsIcon,
 } from "lucide-react";
 import { useSessionLock } from "@/hooks/use-session-lock";
+import { useAuth } from "@/contexts/AuthContext";
 import { WHITELIST_SYMBOLS } from "@/services/candleData";
 import { ASSET_BY_SYMBOL } from "@/data/asset-registry";
 import { articles, tips } from "@/data/educationContent";
@@ -287,6 +288,17 @@ interface AppHeaderProps {
 
 export function AppHeader({ title, rightContent }: AppHeaderProps) {
   const { lock } = useSessionLock();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const userEmail = user?.email ?? "";
+  const avatarInitials = userEmail ? userEmail.slice(0, 2).toUpperCase() : "?";
+  const displayEmail = userEmail.length > 28 ? `${userEmail.slice(0, 26)}…` : userEmail;
+
+  async function handleSignOut() {
+    await signOut();
+    navigate("/login");
+  }
 
   return (
     <header
@@ -311,15 +323,16 @@ export function AppHeader({ title, rightContent }: AppHeaderProps) {
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-primary text-primary-foreground text-sm font-medium">JD</AvatarFallback>
+              <AvatarFallback className="bg-primary text-primary-foreground text-sm font-medium">
+                {avatarInitials}
+              </AvatarFallback>
             </Avatar>
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel className="py-2">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">John Doe</p>
-                <p className="text-xs text-muted-foreground">john@example.com</p>
+                <p className="text-xs text-muted-foreground truncate">{displayEmail}</p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -332,7 +345,7 @@ export function AppHeader({ title, rightContent }: AppHeaderProps) {
               Lock now
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="py-2">
+            <DropdownMenuItem className="py-2" onClick={handleSignOut}>
               <LogOut className="mr-2.5 h-4 w-4" />
               Sign out
             </DropdownMenuItem>
