@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { AreaChart, Area, ResponsiveContainer, XAxis } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import sbLogo from "@/assets/sb-logo.svg";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Play, UserPlus, BarChart2, TrendingUp } from "lucide-react";
+import { submitDemoLead } from "@/lib/demoLeads";
 
 // ── Static data ────────────────────────────────────────────────────────────────
 
@@ -328,6 +329,25 @@ export default function Landing() {
     return () => window.removeEventListener("mousemove", onMouseMove);
   }, []);
 
+  const [demoName, setDemoName] = useState("");
+  const [demoEmail, setDemoEmail] = useState("");
+  const [demoSubmitting, setDemoSubmitting] = useState(false);
+  const [demoSubmitted, setDemoSubmitted] = useState(false);
+  const [demoError, setDemoError] = useState("");
+
+  async function handleDemoSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setDemoSubmitting(true);
+    setDemoError("");
+    const result = await submitDemoLead(demoName, demoEmail);
+    setDemoSubmitting(false);
+    if (result.success) {
+      setDemoSubmitted(true);
+    } else {
+      setDemoError(result.error ?? "Something went wrong. Please try again.");
+    }
+  }
+
   const scrollToFeatures = () =>
     document.getElementById("features")?.scrollIntoView({ behavior: "smooth" });
 
@@ -420,6 +440,58 @@ export default function Landing() {
         </div>
       </AnimatedSection>
 
+      {/* ── HOW IT WORKS ──────────────────────────────────────────────────── */}
+      <section className="py-20 px-6 bg-background">
+        <div className="max-w-4xl mx-auto">
+          <AnimatedSection className="text-center mb-14 flex flex-col items-center gap-2">
+            <span className="text-xs font-bold tracking-widest uppercase text-primary">How it works</span>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground">Up and running in minutes.</h2>
+          </AnimatedSection>
+
+          <div className="relative grid md:grid-cols-3 gap-10">
+            {/* Dashed connector — desktop only */}
+            <div
+              className="hidden md:block absolute top-10 left-[calc(16.67%+1.5rem)] right-[calc(16.67%+1.5rem)] h-px"
+              style={{ borderTop: "2px dashed hsl(var(--border))" }}
+            />
+
+            {[
+              {
+                icon: UserPlus,
+                step: "1",
+                title: "Create your account",
+                desc: "Sign up free — no credit card needed. Your 7-day trial starts the moment you log in.",
+              },
+              {
+                icon: BarChart2,
+                step: "2",
+                title: "Connect your markets",
+                desc: "Select the assets you trade. StreamBias starts reading bias and delivering signals immediately.",
+              },
+              {
+                icon: TrendingUp,
+                step: "3",
+                title: "Trade with clarity",
+                desc: "Open every session knowing the bias, logging every trade, and improving with data-backed insights.",
+              },
+            ].map(({ icon: Icon, step, title, desc }, i) => (
+              <AnimatedSection key={step} delay={i * 120} className="flex flex-col items-center text-center gap-4">
+                <div className="relative">
+                  <div className="w-20 h-20 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                    <Icon className="h-8 w-8 text-primary" />
+                  </div>
+                  <span className="absolute -top-3 -right-3 w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center shadow-md">
+                    {step}
+                  </span>
+                </div>
+                <h3 className="text-base font-semibold text-foreground">{title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed max-w-xs">{desc}</p>
+              </AnimatedSection>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── FEATURE 1: BIAS ENGINE ────────────────────────────────────────── */}
       <section id="features" className="py-20 px-6 bg-background">
         <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16 items-center">
@@ -443,6 +515,91 @@ export default function Landing() {
             <div className="w-full max-w-xs bg-card border border-border rounded-2xl p-8 shadow-xl">
               <BiasGauge />
             </div>
+          </AnimatedSection>
+        </div>
+      </section>
+
+      {/* ── DEMO VIDEO ────────────────────────────────────────────────────── */}
+      <section className="py-20 px-6" style={{ background: "hsl(var(--card)/0.4)" }}>
+        <div className="max-w-4xl mx-auto flex flex-col items-center gap-10">
+          <AnimatedSection className="text-center flex flex-col items-center gap-3">
+            <span className="text-xs font-bold tracking-widest uppercase text-primary">See it live</span>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground">Watch StreamBias in action.</h2>
+            <p className="text-muted-foreground max-w-xl leading-relaxed">
+              See how traders use StreamBias to build their morning bias, manage risk, and review their week — all in one platform.
+            </p>
+          </AnimatedSection>
+
+          {/* Video placeholder */}
+          <AnimatedSection delay={100} className="w-full">
+            <div
+              className="relative w-full rounded-2xl overflow-hidden border border-border shadow-2xl"
+              style={{ aspectRatio: "16/9", background: "hsl(var(--card))" }}
+            >
+              {/* Grid pattern */}
+              <div
+                className="absolute inset-0"
+                style={{
+                  backgroundImage: "linear-gradient(hsl(var(--border)/0.5) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--border)/0.5) 1px, transparent 1px)",
+                  backgroundSize: "40px 40px",
+                }}
+              />
+              {/* Preview badge */}
+              <div className="absolute top-4 left-4 flex items-center gap-1.5 bg-primary/90 text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full backdrop-blur-sm">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground animate-pulse" />
+                Preview
+              </div>
+              {/* Play button */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-20 h-20 rounded-full bg-primary/90 backdrop-blur-sm flex items-center justify-center shadow-lg hover:bg-primary transition-colors cursor-pointer border border-primary-foreground/20">
+                  <Play className="h-8 w-8 text-primary-foreground fill-primary-foreground ml-1" />
+                </div>
+              </div>
+              {/* Mock UI preview label */}
+              <div className="absolute bottom-4 right-4 bg-background/80 backdrop-blur-sm border border-border rounded-lg px-3 py-1.5">
+                <p className="text-xs text-muted-foreground">Full demo • 4 min</p>
+              </div>
+            </div>
+          </AnimatedSection>
+
+          {/* Email gate */}
+          <AnimatedSection delay={200} className="w-full max-w-md mx-auto">
+            {demoSubmitted ? (
+              <div className="text-center p-8 rounded-2xl border border-primary/20 bg-primary/5 flex flex-col items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                  <Play className="h-5 w-5 text-primary fill-primary" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground">You're in!</h3>
+                <p className="text-sm text-muted-foreground">We'll send the full demo to your inbox shortly.</p>
+              </div>
+            ) : (
+              <form onSubmit={handleDemoSubmit} className="flex flex-col gap-3">
+                <p className="text-center text-sm text-muted-foreground mb-1">
+                  Enter your details to watch the full demo.
+                </p>
+                <input
+                  type="text"
+                  placeholder="Your name"
+                  required
+                  value={demoName}
+                  onChange={e => setDemoName(e.target.value)}
+                  className="w-full h-10 px-4 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+                <input
+                  type="email"
+                  placeholder="Your email address"
+                  required
+                  value={demoEmail}
+                  onChange={e => setDemoEmail(e.target.value)}
+                  className="w-full h-10 px-4 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+                {demoError && <p className="text-xs text-destructive text-center">{demoError}</p>}
+                <Button type="submit" className="h-11 font-semibold" disabled={demoSubmitting}>
+                  {demoSubmitting ? "Sending…" : "Watch the Full Demo →"}
+                </Button>
+                <p className="text-center text-xs text-muted-foreground">No spam. Unsubscribe anytime.</p>
+              </form>
+            )}
           </AnimatedSection>
         </div>
       </section>
@@ -587,8 +744,8 @@ export default function Landing() {
               <h2 className="text-3xl md:text-4xl font-bold text-foreground">Become a Founding Member.</h2>
 
               <p className="text-muted-foreground max-w-md leading-relaxed">
-                Lock in 50% off Pro — forever. Only available to the first 100 members.
-                This offer disappears when we launch publicly.
+                Lock in 50% off Pro — forever. Start with a 7-day free trial, then pay half price for life.
+                Only available to the first 100 members.
               </p>
 
               <div className="w-full max-w-sm space-y-2">
@@ -641,7 +798,7 @@ export default function Landing() {
           <h2 className="text-4xl md:text-5xl font-bold text-foreground leading-tight">
             Ready to trade with conviction?
           </h2>
-          <p className="text-lg text-muted-foreground">Join StreamBias free. No credit card required.</p>
+          <p className="text-lg text-muted-foreground">Start your 7-day free trial. No credit card required.</p>
           <Button
             size="lg"
             className="h-14 px-10 text-lg font-semibold mt-2"
