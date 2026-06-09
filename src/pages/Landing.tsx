@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { AreaChart, Area, ResponsiveContainer, XAxis } from "recharts";
+import {
+  AreaChart, Area, ResponsiveContainer, XAxis,
+  BarChart, Bar, Cell, YAxis,
+} from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import sbLogo from "@/assets/sb-logo.svg";
-import { ChevronDown, Play, UserPlus, BarChart2, TrendingUp } from "lucide-react";
+import {
+  ChevronDown, Play, UserPlus, BarChart2, TrendingUp,
+  Gem, Bitcoin, LineChart,
+} from "lucide-react";
 import { submitDemoLead } from "@/lib/demoLeads";
 
 // ── Static data ────────────────────────────────────────────────────────────────
@@ -14,6 +20,38 @@ const EQUITY_DATA = [
   { d: "Apr", v: 10890 }, { d: "May", v: 11340 }, { d: "Jun", v: 11180 },
   { d: "Jul", v: 11820 }, { d: "Aug", v: 12350 }, { d: "Sep", v: 12100 },
   { d: "Oct", v: 13050 }, { d: "Nov", v: 13480 }, { d: "Dec", v: 14200 },
+];
+
+const ROLLING_DATA = [
+  { w: "W1", pnl: 1240 }, { w: "W2", pnl: 890  }, { w: "W3", pnl: -420 },
+  { w: "W4", pnl: 1680 }, { w: "W5", pnl: 560  }, { w: "W6", pnl: -180 },
+  { w: "W7", pnl: 2100 }, { w: "W8", pnl: 1450 },
+];
+
+type CalDay = { d: number | null; pnl?: number | null; weekend?: boolean };
+
+const CALENDAR_WEEKS: CalDay[][] = [
+  [
+    { d: 1, pnl:  420 }, { d: 2, pnl:  180 }, { d: 3, pnl: -290 }, { d: 4, pnl: 650 }, { d: 5, pnl:  120 },
+    { d: 6, weekend: true }, { d: 7, weekend: true },
+  ],
+  [
+    { d: 8, pnl: -180 }, { d: 9, pnl:  890 }, { d: 10, pnl: 340 }, { d: 11, pnl: -120 }, { d: 12, pnl: 560 },
+    { d: 13, weekend: true }, { d: 14, weekend: true },
+  ],
+  [
+    { d: 15, pnl: 720 }, { d: 16, pnl: -450 }, { d: 17, pnl: 280 }, { d: 18, pnl:  190 }, { d: 19, pnl: -320 },
+    { d: 20, weekend: true }, { d: 21, weekend: true },
+  ],
+  [
+    { d: 22, pnl: 540 }, { d: 23, pnl:  380 }, { d: 24, pnl: -210 }, { d: 25, pnl: 820 }, { d: 26, pnl:  160 },
+    { d: 27, weekend: true }, { d: 28, weekend: true },
+  ],
+  [
+    { d: 29, pnl: null }, { d: 30, pnl: null }, { d: 31, pnl: null },
+    { d: null }, { d: null },
+    { d: null, weekend: true }, { d: null, weekend: true },
+  ],
 ];
 
 // mx/my: pixel offset applied at the extreme edges of the viewport (x=0 or x=1)
@@ -132,20 +170,21 @@ function BiasGauge() {
   );
 }
 
-// ── EquityMockup ───────────────────────────────────────────────────────────────
+// ── JournalShowcaseMockup ──────────────────────────────────────────────────────
 
-function EquityMockup() {
+function JournalShowcaseMockup() {
   const { ref, inView } = useInView();
   return (
     <div
       ref={ref}
-      className="w-full rounded-xl overflow-hidden border border-border shadow-2xl"
+      className="w-full max-w-lg mx-auto rounded-xl overflow-hidden border border-border shadow-2xl"
       style={{
         opacity: inView ? 1 : 0,
         transform: inView ? "translateY(0)" : "translateY(20px)",
         transition: "opacity 0.7s ease, transform 0.7s ease",
       }}
     >
+      {/* Browser chrome */}
       <div className="bg-card/80 border-b border-border px-4 py-2.5 flex items-center gap-3">
         <div className="flex gap-1.5">
           <div className="w-2.5 h-2.5 rounded-full" style={{ background: "hsl(0,65%,55%)" }} />
@@ -156,45 +195,115 @@ function EquityMockup() {
           <span className="text-[10px] text-muted-foreground">app.streambias.com/journal</span>
         </div>
       </div>
-      <div className="bg-card p-5">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <p className="text-xs text-muted-foreground mb-0.5">Equity Curve</p>
-            <p className="text-2xl font-bold text-success">+£4,200</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Dec 2025 – Dec 2026</p>
+
+      <div className="bg-card p-4 space-y-3">
+        {/* Panel A: Journal Calendar */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-foreground">May 2026</p>
+            <span className="text-[10px] text-muted-foreground">Trading Journal</span>
           </div>
-          <span className="text-xs px-2.5 py-1 rounded-full bg-success/10 text-success font-semibold border border-success/20">+42.0%</span>
+          <div className="grid grid-cols-7 gap-0.5 mb-1">
+            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+              <div key={d} className="text-[9px] text-center text-muted-foreground font-medium py-0.5">{d}</div>
+            ))}
+          </div>
+          <div className="space-y-0.5">
+            {CALENDAR_WEEKS.map((week, wi) => (
+              <div key={wi} className="grid grid-cols-7 gap-0.5">
+                {week.map((cell, ci) => {
+                  if (cell.weekend) {
+                    return <div key={ci} className="rounded bg-muted/20 min-h-[28px]" />;
+                  }
+                  if (cell.d === null) {
+                    return <div key={ci} className="min-h-[28px]" />;
+                  }
+                  if (cell.pnl == null) {
+                    return (
+                      <div key={ci} className="rounded bg-muted/10 border border-border/20 min-h-[28px] flex items-center justify-center">
+                        <span className="text-[8px] text-muted-foreground/40">{cell.d}</span>
+                      </div>
+                    );
+                  }
+                  const pos = cell.pnl > 0;
+                  return (
+                    <div
+                      key={ci}
+                      className={`rounded min-h-[28px] flex flex-col items-center justify-center ${
+                        pos ? "bg-success/10 border border-success/20" : "bg-destructive/10 border border-destructive/20"
+                      }`}
+                    >
+                      <span className="text-[7px] text-muted-foreground leading-none">{cell.d}</span>
+                      <span className={`text-[7px] font-semibold leading-tight ${pos ? "text-success" : "text-destructive"}`}>
+                        {pos ? "+" : ""}£{Math.abs(cell.pnl)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="h-44">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={EQUITY_DATA} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="landing-eq-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="hsl(195,100%,50%)" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="hsl(195,100%,50%)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="d" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-              <Area type="monotone" dataKey="v" stroke="hsl(195,100%,50%)" fill="url(#landing-eq-grad)" strokeWidth={2} dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="grid grid-cols-3 gap-2 mt-4">
-          {[{ label: "Win Rate", value: "68%" }, { label: "Avg R:R", value: "1.8" }, { label: "Trades", value: "94" }].map(({ label, value }) => (
-            <div key={label} className="text-center p-2 rounded-lg bg-muted/40">
-              <p className="text-xs text-muted-foreground">{label}</p>
-              <p className="text-sm font-bold text-foreground">{value}</p>
+
+        <div className="border-t border-border/50" />
+
+        {/* Panel B: Equity curve */}
+        <div className="flex items-center gap-4">
+          <div className="flex-1 h-20">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={EQUITY_DATA} margin={{ top: 2, right: 0, left: 0, bottom: 2 }}>
+                <defs>
+                  <linearGradient id="journal-eq-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="hsl(195,100%,50%)" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="hsl(195,100%,50%)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area type="monotone" dataKey="v" stroke="hsl(195,100%,50%)" fill="url(#journal-eq-grad)" strokeWidth={1.5} dot={false} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex flex-col gap-2 shrink-0">
+            <div>
+              <p className="text-[10px] text-muted-foreground">Total P&L</p>
+              <p className="text-sm font-bold text-success">+£91,310</p>
             </div>
-          ))}
+            <div>
+              <p className="text-[10px] text-muted-foreground">Win rate</p>
+              <p className="text-sm font-bold text-foreground">60%</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-border/50" />
+
+        {/* Panel C: 30-Day Rolling Performance */}
+        <div>
+          <p className="text-[10px] text-muted-foreground mb-1.5">30-Day Rolling Performance</p>
+          <div className="h-[70px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={ROLLING_DATA} margin={{ top: 2, right: 0, left: 0, bottom: 2 }} barSize={16}>
+                <YAxis hide domain={["auto", "auto"]} />
+                <Bar dataKey="pnl" radius={[2, 2, 0, 0]}>
+                  {ROLLING_DATA.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={entry.pnl >= 0 ? "hsl(142,55%,50%)" : "hsl(0,65%,55%)"}
+                      fillOpacity={0.85}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// ── RiskCalculatorMockup ───────────────────────────────────────────────────────
+// ── QuickRiskMockup ────────────────────────────────────────────────────────────
 
-function RiskCalculatorMockup() {
+function QuickRiskMockup() {
   const { ref, inView } = useInView();
   return (
     <div
@@ -207,31 +316,77 @@ function RiskCalculatorMockup() {
       }}
     >
       <div className="bg-card border border-border rounded-xl p-5 shadow-2xl space-y-3">
-        <div className="flex items-center gap-2 pb-1">
-          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-          <p className="text-sm font-semibold text-foreground">Position Size Calculator</p>
-          <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-success/10 text-success border border-success/20">Linked</span>
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-foreground">Quick Risk Calculator</p>
+          <span className="flex items-center gap-1.5 text-[10px] px-2.5 py-0.5 rounded-full bg-success/10 text-success border border-success/20 font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-success" />
+            Linked
+          </span>
         </div>
-        {[
-          { label: "Account Balance", value: "£10,000", note: "IG Demo Account" },
-          { label: "Risk per trade",  value: "1.0%",    note: "£100 max loss" },
-          { label: "Stop loss",       value: "25 pips", note: "EURUSD" },
-        ].map(({ label, value, note }) => (
-          <div key={label} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border">
-            <div>
-              <p className="text-[11px] text-muted-foreground">{label}</p>
-              <p className="text-sm font-medium text-foreground">{value}</p>
-            </div>
-            <p className="text-[11px] text-muted-foreground">{note}</p>
+
+        <p className="text-[10px] text-muted-foreground">Mode: Linked — IG Demo Account</p>
+
+        {/* Account Balance */}
+        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border">
+          <div>
+            <p className="text-[11px] text-muted-foreground">Account Balance</p>
+            <p className="text-sm font-medium text-foreground">£140,000</p>
           </div>
-        ))}
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-semibold">
+            Auto
+          </span>
+        </div>
+
+        {/* Risk % selector */}
+        <div>
+          <p className="text-[11px] text-muted-foreground mb-2">Risk per trade</p>
+          <div className="flex gap-1.5">
+            {["0.5%", "1%", "1.5%", "2%"].map((r) => (
+              <button
+                key={r}
+                type="button"
+                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  r === "1%"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted/50 text-muted-foreground border border-border"
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Max Risk result */}
         <div className="p-4 rounded-lg bg-primary/10 border border-primary/30">
-          <p className="text-xs text-primary font-medium mb-1.5">Recommended Position Size</p>
-          <p className="text-3xl font-bold text-primary">0.40 <span className="text-base font-normal text-primary/70">lots</span></p>
-          <div className="flex gap-4 mt-2">
-            <p className="text-xs text-muted-foreground">Max risk: <span className="text-foreground">£100</span></p>
-            <p className="text-xs text-muted-foreground">Margin: <span className="text-foreground">~£400</span></p>
+          <p className="text-xs text-primary font-medium mb-1">Max Risk</p>
+          <p className="text-3xl font-bold text-primary">£1,400</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">at 1.0% of £140,000</p>
+        </div>
+
+        {/* Spread adjusted */}
+        <div className="flex items-center justify-between px-0.5">
+          <p className="text-xs text-muted-foreground">
+            Spread adjusted: <span className="text-foreground font-medium">£1,387</span>
+          </p>
+          <div className="w-4 h-4 rounded-full bg-muted/60 flex items-center justify-center cursor-help">
+            <span className="text-[9px] text-muted-foreground font-bold">?</span>
           </div>
+        </div>
+
+        <div className="border-t border-border/50" />
+
+        {/* Live price */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[10px] text-muted-foreground mb-0.5">Entry Price</p>
+            <p className="text-sm font-medium text-foreground font-mono">1.08442</p>
+          </div>
+          <span className="flex items-center gap-1.5 text-[10px] text-success font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+            Live
+          </span>
         </div>
       </div>
     </div>
@@ -297,7 +452,7 @@ function NavBar({ onNavigate }: { onNavigate: (path: string) => void }) {
       </button>
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={() => onNavigate("/login")}>Sign in</Button>
-        <Button size="sm" onClick={() => onNavigate("/register")}>Start Free</Button>
+        <Button size="sm" onClick={() => onNavigate("/register")}>Start Free Trial</Button>
       </div>
     </nav>
   );
@@ -411,7 +566,7 @@ export default function Landing() {
             </Button>
           </div>
 
-          <p className="text-xs text-muted-foreground mt-2">No credit card required · Free to start</p>
+          <p className="text-xs text-muted-foreground mt-2">7-day free trial · No credit card required</p>
         </div>
 
         <button
@@ -423,22 +578,6 @@ export default function Landing() {
           <ChevronDown className="h-6 w-6" />
         </button>
       </section>
-
-      {/* ── SOCIAL PROOF ──────────────────────────────────────────────────── */}
-      <AnimatedSection>
-        <div className="border-y border-border bg-card/30 py-5 px-6">
-          <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-3 text-sm text-muted-foreground">
-            <span className="font-medium text-foreground/70">Trusted by traders across</span>
-            <div className="flex items-center gap-2 flex-wrap justify-center">
-              {["FX", "Gold", "Indices", "Crypto", "Stocks"].map((asset) => (
-                <span key={asset} className="px-3 py-1 rounded-full bg-muted/60 border border-border text-xs font-medium text-foreground/80">
-                  {asset}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </AnimatedSection>
 
       {/* ── HOW IT WORKS ──────────────────────────────────────────────────── */}
       <section className="py-20 px-6 bg-background">
@@ -457,24 +596,24 @@ export default function Landing() {
 
             {[
               {
-                icon: UserPlus,
+                Icon: UserPlus,
                 step: "1",
                 title: "Create your account",
                 desc: "Sign up free — no credit card needed. Your 7-day trial starts the moment you log in.",
               },
               {
-                icon: BarChart2,
+                Icon: BarChart2,
                 step: "2",
                 title: "Connect your markets",
                 desc: "Select the assets you trade. StreamBias starts reading bias and delivering signals immediately.",
               },
               {
-                icon: TrendingUp,
+                Icon: TrendingUp,
                 step: "3",
                 title: "Trade with clarity",
                 desc: "Open every session knowing the bias, logging every trade, and improving with data-backed insights.",
               },
-            ].map(({ icon: Icon, step, title, desc }, i) => (
+            ].map(({ Icon, step, title, desc }, i) => (
               <AnimatedSection key={step} delay={i * 120} className="flex flex-col items-center text-center gap-4">
                 <div className="relative">
                   <div className="w-20 h-20 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
@@ -489,6 +628,29 @@ export default function Landing() {
               </AnimatedSection>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ── SOCIAL PROOF / BUILT FOR EVERY MARKET ─────────────────────────── */}
+      <section className="py-12 px-6 bg-background">
+        <div className="max-w-4xl mx-auto flex flex-col items-center gap-6">
+          <AnimatedSection>
+            <p className="text-sm font-semibold text-muted-foreground text-center">Built for every market</p>
+          </AnimatedSection>
+          <AnimatedSection delay={100} className="flex items-center gap-3 flex-wrap justify-center">
+            {[
+              { label: "FX",      Icon: TrendingUp },
+              { label: "Gold",    Icon: Gem        },
+              { label: "Indices", Icon: BarChart2  },
+              { label: "Crypto",  Icon: Bitcoin    },
+              { label: "Stocks",  Icon: LineChart  },
+            ].map(({ label, Icon }) => (
+              <span key={label} className="flex items-center gap-2 px-6 py-3 rounded-full bg-muted/60 border border-border text-sm font-semibold text-foreground/80">
+                <Icon className="h-4 w-4 text-primary" />
+                {label}
+              </span>
+            ))}
+          </AnimatedSection>
         </div>
       </section>
 
@@ -525,18 +687,15 @@ export default function Landing() {
           <AnimatedSection className="text-center flex flex-col items-center gap-3">
             <span className="text-xs font-bold tracking-widest uppercase text-primary">See it live</span>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground">Watch StreamBias in action.</h2>
-            <p className="text-muted-foreground max-w-xl leading-relaxed">
-              See how traders use StreamBias to build their morning bias, manage risk, and review their week — all in one platform.
-            </p>
+            <p className="text-muted-foreground max-w-xl leading-relaxed">Get a quick feel for the platform.</p>
           </AnimatedSection>
 
-          {/* Video placeholder */}
+          {/* Part A: 60-second overview */}
           <AnimatedSection delay={100} className="w-full">
             <div
               className="relative w-full rounded-2xl overflow-hidden border border-border shadow-2xl"
               style={{ aspectRatio: "16/9", background: "hsl(var(--card))" }}
             >
-              {/* Grid pattern */}
               <div
                 className="absolute inset-0"
                 style={{
@@ -544,71 +703,79 @@ export default function Landing() {
                   backgroundSize: "40px 40px",
                 }}
               />
-              {/* Preview badge */}
               <div className="absolute top-4 left-4 flex items-center gap-1.5 bg-primary/90 text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full backdrop-blur-sm">
                 <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground animate-pulse" />
                 Preview
               </div>
-              {/* Play button */}
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="w-20 h-20 rounded-full bg-primary/90 backdrop-blur-sm flex items-center justify-center shadow-lg hover:bg-primary transition-colors cursor-pointer border border-primary-foreground/20">
                   <Play className="h-8 w-8 text-primary-foreground fill-primary-foreground ml-1" />
                 </div>
               </div>
-              {/* Mock UI preview label */}
               <div className="absolute bottom-4 right-4 bg-background/80 backdrop-blur-sm border border-border rounded-lg px-3 py-1.5">
-                <p className="text-xs text-muted-foreground">Full demo • 4 min</p>
+                <p className="text-xs text-muted-foreground">60-second overview · Coming soon</p>
               </div>
             </div>
           </AnimatedSection>
 
-          {/* Email gate */}
-          <AnimatedSection delay={200} className="w-full max-w-md mx-auto">
+          {/* Divider */}
+          <div className="w-full flex items-center gap-4">
+            <div className="flex-1 border-t border-border" />
+            <p className="text-xs text-muted-foreground shrink-0">or</p>
+            <div className="flex-1 border-t border-border" />
+          </div>
+
+          {/* Part B: Email gate — full platform walkthrough */}
+          <AnimatedSection delay={150} className="w-full max-w-md mx-auto">
             {demoSubmitted ? (
               <div className="text-center p-8 rounded-2xl border border-primary/20 bg-primary/5 flex flex-col items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
                   <Play className="h-5 w-5 text-primary fill-primary" />
                 </div>
-                <h3 className="text-lg font-semibold text-foreground">You're in!</h3>
-                <p className="text-sm text-muted-foreground">We'll send the full demo to your inbox shortly.</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  You're on the list — we'll send the full walkthrough straight to your inbox.
+                </p>
               </div>
             ) : (
-              <form onSubmit={handleDemoSubmit} className="flex flex-col gap-3">
-                <p className="text-center text-sm text-muted-foreground mb-1">
-                  Enter your details to watch the full demo.
+              <div className="flex flex-col items-center gap-4 text-center">
+                <h3 className="text-lg font-semibold text-foreground">Want the full platform walkthrough?</h3>
+                <p className="text-sm text-muted-foreground max-w-sm">
+                  Enter your details and we'll send you the complete demo the moment it goes live.
                 </p>
-                <input
-                  type="text"
-                  placeholder="Your name"
-                  required
-                  value={demoName}
-                  onChange={e => setDemoName(e.target.value)}
-                  className="w-full h-10 px-4 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-                />
-                <input
-                  type="email"
-                  placeholder="Your email address"
-                  required
-                  value={demoEmail}
-                  onChange={e => setDemoEmail(e.target.value)}
-                  className="w-full h-10 px-4 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-                />
-                {demoError && <p className="text-xs text-destructive text-center">{demoError}</p>}
-                <Button type="submit" className="h-11 font-semibold" disabled={demoSubmitting}>
-                  {demoSubmitting ? "Sending…" : "Watch the Full Demo →"}
-                </Button>
-                <p className="text-center text-xs text-muted-foreground">No spam. Unsubscribe anytime.</p>
-              </form>
+                <form onSubmit={handleDemoSubmit} className="flex flex-col gap-3 w-full">
+                  <input
+                    type="text"
+                    placeholder="Your name"
+                    required
+                    value={demoName}
+                    onChange={(e) => setDemoName(e.target.value)}
+                    className="w-full h-10 px-4 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                  <input
+                    type="email"
+                    placeholder="Your email address"
+                    required
+                    value={demoEmail}
+                    onChange={(e) => setDemoEmail(e.target.value)}
+                    className="w-full h-10 px-4 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  />
+                  {demoError && <p className="text-xs text-destructive text-center">{demoError}</p>}
+                  <Button type="submit" className="h-11 font-semibold" disabled={demoSubmitting}>
+                    {demoSubmitting ? "Sending…" : "Send Me the Full Demo →"}
+                  </Button>
+                  <p className="text-center text-xs text-muted-foreground">No spam. Unsubscribe anytime.</p>
+                </form>
+              </div>
             )}
           </AnimatedSection>
         </div>
       </section>
 
       {/* ── FEATURE 2: JOURNAL ────────────────────────────────────────────── */}
-      <section className="py-20 px-6" style={{ background: "hsl(var(--card)/0.4)" }}>
+      <section className="py-20 px-6 bg-background">
         <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16 items-center">
           <AnimatedSection delay={100}>
-            <EquityMockup />
+            <JournalShowcaseMockup />
           </AnimatedSection>
 
           <AnimatedSection delay={200} className="flex flex-col gap-5">
@@ -630,7 +797,7 @@ export default function Landing() {
       </section>
 
       {/* ── FEATURE 3: RISK TOOLS ─────────────────────────────────────────── */}
-      <section className="py-20 px-6 bg-background">
+      <section className="py-20 px-6" style={{ background: "hsl(var(--card)/0.4)" }}>
         <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16 items-center">
           <AnimatedSection className="flex flex-col gap-5">
             <span className="text-xs font-bold tracking-widest uppercase text-primary">Risk Management</span>
@@ -649,13 +816,13 @@ export default function Landing() {
           </AnimatedSection>
 
           <AnimatedSection delay={150}>
-            <RiskCalculatorMockup />
+            <QuickRiskMockup />
           </AnimatedSection>
         </div>
       </section>
 
       {/* ── TESTIMONIALS ──────────────────────────────────────────────────── */}
-      <section className="py-20 px-6" style={{ background: "hsl(var(--card)/0.4)" }}>
+      <section className="py-20 px-6 bg-background">
         <div className="max-w-6xl mx-auto">
           <AnimatedSection className="text-center mb-10 flex flex-col items-center gap-2">
             <h2 className="text-3xl md:text-4xl font-bold text-foreground">What traders are saying.</h2>
@@ -699,7 +866,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── FEATURE 4: EDUCATION ──────────────────────────────────────────── */}
+      {/* ── EDUCATION ─────────────────────────────────────────────────────── */}
       <section className="py-20 px-6" style={{ background: "hsl(var(--muted)/0.2)" }}>
         <div className="max-w-4xl mx-auto">
           <AnimatedSection className="text-center mb-10 flex flex-col items-center gap-4">
@@ -748,6 +915,7 @@ export default function Landing() {
                 Only available to the first 100 members.
               </p>
 
+              {/* ── UPDATE BEFORE LAUNCH: adjust spot count, percentage, and progress bar width ── */}
               <div className="w-full max-w-sm space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-foreground">67 of 100 spots remaining</span>
@@ -774,7 +942,6 @@ export default function Landing() {
 
       {/* ── FINAL CTA ─────────────────────────────────────────────────────── */}
       <section className="relative py-20 px-6 overflow-hidden bg-background flex flex-col items-center justify-center text-center">
-        {/* Orbs */}
         <div
           style={{
             position: "absolute", top: "15%", left: "15%",
@@ -817,11 +984,19 @@ export default function Landing() {
 
       {/* ── FOOTER ────────────────────────────────────────────────────────── */}
       <footer className="border-t border-border bg-card/30 py-8 px-6">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2.5">
             <img src={sbLogo} alt="StreamBias" className="h-6 w-auto opacity-70" />
             <span className="text-sm text-muted-foreground font-medium">StreamBias</span>
           </div>
+
+          <div className="flex items-center gap-6">
+            <button type="button" onClick={() => navigate("/login")}    className="text-xs text-muted-foreground hover:text-foreground transition-colors">Sign in</button>
+            <button type="button" onClick={() => navigate("/register")} className="text-xs text-muted-foreground hover:text-foreground transition-colors">Create Account</button>
+            <button type="button" onClick={() => navigate("/privacy")}  className="text-xs text-muted-foreground hover:text-foreground transition-colors">Privacy Policy</button>
+            <button type="button" onClick={() => navigate("/terms")}    className="text-xs text-muted-foreground hover:text-foreground transition-colors">Terms</button>
+          </div>
+
           <p className="text-xs text-muted-foreground">
             © {new Date().getFullYear()} StreamBias. Built for disciplined traders.
           </p>
