@@ -1,243 +1,311 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, Flame, Zap, BarChart3, Bell, TrendingUp, Monitor, Users, Headphones } from "lucide-react";
+import { Check, ChevronLeft, Zap } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
+import { createCheckoutSession, PRICE_IDS } from "@/lib/stripe";
 
-const Pricing = () => {
-  const [heroEmail, setHeroEmail] = useState("");
-  const [footerEmail, setFooterEmail] = useState("");
+// ── Types ──────────────────────────────────────────────────────────────────────
 
-  const plans = [
-    {
-      name: "Basic",
-      subtitle: "Entry / Core",
-      price: "£40",
-      period: "/month",
-      features: [
-        "Core market overview",
-        "Essential tools",
-        "Basic insights",
-        "Limited alerts",
-        "Community access",
-        "Standard support",
-      ],
-      cta: "Join Waiting List",
-      highlighted: false,
-    },
-    {
-      name: "Premium",
-      subtitle: "Advanced",
-      price: "£60",
-      period: "/month",
-      features: [
-        "Everything in Basic",
-        "Full market deep-dives",
-        "Advanced analytics",
-        "All alerts + custom alerts",
-        "Smart tools / automations",
-        "Early access to new features",
-        "Priority support",
-      ],
-      cta: "Join Waiting List",
-      highlighted: true,
-      badge: "Most Popular",
-    },
-    {
-      name: "Enterprise",
-      subtitle: "Teams & Scale",
-      price: "£120",
-      period: "/month",
-      features: [
-        "Everything in Premium",
-        "Team / multi-user access",
-        "Advanced analytics suite",
-        "API access",
-        "Dedicated onboarding",
-        "Priority customer success manager",
-      ],
-      cta: "Contact Us",
-      highlighted: false,
-    },
-  ];
+type Billing = "monthly" | "annual";
 
-  const featureGrid = [
-    { icon: TrendingUp, title: "Real-time market insights", description: "Stay ahead with live data and analysis" },
-    { icon: Zap, title: "Automated smart tools", description: "Let AI handle the heavy lifting" },
-    { icon: BarChart3, title: "Portfolio monitoring", description: "Track performance at a glance" },
-    { icon: Bell, title: "Trends & sentiment", description: "Understand market mood instantly" },
-    { icon: Monitor, title: "Deep-dive analysis", description: "Comprehensive research tools" },
-    { icon: Users, title: "Desktop + mobile access", description: "Trade anywhere, anytime" },
-  ];
+interface Plan {
+  name: string;
+  description: string;
+  monthlyPrice: string;
+  annualPrice: string;
+  annualMonthly: string;
+  features: string[];
+  cta: string;
+  priceIdMonthly: string;
+  priceIdAnnual: string;
+  highlighted: boolean;
+  badge?: string;
+  trial: boolean;
+}
+
+// ── Static plan definitions ────────────────────────────────────────────────────
+
+const PLANS: Plan[] = [
+  {
+    name: "Standard",
+    description: "Everything you need to trade with clarity.",
+    monthlyPrice: "£19",
+    annualPrice: "£190",
+    annualMonthly: "£15.83",
+    features: [
+      "Live bias engine (all timeframes)",
+      "Economic calendar (filtered by pairs)",
+      "Risk tools & position calculator",
+      "Trading journal with analytics",
+      "Education library",
+      "Price & session alerts",
+    ],
+    cta: "Start Free Trial",
+    priceIdMonthly: PRICE_IDS.STANDARD_MONTHLY,
+    priceIdAnnual: PRICE_IDS.STANDARD_ANNUAL,
+    highlighted: false,
+    trial: true,
+  },
+  {
+    name: "Pro",
+    description: "For serious traders who want the full edge.",
+    monthlyPrice: "£29",
+    annualPrice: "£290",
+    annualMonthly: "£24.17",
+    features: [
+      "Everything in Standard",
+      "Broker sync & auto-journaling",
+      "Advanced analytics & reports",
+      "Deep aggregation & comparisons",
+      "Priority support",
+      "Early feature access",
+    ],
+    cta: "Start Free Trial",
+    priceIdMonthly: PRICE_IDS.PRO_MONTHLY,
+    priceIdAnnual: PRICE_IDS.PRO_ANNUAL,
+    highlighted: true,
+    badge: "Most Popular",
+    trial: true,
+  },
+];
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export default function Pricing() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [billing, setBilling] = useState<Billing>("monthly");
+  const [loadingPriceId, setLoadingPriceId] = useState<string | null>(null);
+  const [foundingCount, setFoundingCount] = useState(0);
+
+  useEffect(() => {
+    supabase
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("is_founding_member", true)
+      .then(({ count }) => setFoundingCount(count ?? 0));
+  }, []);
+
+  const spotsRemaining = Math.max(0, 100 - foundingCount);
+
+  async function handleCheckout(priceId: string, isFoundingMember = false) {
+    if (!user) {
+      navigate("/register");
+      return;
+    }
+    setLoadingPriceId(priceId);
+    try {
+      await createCheckoutSession(priceId, user.id, user.email ?? "", isFoundingMember);
+    } catch {
+      setLoadingPriceId(null);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero Section */}
-      <section className="relative px-6 py-20 md:py-28">
-        <div className="mx-auto max-w-7xl text-center">
-          <h1 className="text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
-            Choose Your Plan
-          </h1>
-          <p className="mt-4 text-lg text-muted-foreground md:text-xl">
-            Simple, transparent pricing. No surprises. Join the waiting list to secure early access.
-          </p>
-          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            <Input
-              type="email"
-              placeholder="Enter your email"
-              value={heroEmail}
-              onChange={(e) => setHeroEmail(e.target.value)}
-              className="h-11 w-full max-w-sm bg-card"
-            />
-            <Button size="lg" className="w-full sm:w-auto">
-              Join Waiting List
-            </Button>
-          </div>
+      {/* Nav */}
+      <div className="px-6 pt-6 max-w-6xl mx-auto">
+        <button
+          type="button"
+          onClick={() => navigate("/")}
+          className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Back to home
+        </button>
+      </div>
+
+      {/* Header */}
+      <section className="text-center px-6 pt-12 pb-10 max-w-3xl mx-auto">
+        <h1 className="text-4xl md:text-5xl font-bold text-foreground">Simple, clear pricing.</h1>
+        <p className="mt-4 text-lg text-muted-foreground">
+          Start with a 7-day free trial. Card required — cancel before day 7 and you won't be charged.
+        </p>
+
+        {/* Monthly / Annual toggle */}
+        <div className="mt-8 inline-flex items-center gap-1 bg-muted/50 border border-border rounded-full p-1">
+          <button
+            type="button"
+            onClick={() => setBilling("monthly")}
+            className={`px-5 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+              billing === "monthly"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Monthly
+          </button>
+          <button
+            type="button"
+            onClick={() => setBilling("annual")}
+            className={`px-5 py-1.5 rounded-full text-sm font-semibold transition-colors flex items-center gap-2 ${
+              billing === "annual"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Annual
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-success/20 text-success font-bold">
+              Save 33%
+            </span>
+          </button>
         </div>
       </section>
 
-      {/* Launch Offer Banner */}
-      <section className="px-6">
-        <div className="mx-auto max-w-7xl">
-          <div className="rounded-xl border border-primary/30 bg-primary/10 px-6 py-4 text-center">
-            <p className="flex items-center justify-center gap-2 text-sm font-medium text-foreground md:text-base">
-              <Flame className="h-5 w-5 text-orange-500" />
-              <span>
-                <strong>Launch Offer:</strong> First 100 users get Premium for £29.99/month equivalent — billed annually (£359.88/year). Lifetime locked-in pricing.
-              </span>
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Table */}
-      <section className="px-6 py-16 md:py-20">
-        <div className="mx-auto max-w-6xl">
-          <div className="grid gap-6 md:grid-cols-3">
-            {plans.map((plan) => (
-              <Card
+      {/* Standard + Pro cards */}
+      <section className="px-6 pb-10 max-w-4xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-6">
+          {PLANS.map((plan) => {
+            const priceId = billing === "monthly" ? plan.priceIdMonthly : plan.priceIdAnnual;
+            const isLoading = loadingPriceId === priceId;
+            return (
+              <div
                 key={plan.name}
-                className={`relative flex flex-col ${
+                className={`relative flex flex-col rounded-2xl border p-8 ${
                   plan.highlighted
                     ? "border-primary bg-card ring-2 ring-primary/20"
                     : "border-border bg-card"
                 }`}
               >
                 {plan.badge && (
-                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground">
+                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-4">
                     {plan.badge}
                   </Badge>
                 )}
-                <CardHeader className="text-center">
-                  <CardTitle className="text-xl font-semibold">{plan.name}</CardTitle>
-                  <CardDescription className="text-muted-foreground">{plan.subtitle}</CardDescription>
-                  <div className="mt-4">
-                    <span className="text-4xl font-bold text-foreground">{plan.price}</span>
-                    <span className="text-muted-foreground">{plan.period}</span>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex flex-1 flex-col">
-                  <ul className="mb-6 flex-1 space-y-3">
-                    {plan.features.map((feature, index) => (
-                      <li key={index} className="flex items-start gap-3 text-sm text-muted-foreground">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Button
-                    className="w-full"
-                    variant={plan.highlighted ? "default" : "outline"}
-                  >
-                    {plan.cta}
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
 
-      {/* Launch Offer Card */}
-      <section className="px-6 pb-16">
-        <div className="mx-auto max-w-2xl">
-          <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
-            <CardContent className="py-8 text-center">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-primary/20 px-4 py-1.5 text-sm font-medium text-primary">
-                <Flame className="h-4 w-4" />
-                First 100 Users Only
+                <div className="mb-6">
+                  <h2 className="text-xl font-bold text-foreground">{plan.name}</h2>
+                  <p className="text-sm text-muted-foreground mt-1">{plan.description}</p>
+                </div>
+
+                <div className="mb-6">
+                  <div className="flex items-end gap-1">
+                    <span className="text-4xl font-bold text-foreground">
+                      {billing === "monthly" ? plan.monthlyPrice : plan.annualPrice}
+                    </span>
+                    <span className="text-muted-foreground mb-1 text-sm">
+                      {billing === "monthly" ? "/month" : "/year"}
+                    </span>
+                  </div>
+                  {billing === "annual" && (
+                    <p className="text-xs text-success mt-1">
+                      {plan.annualMonthly}/month — billed annually
+                    </p>
+                  )}
+                </div>
+
+                <ul className="space-y-3 flex-1 mb-8">
+                  {plan.features.map((f) => (
+                    <li key={f} className="flex items-start gap-3 text-sm text-muted-foreground">
+                      <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+
+                <Button
+                  className="w-full h-11"
+                  variant={plan.highlighted ? "default" : "outline"}
+                  disabled={isLoading}
+                  onClick={() => handleCheckout(priceId)}
+                >
+                  {isLoading ? "Redirecting…" : plan.cta}
+                </Button>
+                <p className="text-center text-xs text-muted-foreground mt-3">
+                  7-day trial · Card required · Cancel before day 7 — no charge
+                </p>
               </div>
-              <h3 className="text-2xl font-bold text-foreground">
-                Premium for £29.99/month
-              </h3>
-              <p className="mt-2 text-muted-foreground">
-                Billed annually at £359.88. Lifetime locked-in price.
-              </p>
-              <Button size="lg" className="mt-6">
-                Claim Launch Offer
-              </Button>
-            </CardContent>
-          </Card>
+            );
+          })}
         </div>
       </section>
 
-      {/* Feature Grid */}
-      <section className="bg-muted/30 px-6 py-16 md:py-20">
-        <div className="mx-auto max-w-6xl">
-          <h2 className="mb-12 text-center text-3xl font-bold text-foreground">
-            Everything you need to succeed
-          </h2>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {featureGrid.map((feature, index) => (
-              <Card key={index} className="border-border bg-card">
-                <CardContent className="flex items-start gap-4 py-6">
-                  <div className="rounded-lg bg-primary/10 p-2.5">
-                    <feature.icon className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground">{feature.title}</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">{feature.description}</p>
-                  </div>
-                </CardContent>
-              </Card>
+      {/* Founding Member card */}
+      <section className="px-6 pb-20 max-w-2xl mx-auto">
+        <div
+          className="relative rounded-2xl border border-primary/30 p-8 text-center flex flex-col items-center gap-5"
+          style={{
+            background: "radial-gradient(ellipse at top, hsl(195 100% 50% / 0.07) 0%, transparent 70%)",
+            boxShadow: "0 0 60px hsl(195 100% 50% / 0.06)",
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+            <span className="text-xs font-bold tracking-widest uppercase text-primary">Limited Offer</span>
+          </div>
+
+          <div>
+            <h2 className="text-2xl md:text-3xl font-bold text-foreground">Founding Member</h2>
+            <p className="text-muted-foreground mt-2 text-sm max-w-md">
+              Everything in Pro, locked in forever at half price. No trial — immediate payment.
+            </p>
+          </div>
+
+          <div className="flex items-end gap-1">
+            <span className="text-4xl font-bold text-foreground">£197</span>
+            <span className="text-muted-foreground mb-1 text-sm">/year</span>
+          </div>
+
+          <ul className="space-y-2 text-left w-full max-w-xs">
+            {[
+              "Everything in Pro",
+              "Price locked forever",
+              "Exclusive founding member badge",
+              "Direct feedback line to founders",
+            ].map((f) => (
+              <li key={f} className="flex items-center gap-3 text-sm text-muted-foreground">
+                <Check className="h-4 w-4 text-primary shrink-0" />
+                {f}
+              </li>
             ))}
-          </div>
-        </div>
-      </section>
+          </ul>
 
-      {/* Footer CTA */}
-      <section className="px-6 py-16 md:py-20">
-        <div className="mx-auto max-w-7xl text-center">
-          <h2 className="text-3xl font-bold text-foreground">
-            Secure early access
-          </h2>
-          <p className="mt-3 text-lg text-muted-foreground">
-            Join the waiting list today and be first in line.
+          {/* Spot counter */}
+          <div className="w-full max-w-sm space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-foreground">{spotsRemaining} of 100 spots remaining</span>
+              <span className="text-xs text-primary font-semibold">{100 - spotsRemaining}% claimed</span>
+            </div>
+            <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-full transition-all"
+                style={{ width: `${100 - spotsRemaining}%` }}
+              />
+            </div>
+          </div>
+
+          <Button
+            size="lg"
+            className="h-12 px-10 font-semibold"
+            disabled={loadingPriceId === PRICE_IDS.FOUNDING_MEMBER || spotsRemaining === 0}
+            onClick={() => handleCheckout(PRICE_IDS.FOUNDING_MEMBER, true)}
+          >
+            {loadingPriceId === PRICE_IDS.FOUNDING_MEMBER ? (
+              "Redirecting…"
+            ) : spotsRemaining === 0 ? (
+              "Sold Out"
+            ) : (
+              <>
+                <Zap className="h-4 w-4 mr-2" />
+                Claim Your Spot
+              </>
+            )}
+          </Button>
+
+          <p className="text-xs text-muted-foreground">
+            One-time annual payment · No trial · Renews at £197/year
           </p>
-          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            <Input
-              type="email"
-              placeholder="Enter your email"
-              value={footerEmail}
-              onChange={(e) => setFooterEmail(e.target.value)}
-              className="h-11 w-full max-w-sm bg-card"
-            />
-            <Button size="lg" className="w-full sm:w-auto">
-              Join Waiting List
-            </Button>
-          </div>
         </div>
       </section>
 
-      {/* Simple Footer */}
-      <footer className="border-t border-border px-6 py-8">
-        <div className="mx-auto max-w-6xl text-center text-sm text-muted-foreground">
+      <footer className="border-t border-border py-8 px-6 text-center">
+        <p className="text-xs text-muted-foreground">
           © {new Date().getFullYear()} StreamBias. All rights reserved.
-        </div>
+        </p>
       </footer>
     </div>
   );
-};
-
-export default Pricing;
+}

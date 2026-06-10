@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Link2, ArrowRight, Sparkles, ShieldOff, RefreshCw, Lock, KeyRound, SlidersHorizontal } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSubscription } from "@/hooks/use-subscription";
+import { useSubscription as useStripeSubscription } from "@/contexts/SubscriptionContext";
+import { createPortalSession } from "@/lib/stripe";
+import { CreditCard } from "lucide-react";
 import { useSessionLock } from "@/hooks/use-session-lock";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,6 +36,16 @@ const ALL_TIMEFRAMES: { value: BiasTimeframe; label: string }[] = [
 export default function Settings() {
   const navigate = useNavigate();
   const { plan, setPlan } = useSubscription();
+  const {
+    subscriptionStatus,
+    subscriptionTier,
+    isFoundingMember,
+    isTrial,
+    trialEndsAt,
+    currentPeriodEnd,
+    stripeCustomerId,
+  } = useStripeSubscription();
+  const [portalLoading, setPortalLoading] = useState(false);
   const { pinEnabled, setPinEnabled, pinSet, setPin, clearPin } = useSessionLock();
 
   const { accounts, primaryAccount } = useLinkedAccounts();
@@ -124,6 +137,13 @@ export default function Settings() {
     setPinSetupError("");
     if (!pinSet) setPinEnabled(false);
   };
+
+  const handleManageBilling = useCallback(async () => {
+    if (!stripeCustomerId) { navigate("/pricing"); return; }
+    setPortalLoading(true);
+    try { await createPortalSession(stripeCustomerId); }
+    finally { setPortalLoading(false); }
+  }, [stripeCustomerId, navigate]);
 
   const planOptions: { value: SubscriptionPlan; label: string; color: string }[] = [
     { value: "free", label: "Free", color: "bg-muted text-muted-foreground" },
@@ -401,6 +421,64 @@ export default function Settings() {
                   Lock overlay is disabled. The app will not show the lock screen on inactivity or first load.
                 </p>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Billing */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-primary" />
+                <CardTitle className="text-base">Billing</CardTitle>
+              </div>
+              <CardDescription className="text-xs">Manage your subscription and billing details.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-foreground capitalize">
+                    {subscriptionTier
+                      ? subscriptionTier.replace(/_/g, " ")
+                      : "No active plan"}
+                    {isFoundingMember && (
+                      <Badge className="ml-2 text-[10px] bg-primary/20 text-primary border-primary/30" variant="outline">
+                        Founding Member
+                      </Badge>
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground capitalize mt-0.5">
+                    Status: {subscriptionStatus ?? "inactive"}
+                  </p>
+                </div>
+                <div className="text-right text-xs text-muted-foreground">
+                  {isTrial && trialEndsAt && (
+                    <p>Trial ends {new Date(trialEndsAt).toLocaleDateString()}</p>
+                  )}
+                  {!isTrial && currentPeriodEnd && (
+                    <p>Renews {new Date(currentPeriodEnd).toLocaleDateString()}</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={portalLoading}
+                  onClick={handleManageBilling}
+                >
+                  {portalLoading ? "Loading…" : "Manage Subscription"}
+                </Button>
+                {subscriptionTier === "standard" && (
+                  <Button size="sm" onClick={() => navigate("/pricing")}>
+                    Upgrade to Pro
+                  </Button>
+                )}
+                {!subscriptionStatus || subscriptionStatus === "inactive" || subscriptionStatus === "cancelled" ? (
+                  <Button size="sm" onClick={() => navigate("/pricing")}>
+                    Choose a Plan
+                  </Button>
+                ) : null}
+              </div>
             </CardContent>
           </Card>
 

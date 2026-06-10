@@ -1,10 +1,12 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 
 export function ProtectedRoute() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
+  const { subscriptionStatus, trialEndsAt, isLoading: subLoading } = useSubscription();
 
-  if (isLoading) {
+  if (authLoading || subLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
@@ -14,6 +16,15 @@ export function ProtectedRoute() {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Paywall: only block on explicit inactive/cancelled with an expired (or absent) trial
+  const isBlocked =
+    (subscriptionStatus === "inactive" || subscriptionStatus === "cancelled") &&
+    (!trialEndsAt || new Date(trialEndsAt) < new Date());
+
+  if (isBlocked) {
+    return <Navigate to="/pricing" replace />;
   }
 
   return <Outlet />;

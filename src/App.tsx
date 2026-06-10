@@ -1,6 +1,8 @@
 // src/App.tsx
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Routes, Route, useLocation, useParams } from "react-router-dom";
@@ -13,6 +15,7 @@ import { AppLayout } from "@/layouts/AppLayout";
 import { ActiveTradingAccountProvider } from "@/context/ActiveTradingAccountProvider";
 import { TraderStyleProvider } from "@/context/TraderStyleProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 import Login from "./pages/Login";
@@ -42,6 +45,17 @@ function AssetDetailWithBoundary() {
       <AssetDetail />
     </ErrorBoundary>
   );
+}
+
+function SubscriptionSuccessToast() {
+  const location = useLocation();
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get("subscription") === "success") {
+      toast.success("Welcome to StreamBias! Your subscription is active.");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
 }
 
 function AppRoutes() {
@@ -95,18 +109,21 @@ export default function App() {
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <AuthProvider>
-            <AlertsProvider>
-              <SessionLockProvider>
-                <TraderStyleProvider>
-                  <ActiveTradingAccountProvider>
-                    <GlobalNotifications />
-                    <Toaster />
-                    <Sonner />
-                    <AppRoutes />
-                  </ActiveTradingAccountProvider>
-                </TraderStyleProvider>
-              </SessionLockProvider>
-            </AlertsProvider>
+            <SubscriptionProvider>
+              <AlertsProvider>
+                <SessionLockProvider>
+                  <TraderStyleProvider>
+                    <ActiveTradingAccountProvider>
+                      <GlobalNotifications />
+                      <Toaster />
+                      <Sonner />
+                      <SubscriptionSuccessToast />
+                      <AppRoutes />
+                    </ActiveTradingAccountProvider>
+                  </TraderStyleProvider>
+                </SessionLockProvider>
+              </AlertsProvider>
+            </SubscriptionProvider>
           </AuthProvider>
         </TooltipProvider>
       </ThemeProvider>

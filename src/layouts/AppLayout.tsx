@@ -3,6 +3,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { AppSidebarProvider } from "@/hooks/use-app-sidebar";
 import { useSessionLock } from "@/hooks/use-session-lock";
 import { LockScreen } from "@/components/LockScreen";
+import { TrialBanner } from "@/components/TrialBanner";
 import { useEffect } from "react";
 
 function AppLayoutInner() {
@@ -34,6 +35,7 @@ function AppLayoutInner() {
 
       {/* Content column */}
       <div className="flex-1 min-w-0 flex flex-col">
+        <TrialBanner />
         <main className="flex-1 overflow-y-auto min-w-0">
           <Outlet />
         </main>
