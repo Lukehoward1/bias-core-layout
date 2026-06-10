@@ -9,7 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import sbLogo from "@/assets/sb-logo.svg";
 import {
   ChevronDown, Play, UserPlus, BarChart2, TrendingUp,
-  Gem, Bitcoin, LineChart,
+  Gem, Bitcoin, LineChart, Bell, Plus,
 } from "lucide-react";
 import { submitDemoLead } from "@/lib/demoLeads";
 
@@ -387,6 +387,92 @@ function QuickRiskMockup() {
             <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
             Live
           </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── AlertsMockup ──────────────────────────────────────────────────────────────
+
+function AlertsMockup() {
+  const { ref, inView } = useInView();
+  return (
+    <div
+      ref={ref}
+      className="w-full max-w-sm mx-auto"
+      style={{
+        opacity: inView ? 1 : 0,
+        transform: inView ? "translateY(0)" : "translateY(20px)",
+        transition: "opacity 0.7s ease, transform 0.7s ease",
+      }}
+    >
+      <div className="bg-card border border-border rounded-xl p-5 shadow-2xl space-y-1">
+        {/* Header */}
+        <div className="flex items-center justify-between pb-3">
+          <p className="text-sm font-semibold text-foreground">My Alerts</p>
+          <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-semibold">
+            3 Active
+          </span>
+        </div>
+
+        {/* Row 1 */}
+        <div className="flex items-center justify-between py-3 border-b border-border/50">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-success shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">EURUSD above 1.0900</p>
+              <p className="text-[10px] text-muted-foreground">Set 2h ago</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 ml-3">
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium whitespace-nowrap">
+              Price Alert
+            </span>
+            <Bell className="h-3.5 w-3.5 text-muted-foreground" />
+          </div>
+        </div>
+
+        {/* Row 2 */}
+        <div className="flex items-center justify-between py-3 border-b border-border/50">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-success shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">London Session Open</p>
+              <p className="text-[10px] text-muted-foreground">Daily · 07:00 UTC</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 ml-3">
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium whitespace-nowrap">
+              Session Alert
+            </span>
+            <Bell className="h-3.5 w-3.5 text-muted-foreground" />
+          </div>
+        </div>
+
+        {/* Row 3 */}
+        <div className="flex items-center justify-between py-3 border-b border-border/50">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">US CPI Release</p>
+              <p className="text-[10px] text-muted-foreground">Tomorrow · 13:30 UTC</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 ml-3">
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 font-medium whitespace-nowrap">
+              News Alert
+            </span>
+            <Bell className="h-3.5 w-3.5 text-muted-foreground" />
+          </div>
+        </div>
+
+        {/* Add Alert row */}
+        <div className="flex items-center gap-2 pt-3 cursor-pointer group">
+          <div className="w-5 h-5 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+            <Plus className="h-3 w-3 text-primary" />
+          </div>
+          <p className="text-xs text-primary font-medium group-hover:text-primary/80 transition-colors">Add Alert</p>
         </div>
       </div>
     </div>
@@ -817,6 +903,32 @@ export default function Landing() {
 
           <AnimatedSection delay={150}>
             <QuickRiskMockup />
+          </AnimatedSection>
+        </div>
+      </section>
+
+      {/* ── FEATURE 4: ALERTS ────────────────────────────────────────────── */}
+      <section className="py-20 px-6 bg-background">
+        <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16 items-center">
+          <AnimatedSection delay={150}>
+            <AlertsMockup />
+          </AnimatedSection>
+
+          <AnimatedSection className="flex flex-col gap-5">
+            <span className="text-xs font-bold tracking-widest uppercase text-primary">Price Alerts</span>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground leading-tight">
+              Trade smarter. Not harder.
+            </h2>
+            <p className="text-muted-foreground leading-relaxed">
+              Set custom price alerts and let StreamBias monitor the markets for you. Get notified the moment
+              key levels are hit, sessions open, or high-impact news is scheduled — so you can step away from
+              the charts without missing a move.
+            </p>
+            <div className="flex flex-wrap gap-2 mt-1">
+              <FeaturePill label="Custom price levels" />
+              <FeaturePill label="Session open alerts" />
+              <FeaturePill label="High-impact news notifications" />
+            </div>
           </AnimatedSection>
         </div>
       </section>
