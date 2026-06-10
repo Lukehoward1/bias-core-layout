@@ -9,7 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import sbLogo from "@/assets/sb-logo.svg";
 import {
   ChevronDown, Play, UserPlus, BarChart2, TrendingUp,
-  Gem, Bitcoin, LineChart, Bell, Plus,
+  Gem, Bitcoin, LineChart,
 } from "lucide-react";
 import { submitDemoLead } from "@/lib/demoLeads";
 
@@ -393,86 +393,116 @@ function QuickRiskMockup() {
   );
 }
 
-// ── AlertsMockup ──────────────────────────────────────────────────────────────
+// ── CalendarEventMockup ───────────────────────────────────────────────────────
 
-function AlertsMockup() {
+const CAL_BARS = [
+  { rate: "5.25%", h: 40 },
+  { rate: "5.00%", h: 25 },
+  { rate: "5.00%", h: 25 },
+  { rate: "5.25%", h: 40 },
+  { rate: "5.00%", h: 25 },
+  { rate: "4.75%", h: 10 },
+];
+
+function CalendarEventMockup() {
   const { ref, inView } = useInView();
   return (
     <div
       ref={ref}
-      className="w-full max-w-sm mx-auto"
+      className="w-full max-w-lg mx-auto rounded-xl overflow-hidden border border-border shadow-2xl"
       style={{
         opacity: inView ? 1 : 0,
         transform: inView ? "translateY(0)" : "translateY(20px)",
         transition: "opacity 0.7s ease, transform 0.7s ease",
       }}
     >
-      <div className="bg-card border border-border rounded-xl p-5 shadow-2xl space-y-1">
-        {/* Header */}
-        <div className="flex items-center justify-between pb-3">
-          <p className="text-sm font-semibold text-foreground">My Alerts</p>
-          <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-semibold">
-            3 Active
-          </span>
+      {/* Browser chrome */}
+      <div className="bg-card/80 border-b border-border px-4 py-2.5 flex items-center gap-3">
+        <div className="flex gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-full" style={{ background: "hsl(0,65%,55%)" }} />
+          <div className="w-2.5 h-2.5 rounded-full" style={{ background: "hsl(40,70%,55%)" }} />
+          <div className="w-2.5 h-2.5 rounded-full" style={{ background: "hsl(142,55%,50%)" }} />
         </div>
+        <div className="flex-1 bg-muted/40 rounded h-5 flex items-center px-3">
+          <span className="text-[10px] text-muted-foreground">app.streambias.com/calendar</span>
+        </div>
+      </div>
 
-        {/* Row 1 */}
-        <div className="flex items-center justify-between py-3 border-b border-border/50">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="w-2 h-2 rounded-full bg-success shrink-0" />
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">EURUSD above 1.0900</p>
-              <p className="text-[10px] text-muted-foreground">Set 2h ago</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0 ml-3">
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium whitespace-nowrap">
-              Price Alert
+      {/* Event detail panel */}
+      <div className="bg-card p-5 space-y-4">
+        {/* Event header */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-destructive/15 text-destructive border border-destructive/25 font-bold uppercase tracking-wide">
+              HIGH
             </span>
-            <Bell className="h-3.5 w-3.5 text-muted-foreground" />
+            <p className="text-sm font-semibold text-foreground">BOE Interest Rate Decision</p>
           </div>
+          <p className="text-[11px] text-muted-foreground">GBP · Today · 12:00 UTC</p>
         </div>
 
-        {/* Row 2 */}
-        <div className="flex items-center justify-between py-3 border-b border-border/50">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="w-2 h-2 rounded-full bg-success shrink-0" />
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">London Session Open</p>
-              <p className="text-[10px] text-muted-foreground">Daily · 07:00 UTC</p>
+        {/* Stat boxes */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: "Previous", value: "5.00%", green: false },
+            { label: "Forecast", value: "4.75%", green: false },
+            { label: "Actual",   value: "4.75%", green: true  },
+          ].map(({ label, value, green }) => (
+            <div
+              key={label}
+              className={`rounded-lg p-3 flex flex-col gap-1 ${
+                green
+                  ? "bg-success/10 border border-success/20"
+                  : "bg-muted/40 border border-border"
+              }`}
+            >
+              <p className="text-[9px] text-muted-foreground uppercase tracking-wide font-medium">{label}</p>
+              <p className={`text-base font-bold ${green ? "text-success" : "text-foreground"}`}>{value}</p>
             </div>
+          ))}
+        </div>
+
+        {/* Historical trend */}
+        <div>
+          <p className="text-[10px] text-muted-foreground mb-2">Historical Trend</p>
+          <div className="flex items-end gap-1.5 h-12">
+            {CAL_BARS.map((bar, i) => (
+              <div
+                key={i}
+                className="flex-1 rounded-sm"
+                style={{
+                  height: `${bar.h}px`,
+                  background: i === CAL_BARS.length - 1
+                    ? "hsl(var(--primary))"
+                    : "hsl(var(--muted-foreground)/0.3)",
+                }}
+              />
+            ))}
           </div>
-          <div className="flex items-center gap-2 shrink-0 ml-3">
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium whitespace-nowrap">
-              Session Alert
-            </span>
-            <Bell className="h-3.5 w-3.5 text-muted-foreground" />
+          <div className="flex gap-1.5 mt-1">
+            {CAL_BARS.map((bar, i) => (
+              <p key={i} className="flex-1 text-center text-[7px] text-muted-foreground">{bar.rate}</p>
+            ))}
           </div>
         </div>
 
-        {/* Row 3 */}
-        <div className="flex items-center justify-between py-3 border-b border-border/50">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" />
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">US CPI Release</p>
-              <p className="text-[10px] text-muted-foreground">Tomorrow · 13:30 UTC</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0 ml-3">
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-400/10 text-yellow-400 border border-yellow-400/20 font-medium whitespace-nowrap">
-              News Alert
-            </span>
-            <Bell className="h-3.5 w-3.5 text-muted-foreground" />
-          </div>
-        </div>
+        {/* Outcome note */}
+        <p className="text-xs text-success font-medium">Rate cut confirmed — matched forecast</p>
 
-        {/* Add Alert row */}
-        <div className="flex items-center gap-2 pt-3 cursor-pointer group">
-          <div className="w-5 h-5 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-            <Plus className="h-3 w-3 text-primary" />
-          </div>
-          <p className="text-xs text-primary font-medium group-hover:text-primary/80 transition-colors">Add Alert</p>
+        {/* Action buttons */}
+        <div className="flex gap-2 pt-1">
+          <button
+            type="button"
+            className="flex-1 text-[11px] font-medium py-2 px-3 rounded-lg border border-border bg-muted/30 text-foreground hover:bg-muted/60 transition-colors"
+          >
+            🔔 Set Price Alert
+          </button>
+          <button
+            type="button"
+            className="flex-1 text-[11px] font-medium py-2 px-3 rounded-lg border border-border bg-muted/30 text-foreground hover:bg-muted/60 transition-colors"
+          >
+            📅 Add to Calendar
+          </button>
         </div>
       </div>
     </div>
@@ -907,27 +937,44 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── FEATURE 4: ALERTS ────────────────────────────────────────────── */}
-      <section className="py-20 px-6 bg-background">
+      {/* ── FEATURE 4: CALENDAR + ALERTS ─────────────────────────────────── */}
+      <section className="py-20 px-6" style={{ background: "hsl(var(--card)/0.4)" }}>
         <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16 items-center">
           <AnimatedSection delay={150}>
-            <AlertsMockup />
+            <CalendarEventMockup />
           </AnimatedSection>
 
           <AnimatedSection className="flex flex-col gap-5">
-            <span className="text-xs font-bold tracking-widest uppercase text-primary">Price Alerts</span>
+            <span className="text-xs font-bold tracking-widest uppercase text-primary">Economic Calendar</span>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground leading-tight">
-              Trade smarter. Not harder.
+              Always know what's moving the market.
             </h2>
             <p className="text-muted-foreground leading-relaxed">
-              Set custom price alerts and let StreamBias monitor the markets for you. Get notified the moment
-              key levels are hit, sessions open, or high-impact news is scheduled — so you can step away from
-              the charts without missing a move.
+              A live economic calendar automatically filters high-impact events to the exact pairs you trade —
+              so you're never caught off guard by a rate decision, inflation print, or jobs report.
             </p>
             <div className="flex flex-wrap gap-2 mt-1">
-              <FeaturePill label="Custom price levels" />
-              <FeaturePill label="Session open alerts" />
-              <FeaturePill label="High-impact news notifications" />
+              <FeaturePill label="Filtered by your pairs" />
+              <FeaturePill label="Previous, forecast & actual" />
+              <FeaturePill label="High-impact flagged" />
+            </div>
+
+            <div className="border-t border-border/50 pt-5 flex flex-col gap-3">
+              <span className="text-xs font-bold tracking-widest text-primary/70">PLUS — CUSTOM ALERTS</span>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Set custom price alerts and news notifications. StreamBias monitors the market for you so you
+                can step away from the charts without missing a move.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {["Price level alerts", "Session open alerts", "News event notifications"].map((label) => (
+                  <span
+                    key={label}
+                    className="text-[10px] px-2.5 py-0.5 rounded-full border border-border/50 bg-muted/30 text-muted-foreground font-medium whitespace-nowrap"
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
             </div>
           </AnimatedSection>
         </div>
