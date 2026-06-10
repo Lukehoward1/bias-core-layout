@@ -559,7 +559,7 @@ export default function Landing() {
 
           <div className="flex flex-col sm:flex-row items-center gap-3 mt-2">
             <Button size="lg" className="h-12 px-8 text-base font-semibold" onClick={() => navigate("/register")}>
-              Start Free
+              Start Free Trial
             </Button>
             <Button size="lg" variant="outline" className="h-12 px-8 text-base" onClick={scrollToFeatures}>
               See it in action
@@ -599,7 +599,7 @@ export default function Landing() {
                 Icon: UserPlus,
                 step: "1",
                 title: "Create your account",
-                desc: "Sign up free — no credit card needed. Your 7-day trial starts the moment you log in.",
+                desc: "Start your 7-day free trial — card required to begin. Cancel any time before day 7 and you won't be charged a thing.",
               },
               {
                 Icon: BarChart2,
