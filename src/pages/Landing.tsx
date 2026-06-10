@@ -566,7 +566,7 @@ export default function Landing() {
             </Button>
           </div>
 
-          <p className="text-xs text-muted-foreground mt-2">7-day free trial · No credit card required</p>
+          <p className="text-xs text-muted-foreground mt-2">7-day free trial · Cancel before day 7 and you won't be charged.</p>
         </div>
 
         <button
@@ -740,7 +740,7 @@ export default function Landing() {
               <div className="flex flex-col items-center gap-4 text-center">
                 <h3 className="text-lg font-semibold text-foreground">Want the full platform walkthrough?</h3>
                 <p className="text-sm text-muted-foreground max-w-sm">
-                  Enter your details and we'll send you the complete demo the moment it goes live.
+                  Get notified when the demo goes live.
                 </p>
                 <form onSubmit={handleDemoSubmit} className="flex flex-col gap-3 w-full">
                   <input
@@ -761,7 +761,7 @@ export default function Landing() {
                   />
                   {demoError && <p className="text-xs text-destructive text-center">{demoError}</p>}
                   <Button type="submit" className="h-11 font-semibold" disabled={demoSubmitting}>
-                    {demoSubmitting ? "Sending…" : "Send Me the Full Demo →"}
+                    {demoSubmitting ? "Sending…" : "Notify Me →"}
                   </Button>
                   <p className="text-center text-xs text-muted-foreground">No spam. Unsubscribe anytime.</p>
                 </form>
@@ -912,7 +912,7 @@ export default function Landing() {
 
               <p className="text-muted-foreground max-w-md leading-relaxed">
                 Lock in 50% off Pro — forever. Start with a 7-day free trial, then pay half price for life.
-                Only available to the first 100 members.
+                Only available to the first 100 members. Start your 7-day free trial — cancel before day 7 and you won't be charged.
               </p>
 
               {/* ── UPDATE BEFORE LAUNCH: adjust spot count, percentage, and progress bar width ── */}
@@ -934,7 +934,7 @@ export default function Landing() {
                 Claim Your Spot
               </Button>
 
-              <p className="text-xs text-muted-foreground">Cancel anytime. No credit card required to start.</p>
+              <p className="text-xs text-muted-foreground">Card required to start trial. Cancel before day 7 — you won't be charged a thing.</p>
             </div>
           </AnimatedSection>
         </div>
@@ -965,13 +965,13 @@ export default function Landing() {
           <h2 className="text-4xl md:text-5xl font-bold text-foreground leading-tight">
             Ready to trade with conviction?
           </h2>
-          <p className="text-lg text-muted-foreground">Start your 7-day free trial. No credit card required.</p>
+          <p className="text-lg text-muted-foreground">Start your 7-day free trial. Cancel before day 7 and you won't be charged.</p>
           <Button
             size="lg"
             className="h-14 px-10 text-lg font-semibold mt-2"
             onClick={() => navigate("/register")}
           >
-            Create Free Account
+            Start Free Trial
           </Button>
           <p className="text-xs text-muted-foreground">
             Already have an account?{" "}
