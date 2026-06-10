@@ -24,10 +24,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       cancel_url: `${process.env.VITE_APP_URL}/pricing`,
       metadata: { userId, isFoundingMember: String(isFoundingMember) },
       allow_promotion_codes: true,
+      payment_method_collection: "always",
     };
 
     if (!isFoundingMember) {
-      sessionParams.subscription_data = { trial_period_days: 7 };
+      sessionParams.subscription_data = {
+        trial_period_days: 7,
+        trial_settings: {
+          end_behavior: { missing_payment_method: "cancel" },
+        },
+      };
     }
 
     const session = await stripe.checkout.sessions.create(sessionParams);

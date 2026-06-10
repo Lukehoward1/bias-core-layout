@@ -4,7 +4,7 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 
 export function ProtectedRoute() {
   const { user, isLoading: authLoading } = useAuth();
-  const { subscriptionStatus, trialEndsAt, isLoading: subLoading } = useSubscription();
+  const { isActive, isLoading: subLoading } = useSubscription();
 
   if (authLoading || subLoading) {
     return (
@@ -14,18 +14,8 @@ export function ProtectedRoute() {
     );
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  // Paywall: only block on explicit inactive/cancelled with an expired (or absent) trial
-  const isBlocked =
-    (subscriptionStatus === "inactive" || subscriptionStatus === "cancelled") &&
-    (!trialEndsAt || new Date(trialEndsAt) < new Date());
-
-  if (isBlocked) {
-    return <Navigate to="/pricing" replace />;
-  }
+  if (!user) return <Navigate to="/login" replace />;
+  if (!isActive) return <Navigate to="/pricing" replace />;
 
   return <Outlet />;
 }

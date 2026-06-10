@@ -56,6 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         await supabase.from("profiles").upsert({
           id: userId,
+          email: session.customer_details?.email ?? null,
           stripe_customer_id: session.customer as string,
           stripe_subscription_id: subscription.id,
           subscription_status: subscription.status,

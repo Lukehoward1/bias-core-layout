@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
+import { createCheckoutSession, PRICE_IDS } from "@/lib/stripe";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -29,13 +30,35 @@ export default function Login() {
     e.preventDefault();
     setSignInError(null);
     setSignInLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setSignInLoading(false);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
+      setSignInLoading(false);
       setSignInError(error.message);
-    } else {
-      navigate("/dashboard");
+      return;
     }
+    const user = data.user;
+    if (!user) { navigate("/dashboard"); return; }
+
+    // Check subscription profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("subscription_status, trial_ends_at")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile) {
+      // Registered but never completed Stripe checkout — send them now
+      try {
+        await createCheckoutSession(PRICE_IDS.STANDARD_MONTHLY, user.id, user.email ?? "", false);
+      } catch {
+        navigate("/dashboard"); // silent fallback
+      }
+      return;
+    }
+
+    const status = profile.subscription_status as string | null;
+    const isActive = status === "active" || status === "trialing";
+    navigate(isActive ? "/dashboard" : "/pricing");
   }
 
   async function handleForgot(e: React.FormEvent) {

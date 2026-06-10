@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
+import { createCheckoutSession, PRICE_IDS } from "@/lib/stripe";
 import sbLogo from "@/assets/sb-logo.svg";
 
 export default function Register() {
@@ -16,6 +17,7 @@ export default function Register() {
   const [error, setError] = useState<string | null>(null);
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [trialSetup, setTrialSetup] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -26,15 +28,29 @@ export default function Register() {
     }
     setIsLoading(true);
     const { data, error: authError } = await supabase.auth.signUp({ email, password });
-    setIsLoading(false);
     if (authError) {
+      setIsLoading(false);
       setError(authError.message);
-    } else if (data.user?.confirmed_at) {
-      // Email confirmation disabled — user is already confirmed, go straight in
-      navigate("/dashboard");
-    } else {
-      // Email confirmation required
+      return;
+    }
+    if (!data.user?.confirmed_at) {
+      // Email confirmation required — can't start checkout until confirmed
+      setIsLoading(false);
       setNeedsConfirmation(true);
+      return;
+    }
+    // Account created and confirmed — redirect straight to Stripe checkout
+    setTrialSetup(true);
+    try {
+      await createCheckoutSession(
+        PRICE_IDS.STANDARD_MONTHLY,
+        data.user.id,
+        data.user.email ?? email,
+        false,
+      );
+      // createCheckoutSession redirects the page — code below won't run normally
+    } catch {
+      navigate("/dashboard"); // silent fallback so registration is never blocked
     }
   }
 
@@ -110,8 +126,8 @@ export default function Register() {
                   <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{error}</p>
                 )}
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Creating account…" : "Create Account"}
+                <Button type="submit" className="w-full" disabled={isLoading || trialSetup}>
+                  {trialSetup ? "Setting up your trial…" : isLoading ? "Creating account…" : "Create Account"}
                 </Button>
               </form>
             )}

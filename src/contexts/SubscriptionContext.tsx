@@ -54,8 +54,20 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   }, [fetchProfile]);
 
   const status = profile?.subscription_status ?? null;
-  const isActive = status === "active" || status === "trialing";
-  const isTrial = status === "trialing";
+  const now = new Date();
+
+  // Grace period: if no profile row yet, allow access for 10 minutes after account creation
+  // so the user isn't blocked while waiting for the Stripe webhook to fire.
+  const withinGracePeriod =
+    !profile &&
+    !!user &&
+    now.getTime() - new Date(user.created_at).getTime() < 10 * 60 * 1000;
+
+  const isActive = withinGracePeriod || status === "active" || status === "trialing";
+  const isTrial =
+    status === "trialing" &&
+    !!profile?.trial_ends_at &&
+    new Date(profile.trial_ends_at) > now;
 
   return (
     <SubscriptionContext.Provider
