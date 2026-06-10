@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,10 @@ export default function Login() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-sm space-y-6">
+          <button type="button" onClick={() => navigate("/")} className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+            <ChevronLeft className="h-4 w-4" />
+            Back to home
+          </button>
           {logo}
           <Card>
             <CardHeader className="space-y-1 pb-4">
@@ -92,6 +97,10 @@ export default function Login() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-sm space-y-6">
+          <button type="button" onClick={() => navigate("/")} className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+            <ChevronLeft className="h-4 w-4" />
+            Back to home
+          </button>
           {logo}
           <Card>
             <CardHeader className="space-y-1 pb-4">
@@ -141,6 +150,10 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-6">
+        <button type="button" onClick={() => navigate("/")} className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+          <ChevronLeft className="h-4 w-4" />
+          Back to home
+        </button>
         {logo}
 
         <Card>

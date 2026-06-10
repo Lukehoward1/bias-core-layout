@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,10 @@ export default function Register() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-sm space-y-6">
+        <button type="button" onClick={() => navigate("/")} className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+          <ChevronLeft className="h-4 w-4" />
+          Back to home
+        </button>
         <div className="flex flex-col items-center gap-3">
           <img src={sbLogo} alt="StreamBias" className="h-12 w-auto" />
           <span className="text-2xl font-bold text-foreground">StreamBias</span>
