@@ -61,9 +61,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const priceId = subscription.items?.data?.[0]?.price?.id ?? "";
         const tier = isFoundingMember ? "founding_member" : tierFromPriceId(priceId);
 
-        const { error: upsertError } = await supabase.from("profiles").upsert({
+        const { error: upsertError, data: upsertData } = await supabase.from("profiles").upsert({
           id: userId,
-          email: session.customer_details?.email ?? null,
+          email: session.customer_email ?? "",
           stripe_customer_id: session.customer as string,
           stripe_subscription_id: subscription.id,
           subscription_status: subscription.status,
@@ -76,9 +76,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ? new Date(subscription.current_period_end * 1000).toISOString()
             : null,
           updated_at: new Date().toISOString(),
-        });
+        }, { onConflict: "id" });
         console.log("Profile upsert attempted for userId:", userId);
-        console.log("Profile upsert result:", JSON.stringify(upsertError));
+        console.log("Upsert error:", JSON.stringify(upsertError));
+        console.log("Upsert data:", JSON.stringify(upsertData));
         break;
       }
 
