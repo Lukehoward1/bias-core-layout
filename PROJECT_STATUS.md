@@ -3,61 +3,75 @@
 ## Completed
 
 ### Data & Architecture
-- Server-side caching proxy at /api/quote and /api/timeseries — Twelve Data API key server-side only (TWELVE_DATA_API_KEY in Vercel env vars)
+- Server-side caching proxy at /api/quote and /api/timeseries — Twelve Data API key server-side only
 - Demo seed data: 90 trades Dec 2025–May 2026, £140k demo account, entry/exit times for session analysis
-- Live FMP calendar wired across asset cards, Markets page, Historical Trend Chart, Watchlist card, and shared calendarData service
-- All static calendar/news placeholders replaced with live FMP (live primary, static fallback)
+- Live FMP calendar wired across all components — live primary, static fallback
+- All hardcoded dashboard cards replaced with live data
 
-### Dashboard
-- All hardcoded dashboard cards replaced with live data: active-trades, next-session, performance-overview, risk-snapshot, reports-kpi-total-pnl, reports-kpi-avg-rr, reports-kpi-win-rate, reports-kpi-expectancy, reports-overview-best-day, reports-overview-worst-day, pinned-journal-equity, reports-overview-equity, reports-overview-rolling30
+### Dashboard & Reports
+- All dashboard cards live: active-trades, next-session, performance-overview, risk-snapshot, all KPI cards, equity curves
 - Trading sessions use real UTC market hours with live countdown
-- Upcoming Events card uses live FMP feed
+- Reports: Sessions, Psychology (hold-time), Risk all calculate from real trade data
 
-### Journal & Reports
-- Add Trade dialog: pair selector, Long/Short toggle, SL/TP, date, notes, rating, actualR calculation
-- Trade timestamps (entryTime/exitTime) added to data model and form
-- Reports: Sessions, Psychology (hold-time), and Risk calculate from real trade data with honest empty states
-- Demo trades backfilled with session-distributed entry/exit times
+### Journal & Risk Tools
+- Add Trade dialog: pair selector, Long/Short toggle, SL/TP, date, notes, rating, actualR
+- Trade timestamps added to data model and form
+- Risk tools (Position Size, Daily Risk, Max Drawdown) account-aware with GBP currency
 
-### Risk Tools
-- Position Size, Daily Risk Limit, Max Drawdown Guard all account-aware with correct GBP currency and Mode: Linked/Manual badge
+### Education & Smart Search
+- Guides and Trading Tips as separate sidebar items
+- Reader modal with proper formatting, calculated read times, level filter
+- Smart Search: assets, education articles, page shortcuts with keyboard navigation
 
-### Education
-- Guides and Trading Tips as separate sidebar items (URL-driven via useSearchParams)
-- No landing hub — direct navigation to content lists
-- Reader modal with proper heading/paragraph rendering
-- Calculated read times, level filter on Guides
-- 12 articles + 6 tips imported
+### Auth (Supabase)
+- Login, Register, Forgot Password, Reset Password pages
+- Protected routes — all app routes require authentication
+- Email confirmation flow with Resend SMTP (hfx-capital.com domain verified)
+- AuthCallback page handles email confirmation redirect
+- Card-required trial flow: register → confirm email → Stripe checkout → dashboard
 
-### Smart Search
-- Live search in AppHeader: assets (WHITELIST_SYMBOLS with bias), education articles/tips, page shortcuts
-- Grouped dropdown results, keyboard navigation, click-outside close
-- Education page handles ?article=ID and ?view=tips&tip=ID to open specific content
+### Payments (Stripe)
+- Three products: Standard (£19/mo, £190/yr), Pro (£29/mo, £290/yr), Founding Member (£197/yr)
+- 7-day trial, card required upfront
+- Checkout session serverless function (/api/create-checkout-session)
+- Customer portal serverless function (/api/create-portal-session)
+- Webhook handler (/api/webhook) — processes checkout.session.completed, subscription.updated, subscription.deleted
+- Profiles table in Supabase stores subscription status, tier, trial dates
+- Paywall in ProtectedRoute — redirects inactive users to /pricing
+- Trial banner showing days remaining with cancel option
+- Billing section in Settings
 
-### Auth
-- Supabase Auth fully implemented: login, register, forgot password, reset password pages
-- Protected routes — all app routes require authentication, /login and /register are public
-- Resend SMTP configured for reliable transactional emails (no rate limit issues)
-- AuthContext with useAuth() hook, session persistence via onAuthStateChange
-- AppHeader shows logged-in user email and sign out button
+### Landing Page
+- Hero with mouse-tracking gradient orbs
+- How it Works, Bias Engine, Journal (calendar/equity/analytics mockups), Risk, Calendar/Alerts, Education sections
+- Founding Member section (£197/yr, 100 spots)
+- Testimonials (3 placeholder cards)
+- Demo video placeholder with email capture → Supabase demo_leads table
+- 7-day trial messaging with card-required copy throughout
+- Footer with nav links
 
 ### Infrastructure
 - Deployed on Vercel with auto-deploy on push to main
-- vercel.json configured for SPA routing + /api/* serverless functions
-- PROJECT_STATUS.md maintained at project root
+- Custom SMTP via Resend (hfx-capital.com)
+- Supabase: auth, profiles table, demo_leads table, RLS policies
 
-## Known Approximations (not bugs)
-- ReportsRiskManagement uses lots×100 as pseudo-£ risk proxy (no SL-based risk yet)
-- Active Trades card shows 0 (demo trades are all "closed" — will show real open trades when broker connected)
+## In Progress
+- Post-payment redirect flow: after Stripe checkout → login page → retry profile check → dashboard
+- Currently testing the retry loop (waitForProfile) to handle webhook timing delay
+- NEXT TEST: register with fresh email, complete Stripe checkout, sign in, verify lands on /dashboard
 
 ## Remaining — Pre-Launch
-- Community page: currently static placeholder trade ideas — needs real structure
-- Custom domain setup on Vercel
-- Real broker integration (currently demo only)
-- Billing/Stripe (plan toggle is a dev switch)
-- Smart Search Tier 2: AI-generated explanations for concepts
+- Verify post-payment redirect works end to end ← NEXT SESSION START
+- Remove debug logging from webhook once flow confirmed working
+- Custom domain (streambias.com — not yet purchased)
+- Terms of Service and Privacy Policy pages
+- Switch Stripe from sandbox to live mode before launch
+- Update Supabase Site URL when custom domain is set
 
 ## Remaining — Post-Launch
-- AutomatedStrategyLab, StrategyTester, ManualBacktesting, FundingChallengeSim (simulation logic stubbed)
-- Courses section in Education (SHOW_COURSES = false, code intact)
-- Webinars page
+- Community page (needs auth + database backend)
+- Real broker integration
+- Courses section in Education (SHOW_COURSES = false)
+- Automated Strategy Lab, Backtesting (simulation logic stubbed)
+- Affiliate/partner programme dashboard
+- Email marketing sequences (Resend — trial day 4, day 6, day 7 expiry)
