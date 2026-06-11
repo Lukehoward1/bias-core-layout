@@ -31,6 +31,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
 
+  console.log("WEBHOOK_SECRET present:", !!process.env.STRIPE_WEBHOOK_SECRET);
+  console.log("SUPABASE_URL present:", !!process.env.SUPABASE_URL);
+  console.log("SERVICE_ROLE present:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+
   const rawBody = await getRawBody(req);
   const sig = req.headers["stripe-signature"] as string;
 
@@ -40,6 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log("Webhook received:", event.type);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("Webhook signature error:", message);
     return res.status(400).json({ error: `Webhook Error: ${message}` });
   }
 
@@ -70,6 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
           updated_at: new Date().toISOString(),
         });
+        console.log("Profile upsert attempted for userId:", userId);
         console.log("Profile upsert result:", JSON.stringify(upsertError));
         break;
       }
@@ -112,6 +118,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ received: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("Webhook processing error:", message);
     return res.status(500).json({ error: message });
   }
 }
