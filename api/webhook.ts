@@ -31,17 +31,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
 
-  console.log("WEBHOOK_SECRET present:", !!process.env.STRIPE_WEBHOOK_SECRET);
-  console.log("SUPABASE_URL present:", !!process.env.SUPABASE_URL);
-  console.log("SERVICE_ROLE present:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
-
   const rawBody = await getRawBody(req);
   const sig = req.headers["stripe-signature"] as string;
 
   let event: Stripe.Event;
   try {
     event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET!);
-    console.log("Webhook received:", event.type);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("Webhook signature error:", message);
@@ -53,7 +48,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
         const userId = session.metadata?.userId;
-        console.log("Processing checkout for userId:", userId);
         if (!userId || !session.subscription) break;
 
         const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
@@ -61,7 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const priceId = subscription.items?.data?.[0]?.price?.id ?? "";
         const tier = isFoundingMember ? "founding_member" : tierFromPriceId(priceId);
 
-        const { error: upsertError, data: upsertData } = await supabase.from("profiles").upsert({
+        const { error: upsertError } = await supabase.from("profiles").upsert({
           id: userId,
           email: session.customer_email ?? "",
           stripe_customer_id: session.customer as string,
@@ -77,9 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             : null,
           updated_at: new Date().toISOString(),
         }, { onConflict: "id" });
-        console.log("Profile upsert attempted for userId:", userId);
-        console.log("Upsert error:", JSON.stringify(upsertError));
-        console.log("Upsert data:", JSON.stringify(upsertData));
+        if (upsertError) console.error("Profile upsert error:", JSON.stringify(upsertError));
         break;
       }
 
