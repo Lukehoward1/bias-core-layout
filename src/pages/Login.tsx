@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import { createCheckoutSession, PRICE_IDS } from "@/lib/stripe";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -13,6 +13,8 @@ type View = "signin" | "forgot" | "forgot-sent";
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const subscriptionSuccess = new URLSearchParams(location.search).get("subscription") === "success";
   const [view, setView] = useState<View>("signin");
 
   // Sign-in state
@@ -201,6 +203,11 @@ export default function Login() {
             <CardDescription>Enter your credentials to access your account</CardDescription>
           </CardHeader>
           <CardContent>
+            {subscriptionSuccess && (
+              <p className="text-sm text-success bg-success/10 rounded-md px-3 py-3 text-center mb-4">
+                Payment successful! Sign in to access your StreamBias account.
+              </p>
+            )}
             <form onSubmit={handleSignIn} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
