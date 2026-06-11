@@ -1,10 +1,11 @@
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 
 export function ProtectedRoute() {
   const { user, isLoading: authLoading } = useAuth();
   const { isActive, isLoading: subLoading } = useSubscription();
+  const location = useLocation();
 
   if (authLoading || subLoading) {
     return (
@@ -15,7 +16,7 @@ export function ProtectedRoute() {
   }
 
   if (!user) return <Navigate to="/login" replace />;
-  if (!isActive) return <Navigate to="/pricing" replace />;
+  if (!isActive && location.pathname !== "/") return <Navigate to="/pricing" replace />;
 
   return <Outlet />;
 }

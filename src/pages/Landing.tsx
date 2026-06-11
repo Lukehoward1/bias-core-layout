@@ -6,6 +6,7 @@ import {
   BarChart, Bar, Cell, YAxis,
 } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import sbLogo from "@/assets/sb-logo.svg";
 import {
   ChevronDown, Play, UserPlus, BarChart2, TrendingUp,
@@ -579,10 +580,11 @@ function NavBar({ onNavigate }: { onNavigate: (path: string) => void }) {
 export default function Landing() {
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
+  const { isActive, isLoading: subLoading } = useSubscription();
 
   useEffect(() => {
-    if (!isLoading && user) navigate("/dashboard", { replace: true });
-  }, [user, isLoading, navigate]);
+    if (!isLoading && !subLoading && user && isActive) navigate("/dashboard", { replace: true });
+  }, [user, isLoading, isActive, subLoading, navigate]);
 
   // Orb mouse tracking — window mousemove, direct DOM updates, zero re-renders
   const orbInnerRefs = useRef<(HTMLDivElement | null)[]>([]);
