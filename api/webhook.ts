@@ -58,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
         const isFoundingMember = session.metadata?.isFoundingMember === "true";
-        const priceId = subscription.items.data[0]?.price.id ?? "";
+        const priceId = subscription.items?.data?.[0]?.price?.id ?? "";
         const tier = isFoundingMember ? "founding_member" : tierFromPriceId(priceId);
 
         const { error: upsertError } = await supabase.from("profiles").upsert({
@@ -69,10 +69,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           subscription_status: subscription.status,
           subscription_tier: tier,
           is_founding_member: isFoundingMember,
-          trial_ends_at: subscription.trial_end
+          trial_ends_at: subscription.trial_end && typeof subscription.trial_end === "number"
             ? new Date(subscription.trial_end * 1000).toISOString()
             : null,
-          current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+          current_period_end: subscription.current_period_end && typeof subscription.current_period_end === "number"
+            ? new Date(subscription.current_period_end * 1000).toISOString()
+            : null,
           updated_at: new Date().toISOString(),
         });
         console.log("Profile upsert attempted for userId:", userId);
@@ -90,16 +92,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (!rows?.length) break;
         const row = rows[0];
-        const priceId = subscription.items.data[0]?.price.id ?? "";
+        const priceId = subscription.items?.data?.[0]?.price?.id ?? "";
         const tier = row.is_founding_member ? "founding_member" : tierFromPriceId(priceId);
 
         await supabase.from("profiles").update({
           subscription_status: subscription.status,
           subscription_tier: tier,
-          trial_ends_at: subscription.trial_end
+          trial_ends_at: subscription.trial_end && typeof subscription.trial_end === "number"
             ? new Date(subscription.trial_end * 1000).toISOString()
             : null,
-          current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+          current_period_end: subscription.current_period_end && typeof subscription.current_period_end === "number"
+            ? new Date(subscription.current_period_end * 1000).toISOString()
+            : null,
           updated_at: new Date().toISOString(),
         }).eq("id", row.id);
         break;
