@@ -39,42 +39,39 @@ export default function Login() {
       return;
     }
     const user = data.user;
-    if (!user) { navigate("/dashboard"); return; }
+    if (!user) { navigate("/pricing"); return; }
 
-    // Email confirmation flow: user confirmed then landed on login instead of /auth/callback
+    // Email confirmation flow: pending checkout stored before email was confirmed
     const pending = localStorage.getItem("pendingCheckout");
     if (pending) {
-      const pendingUserId = localStorage.getItem("pendingUserId") ?? user.id;
-      const pendingEmail = localStorage.getItem("pendingEmail") ?? user.email ?? "";
+      if (!subscriptionSuccess) {
+        // Checkout not yet done — redirect to Stripe
+        const pendingUserId = localStorage.getItem("pendingUserId") ?? user.id;
+        const pendingEmail = localStorage.getItem("pendingEmail") ?? user.email ?? "";
+        localStorage.removeItem("pendingCheckout");
+        localStorage.removeItem("pendingUserId");
+        localStorage.removeItem("pendingEmail");
+        try {
+          await createCheckoutSession(PRICE_IDS.STANDARD_MONTHLY, pendingUserId, pendingEmail, false);
+        } catch {
+          navigate("/pricing");
+        }
+        return;
+      }
+      // Checkout already completed (?subscription=success) — just clean up
       localStorage.removeItem("pendingCheckout");
       localStorage.removeItem("pendingUserId");
       localStorage.removeItem("pendingEmail");
-      try {
-        await createCheckoutSession(PRICE_IDS.STANDARD_MONTHLY, pendingUserId, pendingEmail, false);
-      } catch {
-        navigate("/dashboard");
-      }
-      return;
     }
 
-    // Check subscription profile
+    // Fetch profile directly to determine destination
     const { data: profile } = await supabase
       .from("profiles")
-      .select("subscription_status, trial_ends_at")
+      .select("subscription_status")
       .eq("id", user.id)
       .single();
 
-    if (!profile) {
-      // Registered but never completed Stripe checkout — send them now
-      try {
-        await createCheckoutSession(PRICE_IDS.STANDARD_MONTHLY, user.id, user.email ?? "", false);
-      } catch {
-        navigate("/dashboard"); // silent fallback
-      }
-      return;
-    }
-
-    const status = profile.subscription_status as string | null;
+    const status = (profile?.subscription_status ?? null) as string | null;
     const isActive = status === "active" || status === "trialing";
     navigate(isActive ? "/dashboard" : "/pricing");
   }
@@ -205,7 +202,7 @@ export default function Login() {
           <CardContent>
             {subscriptionSuccess && (
               <p className="text-sm text-success bg-success/10 rounded-md px-3 py-3 text-center mb-4">
-                Payment successful! Sign in to access your StreamBias account.
+                Payment successful — sign in to access StreamBias.
               </p>
             )}
             <form onSubmit={handleSignIn} className="space-y-4">
@@ -248,7 +245,7 @@ export default function Login() {
               )}
 
               <Button type="submit" className="w-full" disabled={signInLoading}>
-                {signInLoading ? "Signing in…" : "Sign In"}
+                {signInLoading ? "Signing you in…" : "Sign In"}
               </Button>
             </form>
 
