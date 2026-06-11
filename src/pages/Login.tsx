@@ -22,16 +22,38 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [signInError, setSignInError] = useState<string | null>(null);
   const [signInLoading, setSignInLoading] = useState(false);
+  const [signInLoadingMsg, setSignInLoadingMsg] = useState("Signing you in…");
 
   // Forgot password state
   const [resetEmail, setResetEmail] = useState("");
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetLoading, setResetLoading] = useState(false);
 
+  async function waitForProfile(userId: string, maxAttempts = 8, delayMs = 1500): Promise<string | null> {
+    for (let i = 0; i < maxAttempts; i++) {
+      const { data } = await supabase
+        .from("profiles")
+        .select("subscription_status")
+        .eq("id", userId)
+        .single();
+
+      if (data?.subscription_status === "active" || data?.subscription_status === "trialing") {
+        return data.subscription_status;
+      }
+
+      if (i < maxAttempts - 1) {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+    return null;
+  }
+
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
     setSignInError(null);
     setSignInLoading(true);
+    setSignInLoadingMsg("Signing you in…");
+
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setSignInLoading(false);
@@ -43,6 +65,8 @@ export default function Login() {
 
     // Email confirmation flow: pending checkout stored before email was confirmed
     const pending = localStorage.getItem("pendingCheckout");
+    let awaitWebhook = subscriptionSuccess;
+
     if (pending) {
       if (!subscriptionSuccess) {
         // Checkout not yet done — redirect to Stripe
@@ -58,13 +82,21 @@ export default function Login() {
         }
         return;
       }
-      // Checkout already completed (?subscription=success) — just clean up
+      // Checkout completed — clean up and wait for webhook
       localStorage.removeItem("pendingCheckout");
       localStorage.removeItem("pendingUserId");
       localStorage.removeItem("pendingEmail");
+      awaitWebhook = true;
     }
 
-    // Fetch profile directly to determine destination
+    if (awaitWebhook) {
+      setSignInLoadingMsg("Setting up your account…");
+      const status = await waitForProfile(user.id);
+      navigate(status ? "/dashboard" : "/pricing");
+      return;
+    }
+
+    // Normal login — single profile check
     const { data: profile } = await supabase
       .from("profiles")
       .select("subscription_status")
@@ -245,7 +277,7 @@ export default function Login() {
               )}
 
               <Button type="submit" className="w-full" disabled={signInLoading}>
-                {signInLoading ? "Signing you in…" : "Sign In"}
+                {signInLoading ? signInLoadingMsg : "Sign In"}
               </Button>
             </form>
 
