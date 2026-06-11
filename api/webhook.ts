@@ -37,6 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let event: Stripe.Event;
   try {
     event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET!);
+    console.log("Webhook received:", event.type);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return res.status(400).json({ error: `Webhook Error: ${message}` });
@@ -47,6 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
         const userId = session.metadata?.userId;
+        console.log("Processing checkout for userId:", userId);
         if (!userId || !session.subscription) break;
 
         const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
@@ -54,7 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const priceId = subscription.items.data[0]?.price.id ?? "";
         const tier = isFoundingMember ? "founding_member" : tierFromPriceId(priceId);
 
-        await supabase.from("profiles").upsert({
+        const { error: upsertError } = await supabase.from("profiles").upsert({
           id: userId,
           email: session.customer_details?.email ?? null,
           stripe_customer_id: session.customer as string,
@@ -68,6 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
           updated_at: new Date().toISOString(),
         });
+        console.log("Profile upsert result:", JSON.stringify(upsertError));
         break;
       }
 
