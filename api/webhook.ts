@@ -1,5 +1,5 @@
 // ── IMPORTANT: Add STRIPE_WEBHOOK_SECRET to Vercel env vars after setting up webhook in Stripe dashboard ──
-// ── Also add VITE_APP_URL=https://bias-core-layout.vercel.app to Vercel env vars ──
+// ── Also add APP_URL=https://bias-core-layout.vercel.app to Vercel env vars ──
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import Stripe from "stripe";
