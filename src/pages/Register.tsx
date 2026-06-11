@@ -17,6 +17,7 @@ export default function Register() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [trialSetup, setTrialSetup] = useState(false);
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -26,7 +27,11 @@ export default function Register() {
       return;
     }
     setIsLoading(true);
-    const { data, error: authError } = await supabase.auth.signUp({ email, password });
+    const { data, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    });
     if (authError) {
       setIsLoading(false);
       setError(authError.message);
@@ -37,7 +42,18 @@ export default function Register() {
       setError("Account creation failed. Please try again.");
       return;
     }
-    // Account created and confirmed — redirect straight to Stripe checkout
+
+    if (!data.session) {
+      // Email confirmation is ON — store checkout intent, show confirmation message
+      localStorage.setItem("pendingCheckout", "true");
+      localStorage.setItem("pendingUserId", data.user.id);
+      localStorage.setItem("pendingEmail", email);
+      setIsLoading(false);
+      setNeedsConfirmation(true);
+      return;
+    }
+
+    // Email confirmation is OFF — user is already signed in, go straight to Stripe
     setTrialSetup(true);
     try {
       await createCheckoutSession(
@@ -46,10 +62,41 @@ export default function Register() {
         data.user.email ?? email,
         false,
       );
-      // createCheckoutSession redirects the page — code below won't run normally
     } catch {
-      navigate("/dashboard"); // silent fallback so registration is never blocked
+      navigate("/dashboard");
     }
+  }
+
+  if (needsConfirmation) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-sm space-y-6">
+          <button type="button" onClick={() => navigate("/")} className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+            <ChevronLeft className="h-4 w-4" />
+            Back to home
+          </button>
+          <div className="flex flex-col items-center gap-3">
+            <img src={sbLogo} alt="StreamBias" className="h-12 w-auto" />
+            <span className="text-2xl font-bold text-foreground">StreamBias</span>
+          </div>
+          <Card>
+            <CardHeader className="space-y-1 pb-4">
+              <CardTitle className="text-xl">Check your email</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-success bg-success/10 rounded-md px-3 py-3 text-center">
+                Check your email to confirm your account. Once confirmed, you'll be taken to complete your trial setup.
+              </p>
+              <p className="text-center text-sm text-muted-foreground">
+                <Link to="/login" className="text-primary hover:underline font-medium">
+                  Back to sign in
+                </Link>
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
   }
 
   return (

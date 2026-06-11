@@ -39,6 +39,22 @@ export default function Login() {
     const user = data.user;
     if (!user) { navigate("/dashboard"); return; }
 
+    // Email confirmation flow: user confirmed then landed on login instead of /auth/callback
+    const pending = localStorage.getItem("pendingCheckout");
+    if (pending) {
+      const pendingUserId = localStorage.getItem("pendingUserId") ?? user.id;
+      const pendingEmail = localStorage.getItem("pendingEmail") ?? user.email ?? "";
+      localStorage.removeItem("pendingCheckout");
+      localStorage.removeItem("pendingUserId");
+      localStorage.removeItem("pendingEmail");
+      try {
+        await createCheckoutSession(PRICE_IDS.STANDARD_MONTHLY, pendingUserId, pendingEmail, false);
+      } catch {
+        navigate("/dashboard");
+      }
+      return;
+    }
+
     // Check subscription profile
     const { data: profile } = await supabase
       .from("profiles")
