@@ -44,7 +44,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         "subscription_status,subscription_tier,is_founding_member,trial_ends_at,current_period_end,stripe_customer_id",
       )
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
     setProfile(data as Profile | null);
     setIsLoading(false);
   }, [user]);

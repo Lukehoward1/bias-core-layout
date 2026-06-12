@@ -2,12 +2,15 @@ import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function SubscriptionActivatingGuard() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isActive, refetch } = useSubscription();
+  const { isActive } = useSubscription();
   const { toast } = useToast();
+  const { user } = useAuth();
   const isPostPayment = new URLSearchParams(location.search).get("subscription") === "success";
   const attempts = useRef(0);
   const shown = useRef(false);
@@ -18,14 +21,28 @@ export function SubscriptionActivatingGuard() {
       shown.current = true;
       toast({ title: "Welcome to StreamBias!", description: "Your 7-day free trial has started." });
       navigate("/dashboard", { replace: true });
-      return;
     }
-    if (!isActive && attempts.current < 10) {
+  }, [isActive, isPostPayment, navigate, toast]);
+
+  useEffect(() => {
+    if (!isPostPayment || isActive || !user) return;
+    const interval = setInterval(async () => {
       attempts.current += 1;
-      const timer = setTimeout(() => refetch(), 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [isActive, isPostPayment, refetch, navigate, toast]);
+      if (attempts.current > 10) { clearInterval(interval); return; }
+      const { data } = await supabase
+        .from("profiles")
+        .select("subscription_status")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (data?.subscription_status === "active" || data?.subscription_status === "trialing") {
+        clearInterval(interval);
+        shown.current = true;
+        toast({ title: "Welcome to StreamBias!", description: "Your 7-day free trial has started." });
+        navigate("/dashboard", { replace: true });
+      }
+    }, 1500);
+    return () => clearInterval(interval);
+  }, [isPostPayment, isActive, user, navigate, toast]);
 
   if (isPostPayment && !isActive && attempts.current < 10) {
     return (
