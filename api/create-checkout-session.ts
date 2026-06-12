@@ -15,13 +15,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     isFoundingMember: boolean;
   };
 
+  const appUrl = process.env.APP_URL || "https://bias-core-layout.vercel.app";
+
   try {
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: "subscription",
       customer_email: email,
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${process.env.APP_URL}/dashboard?subscription=success`,
-      cancel_url: `${process.env.APP_URL}/pricing`,
+      success_url: `${appUrl}/dashboard?subscription=success`,
+      cancel_url: `${appUrl}/pricing`,
       metadata: { userId, isFoundingMember: String(isFoundingMember) },
       allow_promotion_codes: true,
       payment_method_collection: "always",
