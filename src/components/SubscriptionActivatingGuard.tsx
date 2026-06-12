@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 export function SubscriptionActivatingGuard() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isActive, isLoading, refetch } = useSubscription();
+  const { isActive, refetch } = useSubscription();
   const { toast } = useToast();
   const isPostPayment = new URLSearchParams(location.search).get("subscription") === "success";
   const attempts = useRef(0);
@@ -20,12 +20,12 @@ export function SubscriptionActivatingGuard() {
       navigate("/dashboard", { replace: true });
       return;
     }
-    if (!isActive && !isLoading && attempts.current < 10) {
+    if (!isActive && attempts.current < 10) {
       attempts.current += 1;
       const timer = setTimeout(() => refetch(), 1500);
       return () => clearTimeout(timer);
     }
-  }, [isActive, isLoading, isPostPayment, refetch, navigate, toast]);
+  }, [isActive, isPostPayment, refetch, navigate, toast]);
 
   if (isPostPayment && !isActive && attempts.current < 10) {
     return (

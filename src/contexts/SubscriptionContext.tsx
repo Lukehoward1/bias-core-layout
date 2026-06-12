@@ -31,7 +31,8 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchProfile = useCallback(async () => {
+  const fetchProfile = useCallback(async (showLoading = true) => {
+    if (showLoading) setIsLoading(true);
     if (!user) {
       setProfile(null);
       setIsLoading(false);
@@ -49,8 +50,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   }, [user]);
 
   useEffect(() => {
-    setIsLoading(true);
-    fetchProfile();
+    fetchProfile(true);
   }, [fetchProfile]);
 
   const status = profile?.subscription_status ?? null;
@@ -74,7 +74,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         currentPeriodEnd: profile?.current_period_end ?? null,
         stripeCustomerId: profile?.stripe_customer_id ?? null,
         isLoading,
-        refetch: fetchProfile,
+        refetch: () => fetchProfile(false),
       }}
     >
       {children}
