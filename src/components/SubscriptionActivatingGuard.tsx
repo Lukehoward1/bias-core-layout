@@ -11,7 +11,8 @@ export function SubscriptionActivatingGuard() {
   const { isActive } = useSubscription();
   const { toast } = useToast();
   const { user } = useAuth();
-  const isPostPayment = new URLSearchParams(location.search).get("subscription") === "success";
+  const isDashboard = location.pathname === "/dashboard";
+  const isPostPayment = isDashboard && new URLSearchParams(location.search).get("subscription") === "success";
   const attempts = useRef(0);
   const shown = useRef(false);
 
