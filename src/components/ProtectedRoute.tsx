@@ -7,7 +7,11 @@ export function ProtectedRoute() {
   const { isActive, isLoading: subLoading } = useSubscription();
   const location = useLocation();
 
-  if (authLoading || subLoading) {
+  const isPostPayment =
+    location.pathname === "/dashboard" &&
+    new URLSearchParams(location.search).get("subscription") === "success";
+
+  if (authLoading || (subLoading && !isPostPayment)) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
@@ -15,10 +19,12 @@ export function ProtectedRoute() {
     );
   }
 
-  const isPostPayment = new URLSearchParams(location.search).get("subscription") === "success";
-
   if (!user) return <Navigate to="/login" replace />;
-  if (!isActive && !isPostPayment && location.pathname !== "/") return <Navigate to="/pricing" replace />;
+
+  // On post-payment, always allow through — subscription context will load shortly
+  if (isPostPayment) return <Outlet />;
+
+  if (!isActive) return <Navigate to="/pricing" replace />;
 
   return <Outlet />;
 }
