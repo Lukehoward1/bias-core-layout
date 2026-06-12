@@ -15,17 +15,22 @@ export default function AuthCallback() {
       const pending = localStorage.getItem("pendingCheckout");
       if (pending) {
         const storedUserId = localStorage.getItem("pendingUserId") ?? userId;
-        const storedEmail = localStorage.getItem("pendingEmail") ?? userEmail;
         localStorage.removeItem("pendingCheckout");
         localStorage.removeItem("pendingUserId");
-        localStorage.removeItem("pendingEmail");
         try {
-          await createCheckoutSession(PRICE_IDS.STANDARD_MONTHLY, storedUserId, storedEmail, false);
+          await createCheckoutSession(PRICE_IDS.STANDARD_MONTHLY, storedUserId, userEmail, false);
         } catch {
-          navigate("/dashboard");
+          navigate("/pricing");
         }
       } else {
-        navigate("/dashboard");
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("subscription_status")
+          .eq("id", userId)
+          .single();
+        const status = profile?.subscription_status;
+        const isActive = status === "active" || status === "trialing";
+        navigate(isActive ? "/dashboard" : "/pricing");
       }
     }
 

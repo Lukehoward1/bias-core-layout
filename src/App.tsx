@@ -1,11 +1,11 @@
 // src/App.tsx
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route, useLocation, useParams } from "react-router-dom";
+import { Routes, Route, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { SessionLockProvider } from "@/hooks/use-session-lock";
 import { AlertsProvider } from "@/contexts/AlertsContext";
@@ -15,7 +15,7 @@ import { AppLayout } from "@/layouts/AppLayout";
 import { ActiveTradingAccountProvider } from "@/context/ActiveTradingAccountProvider";
 import { TraderStyleProvider } from "@/context/TraderStyleProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
+import { SubscriptionProvider, useSubscription } from "@/contexts/SubscriptionContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 import Login from "./pages/Login";
@@ -48,15 +48,50 @@ function AssetDetailWithBoundary() {
   );
 }
 
-function SubscriptionSuccessToast() {
+function SubscriptionActivatingGuard() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { isActive, isLoading, refetch } = useSubscription();
+  const isPostPayment = new URLSearchParams(location.search).get("subscription") === "success";
+  const [polling, setPolling] = useState(false);
+  const attemptRef = useRef(0);
+
+  // Once subscription loading resolves, decide whether to poll or toast
   useEffect(() => {
-    if (new URLSearchParams(location.search).get("subscription") === "success") {
-      toast.success("Welcome to StreamBias! Your subscription is active.");
+    if (!isPostPayment || isLoading) return;
+    if (isActive) {
+      toast.success("Welcome to StreamBias! Your 7-day trial has started.");
+      navigate(location.pathname, { replace: true });
+    } else {
+      attemptRef.current = 0;
+      setPolling(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  return null;
+  }, [isLoading, isPostPayment]);
+
+  // Retry loop — fires every 1.5s while waiting for webhook to write the profile
+  useEffect(() => {
+    if (!polling) return;
+    if (isActive) {
+      setPolling(false);
+      toast.success("Welcome to StreamBias! Your 7-day trial has started.");
+      navigate(location.pathname, { replace: true });
+      return;
+    }
+    if (attemptRef.current >= 10) { setPolling(false); return; }
+    const t = setTimeout(() => { attemptRef.current += 1; refetch(); }, 1500);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [polling, isActive]);
+
+  if (!polling) return null;
+
+  return (
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4">
+      <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      <p className="text-sm text-muted-foreground">Setting up your account…</p>
+    </div>
+  );
 }
 
 function AppRoutes() {
@@ -119,7 +154,7 @@ export default function App() {
                       <GlobalNotifications />
                       <Toaster />
                       <Sonner />
-                      <SubscriptionSuccessToast />
+                      <SubscriptionActivatingGuard />
                       <AppRoutes />
                     </ActiveTradingAccountProvider>
                   </TraderStyleProvider>

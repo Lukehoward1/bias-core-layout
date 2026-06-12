@@ -15,8 +15,10 @@ export function ProtectedRoute() {
     );
   }
 
+  const isPostPayment = new URLSearchParams(location.search).get("subscription") === "success";
+
   if (!user) return <Navigate to="/login" replace />;
-  if (!isActive && location.pathname !== "/") return <Navigate to="/pricing" replace />;
+  if (!isActive && !isPostPayment && location.pathname !== "/") return <Navigate to="/pricing" replace />;
 
   return <Outlet />;
 }

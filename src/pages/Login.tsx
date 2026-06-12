@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { useNavigate, useLocation, Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
-import { createCheckoutSession, PRICE_IDS } from "@/lib/stripe";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,8 +12,6 @@ type View = "signin" | "forgot" | "forgot-sent";
 
 export default function Login() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const subscriptionSuccess = new URLSearchParams(location.search).get("subscription") === "success";
   const [view, setView] = useState<View>("signin");
 
   // Sign-in state
@@ -22,7 +19,6 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [signInError, setSignInError] = useState<string | null>(null);
   const [signInLoading, setSignInLoading] = useState(false);
-  const [signInLoadingMsg, setSignInLoadingMsg] = useState("Signing you in…");
 
   // Forgot password state
   const [resetEmail, setResetEmail] = useState("");
@@ -52,8 +48,6 @@ export default function Login() {
     e.preventDefault();
     setSignInError(null);
     setSignInLoading(true);
-    setSignInLoadingMsg("Signing you in…");
-
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setSignInLoading(false);
@@ -62,50 +56,8 @@ export default function Login() {
     }
     const user = data.user;
     if (!user) { navigate("/pricing"); return; }
-
-    // Email confirmation flow: pending checkout stored before email was confirmed
-    const pending = localStorage.getItem("pendingCheckout");
-    let awaitWebhook = subscriptionSuccess;
-
-    if (pending) {
-      if (!subscriptionSuccess) {
-        // Checkout not yet done — redirect to Stripe
-        const pendingUserId = localStorage.getItem("pendingUserId") ?? user.id;
-        const pendingEmail = localStorage.getItem("pendingEmail") ?? user.email ?? "";
-        localStorage.removeItem("pendingCheckout");
-        localStorage.removeItem("pendingUserId");
-        localStorage.removeItem("pendingEmail");
-        try {
-          await createCheckoutSession(PRICE_IDS.STANDARD_MONTHLY, pendingUserId, pendingEmail, false);
-        } catch {
-          navigate("/pricing");
-        }
-        return;
-      }
-      // Checkout completed — clean up and wait for webhook
-      localStorage.removeItem("pendingCheckout");
-      localStorage.removeItem("pendingUserId");
-      localStorage.removeItem("pendingEmail");
-      awaitWebhook = true;
-    }
-
-    if (awaitWebhook) {
-      setSignInLoadingMsg("Setting up your account…");
-      const status = await waitForProfile(user.id);
-      navigate(status ? "/dashboard" : "/pricing");
-      return;
-    }
-
-    // Normal login — single profile check
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("subscription_status")
-      .eq("id", user.id)
-      .single();
-
-    const status = (profile?.subscription_status ?? null) as string | null;
-    const isActive = status === "active" || status === "trialing";
-    navigate(isActive ? "/dashboard" : "/pricing");
+    const status = await waitForProfile(user.id);
+    navigate(status ? "/dashboard" : "/pricing");
   }
 
   async function handleForgot(e: React.FormEvent) {
@@ -232,11 +184,6 @@ export default function Login() {
             <CardDescription>Enter your credentials to access your account</CardDescription>
           </CardHeader>
           <CardContent>
-            {subscriptionSuccess && (
-              <p className="text-sm text-success bg-success/10 rounded-md px-3 py-3 text-center mb-4">
-                Payment successful — sign in to access StreamBias.
-              </p>
-            )}
             <form onSubmit={handleSignIn} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -277,7 +224,7 @@ export default function Login() {
               )}
 
               <Button type="submit" className="w-full" disabled={signInLoading}>
-                {signInLoading ? signInLoadingMsg : "Sign In"}
+                {signInLoading ? "Signing you in…" : "Sign In"}
               </Button>
             </form>
 

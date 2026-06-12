@@ -20,7 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       mode: "subscription",
       customer_email: email,
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${process.env.APP_URL}/login?subscription=success`,
+      success_url: `${process.env.APP_URL}/dashboard?subscription=success`,
       cancel_url: `${process.env.APP_URL}/pricing`,
       metadata: { userId, isFoundingMember: String(isFoundingMember) },
       allow_promotion_codes: true,
