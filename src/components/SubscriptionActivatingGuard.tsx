@@ -26,22 +26,41 @@ export function SubscriptionActivatingGuard() {
 
   useEffect(() => {
     if (!isPostPayment || isActive || !user) return;
-    const interval = setInterval(async () => {
-      attempts.current += 1;
-      if (attempts.current > 10) { clearInterval(interval); return; }
-      const { data } = await supabase
-        .from("profiles")
-        .select("subscription_status")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (data?.subscription_status === "active" || data?.subscription_status === "trialing") {
-        clearInterval(interval);
-        shown.current = true;
-        toast({ title: "Welcome to StreamBias!", description: "Your 7-day free trial has started." });
-        navigate("/dashboard", { replace: true });
-      }
-    }, 1500);
-    return () => clearInterval(interval);
+
+    let cancelled = false;
+
+    const poll = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || cancelled) return;
+
+      const interval = setInterval(async () => {
+        attempts.current += 1;
+        if (attempts.current > 10) {
+          clearInterval(interval);
+          return;
+        }
+
+        const { data } = await supabase
+          .from("profiles")
+          .select("subscription_status")
+          .eq("id", session.user.id)
+          .maybeSingle();
+
+        if (data?.subscription_status === "active" || data?.subscription_status === "trialing") {
+          clearInterval(interval);
+          if (!shown.current && !cancelled) {
+            shown.current = true;
+            toast({ title: "Welcome to StreamBias!", description: "Your 7-day free trial has started." });
+            navigate("/dashboard", { replace: true });
+          }
+        }
+      }, 1500);
+
+      return () => clearInterval(interval);
+    };
+
+    poll();
+    return () => { cancelled = true; };
   }, [isPostPayment, isActive, user, navigate, toast]);
 
   if (isPostPayment && !isActive && attempts.current < 10) {
