@@ -34,7 +34,6 @@ import Settings from "./pages/Settings";
 import Billing from "./pages/Billing";
 import Pricing from "./pages/Pricing";
 import StartTrial from "./pages/StartTrial";
-import Debug from "./pages/Debug";
 import NotFound from "./pages/NotFound";
 import AssetDetail from "./pages/AssetDetail";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -66,7 +65,6 @@ function AppRoutes() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/start-trial" element={<StartTrial />} />
-        <Route path="/debug" element={<Debug />} />
 
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>

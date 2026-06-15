@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DEMO_TRADES } from "@/data/demoTrades";
+import { useAuth } from "@/contexts/AuthContext";
+
+const DEMO_OWNER_ID = "a7fda1c9-70eb-40a0-bd66-f80ea1edb27e";
 
 /**
  * Canonical trade model used by Journal + Reports.
@@ -121,6 +124,7 @@ function applyOverrides(trades: Trade[], overrides: OverrideMap): Trade[] {
  * without changing the Journal UI.
  */
 export function useJournalTrades(accountIds: string[] = []) {
+  const { user } = useAuth();
   const [manualTrades, setManualTrades] = useState<Trade[]>([]);
   const [syncedTradesByAccount, setSyncedTradesByAccount] = useState<Record<string, Trade[]>>({});
   const [overrides, setOverrides] = useState<OverrideMap>({});
@@ -159,9 +163,9 @@ export function useJournalTrades(accountIds: string[] = []) {
     window.dispatchEvent(new Event(EVENT_NAME));
   }, []);
 
-  // Demo mode: active when the only account is the virtual demo account and no real
-  // trades (manual or synced) have been recorded yet.
+  // Demo mode: only show demo data for the owner account (scoped by user ID).
   const isDemoData = useMemo(() => {
+    if (user?.id !== DEMO_OWNER_ID) return false;
     const isVirtualDemoSession =
       accountIds.length === 0 ||
       (accountIds.length === 1 && accountIds[0] === "demo-account");
@@ -169,7 +173,7 @@ export function useJournalTrades(accountIds: string[] = []) {
       manualTrades.length > 0 ||
       Object.values(syncedTradesByAccount).flat().length > 0;
     return isVirtualDemoSession && !hasRealTrades;
-  }, [accountIds, manualTrades, syncedTradesByAccount]);
+  }, [user, accountIds, manualTrades, syncedTradesByAccount]);
 
   // Canonical merged list for the app
   const trades: Trade[] = useMemo(() => {
