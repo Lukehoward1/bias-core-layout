@@ -27,12 +27,13 @@ interface SubscriptionContextValue {
 const SubscriptionContext = createContext<SubscriptionContextValue | null>(null);
 
 export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchProfile = useCallback(async (showLoading = true) => {
     if (showLoading) setIsLoading(true);
+    if (authLoading) return;
     if (!user) {
       setProfile(null);
       setIsLoading(false);
