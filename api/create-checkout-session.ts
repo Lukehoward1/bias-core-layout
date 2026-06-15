@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     isFoundingMember: boolean;
   };
 
-  const appUrl = process.env.APP_URL || "https://bias-core-layout.vercel.app";
+  const appUrl = "https://bias-core-layout.vercel.app";
 
   try {
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
