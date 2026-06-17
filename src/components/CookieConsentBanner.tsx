@@ -21,6 +21,7 @@ export function CookieConsentBanner() {
   if (status !== "unset") return null;
 
   function accept() {
+    console.log("accept() called");
     setConsentStatus("accepted");
     setStatus("accepted");
     loadGoogleAnalytics();
