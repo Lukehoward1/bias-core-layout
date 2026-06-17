@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { getConsentStatus, setConsentStatus, ConsentStatus } from "@/lib/cookieConsent";
+import { loadGoogleAnalytics } from "@/lib/analytics";
 
 export function CookieConsentBanner() {
   const [status, setStatus] = useState<ConsentStatus>("unset");
@@ -22,6 +23,7 @@ export function CookieConsentBanner() {
   function accept() {
     setConsentStatus("accepted");
     setStatus("accepted");
+    loadGoogleAnalytics();
   }
 
   function reject() {
