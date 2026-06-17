@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { resetConsentStatus } from "@/lib/cookieConsent";
 import { Button } from "@/components/ui/button";
 import {
   AreaChart, Area, ResponsiveContainer, XAxis,
@@ -1156,6 +1157,7 @@ export default function Landing() {
             <button type="button" onClick={() => navigate("/register")} className="text-xs text-muted-foreground hover:text-foreground transition-colors">Create Account</button>
             <button type="button" onClick={() => navigate("/privacy")}  className="text-xs text-muted-foreground hover:text-foreground transition-colors">Privacy Policy</button>
             <button type="button" onClick={() => navigate("/terms")}    className="text-xs text-muted-foreground hover:text-foreground transition-colors">Terms</button>
+            <button type="button" onClick={resetConsentStatus}          className="text-xs text-muted-foreground hover:text-foreground transition-colors">Cookie Settings</button>
           </div>
 
           <p className="text-xs text-muted-foreground">

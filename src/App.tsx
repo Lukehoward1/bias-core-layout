@@ -17,6 +17,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { SubscriptionActivatingGuard } from "@/components/SubscriptionActivatingGuard";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { CookieConsentBanner } from "@/components/CookieConsentBanner";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -111,6 +112,7 @@ export default function App() {
                       <Toaster />
                       <Sonner />
                       <SubscriptionActivatingGuard />
+                      <CookieConsentBanner />
                       <AppRoutes />
                     </ActiveTradingAccountProvider>
                   </TraderStyleProvider>
