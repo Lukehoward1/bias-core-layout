@@ -1,5 +1,5 @@
 // src/App.tsx
-import React from "react";
+import React, { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,6 +18,8 @@ import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { SubscriptionActivatingGuard } from "@/components/SubscriptionActivatingGuard";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { CookieConsentBanner } from "@/components/CookieConsentBanner";
+import { getConsentStatus, ConsentStatus } from "@/lib/cookieConsent";
+import { loadGoogleAnalytics } from "@/lib/analytics";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -97,6 +99,20 @@ function AppRoutes() {
   );
 }
 
+function AnalyticsLoader() {
+  useEffect(() => {
+    if (getConsentStatus() === "accepted") loadGoogleAnalytics();
+
+    const handler = (e: Event) => {
+      const { status } = (e as CustomEvent<{ status: ConsentStatus }>).detail;
+      if (status === "accepted") loadGoogleAnalytics();
+    };
+    window.addEventListener("cookie-consent-changed", handler);
+    return () => window.removeEventListener("cookie-consent-changed", handler);
+  }, []);
+  return null;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -111,6 +127,7 @@ export default function App() {
                       <GlobalNotifications />
                       <Toaster />
                       <Sonner />
+                      <AnalyticsLoader />
                       <SubscriptionActivatingGuard />
                       <CookieConsentBanner />
                       <AppRoutes />
