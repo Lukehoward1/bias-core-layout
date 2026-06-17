@@ -33,19 +33,23 @@ export function CookieConsentBanner() {
     <div className="fixed bottom-0 left-0 right-0 z-50 p-4 pointer-events-none">
       <div className="max-w-3xl mx-auto pointer-events-auto">
         <div className="rounded-lg border border-border bg-card shadow-lg px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <p className="text-sm text-muted-foreground flex-1">
-            We use essential cookies to run StreamBias, and (with your consent) analytics cookies
-            to understand site usage.{" "}
-            <Link to="/privacy" className="text-primary hover:underline">
-              Privacy Policy
-            </Link>
-          </p>
+          <div className="flex-1 space-y-1">
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">Essential cookies</span> (authentication, checkout) are always active — they're required for StreamBias to function.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              We'd also like to use <span className="font-medium text-foreground">analytics cookies</span> to understand how visitors use StreamBias. You can change this anytime via Cookie Settings in the footer.{" "}
+              <Link to="/privacy" className="text-primary hover:underline">
+                Privacy Policy
+              </Link>
+            </p>
+          </div>
           <div className="flex items-center gap-2 shrink-0">
             <Button variant="outline" size="sm" onClick={reject}>
-              Reject
+              Reject Analytics
             </Button>
             <Button size="sm" onClick={accept}>
-              Accept
+              Accept Analytics
             </Button>
           </div>
         </div>
