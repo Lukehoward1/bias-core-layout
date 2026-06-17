@@ -19,7 +19,7 @@ import { SubscriptionActivatingGuard } from "@/components/SubscriptionActivating
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { CookieConsentBanner } from "@/components/CookieConsentBanner";
 import { getConsentStatus, ConsentStatus } from "@/lib/cookieConsent";
-import { loadGoogleAnalytics } from "@/lib/analytics";
+import { loadGoogleAnalytics, trackPageView } from "@/lib/analytics";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -100,6 +100,9 @@ function AppRoutes() {
 }
 
 function AnalyticsLoader() {
+  const location = useLocation();
+
+  // Load GA4 script on mount if already consented, and re-check when consent changes
   useEffect(() => {
     if (getConsentStatus() === "accepted") loadGoogleAnalytics();
 
@@ -110,6 +113,14 @@ function AnalyticsLoader() {
     window.addEventListener("cookie-consent-changed", handler);
     return () => window.removeEventListener("cookie-consent-changed", handler);
   }, []);
+
+  // Track page views on every route change (SPA navigation)
+  // Fires on mount too — acceptable duplicate on initial load per product decision
+  useEffect(() => {
+    if (getConsentStatus() !== "accepted") return;
+    trackPageView(location.pathname);
+  }, [location.pathname]);
+
   return null;
 }
 

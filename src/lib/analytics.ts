@@ -17,6 +17,11 @@ export function loadGoogleAnalytics(): void {
   gtag("config", GA_ID);
 }
 
+export function trackPageView(path: string): void {
+  if (typeof window.gtag !== "function") return;
+  window.gtag("config", GA_ID, { page_path: path });
+}
+
 declare global {
   interface Window {
     dataLayer: unknown[];
