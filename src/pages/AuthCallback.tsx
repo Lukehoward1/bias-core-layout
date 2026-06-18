@@ -10,6 +10,12 @@ export default function AuthCallback() {
       if (!session) {
         // No session yet — wait for the hash to be processed
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+          if (event === "PASSWORD_RECOVERY") {
+            // Recovery token processed here — send to the reset form, not the app
+            subscription.unsubscribe();
+            navigate("/reset-password", { replace: true });
+            return;
+          }
           if (event === "SIGNED_IN" && session) {
             subscription.unsubscribe();
             handleSession(session.user.id, session.user.email ?? "");
@@ -17,6 +23,13 @@ export default function AuthCallback() {
         });
         return;
       }
+
+      // Session already established — check if it's a recovery token
+      if (window.location.hash.includes("type=recovery")) {
+        navigate("/reset-password", { replace: true });
+        return;
+      }
+
       handleSession(session.user.id, session.user.email ?? "");
     });
 

@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 
 export function ProtectedRoute() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, isPasswordRecovery } = useAuth();
   const { isActive, isLoading: subLoading } = useSubscription();
   const location = useLocation();
 
@@ -20,6 +20,11 @@ export function ProtectedRoute() {
   }
 
   if (!user) return <Navigate to="/login" replace />;
+
+  // Recovery sessions must only reach /reset-password — never the app shell.
+  // This catches any path that lands a recovery token on a protected route
+  // (e.g. if the Supabase redirect URL points at /auth/callback instead of /reset-password).
+  if (isPasswordRecovery) return <Navigate to="/reset-password" replace />;
 
   // Allow through on post-payment redirect — subscription context may not have loaded yet
   if (isPostPayment) return <Outlet />;
