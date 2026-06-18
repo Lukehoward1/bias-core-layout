@@ -19,22 +19,26 @@ export default function ResetPassword() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // Supabase appends the session tokens to the URL hash after the user clicks the email link.
-    // onAuthStateChange fires a PASSWORD_RECOVERY event and establishes the session automatically.
+    const hash = window.location.hash;
+    console.log("[ResetPassword] useEffect — hash at effect time:", JSON.stringify(hash));
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      console.log("[ResetPassword] onAuthStateChange fired:", event);
       if (event === "PASSWORD_RECOVERY") {
         setHasToken(true);
       }
     });
 
-    // Also check if there's an access_token already in the hash (page loaded directly)
-    const hash = window.location.hash;
     if (hash.includes("access_token")) {
+      console.log("[ResetPassword] access_token found in hash — setting hasToken=true");
       setHasToken(true);
     } else {
-      // Give onAuthStateChange a moment to fire before redirecting
+      console.log("[ResetPassword] NO access_token in hash — starting 800ms fallback timer");
       const timer = setTimeout(() => {
-        setHasToken((prev) => (prev === null ? false : prev));
+        setHasToken((prev) => {
+          console.log("[ResetPassword] 800ms timer fired — hasToken was:", prev, "→ setting to false if still null");
+          return prev === null ? false : prev;
+        });
       }, 800);
       return () => {
         clearTimeout(timer);
@@ -47,6 +51,7 @@ export default function ResetPassword() {
 
   useEffect(() => {
     if (hasToken === false) {
+      console.log("[ResetPassword] hasToken=false — redirecting to /login");
       navigate("/login", { replace: true });
     }
   }, [hasToken, navigate]);
