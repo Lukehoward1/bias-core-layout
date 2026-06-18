@@ -16,14 +16,10 @@ export default function ResetPassword() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // DEBUG
-  console.log("[ResetPassword] mounted — href:", window.location.href, "| isPasswordRecovery:", isPasswordRecovery, "| isLoading:", isLoading);
-
   // Redirect to /login if auth has finished loading and this isn't a recovery session
   // (handles direct navigation to /reset-password without a valid recovery link)
   useEffect(() => {
     if (!isLoading && !isPasswordRecovery) {
-      console.log("[ResetPassword] not a recovery session after loading — redirecting to /login");
       navigate("/login", { replace: true });
     }
   }, [isLoading, isPasswordRecovery, navigate]);

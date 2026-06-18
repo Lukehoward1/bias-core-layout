@@ -29,7 +29,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
-      console.log("[AuthContext] onAuthStateChange:", event, "| user:", newSession?.user?.email ?? "null");
       if (event === "PASSWORD_RECOVERY") {
         // Recovery session: expose the flag but still set the session so
         // ResetPassword can call updateUser() with a valid auth token.
