@@ -5,56 +5,28 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 import sbLogo from "@/assets/sb-logo.svg";
 
 export default function ResetPassword() {
   const navigate = useNavigate();
-  const [hasToken, setHasToken] = useState<boolean | null>(null);
-
-  // DEBUG
-  console.log("[ResetPassword] mounted — href:", window.location.href, "| hash:", window.location.hash, "| search:", window.location.search);
+  const { isPasswordRecovery, isLoading } = useAuth();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // DEBUG
+  console.log("[ResetPassword] mounted — href:", window.location.href, "| isPasswordRecovery:", isPasswordRecovery, "| isLoading:", isLoading);
+
+  // Redirect to /login if auth has finished loading and this isn't a recovery session
+  // (handles direct navigation to /reset-password without a valid recovery link)
   useEffect(() => {
-    const hash = window.location.hash;
-    console.log("[ResetPassword] useEffect — hash at effect time:", JSON.stringify(hash));
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      console.log("[ResetPassword] onAuthStateChange fired:", event);
-      if (event === "PASSWORD_RECOVERY") {
-        setHasToken(true);
-      }
-    });
-
-    if (hash.includes("access_token")) {
-      console.log("[ResetPassword] access_token found in hash — setting hasToken=true");
-      setHasToken(true);
-    } else {
-      console.log("[ResetPassword] NO access_token in hash — starting 800ms fallback timer");
-      const timer = setTimeout(() => {
-        setHasToken((prev) => {
-          console.log("[ResetPassword] 800ms timer fired — hasToken was:", prev, "→ setting to false if still null");
-          return prev === null ? false : prev;
-        });
-      }, 800);
-      return () => {
-        clearTimeout(timer);
-        subscription.unsubscribe();
-      };
-    }
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (hasToken === false) {
-      console.log("[ResetPassword] hasToken=false — redirecting to /login");
+    if (!isLoading && !isPasswordRecovery) {
+      console.log("[ResetPassword] not a recovery session after loading — redirecting to /login");
       navigate("/login", { replace: true });
     }
-  }, [hasToken, navigate]);
+  }, [isLoading, isPasswordRecovery, navigate]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -63,9 +35,9 @@ export default function ResetPassword() {
       setError("Passwords do not match.");
       return;
     }
-    setIsLoading(true);
+    setIsSubmitting(true);
     const { error: updateError } = await supabase.auth.updateUser({ password });
-    setIsLoading(false);
+    setIsSubmitting(false);
     if (updateError) {
       setError(updateError.message);
     } else {
@@ -73,13 +45,17 @@ export default function ResetPassword() {
     }
   }
 
-  if (hasToken === null) {
+  // Still determining auth state — show spinner
+  if (isLoading || isPasswordRecovery === null) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
       </div>
     );
   }
+
+  // Not a recovery session — redirect handled by useEffect above, show nothing meanwhile
+  if (!isPasswordRecovery) return null;
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -125,8 +101,8 @@ export default function ResetPassword() {
                 <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{error}</p>
               )}
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Updating…" : "Update password"}
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? "Updating…" : "Update password"}
               </Button>
             </form>
           </CardContent>
