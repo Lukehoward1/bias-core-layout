@@ -19,6 +19,8 @@ export function ProtectedRoute() {
     );
   }
 
+  console.log("[ProtectedRoute] isPasswordRecovery:", isPasswordRecovery, "| user:", user?.email ?? "null", "| path:", location.pathname);
+
   if (!user) return <Navigate to="/login" replace />;
 
   // Recovery sessions must only reach /reset-password — never the app shell.

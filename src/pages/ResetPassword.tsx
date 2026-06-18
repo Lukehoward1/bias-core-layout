@@ -10,6 +10,9 @@ import sbLogo from "@/assets/sb-logo.svg";
 export default function ResetPassword() {
   const navigate = useNavigate();
   const [hasToken, setHasToken] = useState<boolean | null>(null);
+
+  // DEBUG
+  console.log("[ResetPassword] mounted — href:", window.location.href, "| hash:", window.location.hash, "| search:", window.location.search);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
