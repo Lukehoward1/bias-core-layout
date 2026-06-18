@@ -36,6 +36,8 @@ import Education from "./pages/Education";
 import Settings from "./pages/Settings";
 import Billing from "./pages/Billing";
 import Pricing from "./pages/Pricing";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
 import StartTrial from "./pages/StartTrial";
 import NotFound from "./pages/NotFound";
 import AssetDetail from "./pages/AssetDetail";
@@ -67,6 +69,8 @@ function AppRoutes() {
         <Route path="/register" element={<Register />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/pricing" element={<Pricing />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route path="/start-trial" element={<StartTrial />} />
 
         <Route element={<ProtectedRoute />}>
