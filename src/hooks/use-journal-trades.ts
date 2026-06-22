@@ -208,7 +208,13 @@ export function useJournalTrades(accountIds: string[] = []) {
 
   // One-time seed: insert demo trades for the demo account if the table is empty
   useEffect(() => {
-    if (!isLoaded || !user || user.id !== DEMO_OWNER_ID || manualTrades.length > 0) return;
+    console.log("[seedCheck] isLoaded:", isLoaded, "userId:", user?.id, "manualTrades.length:", manualTrades.length, "DEMO_OWNER_ID:", DEMO_OWNER_ID);
+    if (!isLoaded || !user || user.id !== DEMO_OWNER_ID || manualTrades.length > 0) {
+      console.log("[seedCheck] skipping seed — conditions not met");
+      return;
+    }
+
+    console.log("[seedCheck] conditions met — seeding", DEMO_TRADES.length, "demo trades");
 
     async function seedDemoTrades() {
       const rows = DEMO_TRADES.map((t) => toRow(t, DEMO_OWNER_ID));
@@ -216,6 +222,7 @@ export function useJournalTrades(accountIds: string[] = []) {
         .from("trades")
         .insert(rows)
         .select();
+      console.log("[seedCheck] insert result — error:", error, "rows inserted:", data?.length ?? 0);
       if (!error && data) {
         setManualTrades((data as SupabaseTradeRow[]).map(fromRow));
       }
