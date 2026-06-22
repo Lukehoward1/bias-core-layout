@@ -171,7 +171,7 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates, isLocke
                   £{bestSetup?.expectancy?.toLocaleString() || 0}/trade expectancy
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {bestSetup?.winRate || 0}% win rate
+                  {bestSetup?.winRate || 0}% profit rate
                 </p>
               </div>
 
@@ -194,7 +194,7 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates, isLocke
                   £{worstSetup?.expectancy?.toLocaleString() || 0}/trade expectancy
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {worstSetup?.winRate || 0}% win rate
+                  {worstSetup?.winRate || 0}% profit rate
                 </p>
               </div>
             </div>
@@ -225,7 +225,7 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates, isLocke
                     }}
                     formatter={(value: number, name: string) => {
                       if (name === 'expectancy') return [`£${value}`, 'Expectancy'];
-                      if (name === 'winRate') return [`${value}%`, 'Win Rate'];
+                      if (name === 'winRate') return [`${value}%`, 'Profit Rate'];
                       return [value, name];
                     }}
                   />
@@ -253,7 +253,7 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates, isLocke
                   <tr className="border-b border-border">
                     <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Rating</th>
                     <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Trades</th>
-                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Win Rate</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Profit Rate</th>
                     <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Total P&L</th>
                     <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Avg P&L</th>
                     <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Expectancy</th>

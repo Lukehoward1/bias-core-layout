@@ -154,7 +154,7 @@ export function SavedBacktestsDropdown({
                         <span className={backtest.netProfit >= 0 ? 'text-success' : 'text-destructive'}>
                           {backtest.netProfit >= 0 ? '+' : ''}${backtest.netProfit.toLocaleString()}
                         </span>
-                        <span className="text-muted-foreground">{backtest.winRate}% WR</span>
+                        <span className="text-muted-foreground">{backtest.winRate}% PR</span>
                         <span className="text-muted-foreground">{backtest.totalTrades} trades</span>
                       </div>
                       <span className="text-muted-foreground flex items-center gap-1">
@@ -210,7 +210,7 @@ export function SavedBacktestsDropdown({
                           <span className={backtest.netProfit >= 0 ? 'text-success' : 'text-destructive'}>
                             {backtest.netProfit >= 0 ? '+' : ''}${backtest.netProfit.toLocaleString()}
                           </span>
-                          <span>{backtest.winRate}% WR</span>
+                          <span>{backtest.winRate}% PR</span>
                           <span>PF: {backtest.profitFactor}</span>
                         </div>
                       </div>
@@ -249,7 +249,7 @@ export function SavedBacktestsDropdown({
                         ))}
                       </tr>
                       <tr className="border-b border-border/50">
-                        <td className="py-2 text-muted-foreground">Win Rate</td>
+                        <td className="py-2 text-muted-foreground">Profit Rate</td>
                         {selectedBacktests.map(b => (
                           <td key={b.id} className="text-center py-2">{b.winRate}%</td>
                         ))}

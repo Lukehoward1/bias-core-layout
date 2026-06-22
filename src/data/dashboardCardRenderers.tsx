@@ -908,21 +908,20 @@ function ReportsKpiLiveCard({ metric }: { metric: "pnl" | "rr" | "winrate" | "ex
   const { viewTrades } = useTradingData();
   const { activeAccount } = useLinkedAccounts();
   const sym = activeAccount?.currency === "GBP" ? "£" : "$";
-  const closed = viewTrades.filter((t) => t.status === "closed");
-  const winners = closed.filter((t) => (t.pnl ?? 0) > 0);
-  const totalPnl = closed.reduce((s, t) => s + (t.pnl ?? 0), 0);
-  const winRate = closed.length > 0 ? ((winners.length / closed.length) * 100).toFixed(1) : "0.0";
-  const rTrades = closed.filter((t) => t.actualR != null);
+  const winners = viewTrades.filter((t) => (t.pnl ?? 0) > 0);
+  const totalPnl = viewTrades.reduce((s, t) => s + (t.pnl ?? 0), 0);
+  const winRate = viewTrades.length > 0 ? ((winners.length / viewTrades.length) * 100).toFixed(1) : "0.0";
+  const rTrades = viewTrades.filter((t) => t.actualR != null);
   const avgRR = rTrades.length > 0
     ? (rTrades.reduce((s, t) => s + (t.actualR ?? 0), 0) / rTrades.length).toFixed(2)
     : "—";
-  const expectancy = closed.length > 0 ? (totalPnl / closed.length).toFixed(0) : "0";
+  const expectancy = viewTrades.length > 0 ? (totalPnl / viewTrades.length).toFixed(0) : "0";
   const fmtPnl = `${totalPnl >= 0 ? "+" : ""}${sym}${Math.abs(totalPnl).toLocaleString("en-GB", { maximumFractionDigits: 0 })}`;
 
   const configs = {
     pnl: { title: "Total P&L", value: fmtPnl, color: totalPnl >= 0 ? "text-success" : "text-destructive" },
     rr: { title: "Avg R:R", value: avgRR, color: "text-foreground" },
-    winrate: { title: "Win Rate", value: `${winRate}%`, color: "text-foreground" },
+    winrate: { title: "Profit Rate", value: `${winRate}%`, color: "text-foreground" },
     expectancy: {
       title: "Avg Expectancy",
       value: `${sym}${parseInt(expectancy).toLocaleString()}/trade`,
@@ -1172,7 +1171,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">Win Rate and session breakdowns.</p>
+        <p className="text-sm text-muted-foreground">Profit Rate and session breakdowns.</p>
       </CardContent>
     </Card>
   ),

@@ -257,7 +257,7 @@ export default function AutomatedStrategyLab() {
                 </Card>
                 <Card className={`border-border/50 ${!hasResults && 'opacity-50'}`}>
                   <CardContent className="p-4 text-center">
-                    <div className="text-xs text-muted-foreground mb-1">Win Rate</div>
+                    <div className="text-xs text-muted-foreground mb-1">Profit Rate</div>
                     <div className="text-xl font-bold text-foreground">
                       {hasResults ? `${DEMO_RESULTS.winRate}%` : '—'}
                     </div>

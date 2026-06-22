@@ -427,7 +427,7 @@ export function ReportsPsychology({ trades, dateRangeLabel, pinStates, isLocked 
                           <p className="text-sm font-medium">{b.count}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-muted-foreground">Win Rate</p>
+                          <p className="text-xs text-muted-foreground">Profit Rate</p>
                           <p className="text-sm font-medium">{b.winRate}%</p>
                         </div>
                         <div>

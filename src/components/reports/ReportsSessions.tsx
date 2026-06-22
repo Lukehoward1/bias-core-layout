@@ -152,7 +152,7 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = 
                 <CardContent className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <p className="text-xs text-muted-foreground">Win Rate</p>
+                      <p className="text-xs text-muted-foreground">Profit Rate</p>
                       <p className="text-lg font-bold text-foreground">{session.winRate}%</p>
                     </div>
                     <div>
@@ -208,7 +208,7 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = 
                       borderRadius: '8px'
                     }}
                     formatter={(value: number, name: string) => {
-                      if (name === 'winRate') return [`${value}%`, 'Win Rate'];
+                      if (name === 'winRate') return [`${value}%`, 'Profit Rate'];
                       if (name === 'pnl') return [`£${value.toLocaleString()}`, 'P&L'];
                       if (name === 'avgRR') return [`${(value / 100).toFixed(1)}`, 'Avg R:R'];
                       return [value, name];
@@ -285,7 +285,7 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = 
                   </div>
                   <p className="text-sm text-foreground font-medium">{strongest.name} Session</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Your highest win rate ({strongest.winRate}%) and best P&L (£{strongest.pnl.toLocaleString()}).
+                    Your highest profit rate ({strongest.winRate}%) and best P&L (£{strongest.pnl.toLocaleString()}).
                     Consider increasing position sizes during this session.
                   </p>
                 </div>
@@ -297,7 +297,7 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = 
                   </div>
                   <p className="text-sm text-foreground font-medium">{weakest.name} Session</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Lowest win rate ({weakest.winRate}%) and P&L (£{weakest.pnl.toLocaleString()}).
+                    Lowest profit rate ({weakest.winRate}%) and P&L (£{weakest.pnl.toLocaleString()}).
                     Review your setups for this session or reduce size.
                   </p>
                 </div>

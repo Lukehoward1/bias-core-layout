@@ -13,7 +13,7 @@ interface SessionComparisonProps {
 export function SessionComparison({ sessions, onBack }: SessionComparisonProps) {
   const metrics = [
     { key: 'netProfit', label: 'Net Profit', format: (v: number) => `$${v >= 0 ? '+' : ''}${v.toLocaleString()}`, colorize: true },
-    { key: 'winRate', label: 'Win Rate', format: (v: number) => `${v}%` },
+    { key: 'winRate', label: 'Profit Rate', format: (v: number) => `${v}%` },
     { key: 'avgRR', label: 'Avg R:R', format: (v: number) => v.toFixed(2) },
     { key: 'maxDrawdown', label: 'Max Drawdown', format: (v: number) => `${v}%`, negative: true },
     { key: 'expectancy', label: 'Expectancy', format: (v: number) => `$${v.toFixed(2)}`, colorize: true },

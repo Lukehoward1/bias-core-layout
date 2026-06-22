@@ -903,7 +903,7 @@ export default function Landing() {
               A journal that analyses itself.
             </h2>
             <p className="text-muted-foreground leading-relaxed">
-              Log trades manually or sync your broker. StreamBias calculates win rate, R:R, session performance
+              Log trades manually or sync your broker. StreamBias calculates profit rate, R:R, session performance
               and emotional patterns — surfacing insights you'd never find manually.
             </p>
             <div className="flex flex-wrap gap-2 mt-1">

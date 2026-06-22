@@ -125,11 +125,11 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked
         <PdfExportButton onClick={handleExport} />
       </div>
 
-      {/* Win Rate by Day - with per-card pin */}
+      {/* Profit Rate by Day - with per-card pin */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Win Rate by Day of Week</CardTitle>
+            <CardTitle>Profit Rate by Day of Week</CardTitle>
             <div className="flex items-center gap-1.5">
               {isLocked && <TierBadge requiredPlan="standard" />}
               {!isLocked && pinStates?.byDay && (
@@ -155,7 +155,7 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked
                       border: '1px solid hsl(var(--border))',
                       borderRadius: '8px'
                     }}
-                    formatter={(value: number) => [`${value}%`, 'Win Rate']}
+                    formatter={(value: number) => [`${value}%`, 'Profit Rate']}
                     labelFormatter={(label) => `${label} (${dayStats.find(d => d.day === label)?.trades || 0} trades)`}
                   />
                   <Bar dataKey="winRate" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
@@ -167,11 +167,11 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Win Rate by Session - with per-card pin */}
+        {/* Profit Rate by Session - with per-card pin */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Win Rate by Session</CardTitle>
+              <CardTitle>Profit Rate by Session</CardTitle>
               <div className="flex items-center gap-1.5">
                 {isLocked && <TierBadge requiredPlan="standard" />}
                 {!isLocked && pinStates?.bySession && (
@@ -197,7 +197,7 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px'
                       }}
-                      formatter={(value: number) => [`${value}%`, 'Win Rate']}
+                      formatter={(value: number) => [`${value}%`, 'Profit Rate']}
                     />
                     <Bar dataKey="winRate" fill="hsl(var(--accent))" radius={[0, 4, 4, 0]} />
                   </BarChart>

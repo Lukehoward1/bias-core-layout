@@ -174,11 +174,11 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates, isLocked = 
           </CardFeatureGate>
         </Card>
 
-        {/* Win Rate Card */}
+        {/* Profit Rate Card */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-xs font-medium text-muted-foreground">Win Rate</CardTitle>
+              <CardTitle className="text-xs font-medium text-muted-foreground">Profit Rate</CardTitle>
               <div className="flex items-center gap-1.5">
                 {isLocked && <TierBadge requiredPlan="standard" />}
                 {!isLocked && pinStates?.winRate && (

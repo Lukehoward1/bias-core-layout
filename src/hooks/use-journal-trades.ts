@@ -155,6 +155,7 @@ function writeSyncedTradesForAccount(accountId: string, trades: Trade[]) {
 export function useJournalTrades(accountIds: string[] = []) {
   const { user } = useAuth();
   const [manualTrades, setManualTrades] = useState<Trade[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
   const [syncedTradesByAccount, setSyncedTradesByAccount] = useState<
     Record<string, Trade[]>
   >({});
@@ -166,7 +167,10 @@ export function useJournalTrades(accountIds: string[] = []) {
 
     async function fetchManual() {
       if (!user) {
-        if (!cancelled) setManualTrades([]);
+        if (!cancelled) {
+          setManualTrades([]);
+          setIsLoaded(true);
+        }
         return;
       }
       const { data, error } = await supabase
@@ -174,11 +178,15 @@ export function useJournalTrades(accountIds: string[] = []) {
         .select("*")
         .eq("user_id", user.id)
         .order("date", { ascending: false });
-      if (!error && data && !cancelled) {
-        setManualTrades((data as SupabaseTradeRow[]).map(fromRow));
+      if (!cancelled) {
+        if (!error && data) {
+          setManualTrades((data as SupabaseTradeRow[]).map(fromRow));
+        }
+        setIsLoaded(true);
       }
     }
 
+    setIsLoaded(false);
     fetchManual();
 
     // Synced trades remain in localStorage (no broker integration yet)
@@ -198,32 +206,39 @@ export function useJournalTrades(accountIds: string[] = []) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, accountIdsKey]);
 
+  // One-time seed: insert demo trades for the demo account if the table is empty
+  useEffect(() => {
+    if (!isLoaded || !user || user.id !== DEMO_OWNER_ID || manualTrades.length > 0) return;
+
+    async function seedDemoTrades() {
+      const rows = DEMO_TRADES.map((t) => toRow(t, DEMO_OWNER_ID));
+      const { data, error } = await supabase
+        .from("trades")
+        .insert(rows)
+        .select();
+      if (!error && data) {
+        setManualTrades((data as SupabaseTradeRow[]).map(fromRow));
+      }
+    }
+
+    seedDemoTrades();
+  }, [isLoaded, user?.id, manualTrades.length]);
+
   const notify = useCallback(() => {
     window.dispatchEvent(new Event(EVENT_NAME));
   }, []);
 
-  const isDemoData = useMemo(() => {
-    if (user?.id !== DEMO_OWNER_ID) return false;
-    const isVirtualDemoSession =
-      accountIds.length === 0 ||
-      (accountIds.length === 1 && accountIds[0] === "demo-account");
-    const hasRealTrades =
-      manualTrades.length > 0 ||
-      Object.values(syncedTradesByAccount).flat().length > 0;
-    return isVirtualDemoSession && !hasRealTrades;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, accountIdsKey, manualTrades, syncedTradesByAccount]);
+  // isDemoData is kept for API compatibility; after seeding it is always false
+  const isDemoData = false;
 
   const trades: Trade[] = useMemo(() => {
     const syncedAll = Object.values(syncedTradesByAccount).flat();
     const manual = manualTrades.map((t) => ({ ...t, source: "manual" as const }));
     const synced = syncedAll.map((t) => ({ ...t, source: "synced" as const }));
-    const combined = isDemoData
-      ? [...DEMO_TRADES, ...manual]
-      : [...manual, ...synced];
+    const combined = [...manual, ...synced];
     combined.sort((a, b) => b.date.localeCompare(a.date));
     return combined;
-  }, [manualTrades, syncedTradesByAccount, isDemoData]);
+  }, [manualTrades, syncedTradesByAccount]);
 
   const addManualTrade = useCallback(
     async (trade: Trade) => {

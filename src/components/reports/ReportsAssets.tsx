@@ -124,7 +124,7 @@ export function ReportsAssets({ trades, dateRangeLabel, pinStates, isLocked = fa
                 +£{bestPair?.pnl?.toLocaleString() || 0}
               </span>
               <span className="text-sm text-muted-foreground">
-                ({bestPair?.trades || 0} trades, {bestPair?.winRate || 0}% win rate)
+                ({bestPair?.trades || 0} trades, {bestPair?.winRate || 0}% profit rate)
               </span>
             </div>
           </CardContent>
@@ -259,7 +259,7 @@ export function ReportsAssets({ trades, dateRangeLabel, pinStates, isLocked = fa
                   <tr className="border-b border-border">
                     <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Pair</th>
                     <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Trades</th>
-                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Win Rate</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Profit Rate</th>
                     <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">P&L</th>
                     <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Avg Rating</th>
                     <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Confidence</th>

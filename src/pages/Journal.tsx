@@ -555,7 +555,7 @@ export default function Journal() {
     if (include.has("reports-overview")) {
       lines.push(["SECTION", "Overview", ""].map(escapeCsv).join(","));
       lines.push(["Total P&L", tradeSummary.totalPnl, ""].map(escapeCsv).join(","));
-      lines.push(["Win Rate (%)", tradeSummary.winRate.toFixed(2), ""].map(escapeCsv).join(","));
+      lines.push(["Profit Rate (%)", tradeSummary.winRate.toFixed(2), ""].map(escapeCsv).join(","));
       lines.push(["Avg R:R", tradeSummary.avgRR.toFixed(2), ""].map(escapeCsv).join(","));
       lines.push(["Trade Count", tradeSummary.tradeCount, ""].map(escapeCsv).join(","));
       lines.push(
@@ -615,7 +615,7 @@ export default function Journal() {
 
   const handleExportAllReports = () => {
     const sessionHighlights = [
-      "London session: Best performing with highest win rate",
+      "London session: Best performing with highest profit rate",
       "Consider reducing exposure during Asian session",
     ];
     const assetHighlights = filteredTrades.length > 0 ? [`Top pair by P&L: ${filteredTrades[0]?.pair || "N/A"}`] : [];
@@ -663,7 +663,7 @@ export default function Journal() {
     const include = new Set(selectedSectionIds);
 
     const sessionHighlights = [
-      "London session: Best performing with highest win rate",
+      "London session: Best performing with highest profit rate",
       "Consider reducing exposure during Asian session",
     ];
     const assetHighlights = filteredTrades.length > 0 ? [`Top pair by P&L: ${filteredTrades[0]?.pair || "N/A"}`] : [];
@@ -973,7 +973,7 @@ export default function Journal() {
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Profit Rate</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-foreground">{topStats.winRate}%</div>
@@ -1199,7 +1199,7 @@ export default function Journal() {
 
                               <td className="py-3 px-3">
                                 <Badge variant="secondary" className="text-xs">
-                                  {trade.status}
+                                  {trade.status === "win" ? "Profit" : trade.status === "loss" ? "Loss" : "Breakeven"}
                                 </Badge>
                               </td>
 

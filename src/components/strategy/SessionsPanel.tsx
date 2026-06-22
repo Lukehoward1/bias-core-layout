@@ -171,7 +171,7 @@ export function SessionsPanel({
                     </div>
                   </div>
                   <div className="bg-muted/30 rounded-lg p-3 text-center">
-                    <div className="text-xs text-muted-foreground">Win Rate</div>
+                    <div className="text-xs text-muted-foreground">Profit Rate</div>
                     <div className="text-lg font-bold">{viewingSession.metrics.winRate}%</div>
                   </div>
                   <div className="bg-muted/30 rounded-lg p-3 text-center">
@@ -287,7 +287,7 @@ export function SessionsPanel({
                             {formatMetricValue(session.metrics.netProfit, "$")}
                           </span>
                           <span className="text-muted-foreground">
-                            {session.metrics.winRate}% WR
+                            {session.metrics.winRate}% PR
                           </span>
                           <span className="text-muted-foreground">
                             {format(new Date(session.timestamp), "MMM dd")}

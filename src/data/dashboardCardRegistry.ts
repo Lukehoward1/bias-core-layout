@@ -251,7 +251,7 @@ export const DASHBOARD_CARD_REGISTRY: DashboardCardDefinition[] = [
   },
   {
     id: "reports-kpi-win-rate",
-    title: "Win Rate",
+    title: "Profit Rate",
     description: "Percentage of winning trades",
     section: "reports",
     category: "metrics",
@@ -312,7 +312,7 @@ export const DASHBOARD_CARD_REGISTRY: DashboardCardDefinition[] = [
   {
     id: "reports-performance",
     title: "Performance Analysis",
-    description: "Win rate and session breakdowns",
+    description: "Profit rate and session breakdowns",
     section: "reports",
     category: "analysis",
     defaultRowType: "equal",
@@ -321,7 +321,7 @@ export const DASHBOARD_CARD_REGISTRY: DashboardCardDefinition[] = [
   },
   {
     id: "reports-performance-by-day",
-    title: "Win Rate by Day",
+    title: "Profit Rate by Day",
     description: "Performance breakdown by day of week",
     section: "reports",
     category: "analysis",
@@ -331,7 +331,7 @@ export const DASHBOARD_CARD_REGISTRY: DashboardCardDefinition[] = [
   },
   {
     id: "reports-performance-by-session",
-    title: "Win Rate by Session",
+    title: "Profit Rate by Session",
     description: "Performance breakdown by trading session",
     section: "reports",
     category: "analysis",

@@ -59,7 +59,7 @@ Market structure alone won't make you a great trader, but ignoring it will guara
     readTime: "8 min",
     level: "Intermediate",
     tags: ["Psychology"],
-    content: `Every trader, regardless of their win rate, will experience drawdowns. A drawdown is simply the decline from a peak equity level to a subsequent trough. Understanding them psychologically is just as important as managing them mathematically.
+    content: `Every trader, regardless of their profit rate, will experience drawdowns. A drawdown is simply the decline from a peak equity level to a subsequent trough. Understanding them psychologically is just as important as managing them mathematically.
 
 WHY DRAWDOWNS HIT HARDER THAN WINS FEEL GOOD
 Loss aversion — a well-documented cognitive bias — means that psychologically, losses feel roughly twice as painful as equivalent gains feel rewarding. A £500 loss hurts more than a £500 win feels good. This asymmetry creates dangerous pressure to "make it back" quickly.
@@ -80,7 +80,7 @@ WHAT TO DO DURING A DRAWDOWN
 4. Trust your edge. If your strategy has positive expectancy over a sample of 100+ trades, five or ten consecutive losses are statistically normal.
 
 WHAT NORMAL DRAWDOWNS LOOK LIKE
-Even a 65% win rate strategy with a 1.5R average will experience streaks of 5–7 consecutive losses regularly. This is not a strategy problem. This is variance. Expecting zero drawdowns means expecting an impossible edge.
+Even a 65% profit rate strategy with a 1.5R average will experience streaks of 5–7 consecutive losses regularly. This is not a strategy problem. This is variance. Expecting zero drawdowns means expecting an impossible edge.
 
 The traders who survive long enough to compound are the ones who treat drawdowns as information, not punishment.`,
   },
@@ -150,25 +150,25 @@ Order flow analysis is not a guarantee — it's a probability framework. The goa
   {
     id: "a5",
     title: "Risk/Reward Ratios in Practice",
-    description: "Why the ratio matters more than your win rate — and how to use it correctly.",
+    description: "Why the ratio matters more than your profit rate — and how to use it correctly.",
     readTime: "5 min",
     level: "Beginner",
     tags: ["Risk", "Fundamentals"],
-    content: `Most new traders focus on win rate. Professionals focus on expectancy — a function of both win rate and risk/reward ratio. Understanding this distinction is one of the most important mindset shifts in trading.
+    content: `Most new traders focus on profit rate. Professionals focus on expectancy — a function of both profit rate and risk/reward ratio. Understanding this distinction is one of the most important mindset shifts in trading.
 
 WHAT IS RISK/REWARD RATIO?
 The R:R ratio compares the potential profit of a trade to its potential loss. A 2:1 R:R means for every £1 risked, you target £2 in profit. If your stop loss is 30 pips and your target is 60 pips, that's a 2:1 trade.
 
 THE EXPECTANCY FORMULA
-Expectancy = (Win Rate × Average Win) – (Loss Rate × Average Loss)
+Expectancy = (Profit Rate × Average Win) – (Loss Rate × Average Loss)
 
-Example with 50% win rate and 2:1 R:R:
+Example with 50% profit rate and 2:1 R:R:
 Expectancy = (0.50 × 2R) – (0.50 × 1R) = 1R – 0.5R = +0.5R per trade
 
 This means even winning only half your trades, you make 0.5R profit per trade on average. Over 100 trades risking £100 each, that's £5,000 profit.
 
 THE MINIMUM THRESHOLD
-At a 1:1 R:R, you need to win over 50% of trades just to break even (ignoring spread). At 2:1 R:R, you only need a 34% win rate to be profitable. At 3:1 R:R, you only need 26%. Higher R:R ratios give you more room for error.
+At a 1:1 R:R, you need to win over 50% of trades just to break even (ignoring spread). At 2:1 R:R, you only need a 34% profit rate to be profitable. At 3:1 R:R, you only need 26%. Higher R:R ratios give you more room for error.
 
 COMMON MISTAKES
 • Moving stop losses to improve the ratio. If you move your stop closer after entry to fake a higher R:R, you're increasing the probability of being stopped out. The ratio is only meaningful at trade setup, not manipulated after entry.
@@ -176,7 +176,7 @@ COMMON MISTAKES
 • Not accounting for spread and commissions. A 1:1 R:R trade with 2 pips of spread on a 10-pip target is actually a losing trade.
 
 HOW TO APPLY IT
-Every trade should have a defined stop loss and target before entry. Write down the R:R. If it's below 1.5:1 for a strategy that doesn't have an 80%+ win rate, reconsider the setup.`,
+Every trade should have a defined stop loss and target before entry. Write down the R:R. If it's below 1.5:1 for a strategy that doesn't have an 80%+ profit rate, reconsider the setup.`,
   },
   {
     id: "a6",
@@ -327,7 +327,7 @@ TRAILING STOP APPROACHES
 Structure-based trailing tends to give trades the most room to run while still capturing the bulk of a swing. Fixed pip trails are simpler but can be stopped out by minor retracements.
 
 WHEN TO HOLD FULL
-If your strategy has strong statistical basis (50%+ win rate with 2:1+ R:R tested over 200+ trades), holding full to target will produce higher absolute returns than scaling out. Scaling out is psychologically beneficial but mathematically inferior in a strong-edge strategy.`,
+If your strategy has strong statistical basis (50%+ profit rate with 2:1+ R:R tested over 200+ trades), holding full to target will produce higher absolute returns than scaling out. Scaling out is psychologically beneficial but mathematically inferior in a strong-edge strategy.`,
   },
   {
     id: "a10",
@@ -336,7 +336,7 @@ If your strategy has strong statistical basis (50%+ win rate with 2:1+ R:R teste
     readTime: "6 min",
     level: "Intermediate",
     tags: ["Strategy", "Execution"],
-    content: `There are two fundamental ways to enter a trade: waiting for confirmation that the move is happening, or anticipating it in advance. Both are valid. The choice depends on your risk tolerance, win rate targets, and R:R requirements.
+    content: `There are two fundamental ways to enter a trade: waiting for confirmation that the move is happening, or anticipating it in advance. Both are valid. The choice depends on your risk tolerance, profit rate targets, and R:R requirements.
 
 ANTICIPATION ENTRIES (LIMIT ORDERS)
 You identify a level — an Order Block, a Fibonacci retracement, a previous high-turned-support — and place a limit order to enter as price approaches it, before any confirmation.

@@ -298,7 +298,7 @@ const createSummaryStrip = (trades?: ExportOptions['trades']) => {
         <div class="pdf-kpi-value ${trades.totalPnl >= 0 ? 'positive' : 'negative'}">${formatPnl(trades.totalPnl)}</div>
       </div>
       <div class="pdf-kpi-card">
-        <div class="pdf-kpi-label">Win Rate</div>
+        <div class="pdf-kpi-label">Profit Rate</div>
         <div class="pdf-kpi-value">${trades.winRate.toFixed(1)}%</div>
       </div>
       <div class="pdf-kpi-card">

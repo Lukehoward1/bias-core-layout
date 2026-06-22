@@ -277,7 +277,7 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLoc
               </div>
               <div className="flex-1">
                 <p className="text-sm text-muted-foreground">
-                  Based on your current win rate of {Math.round(winRate * 100)}%
+                  Based on your current profit rate of {Math.round(winRate * 100)}%
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {riskOfRuin < 10 

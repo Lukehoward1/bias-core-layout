@@ -95,7 +95,7 @@ export default function ManualBacktesting() {
     
     toast({
       title: "Backtest Complete",
-      description: `${newResults.totalTrades} trades analyzed with ${newResults.winRate}% win rate.`,
+      description: `${newResults.totalTrades} trades analyzed with ${newResults.winRate}% profit rate.`,
     });
   };
 
@@ -323,7 +323,7 @@ export default function ManualBacktesting() {
                   <div className="text-base font-bold text-foreground">{backtestResults.totalTrades}</div>
                 </div>
                 <div className="text-center p-2.5 bg-muted/30 rounded-lg">
-                  <div className="text-[10px] text-muted-foreground mb-0.5">Win Rate</div>
+                  <div className="text-[10px] text-muted-foreground mb-0.5">Profit Rate</div>
                   <div className="text-base font-bold text-foreground">{backtestResults.winRate}%</div>
                 </div>
                 <div className="text-center p-2.5 bg-muted/30 rounded-lg">
