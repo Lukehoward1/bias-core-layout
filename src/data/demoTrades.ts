@@ -4,7 +4,7 @@ export const DEMO_TRADES: Trade[] = [
   // ── December 2025 ────────────────────────────────────────────
   {
     id: "demo-1", date: "2025-12-02", pair: "GBPUSD", type: "Long",
-    entry: 1.2665, exit: 1.2732, lots: 2.0, pnl: 1820, status: "closed",
+    entry: 1.2665, exit: 1.2732, lots: 2.0, pnl: 1820, status: "win",
     notes: "Clean break of London high", rating: 4,
     stopLoss: 1.2625, takeProfit: 1.2750, actualR: 1.68,
     entryTime: "09:00", exitTime: "12:30",
@@ -12,7 +12,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-2", date: "2025-12-03", pair: "USDJPY", type: "Short",
-    entry: 150.45, exit: 149.82, lots: 1.5, pnl: 2240, status: "closed",
+    entry: 150.45, exit: 149.82, lots: 1.5, pnl: 2240, status: "win",
     notes: undefined, rating: 4,
     stopLoss: 150.85, takeProfit: 149.50, actualR: 1.58,
     entryTime: "13:15", exitTime: "17:15",
@@ -20,7 +20,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-3", date: "2025-12-05", pair: "EURUSD", type: "Long",
-    entry: 1.0520, exit: 1.0483, lots: 2.0, pnl: -980, status: "closed",
+    entry: 1.0520, exit: 1.0483, lots: 2.0, pnl: -980, status: "loss",
     notes: "Stopped out at BE", rating: 2,
     stopLoss: 1.0482, actualR: -0.97,
     entryTime: "08:30", exitTime: "09:15",
@@ -28,7 +28,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-4", date: "2025-12-09", pair: "XAUUSD", type: "Long",
-    entry: 2644.0, exit: 2683.5, lots: 0.3, pnl: 3150, status: "closed",
+    entry: 2644.0, exit: 2683.5, lots: 0.3, pnl: 3150, status: "win",
     notes: "Gold holding key level", rating: 5,
     stopLoss: 2625.0, takeProfit: 2700.0, actualR: 2.08,
     entryTime: "14:30", exitTime: "19:30",
@@ -36,7 +36,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-5", date: "2025-12-10", pair: "GBPJPY", type: "Short",
-    entry: 191.85, exit: 192.52, lots: 1.0, pnl: -1340, status: "closed",
+    entry: 191.85, exit: 192.52, lots: 1.0, pnl: -1340, status: "loss",
     notes: undefined, rating: 0,
     stopLoss: 193.00, actualR: -0.58,
     entryTime: "10:00", exitTime: "10:30",
@@ -44,7 +44,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-6", date: "2025-12-11", pair: "EURUSD", type: "Short",
-    entry: 1.0498, exit: 1.0438, lots: 2.0, pnl: 1680, status: "closed",
+    entry: 1.0498, exit: 1.0438, lots: 2.0, pnl: 1680, status: "win",
     notes: "Rejection at weekly resistance", rating: 4,
     stopLoss: 1.0535, takeProfit: 1.0420, actualR: 1.62,
     entryTime: "12:00", exitTime: "15:00",
@@ -52,14 +52,14 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-7", date: "2025-12-12", pair: "GBPUSD", type: "Long",
-    entry: 1.2720, exit: 1.2692, lots: 1.5, pnl: -720, status: "closed",
+    entry: 1.2720, exit: 1.2692, lots: 1.5, pnl: -720, status: "loss",
     notes: undefined, rating: 0,
     entryTime: "07:45", exitTime: "08:05",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-8", date: "2025-12-17", pair: "XAUUSD", type: "Long",
-    entry: 2658.0, exit: 2719.0, lots: 0.35, pnl: 2800, status: "closed",
+    entry: 2658.0, exit: 2719.0, lots: 0.35, pnl: 2800, status: "win",
     notes: "HTF bullish, pre-Christmas squeeze", rating: 5,
     stopLoss: 2625.0, takeProfit: 2760.0, actualR: 1.85,
     entryTime: "09:00", exitTime: "16:00",
@@ -67,14 +67,14 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-9", date: "2025-12-18", pair: "USDJPY", type: "Long",
-    entry: 153.80, exit: 153.23, lots: 1.5, pnl: -1180, status: "closed",
+    entry: 153.80, exit: 153.23, lots: 1.5, pnl: -1180, status: "loss",
     notes: "News driven, cut early", rating: 2,
     entryTime: "14:30", exitTime: "14:55",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-10", date: "2025-12-27", pair: "GBPUSD", type: "Short",
-    entry: 1.2545, exit: 1.2490, lots: 1.5, pnl: 1540, status: "closed",
+    entry: 1.2545, exit: 1.2490, lots: 1.5, pnl: 1540, status: "win",
     notes: undefined, rating: 3,
     entryTime: "13:30", exitTime: "16:00",
     accountId: "demo-account", source: "manual",
@@ -83,7 +83,7 @@ export const DEMO_TRADES: Trade[] = [
   // ── January 2026 ─────────────────────────────────────────────
   {
     id: "demo-11", date: "2026-01-06", pair: "EURUSD", type: "Short",
-    entry: 1.0312, exit: 1.0248, lots: 2.0, pnl: 2100, status: "closed",
+    entry: 1.0312, exit: 1.0248, lots: 2.0, pnl: 2100, status: "win",
     notes: "Dollar strength at the open", rating: 4,
     stopLoss: 1.0358, takeProfit: 1.0200, actualR: 1.39,
     entryTime: "12:30", exitTime: "16:00",
@@ -91,14 +91,14 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-12", date: "2026-01-07", pair: "GBPUSD", type: "Long",
-    entry: 1.2495, exit: 1.2558, lots: 1.5, pnl: 1560, status: "closed",
+    entry: 1.2495, exit: 1.2558, lots: 1.5, pnl: 1560, status: "win",
     notes: undefined, rating: 3,
     entryTime: "09:30", exitTime: "11:30",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-13", date: "2026-01-08", pair: "USDJPY", type: "Long",
-    entry: 158.35, exit: 157.94, lots: 1.5, pnl: -840, status: "closed",
+    entry: 158.35, exit: 157.94, lots: 1.5, pnl: -840, status: "loss",
     notes: undefined, rating: 0,
     stopLoss: 157.85, actualR: -0.82,
     entryTime: "02:30", exitTime: "03:00",
@@ -106,7 +106,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-14", date: "2026-01-09", pair: "XAUUSD", type: "Long",
-    entry: 2655.0, exit: 2722.0, lots: 0.4, pnl: 4200, status: "closed",
+    entry: 2655.0, exit: 2722.0, lots: 0.4, pnl: 4200, status: "win",
     notes: "Breakout of consolidation zone", rating: 5,
     stopLoss: 2628.0, takeProfit: 2750.0, actualR: 2.48,
     entryTime: "13:00", exitTime: "18:00",
@@ -114,14 +114,14 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-15", date: "2026-01-10", pair: "GBPJPY", type: "Short",
-    entry: 189.45, exit: 190.28, lots: 1.0, pnl: -1560, status: "closed",
+    entry: 189.45, exit: 190.28, lots: 1.0, pnl: -1560, status: "loss",
     notes: "Faded the spike, stopped out", rating: 1,
     entryTime: "15:30", exitTime: "15:50",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-16", date: "2026-01-13", pair: "EURUSD", type: "Long",
-    entry: 1.0265, exit: 1.0355, lots: 2.0, pnl: 2800, status: "closed",
+    entry: 1.0265, exit: 1.0355, lots: 2.0, pnl: 2800, status: "win",
     notes: "HTF bullish, 4H pullback entry", rating: 5,
     stopLoss: 1.0222, takeProfit: 1.0400, actualR: 2.09,
     entryTime: "08:00", exitTime: "14:00",
@@ -129,14 +129,14 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-17", date: "2026-01-14", pair: "AUDUSD", type: "Long",
-    entry: 0.6215, exit: 0.6193, lots: 2.0, pnl: -680, status: "closed",
+    entry: 0.6215, exit: 0.6193, lots: 2.0, pnl: -680, status: "loss",
     notes: undefined, rating: 0,
     entryTime: "03:30", exitTime: "03:55",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-18", date: "2026-01-15", pair: "GBPUSD", type: "Short",
-    entry: 1.2280, exit: 1.2208, lots: 1.5, pnl: 1960, status: "closed",
+    entry: 1.2280, exit: 1.2208, lots: 1.5, pnl: 1960, status: "win",
     notes: undefined, rating: 4,
     stopLoss: 1.2325, takeProfit: 1.2175, actualR: 1.60,
     entryTime: "13:00", exitTime: "15:30",
@@ -144,21 +144,21 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-19", date: "2026-01-16", pair: "USDCAD", type: "Short",
-    entry: 1.4385, exit: 1.4432, lots: 1.5, pnl: -1040, status: "closed",
+    entry: 1.4385, exit: 1.4432, lots: 1.5, pnl: -1040, status: "loss",
     notes: "Went against trend", rating: 1,
     entryTime: "16:30", exitTime: "17:05",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-20", date: "2026-01-17", pair: "EURGBP", type: "Long",
-    entry: 0.8385, exit: 0.8358, lots: 2.0, pnl: -760, status: "closed",
+    entry: 0.8385, exit: 0.8358, lots: 2.0, pnl: -760, status: "loss",
     notes: undefined, rating: 0,
     entryTime: "10:00", exitTime: "10:20",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-21", date: "2026-01-21", pair: "GBPUSD", type: "Long",
-    entry: 1.2350, exit: 1.2492, lots: 1.5, pnl: 3360, status: "closed",
+    entry: 1.2350, exit: 1.2492, lots: 1.5, pnl: 3360, status: "win",
     notes: "Strong momentum, held through pullback", rating: 5,
     stopLoss: 1.2295, takeProfit: 1.2550, actualR: 2.58,
     entryTime: "12:45", exitTime: "18:15",
@@ -166,7 +166,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-22", date: "2026-01-22", pair: "USDJPY", type: "Short",
-    entry: 155.80, exit: 154.68, lots: 1.5, pnl: 2520, status: "closed",
+    entry: 155.80, exit: 154.68, lots: 1.5, pnl: 2520, status: "win",
     notes: undefined, rating: 4,
     stopLoss: 156.40, takeProfit: 154.20, actualR: 1.87,
     entryTime: "14:30", exitTime: "17:30",
@@ -174,14 +174,14 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-23", date: "2026-01-23", pair: "EURUSD", type: "Long",
-    entry: 1.0415, exit: 1.0378, lots: 2.0, pnl: -920, status: "closed",
+    entry: 1.0415, exit: 1.0378, lots: 2.0, pnl: -920, status: "loss",
     notes: "Failed breakout", rating: 2,
     entryTime: "08:45", exitTime: "09:15",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-24", date: "2026-01-24", pair: "XAUUSD", type: "Long",
-    entry: 2748.0, exit: 2808.0, lots: 0.35, pnl: 2800, status: "closed",
+    entry: 2748.0, exit: 2808.0, lots: 0.35, pnl: 2800, status: "win",
     notes: "Gold squeezed to new highs", rating: 5,
     stopLoss: 2712.0, takeProfit: 2860.0, actualR: 1.67,
     entryTime: "13:30", exitTime: "18:00",
@@ -189,7 +189,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-25", date: "2026-01-27", pair: "GBPJPY", type: "Long",
-    entry: 192.15, exit: 191.08, lots: 1.0, pnl: -1680, status: "closed",
+    entry: 192.15, exit: 191.08, lots: 1.0, pnl: -1680, status: "loss",
     notes: "Stopped just below target area", rating: 2,
     stopLoss: 191.00, actualR: -0.93,
     entryTime: "09:00", exitTime: "09:45",
@@ -197,7 +197,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-26", date: "2026-01-28", pair: "EURUSD", type: "Short",
-    entry: 1.0458, exit: 1.0385, lots: 2.0, pnl: 1820, status: "closed",
+    entry: 1.0458, exit: 1.0385, lots: 2.0, pnl: 1820, status: "win",
     notes: "BoE week vol, faded the push", rating: 4,
     stopLoss: 1.0498, takeProfit: 1.0360, actualR: 1.83,
     entryTime: "10:30", exitTime: "13:30",
@@ -207,7 +207,7 @@ export const DEMO_TRADES: Trade[] = [
   // ── February 2026 ────────────────────────────────────────────
   {
     id: "demo-27", date: "2026-02-03", pair: "XAUUSD", type: "Long",
-    entry: 2818.0, exit: 2875.0, lots: 0.5, pnl: 3780, status: "closed",
+    entry: 2818.0, exit: 2875.0, lots: 0.5, pnl: 3780, status: "win",
     notes: "Gold holding above key MA", rating: 4,
     stopLoss: 2790.0, takeProfit: 2900.0, actualR: 2.04,
     entryTime: "09:00", exitTime: "15:00",
@@ -215,7 +215,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-28", date: "2026-02-04", pair: "GBPUSD", type: "Long",
-    entry: 1.2468, exit: 1.2558, lots: 1.5, pnl: 2100, status: "closed",
+    entry: 1.2468, exit: 1.2558, lots: 1.5, pnl: 2100, status: "win",
     notes: undefined, rating: 4,
     stopLoss: 1.2420, takeProfit: 1.2600, actualR: 1.88,
     entryTime: "12:30", exitTime: "15:30",
@@ -223,7 +223,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-29", date: "2026-02-05", pair: "EURUSD", type: "Short",
-    entry: 1.0382, exit: 1.0318, lots: 2.0, pnl: 1680, status: "closed",
+    entry: 1.0382, exit: 1.0318, lots: 2.0, pnl: 1680, status: "win",
     notes: "Faded NY open pump", rating: 3,
     stopLoss: 1.0425, takeProfit: 1.0295, actualR: 1.49,
     entryTime: "14:00", exitTime: "16:30",
@@ -231,14 +231,14 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-30", date: "2026-02-06", pair: "USDJPY", type: "Short",
-    entry: 152.95, exit: 153.38, lots: 1.5, pnl: -840, status: "closed",
+    entry: 152.95, exit: 153.38, lots: 1.5, pnl: -840, status: "loss",
     notes: undefined, rating: 0,
     entryTime: "01:00", exitTime: "01:25",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-31", date: "2026-02-07", pair: "XAUUSD", type: "Long",
-    entry: 2855.0, exit: 2940.0, lots: 0.3, pnl: 3500, status: "closed",
+    entry: 2855.0, exit: 2940.0, lots: 0.3, pnl: 3500, status: "win",
     notes: "NFP drove gold higher, held position", rating: 5,
     stopLoss: 2810.0, takeProfit: 2980.0, actualR: 1.89,
     entryTime: "13:30", exitTime: "20:30",
@@ -246,7 +246,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-32", date: "2026-02-10", pair: "GBPUSD", type: "Short",
-    entry: 1.2502, exit: 1.2554, lots: 1.5, pnl: -1260, status: "closed",
+    entry: 1.2502, exit: 1.2554, lots: 1.5, pnl: -1260, status: "loss",
     notes: "Stopped out on retest", rating: 2,
     stopLoss: 1.2560, actualR: -0.90,
     entryTime: "08:00", exitTime: "08:30",
@@ -254,7 +254,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-33", date: "2026-02-11", pair: "EURUSD", type: "Long",
-    entry: 1.0302, exit: 1.0398, lots: 2.0, pnl: 2380, status: "closed",
+    entry: 1.0302, exit: 1.0398, lots: 2.0, pnl: 2380, status: "win",
     notes: "Double bottom on H1, clean setup", rating: 5,
     stopLoss: 1.0258, takeProfit: 1.0450, actualR: 2.18,
     entryTime: "12:00", exitTime: "16:00",
@@ -262,7 +262,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-34", date: "2026-02-12", pair: "GBPJPY", type: "Short",
-    entry: 191.20, exit: 190.12, lots: 1.0, pnl: 1960, status: "closed",
+    entry: 191.20, exit: 190.12, lots: 1.0, pnl: 1960, status: "win",
     notes: undefined, rating: 4,
     stopLoss: 191.75, takeProfit: 189.80, actualR: 1.96,
     entryTime: "13:30", exitTime: "16:00",
@@ -270,21 +270,21 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-35", date: "2026-02-13", pair: "USDJPY", type: "Long",
-    entry: 153.75, exit: 153.41, lots: 1.5, pnl: -700, status: "closed",
+    entry: 153.75, exit: 153.41, lots: 1.5, pnl: -700, status: "loss",
     notes: "Cut early, couldn't hold", rating: 2,
     entryTime: "02:00", exitTime: "02:35",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-36", date: "2026-02-14", pair: "AUDUSD", type: "Long",
-    entry: 0.6278, exit: 0.6257, lots: 2.0, pnl: -560, status: "closed",
+    entry: 0.6278, exit: 0.6257, lots: 2.0, pnl: -560, status: "loss",
     notes: undefined, rating: 0,
     entryTime: "04:00", exitTime: "04:20",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-37", date: "2026-02-18", pair: "XAUUSD", type: "Short",
-    entry: 2910.0, exit: 2857.0, lots: 0.4, pnl: 2800, status: "closed",
+    entry: 2910.0, exit: 2857.0, lots: 0.4, pnl: 2800, status: "win",
     notes: "Fade at HTF resistance", rating: 4,
     stopLoss: 2945.0, takeProfit: 2845.0, actualR: 1.51,
     entryTime: "15:00", exitTime: "18:30",
@@ -292,14 +292,14 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-38", date: "2026-02-19", pair: "GBPUSD", type: "Long",
-    entry: 1.2592, exit: 1.2548, lots: 1.5, pnl: -1120, status: "closed",
+    entry: 1.2592, exit: 1.2548, lots: 1.5, pnl: -1120, status: "loss",
     notes: "Invalidated on open", rating: 1,
     entryTime: "08:00", exitTime: "08:15",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-39", date: "2026-02-20", pair: "EURUSD", type: "Long",
-    entry: 1.0445, exit: 1.0530, lots: 2.0, pnl: 2100, status: "closed",
+    entry: 1.0445, exit: 1.0530, lots: 2.0, pnl: 2100, status: "win",
     notes: "Monthly bias confirmed, clean trend", rating: 5,
     stopLoss: 1.0388, takeProfit: 1.0580, actualR: 1.49,
     entryTime: "12:30", exitTime: "16:30",
@@ -307,14 +307,14 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-40", date: "2026-02-21", pair: "USDCAD", type: "Short",
-    entry: 1.4298, exit: 1.4238, lots: 1.5, pnl: 1540, status: "closed",
+    entry: 1.4298, exit: 1.4238, lots: 1.5, pnl: 1540, status: "win",
     notes: undefined, rating: 3,
     entryTime: "14:00", exitTime: "16:00",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-41", date: "2026-02-24", pair: "USDJPY", type: "Short",
-    entry: 150.82, exit: 149.95, lots: 1.5, pnl: 2100, status: "closed",
+    entry: 150.82, exit: 149.95, lots: 1.5, pnl: 2100, status: "win",
     notes: "Key resistance at 151", rating: 4,
     stopLoss: 151.35, takeProfit: 149.30, actualR: 1.64,
     entryTime: "10:00", exitTime: "14:00",
@@ -322,7 +322,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-42", date: "2026-02-25", pair: "XAUUSD", type: "Long",
-    entry: 2918.0, exit: 2990.0, lots: 0.38, pnl: 3780, status: "closed",
+    entry: 2918.0, exit: 2990.0, lots: 0.38, pnl: 3780, status: "win",
     notes: undefined, rating: 4,
     stopLoss: 2878.0, takeProfit: 3040.0, actualR: 1.80,
     entryTime: "12:00", exitTime: "17:00",
@@ -330,14 +330,14 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-43", date: "2026-02-26", pair: "GBPUSD", type: "Short",
-    entry: 1.2618, exit: 1.2658, lots: 1.5, pnl: -980, status: "closed",
+    entry: 1.2618, exit: 1.2658, lots: 1.5, pnl: -980, status: "loss",
     notes: "Bad timing on the short", rating: 1,
     entryTime: "09:30", exitTime: "09:55",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-44", date: "2026-02-28", pair: "EURUSD", type: "Short",
-    entry: 1.0498, exit: 1.0425, lots: 2.0, pnl: 1820, status: "closed",
+    entry: 1.0498, exit: 1.0425, lots: 2.0, pnl: 1820, status: "win",
     notes: "End of month flow", rating: 3,
     stopLoss: 1.0542, takeProfit: 1.0400, actualR: 1.66,
     entryTime: "15:00", exitTime: "17:30",
@@ -347,7 +347,7 @@ export const DEMO_TRADES: Trade[] = [
   // ── March 2026 ───────────────────────────────────────────────
   {
     id: "demo-45", date: "2026-03-03", pair: "GBPUSD", type: "Long",
-    entry: 1.2682, exit: 1.2786, lots: 1.5, pnl: 2520, status: "closed",
+    entry: 1.2682, exit: 1.2786, lots: 1.5, pnl: 2520, status: "win",
     notes: "Following weekly bullish structure", rating: 4,
     stopLoss: 1.2625, takeProfit: 1.2850, actualR: 1.82,
     entryTime: "09:00", exitTime: "13:00",
@@ -355,7 +355,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-46", date: "2026-03-04", pair: "USDJPY", type: "Short",
-    entry: 149.65, exit: 149.02, lots: 1.5, pnl: 1960, status: "closed",
+    entry: 149.65, exit: 149.02, lots: 1.5, pnl: 1960, status: "win",
     notes: "Yen strength building", rating: 4,
     stopLoss: 150.35, takeProfit: 148.50, actualR: 0.90,
     entryTime: "13:00", exitTime: "15:30",
@@ -363,7 +363,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-47", date: "2026-03-05", pair: "XAUUSD", type: "Long",
-    entry: 2912.0, exit: 2988.0, lots: 0.38, pnl: 3800, status: "closed",
+    entry: 2912.0, exit: 2988.0, lots: 0.38, pnl: 3800, status: "win",
     notes: "Gold breakout, rode the move toward 3000", rating: 5,
     stopLoss: 2862.0, takeProfit: 3060.0, actualR: 1.52,
     entryTime: "12:30", exitTime: "19:00",
@@ -371,14 +371,14 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-48", date: "2026-03-06", pair: "EURUSD", type: "Long",
-    entry: 1.0842, exit: 1.0808, lots: 2.0, pnl: -840, status: "closed",
+    entry: 1.0842, exit: 1.0808, lots: 2.0, pnl: -840, status: "loss",
     notes: undefined, rating: 0,
     entryTime: "08:30", exitTime: "09:00",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-49", date: "2026-03-07", pair: "GBPJPY", type: "Short",
-    entry: 192.95, exit: 192.02, lots: 1.0, pnl: 2100, status: "closed",
+    entry: 192.95, exit: 192.02, lots: 1.0, pnl: 2100, status: "win",
     notes: undefined, rating: 3,
     stopLoss: 193.58, takeProfit: 191.60, actualR: 1.48,
     entryTime: "14:00", exitTime: "17:00",
@@ -386,14 +386,14 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-50", date: "2026-03-10", pair: "AUDUSD", type: "Long",
-    entry: 0.6305, exit: 0.6283, lots: 2.0, pnl: -560, status: "closed",
+    entry: 0.6305, exit: 0.6283, lots: 2.0, pnl: -560, status: "loss",
     notes: "Choppy session, cut the loss", rating: 0,
     entryTime: "03:00", exitTime: "03:20",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-51", date: "2026-03-11", pair: "GBPUSD", type: "Long",
-    entry: 1.2878, exit: 1.2958, lots: 1.5, pnl: 1960, status: "closed",
+    entry: 1.2878, exit: 1.2958, lots: 1.5, pnl: 1960, status: "win",
     notes: undefined, rating: 3,
     stopLoss: 1.2828, takeProfit: 1.3020, actualR: 1.60,
     entryTime: "09:30", exitTime: "11:30",
@@ -401,7 +401,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-52", date: "2026-03-12", pair: "US500", type: "Short",
-    entry: 5685.0, exit: 5558.0, lots: 0.5, pnl: 3360, status: "closed",
+    entry: 5685.0, exit: 5558.0, lots: 0.5, pnl: 3360, status: "win",
     notes: "Macro risk-off, faded equity rally", rating: 5,
     stopLoss: 5748.0, takeProfit: 5480.0, actualR: 2.02,
     entryTime: "14:30", exitTime: "18:30",
@@ -409,21 +409,21 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-53", date: "2026-03-13", pair: "EURUSD", type: "Short",
-    entry: 1.0892, exit: 1.0920, lots: 2.0, pnl: -700, status: "closed",
+    entry: 1.0892, exit: 1.0920, lots: 2.0, pnl: -700, status: "loss",
     notes: "Whipsaw on ECB comments", rating: 1,
     entryTime: "10:30", exitTime: "10:45",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-54", date: "2026-03-14", pair: "USDJPY", type: "Long",
-    entry: 147.85, exit: 148.78, lots: 1.5, pnl: 2240, status: "closed",
+    entry: 147.85, exit: 148.78, lots: 1.5, pnl: 2240, status: "win",
     notes: undefined, rating: 3,
     entryTime: "06:00", exitTime: "09:00",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-55", date: "2026-03-17", pair: "XAUUSD", type: "Long",
-    entry: 2982.0, exit: 3048.0, lots: 0.32, pnl: 2800, status: "closed",
+    entry: 2982.0, exit: 3048.0, lots: 0.32, pnl: 2800, status: "win",
     notes: "Continuation of the bull run", rating: 4,
     stopLoss: 2938.0, takeProfit: 3100.0, actualR: 1.50,
     entryTime: "13:00", exitTime: "17:00",
@@ -431,7 +431,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-56", date: "2026-03-18", pair: "GBPUSD", type: "Long",
-    entry: 1.2948, exit: 1.2896, lots: 1.5, pnl: -1260, status: "closed",
+    entry: 1.2948, exit: 1.2896, lots: 1.5, pnl: -1260, status: "loss",
     notes: "Stopped out just below target area", rating: 2,
     stopLoss: 1.2892, actualR: -0.93,
     entryTime: "07:30", exitTime: "08:00",
@@ -439,7 +439,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-57", date: "2026-03-19", pair: "EURGBP", type: "Short",
-    entry: 0.8448, exit: 0.8392, lots: 2.0, pnl: 1680, status: "closed",
+    entry: 0.8448, exit: 0.8392, lots: 2.0, pnl: 1680, status: "win",
     notes: "Divergence on 4H, clean structure", rating: 4,
     stopLoss: 0.8480, takeProfit: 0.8360, actualR: 1.75,
     entryTime: "10:00", exitTime: "13:00",
@@ -447,7 +447,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-58", date: "2026-03-20", pair: "USDJPY", type: "Short",
-    entry: 148.42, exit: 147.82, lots: 1.5, pnl: 1680, status: "closed",
+    entry: 148.42, exit: 147.82, lots: 1.5, pnl: 1680, status: "win",
     notes: undefined, rating: 4,
     stopLoss: 148.98, takeProfit: 147.20, actualR: 1.07,
     entryTime: "13:30", exitTime: "15:30",
@@ -455,21 +455,21 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-59", date: "2026-03-21", pair: "EURUSD", type: "Long",
-    entry: 1.0915, exit: 1.0876, lots: 2.0, pnl: -980, status: "closed",
+    entry: 1.0915, exit: 1.0876, lots: 2.0, pnl: -980, status: "loss",
     notes: "Range bound, choppy price action", rating: 1,
     entryTime: "09:30", exitTime: "10:05",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-60", date: "2026-03-24", pair: "GBPUSD", type: "Short",
-    entry: 1.2912, exit: 1.2842, lots: 1.5, pnl: 1820, status: "closed",
+    entry: 1.2912, exit: 1.2842, lots: 1.5, pnl: 1820, status: "win",
     notes: "Trapped longs, short opportunity", rating: 4,
     entryTime: "12:30", exitTime: "15:30",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-61", date: "2026-03-25", pair: "XAUUSD", type: "Long",
-    entry: 3085.0, exit: 2998.0, lots: 0.35, pnl: -4200, status: "closed",
+    entry: 3085.0, exit: 2998.0, lots: 0.35, pnl: -4200, status: "loss",
     notes: "Caught the reversal badly, full SL hit", rating: 1,
     stopLoss: 2998.0, actualR: -1.00,
     entryTime: "14:30", exitTime: "15:05",
@@ -477,7 +477,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-62", date: "2026-03-26", pair: "EURUSD", type: "Long",
-    entry: 1.0835, exit: 1.0801, lots: 2.0, pnl: -840, status: "closed",
+    entry: 1.0835, exit: 1.0801, lots: 2.0, pnl: -840, status: "loss",
     notes: undefined, rating: 0,
     entryTime: "10:00", exitTime: "10:20",
     accountId: "demo-account", source: "manual",
@@ -486,7 +486,7 @@ export const DEMO_TRADES: Trade[] = [
   // ── April 2026 ───────────────────────────────────────────────
   {
     id: "demo-63", date: "2026-04-01", pair: "GBPUSD", type: "Long",
-    entry: 1.2958, exit: 1.3042, lots: 1.5, pnl: 2100, status: "closed",
+    entry: 1.2958, exit: 1.3042, lots: 1.5, pnl: 2100, status: "win",
     notes: "New quarter opening move", rating: 4,
     stopLoss: 1.2905, takeProfit: 1.3090, actualR: 1.58,
     entryTime: "08:00", exitTime: "11:30",
@@ -494,7 +494,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-64", date: "2026-04-02", pair: "US500", type: "Short",
-    entry: 5550.0, exit: 5438.0, lots: 0.5, pnl: 2800, status: "closed",
+    entry: 5550.0, exit: 5438.0, lots: 0.5, pnl: 2800, status: "win",
     notes: "Tariff headlines, hard risk-off sell", rating: 5,
     stopLoss: 5622.0, takeProfit: 5350.0, actualR: 1.56,
     entryTime: "14:00", exitTime: "18:00",
@@ -502,7 +502,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-65", date: "2026-04-03", pair: "USDJPY", type: "Short",
-    entry: 149.35, exit: 148.52, lots: 2.0, pnl: 2100, status: "closed",
+    entry: 149.35, exit: 148.52, lots: 2.0, pnl: 2100, status: "win",
     notes: "Yen safe haven bid during tariff panic", rating: 5,
     stopLoss: 150.10, takeProfit: 147.80, actualR: 1.11,
     entryTime: "13:00", exitTime: "18:00",
@@ -510,7 +510,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-66", date: "2026-04-07", pair: "XAUUSD", type: "Long",
-    entry: 3012.0, exit: 3108.0, lots: 0.33, pnl: 4200, status: "closed",
+    entry: 3012.0, exit: 3108.0, lots: 0.33, pnl: 4200, status: "win",
     notes: "Gold safe haven bid, extended overnight", rating: 5,
     stopLoss: 2958.0, takeProfit: 3200.0, actualR: 1.78,
     entryTime: "08:00", exitTime: "17:00",
@@ -518,14 +518,14 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-67", date: "2026-04-08", pair: "EURUSD", type: "Long",
-    entry: 1.1025, exit: 1.0980, lots: 2.0, pnl: -1120, status: "closed",
+    entry: 1.1025, exit: 1.0980, lots: 2.0, pnl: -1120, status: "loss",
     notes: "Overextended, couldn't hold", rating: 1,
     entryTime: "09:00", exitTime: "09:25",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-68", date: "2026-04-09", pair: "GBPJPY", type: "Short",
-    entry: 189.48, exit: 188.44, lots: 1.0, pnl: 2380, status: "closed",
+    entry: 189.48, exit: 188.44, lots: 1.0, pnl: 2380, status: "win",
     notes: undefined, rating: 4,
     stopLoss: 190.08, takeProfit: 188.00, actualR: 1.73,
     entryTime: "13:30", exitTime: "16:30",
@@ -533,14 +533,14 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-69", date: "2026-04-10", pair: "GBPUSD", type: "Long",
-    entry: 1.3082, exit: 1.3048, lots: 1.5, pnl: -840, status: "closed",
+    entry: 1.3082, exit: 1.3048, lots: 1.5, pnl: -840, status: "loss",
     notes: "Reversed quickly after entry", rating: 2,
     entryTime: "15:00", exitTime: "15:15",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-70", date: "2026-04-11", pair: "US500", type: "Short",
-    entry: 5120.0, exit: 5025.0, lots: 0.5, pnl: 2380, status: "closed",
+    entry: 5120.0, exit: 5025.0, lots: 0.5, pnl: 2380, status: "win",
     notes: "Continued selloff, stayed short", rating: 4,
     stopLoss: 5225.0, takeProfit: 4900.0, actualR: 0.90,
     entryTime: "13:30", exitTime: "18:30",
@@ -548,14 +548,14 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-71", date: "2026-04-14", pair: "XAUUSD", type: "Long",
-    entry: 3225.0, exit: 3157.0, lots: 0.3, pnl: -1680, status: "closed",
+    entry: 3225.0, exit: 3157.0, lots: 0.3, pnl: -1680, status: "loss",
     notes: "ATH zone rejection", rating: 2,
     entryTime: "15:30", exitTime: "16:10",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-72", date: "2026-04-15", pair: "EURUSD", type: "Short",
-    entry: 1.1348, exit: 1.1270, lots: 2.0, pnl: 1960, status: "closed",
+    entry: 1.1348, exit: 1.1270, lots: 2.0, pnl: 1960, status: "win",
     notes: "BoE/ECB divergence play", rating: 4,
     stopLoss: 1.1395, takeProfit: 1.1200, actualR: 1.66,
     entryTime: "12:30", exitTime: "15:30",
@@ -563,14 +563,14 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-73", date: "2026-04-22", pair: "GBPUSD", type: "Long",
-    entry: 1.3245, exit: 1.3195, lots: 1.5, pnl: -1260, status: "closed",
+    entry: 1.3245, exit: 1.3195, lots: 1.5, pnl: -1260, status: "loss",
     notes: undefined, rating: 0,
     entryTime: "09:00", exitTime: "09:25",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-74", date: "2026-04-23", pair: "USDJPY", type: "Long",
-    entry: 142.48, exit: 143.08, lots: 1.5, pnl: 1400, status: "closed",
+    entry: 142.48, exit: 143.08, lots: 1.5, pnl: 1400, status: "win",
     notes: undefined, rating: 3,
     stopLoss: 141.90, takeProfit: 143.80, actualR: 1.03,
     entryTime: "03:00", exitTime: "05:30",
@@ -578,7 +578,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-75", date: "2026-04-24", pair: "XAUUSD", type: "Long",
-    entry: 3342.0, exit: 3215.0, lots: 0.2, pnl: -3360, status: "closed",
+    entry: 3342.0, exit: 3215.0, lots: 0.2, pnl: -3360, status: "loss",
     notes: "Near ATH, caught the rejection hard", rating: 1,
     stopLoss: 3208.0, actualR: -0.95,
     entryTime: "14:00", exitTime: "14:30",
@@ -586,14 +586,14 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-76", date: "2026-04-25", pair: "EURUSD", type: "Long",
-    entry: 1.1342, exit: 1.1314, lots: 2.0, pnl: -700, status: "closed",
+    entry: 1.1342, exit: 1.1314, lots: 2.0, pnl: -700, status: "loss",
     notes: undefined, rating: 0,
     entryTime: "10:30", exitTime: "10:50",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-77", date: "2026-04-28", pair: "GBPUSD", type: "Short",
-    entry: 1.3298, exit: 1.3228, lots: 1.5, pnl: 1820, status: "closed",
+    entry: 1.3298, exit: 1.3228, lots: 1.5, pnl: 1820, status: "win",
     notes: "Reversal after extended uptrend", rating: 3,
     stopLoss: 1.3345, takeProfit: 1.3160, actualR: 1.49,
     entryTime: "12:00", exitTime: "14:30",
@@ -601,7 +601,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-78", date: "2026-04-29", pair: "US500", type: "Long",
-    entry: 5522.0, exit: 5481.0, lots: 0.5, pnl: -980, status: "closed",
+    entry: 5522.0, exit: 5481.0, lots: 0.5, pnl: -980, status: "loss",
     notes: "Failed bounce attempt", rating: 1,
     entryTime: "14:30", exitTime: "14:55",
     accountId: "demo-account", source: "manual",
@@ -610,7 +610,7 @@ export const DEMO_TRADES: Trade[] = [
   // ── May 2026 ─────────────────────────────────────────────────
   {
     id: "demo-79", date: "2026-05-05", pair: "XAUUSD", type: "Long",
-    entry: 3242.0, exit: 3316.0, lots: 0.35, pnl: 3640, status: "closed",
+    entry: 3242.0, exit: 3316.0, lots: 0.35, pnl: 3640, status: "win",
     notes: "Gold reclaim after April drawdown", rating: 4,
     stopLoss: 3198.0, takeProfit: 3360.0, actualR: 1.68,
     entryTime: "09:30", exitTime: "14:30",
@@ -618,7 +618,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-80", date: "2026-05-06", pair: "GBPUSD", type: "Long",
-    entry: 1.3302, exit: 1.3390, lots: 1.5, pnl: 2100, status: "closed",
+    entry: 1.3302, exit: 1.3390, lots: 1.5, pnl: 2100, status: "win",
     notes: undefined, rating: 4,
     stopLoss: 1.3245, takeProfit: 1.3450, actualR: 1.54,
     entryTime: "12:30", exitTime: "15:30",
@@ -626,7 +626,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-81", date: "2026-05-07", pair: "EURUSD", type: "Long",
-    entry: 1.1248, exit: 1.1322, lots: 2.0, pnl: 1820, status: "closed",
+    entry: 1.1248, exit: 1.1322, lots: 2.0, pnl: 1820, status: "win",
     notes: "FOMC reaction, took the fade long", rating: 3,
     stopLoss: 1.1200, takeProfit: 1.1380, actualR: 1.54,
     entryTime: "14:30", exitTime: "17:00",
@@ -634,14 +634,14 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-82", date: "2026-05-08", pair: "USDJPY", type: "Short",
-    entry: 145.28, exit: 145.72, lots: 1.5, pnl: -840, status: "closed",
+    entry: 145.28, exit: 145.72, lots: 1.5, pnl: -840, status: "loss",
     notes: "Missed the direction entirely", rating: 1,
     entryTime: "02:00", exitTime: "02:30",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-83", date: "2026-05-09", pair: "GBPJPY", type: "Long",
-    entry: 193.42, exit: 194.58, lots: 1.0, pnl: 2800, status: "closed",
+    entry: 193.42, exit: 194.58, lots: 1.0, pnl: 2800, status: "win",
     notes: "Strong GBP momentum post-BoE", rating: 5,
     stopLoss: 192.85, takeProfit: 195.00, actualR: 2.04,
     entryTime: "10:00", exitTime: "14:00",
@@ -649,7 +649,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-84", date: "2026-05-12", pair: "XAUUSD", type: "Long",
-    entry: 3280.0, exit: 3360.0, lots: 0.4, pnl: 4200, status: "closed",
+    entry: 3280.0, exit: 3360.0, lots: 0.4, pnl: 4200, status: "win",
     notes: "Gold breaking to new ATH territory", rating: 5,
     stopLoss: 3235.0, takeProfit: 3400.0, actualR: 1.78,
     entryTime: "13:00", exitTime: "18:30",
@@ -657,21 +657,21 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-85", date: "2026-05-13", pair: "EURUSD", type: "Short",
-    entry: 1.1298, exit: 1.1350, lots: 2.0, pnl: -1120, status: "closed",
+    entry: 1.1298, exit: 1.1350, lots: 2.0, pnl: -1120, status: "loss",
     notes: "Fade attempt failed on strong bid", rating: 2,
     entryTime: "12:00", exitTime: "12:25",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-86", date: "2026-05-14", pair: "GBPUSD", type: "Long",
-    entry: 1.3312, exit: 1.3284, lots: 1.5, pnl: -700, status: "closed",
+    entry: 1.3312, exit: 1.3284, lots: 1.5, pnl: -700, status: "loss",
     notes: undefined, rating: 0,
     entryTime: "10:30", exitTime: "10:45",
     accountId: "demo-account", source: "manual",
   },
   {
     id: "demo-87", date: "2026-05-15", pair: "US500", type: "Long",
-    entry: 5642.0, exit: 5766.0, lots: 0.5, pnl: 3080, status: "closed",
+    entry: 5642.0, exit: 5766.0, lots: 0.5, pnl: 3080, status: "win",
     notes: "Trade deal optimism, strong upside momentum", rating: 5,
     stopLoss: 5590.0, takeProfit: 5850.0, actualR: 2.38,
     entryTime: "14:00", exitTime: "19:30",
@@ -679,7 +679,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-88", date: "2026-05-20", pair: "XAUUSD", type: "Short",
-    entry: 3298.0, exit: 3352.0, lots: 0.25, pnl: -1540, status: "closed",
+    entry: 3298.0, exit: 3352.0, lots: 0.25, pnl: -1540, status: "loss",
     notes: "Wrong call on the gold fade", rating: 1,
     stopLoss: 3358.0, actualR: -0.90,
     entryTime: "13:00", exitTime: "13:30",
@@ -687,7 +687,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-89", date: "2026-05-21", pair: "EURUSD", type: "Long",
-    entry: 1.1312, exit: 1.1392, lots: 2.0, pnl: 1960, status: "closed",
+    entry: 1.1312, exit: 1.1392, lots: 2.0, pnl: 1960, status: "win",
     notes: undefined, rating: 4,
     stopLoss: 1.1268, takeProfit: 1.1440, actualR: 1.82,
     entryTime: "09:30", exitTime: "12:30",
@@ -695,7 +695,7 @@ export const DEMO_TRADES: Trade[] = [
   },
   {
     id: "demo-90", date: "2026-05-27", pair: "GBPUSD", type: "Long",
-    entry: 1.3428, exit: 1.3406, lots: 1.5, pnl: -560, status: "closed",
+    entry: 1.3428, exit: 1.3406, lots: 1.5, pnl: -560, status: "loss",
     notes: "Small loss, kept position size tight", rating: 2,
     entryTime: "10:00", exitTime: "10:20",
     accountId: "demo-account", source: "manual",

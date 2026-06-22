@@ -19,30 +19,12 @@ interface DailyRiskLimitTrackerProps {
   compact?: boolean;
 }
 
-const MANUAL_TRADES_KEY = "journalManualTrades:v1";
-
 /** Allow empty inputs visually, but treat empty as 0 for maths */
 const toNumberOrZero = (v: string) => {
   if (v.trim() === "") return 0;
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 };
-
-/** Read today's realized losses synchronously from localStorage. Avoids async timing issues. */
-function readTodayLossFromStorage(): string {
-  try {
-    const todayStr = format(new Date(), "yyyy-MM-dd");
-    const raw = localStorage.getItem(MANUAL_TRADES_KEY);
-    if (!raw) return "0";
-    const stored = JSON.parse(raw) as Array<{ date: string; pnl?: number; status?: string }>;
-    const total = stored
-      .filter((t) => t.date === todayStr && t.status === "closed" && (t.pnl ?? 0) < 0)
-      .reduce((sum, t) => sum + Math.abs(t.pnl ?? 0), 0);
-    return total.toFixed(2);
-  } catch {
-    return "0";
-  }
-}
 
 export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = false }: DailyRiskLimitTrackerProps) {
   // ── Account awareness ────────────────────────────────────────────────────
@@ -60,8 +42,7 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
 
   const [dailyLimitInput, setDailyLimitInput] = useState<string>("5");
   const [accountBalanceInput, setAccountBalanceInput] = useState<string>("10000");
-  // Initialize today's loss synchronously from localStorage so it's ready on first render
-  const [lossTodayInput, setLossTodayInput] = useState<string>(() => readTodayLossFromStorage());
+  const [lossTodayInput, setLossTodayInput] = useState<string>("0");
 
   // Populate balance from account once on first load; user edits are sticky after that
   const balanceInitRef = useRef(false);
@@ -78,7 +59,7 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
     if (lossInitRef.current || isAccountLoading) return;
     const todayStr = format(new Date(), "yyyy-MM-dd");
     const total = trades
-      .filter((t) => t.date === todayStr && t.status === "closed" && (t.pnl || 0) < 0)
+      .filter((t) => t.date === todayStr && (t.pnl || 0) < 0)
       .reduce((sum, t) => sum + Math.abs(t.pnl || 0), 0);
     setLossTodayInput(total.toFixed(2));
     lossInitRef.current = true;

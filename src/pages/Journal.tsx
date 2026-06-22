@@ -786,7 +786,7 @@ export default function Journal() {
       exit,
       lots,
       pnl,
-      status: "closed",
+      status: pnl > 0 ? "win" : pnl < 0 ? "loss" : "breakeven",
       notes: newTrade.notes,
       rating: newTrade.rating,
       actualR,

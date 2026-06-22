@@ -804,10 +804,9 @@ function PerformanceOverviewCard() {
 
   const { weekPnl, monthPnl } = useMemo(() => {
     const now = Date.now();
-    const closed = viewTrades.filter((t) => t.status === "closed");
-    const weekPnl = closed.reduce((s, t) =>
+    const weekPnl = viewTrades.reduce((s, t) =>
       now - new Date(t.date).getTime() <= 7 * 86_400_000 ? s + (t.pnl ?? 0) : s, 0);
-    const monthPnl = closed.reduce((s, t) =>
+    const monthPnl = viewTrades.reduce((s, t) =>
       now - new Date(t.date).getTime() <= 30 * 86_400_000 ? s + (t.pnl ?? 0) : s, 0);
     return { weekPnl, monthPnl };
   }, [viewTrades]);
@@ -857,12 +856,10 @@ function RiskSnapshotCard() {
     const openCount = viewTrades.filter((t) => t.status === "open").length;
     const openExposurePct = viewTrades.length > 0 ? (openCount / viewTrades.length) * 100 : 0;
 
-    const closed = [...viewTrades]
-      .filter((t) => t.status === "closed")
-      .sort((a, b) => a.date.localeCompare(b.date));
+    const sorted = [...viewTrades].sort((a, b) => a.date.localeCompare(b.date));
     let peak = balance;
     let running = balance;
-    for (const t of closed) {
+    for (const t of sorted) {
       running += t.pnl ?? 0;
       if (running > peak) peak = running;
     }
@@ -952,7 +949,7 @@ function BestWorstDayCard({ type }: { type: "best" | "worst" }) {
 
   const { amount, date } = useMemo(() => {
     const byDay = new Map<string, number>();
-    for (const t of viewTrades.filter((t) => t.status === "closed")) {
+    for (const t of viewTrades) {
       byDay.set(t.date, (byDay.get(t.date) ?? 0) + (t.pnl ?? 0));
     }
     if (byDay.size === 0) return { amount: null as number | null, date: null as string | null };
@@ -1023,11 +1020,9 @@ function LiveEquityCard({ slotType }: { slotType: string }) {
   const equityData = useMemo(() => {
     const balance = primaryAccount?.balance ?? 100_000;
     const startBalance = balance - stats.totalPnl;
-    const closed = [...viewTrades]
-      .filter((t) => t.status === "closed")
-      .sort((a, b) => a.date.localeCompare(b.date));
+    const sorted = [...viewTrades].sort((a, b) => a.date.localeCompare(b.date));
     let running = startBalance;
-    return closed.map((t) => {
+    return sorted.map((t) => {
       running += t.pnl ?? 0;
       return {
         date: t.date,
