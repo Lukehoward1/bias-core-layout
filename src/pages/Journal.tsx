@@ -2064,7 +2064,7 @@ export default function Journal() {
 
           {/* Strategy Manager Sheet */}
           <Sheet open={isStrategyManagerOpen} onOpenChange={setIsStrategyManagerOpen}>
-            <SheetContent side="right" className="w-full sm:max-w-sm">
+            <SheetContent side="right" className="w-full sm:max-w-sm" zIndex={10000}>
               <SheetHeader className="mb-4">
                 <SheetTitle>Manage Strategies</SheetTitle>
               </SheetHeader>
@@ -2074,7 +2074,7 @@ export default function Journal() {
 
           {/* Tag Manager Sheet */}
           <Sheet open={isTagManagerOpen} onOpenChange={setIsTagManagerOpen}>
-            <SheetContent side="right" className="w-full sm:max-w-sm">
+            <SheetContent side="right" className="w-full sm:max-w-sm" zIndex={10000}>
               <SheetHeader className="mb-4">
                 <SheetTitle>Manage Tags</SheetTitle>
               </SheetHeader>
