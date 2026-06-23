@@ -124,7 +124,7 @@ function patchToRow(patch: Partial<Trade>): Record<string, unknown> {
   if (patch.exitTime !== undefined) row.exit_time = patch.exitTime;
   if (patch.accountId !== undefined) row.account_id = patch.accountId;
   if (patch.source !== undefined) row.source = patch.source;
-  if (patch.setup !== undefined) row.setup = patch.setup;
+  if (patch.setup !== undefined) row.setup = patch.setup || null;
   return row;
 }
 

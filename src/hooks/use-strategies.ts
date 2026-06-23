@@ -19,6 +19,27 @@ function fromRow(row: StrategyRow): Strategy {
   return { id: row.id, name: row.name, createdAt: row.created_at };
 }
 
+const DEFAULT_STRATEGIES = [
+  "London Breakout",
+  "New York Breakout",
+  "Asia Breakout",
+  "London/NY Overlap",
+  "Fair Value Gap (FVG)",
+  "Order Block",
+  "Breaker Block",
+  "Liquidity Sweep",
+  "Break of Structure (BOS)",
+  "Change of Character (CHoCH)",
+  "4H Pullback",
+  "Support & Resistance",
+  "Trend Continuation",
+  "Reversal",
+  "News Trade",
+  "Range Breakout",
+];
+
+const SEEDED_FLAG_PREFIX = "strategiesSeeded:v1:";
+
 export function useStrategies() {
   const { user } = useAuth();
   const [strategies, setStrategies] = useState<Strategy[]>([]);
@@ -44,6 +65,27 @@ export function useStrategies() {
         setIsLoading(false);
       });
   }, [user?.id]);
+
+  // One-time seed: insert 16 default strategies when user has none
+  useEffect(() => {
+    if (isLoading || !user || strategies.length > 0) return;
+    const seededKey = `${SEEDED_FLAG_PREFIX}${user.id}`;
+    if (localStorage.getItem(seededKey)) return;
+
+    supabase
+      .from("strategies")
+      .insert(DEFAULT_STRATEGIES.map((name) => ({ user_id: user.id, name })))
+      .select()
+      .then(({ data, error }) => {
+        if (!error && data) {
+          setStrategies(
+            (data as StrategyRow[]).map(fromRow).sort((a, b) => a.name.localeCompare(b.name)),
+          );
+          localStorage.setItem(seededKey, "1");
+        }
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, user?.id, strategies.length]);
 
   const addStrategy = useCallback(
     async (name: string) => {

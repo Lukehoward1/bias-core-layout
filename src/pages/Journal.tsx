@@ -53,6 +53,9 @@ import { ReportsTradeLog } from "@/components/reports/ReportsTradeLog";
 import { ReportDateRangeFilter, DateRange } from "@/components/reports/ReportDateRangeFilter";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { Link } from "react-router-dom";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { StrategyManager } from "@/components/journal/StrategyManager";
+import { useStrategies } from "@/hooks/use-strategies";
 
 // ✅ Trading data (active account scope + stats)
 import { useTradingData } from "@/hooks/use-trading-data";
@@ -282,6 +285,18 @@ export default function Journal() {
   const canExportReports = limits.journal.exportReports;
   const canUseAutoJournaling = limits.journal.autoJournaling;
 
+  const { strategies } = useStrategies();
+  const [isStrategyManagerOpen, setIsStrategyManagerOpen] = useState(false);
+  const [filterSetup, setFilterSetup] = useState("");
+
+  const availableSetups = useMemo(() => {
+    const fromStrategies = strategies.map((s) => s.name);
+    const fromTrades = Array.from(
+      new Set(viewTrades.map((t) => t.setup).filter((s): s is string => Boolean(s))),
+    );
+    return Array.from(new Set([...fromStrategies, ...fromTrades])).sort();
+  }, [strategies, viewTrades]);
+
   const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
 
   // Dashboard pins
@@ -435,22 +450,23 @@ export default function Journal() {
 
   const dateRangeLabel = `${format(dateRange.from, "MMM d, yyyy")} - ${format(dateRange.to, "MMM d, yyyy")}`;
 
-  // ✅ Top cards must use viewTrades (active scope)
+  // ✅ Top cards use viewTrades scoped by account + optional setup filter
   const topStats = useMemo(() => {
-    const totalTrades = viewTrades.length;
-    const wins = viewTrades.filter((t) => t.pnl > 0).length;
-    const totalPnl = viewTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+    const base = filterSetup ? viewTrades.filter((t) => t.setup === filterSetup) : viewTrades;
+    const totalTrades = base.length;
+    const wins = base.filter((t) => t.pnl > 0).length;
+    const totalPnl = base.reduce((sum, t) => sum + (t.pnl || 0), 0);
     const winRate = totalTrades > 0 ? Math.round((wins / totalTrades) * 100) : 0;
 
-    const winningTrades = viewTrades.filter((t) => t.pnl > 0);
-    const losingTrades = viewTrades.filter((t) => t.pnl < 0);
+    const winningTrades = base.filter((t) => t.pnl > 0);
+    const losingTrades = base.filter((t) => t.pnl < 0);
     const avgWin = winningTrades.length > 0 ? winningTrades.reduce((s, t) => s + t.pnl, 0) / winningTrades.length : 0;
     const avgLoss =
       losingTrades.length > 0 ? Math.abs(losingTrades.reduce((s, t) => s + t.pnl, 0) / losingTrades.length) : 1;
     const avgRR = avgLoss > 0 ? avgWin / avgLoss : 0;
 
     return { totalTrades, winRate, totalPnl, avgRR };
-  }, [viewTrades]);
+  }, [viewTrades, filterSetup]);
 
   const tradeSummary = useMemo(() => {
     const totalPnl = filteredTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
@@ -500,6 +516,7 @@ export default function Journal() {
     exitTime: "",
     notes: "",
     rating: 0,
+    setup: "",
   });
   const [pairIsManual, setPairIsManual] = useState(false);
 
@@ -518,6 +535,7 @@ export default function Journal() {
       exitTime: "",
       notes: "",
       rating: 0,
+      setup: "",
     });
     setPairIsManual(false);
     setIsAddTradeOpen(true);
@@ -687,10 +705,12 @@ export default function Journal() {
     setIsExportModalOpen(false);
   };
 
-  // ✅ Calendar day summaries MUST use viewTrades
+  // ✅ Calendar day summaries use viewTrades, respecting setup filter
   function getDailySummary(date: Date) {
     const dateStr = format(date, "yyyy-MM-dd");
-    const dayTrades = viewTrades.filter((t) => t.date === dateStr);
+    const dayTrades = viewTrades.filter(
+      (t) => t.date === dateStr && (!filterSetup || t.setup === filterSetup),
+    );
     const totalPnl = dayTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
     return { trades: dayTrades, totalPnl, tradeCount: dayTrades.length };
   }
@@ -794,6 +814,7 @@ export default function Journal() {
       exitTime: newTrade.exitTime || undefined,
       accountId: resolvedAccountId,
       source: "manual",
+      setup: newTrade.setup || undefined,
     };
 
     addManualTrade(trade);
@@ -812,6 +833,7 @@ export default function Journal() {
       exitTime: "",
       notes: "",
       rating: 0,
+      setup: "",
     });
     setPairIsManual(false);
     setIsAddTradeOpen(false);
@@ -883,6 +905,7 @@ export default function Journal() {
       pnl,
       status: editingTrade.status,
       accountId: editingTrade.accountId,
+      setup: editingTrade.setup || undefined,
     });
 
     setTradeNotes(editingTrade.id, editingTrade.notes ?? "");
@@ -944,8 +967,21 @@ export default function Journal() {
               </CardContent>
             </Card>
 
-            {/* ✅ Optional: show scope (keeps design consistent, subtle) */}
-            <div className="flex items-center justify-end">
+            {/* Filter bar: account scope + setup filter */}
+            <div className="flex items-center justify-end gap-2 flex-wrap">
+              <Select value={filterSetup} onValueChange={setFilterSetup}>
+                <SelectTrigger className="h-7 w-auto min-w-[160px] text-xs gap-1.5">
+                  <span className="text-muted-foreground">Setup:</span>
+                  <SelectValue placeholder="All setups" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All setups</SelectItem>
+                  {availableSetups.map((name) => (
+                    <SelectItem key={name} value={name}>{name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
               <Select value={activeAccountId} onValueChange={setActiveAccountId}>
                 <SelectTrigger className="h-7 w-auto min-w-[160px] text-xs gap-1.5">
                   <span className="text-muted-foreground">Viewing:</span>
@@ -1132,6 +1168,7 @@ export default function Journal() {
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">P&amp;L</th>
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">R</th>
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Status</th>
+                          <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Setup</th>
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground min-w-[140px]">
                             Notes
                           </th>
@@ -1201,6 +1238,10 @@ export default function Journal() {
                                 <Badge variant="secondary" className="text-xs">
                                   {trade.status === "win" ? "Profit" : trade.status === "loss" ? "Loss" : "Breakeven"}
                                 </Badge>
+                              </td>
+
+                              <td className="py-3 px-3 text-sm text-muted-foreground whitespace-nowrap">
+                                {trade.setup || "—"}
                               </td>
 
                               <td className="py-3 px-3">
@@ -1489,6 +1530,34 @@ export default function Journal() {
                     <p className="text-xs text-muted-foreground">Optional — used for session and hold-time analysis.</p>
                   </div>
 
+                  {/* Setup / Strategy */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="setup">Setup / Strategy</Label>
+                      <button
+                        type="button"
+                        className="text-xs text-primary hover:underline"
+                        onClick={() => setIsStrategyManagerOpen(true)}
+                      >
+                        Manage strategies →
+                      </button>
+                    </div>
+                    <Select
+                      value={newTrade.setup || ""}
+                      onValueChange={(v) => setNewTrade({ ...newTrade, setup: v })}
+                    >
+                      <SelectTrigger id="setup">
+                        <SelectValue placeholder="No setup" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">No setup</SelectItem>
+                        {strategies.map((s) => (
+                          <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   {/* Notes */}
                   <div className="space-y-2">
                     <Label htmlFor="notes">Notes</Label>
@@ -1632,6 +1701,24 @@ export default function Journal() {
                     </div>
 
                     <div className="space-y-2">
+                      <Label>Setup / Strategy</Label>
+                      <Select
+                        value={editingTrade.setup || ""}
+                        onValueChange={(v) => setEditingTrade((p) => (p ? { ...p, setup: v || undefined } : p))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="No setup" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">No setup</SelectItem>
+                          {strategies.map((s) => (
+                            <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
                       <Label>Notes</Label>
                       <Input
                         value={editingTrade.notes || ""}
@@ -1660,6 +1747,16 @@ export default function Journal() {
               </DialogContent>
             </Dialog>
           </TabsContent>
+
+          {/* Strategy Manager Sheet */}
+          <Sheet open={isStrategyManagerOpen} onOpenChange={setIsStrategyManagerOpen}>
+            <SheetContent side="right" className="w-full sm:max-w-sm">
+              <SheetHeader className="mb-4">
+                <SheetTitle>Manage Strategies</SheetTitle>
+              </SheetHeader>
+              <StrategyManager />
+            </SheetContent>
+          </Sheet>
 
           {/* Reports */}
           <TabsContent value="reports" className="space-y-6 mt-5">
