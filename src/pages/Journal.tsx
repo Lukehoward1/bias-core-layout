@@ -1247,7 +1247,7 @@ export default function Journal() {
                                     updateManualTrade(trade.id, { setup: v === "__none__" ? "" : v })
                                   }
                                 >
-                                  <SelectTrigger className="h-7 w-auto min-w-[100px] max-w-[160px] text-xs border-0 bg-transparent shadow-none px-2 hover:bg-muted/50 focus:ring-0">
+                                  <SelectTrigger className="h-7 w-auto min-w-[110px] max-w-[180px] text-xs px-2 gap-1">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
