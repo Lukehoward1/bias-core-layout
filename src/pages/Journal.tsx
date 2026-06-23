@@ -1465,12 +1465,13 @@ export default function Journal() {
 
             {/* Add trade modal */}
             <Dialog open={isAddTradeOpen} onOpenChange={setIsAddTradeOpen}>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
                 <DialogHeader>
                   <DialogTitle>Add New Trade</DialogTitle>
                 </DialogHeader>
 
-                <div className="space-y-4 pt-4">
+                <div className="overflow-y-auto flex-1">
+                  <div className="space-y-4 pt-4">
                   {/* Account */}
                   <div className="space-y-2">
                     <Label htmlFor="account">Account</Label>
@@ -1810,6 +1811,10 @@ export default function Journal() {
                     />
                   </div>
 
+                  </div>
+                </div>
+
+                <div className="border-t border-border pt-4 mt-2 shrink-0">
                   <Button className="w-full" onClick={handleAddTrade}>
                     Add Trade
                   </Button>
@@ -1819,12 +1824,14 @@ export default function Journal() {
 
             {/* Edit trade modal */}
             <Dialog open={isEditTradeOpen} onOpenChange={setIsEditTradeOpen}>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-md max-h-[90vh] flex flex-col">
                 <DialogHeader>
                   <DialogTitle>Edit Trade</DialogTitle>
                 </DialogHeader>
 
                 {editingTrade && (
+                  <>
+                  <div className="overflow-y-auto flex-1">
                   <div className="space-y-4 pt-4">
                     {isSyncedTrade(editingTrade) && (
                       <div className="text-xs text-muted-foreground bg-muted/30 border border-border rounded-md p-3">
@@ -2050,13 +2057,16 @@ export default function Journal() {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-end gap-2 pt-2">
-                      <Button variant="outline" onClick={closeEditTrade}>
-                        Cancel
-                      </Button>
-                      <Button onClick={handleSaveEditTrade}>Save</Button>
-                    </div>
                   </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 border-t border-border pt-4 mt-2 shrink-0">
+                    <Button variant="outline" onClick={closeEditTrade}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveEditTrade}>Save</Button>
+                  </div>
+                  </>
                 )}
               </DialogContent>
             </Dialog>
