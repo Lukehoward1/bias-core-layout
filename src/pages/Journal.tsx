@@ -55,8 +55,11 @@ import { usePdfExport } from "@/hooks/use-pdf-export";
 import { Link } from "react-router-dom";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { StrategyManager } from "@/components/journal/StrategyManager";
+import { TagManager } from "@/components/journal/TagManager";
 import { useStrategies } from "@/hooks/use-strategies";
+import { useTags } from "@/hooks/use-tags";
 
 const CONFLUENCE_OPTIONS = [
   "HTF Bias Aligned",
@@ -303,6 +306,10 @@ export default function Journal() {
   const [isStrategyManagerOpen, setIsStrategyManagerOpen] = useState(false);
   const [filterSetup, setFilterSetup] = useState("__all__");
 
+  const { tags } = useTags();
+  const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
+  const [filterTags, setFilterTags] = useState<string[]>([]);
+
   const availableSetups = useMemo(() => {
     const fromStrategies = strategies.map((s) => s.name);
     const fromTrades = Array.from(
@@ -464,9 +471,11 @@ export default function Journal() {
 
   const dateRangeLabel = `${format(dateRange.from, "MMM d, yyyy")} - ${format(dateRange.to, "MMM d, yyyy")}`;
 
-  // ✅ Top cards use viewTrades scoped by account + optional setup filter
+  // ✅ Top cards use viewTrades scoped by account + optional setup/tag filters
   const topStats = useMemo(() => {
-    const base = filterSetup !== "__all__" ? viewTrades.filter((t) => t.setup === filterSetup) : viewTrades;
+    const base = viewTrades
+      .filter((t) => filterSetup === "__all__" || t.setup === filterSetup)
+      .filter((t) => filterTags.length === 0 || filterTags.some((tag) => (t.tags ?? []).includes(tag)));
     const totalTrades = base.length;
     const wins = base.filter((t) => t.pnl > 0).length;
     const totalPnl = base.reduce((sum, t) => sum + (t.pnl || 0), 0);
@@ -480,7 +489,7 @@ export default function Journal() {
     const avgRR = avgLoss > 0 ? avgWin / avgLoss : 0;
 
     return { totalTrades, winRate, totalPnl, avgRR };
-  }, [viewTrades, filterSetup]);
+  }, [viewTrades, filterSetup, filterTags]);
 
   const tradeSummary = useMemo(() => {
     const totalPnl = filteredTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
@@ -532,6 +541,7 @@ export default function Journal() {
     rating: 0,
     setup: "",
     confluence: [] as string[],
+    tags: [] as string[],
   });
   const [pairIsManual, setPairIsManual] = useState(false);
 
@@ -552,6 +562,7 @@ export default function Journal() {
       rating: 0,
       setup: "",
       confluence: [],
+      tags: [],
     });
     setPairIsManual(false);
     setIsAddTradeOpen(true);
@@ -721,11 +732,14 @@ export default function Journal() {
     setIsExportModalOpen(false);
   };
 
-  // ✅ Calendar day summaries use viewTrades, respecting setup filter
+  // ✅ Calendar day summaries use viewTrades, respecting setup + tag filters
   function getDailySummary(date: Date) {
     const dateStr = format(date, "yyyy-MM-dd");
     const dayTrades = viewTrades.filter(
-      (t) => t.date === dateStr && (filterSetup === "__all__" || t.setup === filterSetup),
+      (t) =>
+        t.date === dateStr &&
+        (filterSetup === "__all__" || t.setup === filterSetup) &&
+        (filterTags.length === 0 || filterTags.some((tag) => (t.tags ?? []).includes(tag))),
     );
     const totalPnl = dayTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
     return { trades: dayTrades, totalPnl, tradeCount: dayTrades.length };
@@ -832,6 +846,7 @@ export default function Journal() {
       source: "manual",
       setup: newTrade.setup || undefined,
       confluence: newTrade.confluence,
+      tags: newTrade.tags,
     };
 
     addManualTrade(trade);
@@ -852,6 +867,7 @@ export default function Journal() {
       rating: 0,
       setup: "",
       confluence: [],
+      tags: [],
     });
     setPairIsManual(false);
     setIsAddTradeOpen(false);
@@ -925,6 +941,7 @@ export default function Journal() {
       accountId: editingTrade.accountId,
       setup: editingTrade.setup || undefined,
       confluence: editingTrade.confluence ?? [],
+      tags: editingTrade.tags ?? [],
     });
 
     setTradeNotes(editingTrade.id, editingTrade.notes ?? "");
@@ -986,7 +1003,7 @@ export default function Journal() {
               </CardContent>
             </Card>
 
-            {/* Filter bar: account scope + setup filter */}
+            {/* Filter bar: setup + tags + account */}
             <div className="flex items-center justify-end gap-2 flex-wrap">
               <Select value={filterSetup} onValueChange={setFilterSetup}>
                 <SelectTrigger className="h-7 w-auto min-w-[160px] text-xs gap-1.5">
@@ -1000,6 +1017,48 @@ export default function Journal() {
                   ))}
                 </SelectContent>
               </Select>
+
+              {tags.length > 0 && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className="h-7 px-2 rounded-md border border-input bg-background text-xs flex items-center gap-1.5 hover:bg-accent transition-colors">
+                      <span className="text-muted-foreground">Tags:</span>
+                      <span>{filterTags.length === 0 ? "All" : `${filterTags.length} selected`}</span>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-52 p-2" align="end">
+                    <div className="space-y-1">
+                      <button
+                        className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-muted transition-colors text-muted-foreground"
+                        onClick={() => setFilterTags([])}
+                      >
+                        Clear filter
+                      </button>
+                      {tags.map((tag) => {
+                        const active = filterTags.includes(tag.name);
+                        return (
+                          <button
+                            key={tag.id}
+                            className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-muted transition-colors flex items-center gap-2"
+                            onClick={() =>
+                              setFilterTags((prev) =>
+                                active ? prev.filter((t) => t !== tag.name) : [...prev, tag.name],
+                              )
+                            }
+                          >
+                            <span
+                              className="h-2.5 w-2.5 rounded-full shrink-0"
+                              style={{ backgroundColor: tag.color }}
+                            />
+                            <span className="flex-1 truncate">{tag.name}</span>
+                            {active && <span className="text-primary font-medium">✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
 
               <Select value={activeAccountId} onValueChange={setActiveAccountId}>
                 <SelectTrigger className="h-7 w-auto min-w-[160px] text-xs gap-1.5">
@@ -1189,6 +1248,7 @@ export default function Journal() {
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Status</th>
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Setup</th>
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Confluence</th>
+                          <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Tags</th>
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground min-w-[140px]">
                             Notes
                           </th>
@@ -1297,6 +1357,31 @@ export default function Journal() {
                                       </TooltipContent>
                                     </Tooltip>
                                   </TooltipProvider>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">—</span>
+                                )}
+                              </td>
+
+                              <td className="py-3 px-3 whitespace-nowrap">
+                                {(trade.tags ?? []).length > 0 ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {(trade.tags ?? []).map((tagName) => {
+                                      const tagDef = tags.find((t) => t.name === tagName);
+                                      return (
+                                        <span
+                                          key={tagName}
+                                          className="text-xs px-1.5 py-0.5 rounded-full"
+                                          style={{
+                                            backgroundColor: tagDef ? `${tagDef.color}22` : undefined,
+                                            color: tagDef?.color,
+                                            border: `1px solid ${tagDef?.color ?? "#e2e8f0"}`,
+                                          }}
+                                        >
+                                          {tagName}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
                                 ) : (
                                   <span className="text-sm text-muted-foreground">—</span>
                                 )}
@@ -1647,6 +1732,64 @@ export default function Journal() {
                     </div>
                   </div>
 
+                  {/* Tags */}
+                  {tags.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Tags</Label>
+                        <button
+                          type="button"
+                          className="text-xs text-primary hover:underline"
+                          onClick={() => setIsTagManagerOpen(true)}
+                        >
+                          Manage tags →
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {tags.map((tag) => {
+                          const selected = newTrade.tags.includes(tag.name);
+                          return (
+                            <button
+                              key={tag.id}
+                              type="button"
+                              onClick={() =>
+                                setNewTrade({
+                                  ...newTrade,
+                                  tags: selected
+                                    ? newTrade.tags.filter((t) => t !== tag.name)
+                                    : [...newTrade.tags, tag.name],
+                                })
+                              }
+                              className="text-xs px-2 py-1 rounded-full border transition-colors"
+                              style={
+                                selected
+                                  ? { backgroundColor: tag.color, borderColor: tag.color, color: "#fff" }
+                                  : { borderColor: "#e2e8f0" }
+                              }
+                            >
+                              {tag.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {tags.length === 0 && (
+                    <div className="space-y-1">
+                      <Label>Tags</Label>
+                      <p className="text-xs text-muted-foreground">
+                        No tags yet.{" "}
+                        <button
+                          type="button"
+                          className="text-primary hover:underline"
+                          onClick={() => setIsTagManagerOpen(true)}
+                        >
+                          Create your first tag →
+                        </button>
+                      </p>
+                    </div>
+                  )}
+
                   {/* Notes */}
                   <div className="space-y-2">
                     <Label htmlFor="notes">Notes</Label>
@@ -1843,6 +1986,52 @@ export default function Journal() {
                       </div>
                     </div>
 
+                    {tags.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label>Tags</Label>
+                          <button
+                            type="button"
+                            className="text-xs text-primary hover:underline"
+                            onClick={() => setIsTagManagerOpen(true)}
+                          >
+                            Manage tags →
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {tags.map((tag) => {
+                            const selected = (editingTrade.tags ?? []).includes(tag.name);
+                            return (
+                              <button
+                                key={tag.id}
+                                type="button"
+                                onClick={() =>
+                                  setEditingTrade((p) =>
+                                    p
+                                      ? {
+                                          ...p,
+                                          tags: selected
+                                            ? (p.tags ?? []).filter((t) => t !== tag.name)
+                                            : [...(p.tags ?? []), tag.name],
+                                        }
+                                      : p,
+                                  )
+                                }
+                                className="text-xs px-2 py-1 rounded-full border transition-colors"
+                                style={
+                                  selected
+                                    ? { backgroundColor: tag.color, borderColor: tag.color, color: "#fff" }
+                                    : { borderColor: "#e2e8f0" }
+                                }
+                              >
+                                {tag.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="space-y-2">
                       <Label>Notes</Label>
                       <Input
@@ -1880,6 +2069,16 @@ export default function Journal() {
                 <SheetTitle>Manage Strategies</SheetTitle>
               </SheetHeader>
               <StrategyManager />
+            </SheetContent>
+          </Sheet>
+
+          {/* Tag Manager Sheet */}
+          <Sheet open={isTagManagerOpen} onOpenChange={setIsTagManagerOpen}>
+            <SheetContent side="right" className="w-full sm:max-w-sm">
+              <SheetHeader className="mb-4">
+                <SheetTitle>Manage Tags</SheetTitle>
+              </SheetHeader>
+              <TagManager />
             </SheetContent>
           </Sheet>
 
