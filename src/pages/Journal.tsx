@@ -1240,8 +1240,23 @@ export default function Journal() {
                                 </Badge>
                               </td>
 
-                              <td className="py-3 px-3 text-sm text-muted-foreground whitespace-nowrap">
-                                {trade.setup || "—"}
+                              <td className="py-2 px-3 whitespace-nowrap">
+                                <Select
+                                  value={trade.setup || "__none__"}
+                                  onValueChange={(v) =>
+                                    updateManualTrade(trade.id, { setup: v === "__none__" ? "" : v })
+                                  }
+                                >
+                                  <SelectTrigger className="h-7 w-auto min-w-[100px] max-w-[160px] text-xs border-0 bg-transparent shadow-none px-2 hover:bg-muted/50 focus:ring-0">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none__" className="text-xs text-muted-foreground">No setup</SelectItem>
+                                    {strategies.map((s) => (
+                                      <SelectItem key={s.id} value={s.name} className="text-xs">{s.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                               </td>
 
                               <td className="py-3 px-3">
