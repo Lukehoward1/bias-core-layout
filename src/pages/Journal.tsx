@@ -287,7 +287,7 @@ export default function Journal() {
 
   const { strategies } = useStrategies();
   const [isStrategyManagerOpen, setIsStrategyManagerOpen] = useState(false);
-  const [filterSetup, setFilterSetup] = useState("");
+  const [filterSetup, setFilterSetup] = useState("__all__");
 
   const availableSetups = useMemo(() => {
     const fromStrategies = strategies.map((s) => s.name);
@@ -452,7 +452,7 @@ export default function Journal() {
 
   // ✅ Top cards use viewTrades scoped by account + optional setup filter
   const topStats = useMemo(() => {
-    const base = filterSetup ? viewTrades.filter((t) => t.setup === filterSetup) : viewTrades;
+    const base = filterSetup !== "__all__" ? viewTrades.filter((t) => t.setup === filterSetup) : viewTrades;
     const totalTrades = base.length;
     const wins = base.filter((t) => t.pnl > 0).length;
     const totalPnl = base.reduce((sum, t) => sum + (t.pnl || 0), 0);
@@ -709,7 +709,7 @@ export default function Journal() {
   function getDailySummary(date: Date) {
     const dateStr = format(date, "yyyy-MM-dd");
     const dayTrades = viewTrades.filter(
-      (t) => t.date === dateStr && (!filterSetup || t.setup === filterSetup),
+      (t) => t.date === dateStr && (filterSetup === "__all__" || t.setup === filterSetup),
     );
     const totalPnl = dayTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
     return { trades: dayTrades, totalPnl, tradeCount: dayTrades.length };
@@ -975,7 +975,7 @@ export default function Journal() {
                   <SelectValue placeholder="All setups" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All setups</SelectItem>
+                  <SelectItem value="__all__">All setups</SelectItem>
                   {availableSetups.map((name) => (
                     <SelectItem key={name} value={name}>{name}</SelectItem>
                   ))}
@@ -1543,14 +1543,14 @@ export default function Journal() {
                       </button>
                     </div>
                     <Select
-                      value={newTrade.setup || ""}
-                      onValueChange={(v) => setNewTrade({ ...newTrade, setup: v })}
+                      value={newTrade.setup || "__none__"}
+                      onValueChange={(v) => setNewTrade({ ...newTrade, setup: v === "__none__" ? "" : v })}
                     >
                       <SelectTrigger id="setup">
                         <SelectValue placeholder="No setup" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No setup</SelectItem>
+                        <SelectItem value="__none__">No setup</SelectItem>
                         {strategies.map((s) => (
                           <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
                         ))}
@@ -1703,14 +1703,16 @@ export default function Journal() {
                     <div className="space-y-2">
                       <Label>Setup / Strategy</Label>
                       <Select
-                        value={editingTrade.setup || ""}
-                        onValueChange={(v) => setEditingTrade((p) => (p ? { ...p, setup: v || undefined } : p))}
+                        value={editingTrade.setup || "__none__"}
+                        onValueChange={(v) =>
+                          setEditingTrade((p) => (p ? { ...p, setup: v === "__none__" ? undefined : v } : p))
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="No setup" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">No setup</SelectItem>
+                          <SelectItem value="__none__">No setup</SelectItem>
                           {strategies.map((s) => (
                             <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
                           ))}
