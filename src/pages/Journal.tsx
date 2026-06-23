@@ -54,8 +54,22 @@ import { ReportDateRangeFilter, DateRange } from "@/components/reports/ReportDat
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { Link } from "react-router-dom";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { StrategyManager } from "@/components/journal/StrategyManager";
 import { useStrategies } from "@/hooks/use-strategies";
+
+const CONFLUENCE_OPTIONS = [
+  "HTF Bias Aligned",
+  "Key Level",
+  "Session Open",
+  "News Catalyst",
+  "Structure Break",
+  "Order Block",
+  "Fair Value Gap",
+  "Liquidity Sweep",
+  "Trend Aligned",
+  "Higher Timeframe Pattern",
+] as const;
 
 // ✅ Trading data (active account scope + stats)
 import { useTradingData } from "@/hooks/use-trading-data";
@@ -517,6 +531,7 @@ export default function Journal() {
     notes: "",
     rating: 0,
     setup: "",
+    confluence: [] as string[],
   });
   const [pairIsManual, setPairIsManual] = useState(false);
 
@@ -536,6 +551,7 @@ export default function Journal() {
       notes: "",
       rating: 0,
       setup: "",
+      confluence: [],
     });
     setPairIsManual(false);
     setIsAddTradeOpen(true);
@@ -815,6 +831,7 @@ export default function Journal() {
       accountId: resolvedAccountId,
       source: "manual",
       setup: newTrade.setup || undefined,
+      confluence: newTrade.confluence,
     };
 
     addManualTrade(trade);
@@ -834,6 +851,7 @@ export default function Journal() {
       notes: "",
       rating: 0,
       setup: "",
+      confluence: [],
     });
     setPairIsManual(false);
     setIsAddTradeOpen(false);
@@ -906,6 +924,7 @@ export default function Journal() {
       status: editingTrade.status,
       accountId: editingTrade.accountId,
       setup: editingTrade.setup || undefined,
+      confluence: editingTrade.confluence ?? [],
     });
 
     setTradeNotes(editingTrade.id, editingTrade.notes ?? "");
@@ -1169,6 +1188,7 @@ export default function Journal() {
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">R</th>
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Status</th>
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Setup</th>
+                          <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Confluence</th>
                           <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground min-w-[140px]">
                             Notes
                           </th>
@@ -1257,6 +1277,29 @@ export default function Journal() {
                                     ))}
                                   </SelectContent>
                                 </Select>
+                              </td>
+
+                              <td className="py-3 px-3 whitespace-nowrap">
+                                {(trade.confluence ?? []).length > 0 ? (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Badge variant="secondary" className="text-xs cursor-default">
+                                          {(trade.confluence ?? []).length} confluence{(trade.confluence ?? []).length !== 1 ? "s" : ""}
+                                        </Badge>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="max-w-[200px]">
+                                        <ul className="space-y-0.5">
+                                          {(trade.confluence ?? []).map((c) => (
+                                            <li key={c} className="text-xs">{c}</li>
+                                          ))}
+                                        </ul>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">—</span>
+                                )}
                               </td>
 
                               <td className="py-3 px-3">
@@ -1573,6 +1616,37 @@ export default function Journal() {
                     </Select>
                   </div>
 
+                  {/* Confluence */}
+                  <div className="space-y-2">
+                    <Label>Confluence</Label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {CONFLUENCE_OPTIONS.map((opt) => {
+                        const selected = newTrade.confluence.includes(opt);
+                        return (
+                          <button
+                            key={opt}
+                            type="button"
+                            onClick={() =>
+                              setNewTrade({
+                                ...newTrade,
+                                confluence: selected
+                                  ? newTrade.confluence.filter((c) => c !== opt)
+                                  : [...newTrade.confluence, opt],
+                              })
+                            }
+                            className={`text-xs px-2 py-1 rounded-full border transition-colors ${
+                              selected
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-muted/40 text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
+                            }`}
+                          >
+                            {opt}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   {/* Notes */}
                   <div className="space-y-2">
                     <Label htmlFor="notes">Notes</Label>
@@ -1733,6 +1807,40 @@ export default function Journal() {
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Confluence</Label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {CONFLUENCE_OPTIONS.map((opt) => {
+                          const selected = (editingTrade.confluence ?? []).includes(opt);
+                          return (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() =>
+                                setEditingTrade((p) =>
+                                  p
+                                    ? {
+                                        ...p,
+                                        confluence: selected
+                                          ? (p.confluence ?? []).filter((c) => c !== opt)
+                                          : [...(p.confluence ?? []), opt],
+                                      }
+                                    : p,
+                                )
+                              }
+                              className={`text-xs px-2 py-1 rounded-full border transition-colors ${
+                                selected
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "bg-muted/40 text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
+                              }`}
+                            >
+                              {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div className="space-y-2">

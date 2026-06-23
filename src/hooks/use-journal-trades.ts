@@ -31,6 +31,7 @@ export interface Trade {
   accountId?: string;
   source?: "manual" | "synced";
   setup?: string;
+  confluence?: string[];
 }
 
 type SupabaseTradeRow = {
@@ -54,6 +55,7 @@ type SupabaseTradeRow = {
   account_id: string | null;
   source: string | null;
   setup: string | null;
+  confluence: string[] | null;
 };
 
 function fromRow(row: SupabaseTradeRow): Trade {
@@ -77,6 +79,7 @@ function fromRow(row: SupabaseTradeRow): Trade {
     accountId: row.account_id ?? undefined,
     source: (row.source as "manual" | "synced") ?? "manual",
     setup: row.setup ?? undefined,
+    confluence: row.confluence ?? [],
   };
 }
 
@@ -101,6 +104,7 @@ function toRow(t: Trade, userId: string): Omit<SupabaseTradeRow, "id"> {
     account_id: t.accountId ?? null,
     source: t.source ?? "manual",
     setup: t.setup ?? null,
+    confluence: t.confluence ?? [],
   };
 }
 
@@ -125,6 +129,7 @@ function patchToRow(patch: Partial<Trade>): Record<string, unknown> {
   if (patch.accountId !== undefined) row.account_id = patch.accountId;
   if (patch.source !== undefined) row.source = patch.source;
   if (patch.setup !== undefined) row.setup = patch.setup || null;
+  if (patch.confluence !== undefined) row.confluence = patch.confluence ?? [];
   return row;
 }
 
