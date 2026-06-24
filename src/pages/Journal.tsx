@@ -47,6 +47,7 @@ import { ReportsPerformance } from "@/components/reports/ReportsPerformance";
 import { ReportsSessions } from "@/components/reports/ReportsSessions";
 import { ReportsAssets } from "@/components/reports/ReportsAssets";
 import { ReportsSetupQuality } from "@/components/reports/ReportsSetupQuality";
+import { ReportBuilder } from "@/components/reports/ReportBuilder";
 import { ReportsPsychology } from "@/components/reports/ReportsPsychology";
 import { ReportsRiskManagement } from "@/components/reports/ReportsRiskManagement";
 import { ReportsTradeLog } from "@/components/reports/ReportsTradeLog";
@@ -2094,6 +2095,8 @@ export default function Journal() {
 
           {/* Reports */}
           <TabsContent value="reports" className="space-y-6 mt-5">
+            <ReportBuilder />
+
             <Tabs defaultValue="overview" className="w-full">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
                 <TabsList className="grid w-full lg:w-auto grid-cols-4 lg:grid-cols-8 h-auto gap-1 p-1">
