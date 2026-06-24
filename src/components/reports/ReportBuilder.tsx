@@ -4,6 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2, Play, Save, ChevronDown, ChevronUp } from "lucide-react";
+
+interface ReportBuilderProps {
+  /** When true (default), render the collapsible card wrapper. Set false when inside a Dialog. */
+  showHeader?: boolean;
+}
 import { formatDistanceToNow } from "date-fns";
 import { useSavedReports } from "@/hooks/use-saved-reports";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
@@ -34,7 +39,7 @@ const DATE_PRESETS = [
   { id: "last-90",    label: "Last 90 Days" },
 ] as const;
 
-export function ReportBuilder() {
+export function ReportBuilder({ showHeader = true }: ReportBuilderProps) {
   const { reports, isLoading, saveReport, deleteReport, runReport } = useSavedReports();
   const { accounts } = useLinkedAccounts();
 
@@ -86,31 +91,8 @@ export function ReportBuilder() {
     toast.info("Report preview coming soon.");
   };
 
-  return (
-    <div className="space-y-4">
-      {/* Builder card */}
-      <div className="rounded-lg border border-border bg-card">
-        {/* Header */}
-        <button
-          type="button"
-          className="w-full flex items-center justify-between px-5 py-4 text-left"
-          onClick={() => setIsExpanded((v) => !v)}
-        >
-          <div>
-            <p className="text-sm font-semibold">Build &amp; Export Report</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Select a type, configure scope, then preview or save for later.
-            </p>
-          </div>
-          {isExpanded ? (
-            <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-          )}
-        </button>
-
-        {isExpanded && (
-          <div className="px-5 pb-5 space-y-5 border-t border-border pt-4">
+  const steps = (
+    <div className="space-y-5">
 
             {/* Step 1 — Report Type */}
             <div className="space-y-2">
@@ -248,86 +230,123 @@ export function ReportBuilder() {
               </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+  );
 
-      {/* Saved configs */}
-      {!isLoading && reports.length > 0 && (
-        <div className="rounded-lg border border-border bg-card">
-          <div className="px-5 py-3 border-b border-border">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Saved Configs
+  const savedConfigs = !isLoading && reports.length > 0 ? (
+    <div className="rounded-lg border border-border bg-card">
+      <div className="px-5 py-3 border-b border-border">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          Saved Configs
+        </p>
+      </div>
+      <ul className="divide-y divide-border">
+        {reports.map((r) => (
+          <li key={r.id} className="flex items-center gap-3 px-5 py-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{r.name}</p>
+              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                  {REPORT_TYPES.find((t) => t.id === r.type)?.label ?? r.type}
+                </Badge>
+                {r.subject && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    {r.subject}
+                  </Badge>
+                )}
+                <span className="text-[10px] text-muted-foreground">
+                  {r.lastRunAt
+                    ? `Run ${formatDistanceToNow(new Date(r.lastRunAt), { addSuffix: true })}`
+                    : "Never run"}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0">
+              {confirmDeleteId === r.id ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                    onClick={() => { deleteReport(r.id); setConfirmDeleteId(null); }}
+                  >
+                    Delete
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setConfirmDeleteId(null)}
+                  >
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => handleRun(r.id)}
+                  >
+                    <Play className="h-3 w-3 mr-1" />
+                    Run
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    onClick={() => setConfirmDeleteId(r.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  ) : null;
+
+  if (!showHeader) {
+    return (
+      <div className="space-y-5">
+        {steps}
+        {savedConfigs}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-border bg-card">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-5 py-4 text-left"
+          onClick={() => setIsExpanded((v) => !v)}
+        >
+          <div>
+            <p className="text-sm font-semibold">Build &amp; Export Report</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Select a type, configure scope, then preview or save for later.
             </p>
           </div>
-          <ul className="divide-y divide-border">
-            {reports.map((r) => (
-              <li key={r.id} className="flex items-center gap-3 px-5 py-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{r.name}</p>
-                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                      {REPORT_TYPES.find((t) => t.id === r.type)?.label ?? r.type}
-                    </Badge>
-                    {r.subject && (
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                        {r.subject}
-                      </Badge>
-                    )}
-                    <span className="text-[10px] text-muted-foreground">
-                      {r.lastRunAt
-                        ? `Run ${formatDistanceToNow(new Date(r.lastRunAt), { addSuffix: true })}`
-                        : "Never run"}
-                    </span>
-                  </div>
-                </div>
+          {isExpanded ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+          )}
+        </button>
 
-                <div className="flex items-center gap-1 shrink-0">
-                  {confirmDeleteId === r.id ? (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs text-destructive hover:text-destructive"
-                        onClick={() => { deleteReport(r.id); setConfirmDeleteId(null); }}
-                      >
-                        Delete
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                        onClick={() => setConfirmDeleteId(null)}
-                      >
-                        Cancel
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 px-2 text-xs"
-                        onClick={() => handleRun(r.id)}
-                      >
-                        <Play className="h-3 w-3 mr-1" />
-                        Run
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                        onClick={() => setConfirmDeleteId(r.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+        {isExpanded && (
+          <div className="px-5 pb-5 border-t border-border pt-4">
+            {steps}
+          </div>
+        )}
+      </div>
+      {savedConfigs}
     </div>
   );
 }

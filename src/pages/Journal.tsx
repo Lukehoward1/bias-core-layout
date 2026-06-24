@@ -305,6 +305,7 @@ export default function Journal() {
 
   const { strategies } = useStrategies();
   const [isStrategyManagerOpen, setIsStrategyManagerOpen] = useState(false);
+  const [isReportBuilderOpen, setIsReportBuilderOpen] = useState(false);
   const [filterSetup, setFilterSetup] = useState("__all__");
 
   const { tags } = useTags();
@@ -2093,10 +2094,20 @@ export default function Journal() {
             </SheetContent>
           </Sheet>
 
+          {/* Report Builder Dialog */}
+          <Dialog open={isReportBuilderOpen} onOpenChange={setIsReportBuilderOpen}>
+            <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Build &amp; Export Report</DialogTitle>
+              </DialogHeader>
+              <div className="overflow-y-auto flex-1 pt-2">
+                <ReportBuilder showHeader={false} />
+              </div>
+            </DialogContent>
+          </Dialog>
+
           {/* Reports */}
           <TabsContent value="reports" className="space-y-6 mt-5">
-            <ReportBuilder />
-
             <Tabs defaultValue="overview" className="w-full">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
                 <TabsList className="grid w-full lg:w-auto grid-cols-4 lg:grid-cols-8 h-auto gap-1 p-1">
@@ -2127,6 +2138,16 @@ export default function Journal() {
                 </TabsList>
 
                 <div className="flex items-center gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5 text-xs"
+                    onClick={() => setIsReportBuilderOpen(true)}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Build Report
+                  </Button>
+
                   <ReportDateRangeFilter
                     dateRange={dateRange}
                     onDateRangeChange={setDateRange}
