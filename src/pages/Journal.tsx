@@ -21,6 +21,7 @@ import {
   Zap,
   Pencil,
   Trash2,
+  FileText,
 } from "lucide-react";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { useSubscription } from "@/hooks/use-subscription";
@@ -47,7 +48,6 @@ import { ReportsPerformance } from "@/components/reports/ReportsPerformance";
 import { ReportsSessions } from "@/components/reports/ReportsSessions";
 import { ReportsAssets } from "@/components/reports/ReportsAssets";
 import { ReportsSetupQuality } from "@/components/reports/ReportsSetupQuality";
-import { ReportBuilder } from "@/components/reports/ReportBuilder";
 import { ReportsPsychology } from "@/components/reports/ReportsPsychology";
 import { ReportsRiskManagement } from "@/components/reports/ReportsRiskManagement";
 import { ReportsTradeLog } from "@/components/reports/ReportsTradeLog";
@@ -305,7 +305,6 @@ export default function Journal() {
 
   const { strategies } = useStrategies();
   const [isStrategyManagerOpen, setIsStrategyManagerOpen] = useState(false);
-  const [isReportBuilderOpen, setIsReportBuilderOpen] = useState(false);
   const [filterSetup, setFilterSetup] = useState("__all__");
 
   const { tags } = useTags();
@@ -570,8 +569,12 @@ export default function Journal() {
     setIsAddTradeOpen(true);
   };
 
-  // Export selected modal
-  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  // Reports dialog
+  const [isReportsDialogOpen, setIsReportsDialogOpen] = useState(false);
+  const [reportType, setReportType] = useState<string | null>(null);
+  const [reportDatePreset, setReportDatePreset] = useState("last-30");
+  const [reportAccountId, setReportAccountId] = useState<string>(ACTIVE_ACCOUNT_ALL);
+  const [reportPair, setReportPair] = useState("__all__");
   const [exportFormat, setExportFormat] = useState<ExportFormat>("pdf");
   const defaultSelectedSectionIds = useMemo(() => REPORT_SECTIONS.map((s) => s.id), []);
   const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>(defaultSelectedSectionIds);
@@ -703,7 +706,7 @@ export default function Journal() {
         "text/csv;charset=utf-8",
       );
       toast.success("CSV exported");
-      setIsExportModalOpen(false);
+      setIsReportsDialogOpen(false);
       return;
     }
 
@@ -731,7 +734,7 @@ export default function Journal() {
     });
 
     toast.success("PDF export started");
-    setIsExportModalOpen(false);
+    setIsReportsDialogOpen(false);
   };
 
   // ✅ Calendar day summaries use viewTrades, respecting setup + tag filters
@@ -2094,20 +2097,181 @@ export default function Journal() {
             </SheetContent>
           </Sheet>
 
-          {/* Report Builder Dialog */}
-          <Dialog open={isReportBuilderOpen} onOpenChange={setIsReportBuilderOpen}>
-            <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
-              <DialogHeader>
-                <DialogTitle>Build &amp; Export Report</DialogTitle>
-              </DialogHeader>
-              <div className="overflow-y-auto flex-1 pt-2">
-                <ReportBuilder showHeader={false} />
-              </div>
-            </DialogContent>
-          </Dialog>
-
           {/* Reports */}
           <TabsContent value="reports" className="space-y-6 mt-5">
+            {/* Reports Dialog */}
+            <Dialog open={isReportsDialogOpen} onOpenChange={setIsReportsDialogOpen}>
+              <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+                <DialogHeader>
+                  <DialogTitle>Reports</DialogTitle>
+                </DialogHeader>
+
+                <div className="overflow-y-auto flex-1 space-y-6 pt-2 pb-1">
+                  {/* Step 1 — Report Type */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      1 — Report Type
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(
+                        [
+                          { id: "overview",   label: "Overview",       desc: "Key metrics at a glance" },
+                          { id: "comparison", label: "Comparison",     desc: "Compare across dimensions" },
+                          { id: "trend",      label: "Trend",          desc: "Performance over time" },
+                          { id: "deep-dive",  label: "Deep Dive",      desc: "In-depth on one dimension" },
+                          { id: "weekly",     label: "Weekly Review",  desc: "Structured weekly summary" },
+                          { id: "monthly",    label: "Monthly Review", desc: "Structured monthly summary" },
+                        ] as const
+                      ).map((rt) => (
+                        <button
+                          key={rt.id}
+                          type="button"
+                          onClick={() => setReportType(rt.id)}
+                          className={`flex flex-col items-start px-3 py-2 rounded-md border text-left transition-colors ${
+                            reportType === rt.id
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-muted/30 border-border hover:border-primary/50 hover:bg-muted/60"
+                          }`}
+                        >
+                          <span className="text-xs font-medium">{rt.label}</span>
+                          <span
+                            className={`text-[10px] mt-0.5 leading-tight ${
+                              reportType === rt.id ? "text-primary-foreground/70" : "text-muted-foreground"
+                            }`}
+                          >
+                            {rt.desc}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Step 2 — Stats to include */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        2 — Stats to Include
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          className="text-xs text-primary hover:underline"
+                          onClick={() => setSelectedSectionIds(REPORT_SECTIONS.map((s) => s.id))}
+                        >
+                          Select all
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs text-primary hover:underline"
+                          onClick={() => setSelectedSectionIds([])}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {REPORT_SECTIONS.map((s) => {
+                        const checked = selectedSectionIds.includes(s.id);
+                        return (
+                          <label
+                            key={s.id}
+                            className="flex items-center gap-2.5 p-2.5 rounded-md border border-border bg-muted/20 hover:bg-muted/30 transition-colors cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleSection(s.id)}
+                              className="h-3.5 w-3.5 shrink-0"
+                            />
+                            <span className="text-xs text-foreground">{s.title}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Step 3 — Date Range & Filters */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      3 — Date Range &amp; Filters
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {(
+                        [
+                          { id: "this-week",  label: "This Week" },
+                          { id: "this-month", label: "This Month" },
+                          { id: "last-30",    label: "Last 30 Days" },
+                          { id: "last-90",    label: "Last 90 Days" },
+                        ] as const
+                      ).map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setReportDatePreset(p.id)}
+                          className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${
+                            reportDatePreset === p.id
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-muted/30 border-border hover:border-primary/50 hover:text-foreground text-muted-foreground"
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <Select value={reportAccountId} onValueChange={setReportAccountId}>
+                        <SelectTrigger className="h-7 w-auto min-w-[150px] text-xs gap-1.5">
+                          <span className="text-muted-foreground">Account:</span>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={ACTIVE_ACCOUNT_ALL}>All Accounts</SelectItem>
+                          {accounts.map((a) => (
+                            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={reportPair} onValueChange={setReportPair}>
+                        <SelectTrigger className="h-7 w-auto min-w-[130px] text-xs gap-1.5">
+                          <span className="text-muted-foreground">Pair:</span>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">All Pairs</SelectItem>
+                          {[...new Set(viewTrades.map((t) => t.pair).filter(Boolean))].sort().map((pair) => (
+                            <SelectItem key={pair} value={pair}>{pair}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-border pt-4 mt-2 shrink-0 flex items-center justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toast.info("Report preview coming soon.")}
+                  >
+                    Preview Report
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={selectedSectionIds.length === 0 || !canExportReports}
+                    onClick={() => {
+                      setExportFormat("pdf");
+                      handleExportSelected();
+                    }}
+                  >
+                    <Download className="h-3.5 w-3.5 mr-1.5" />
+                    Export PDF
+                    {!canExportReports && <Lock className="h-3 w-3 ml-1.5" />}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
             <Tabs defaultValue="overview" className="w-full">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
                 <TabsList className="grid w-full lg:w-auto grid-cols-4 lg:grid-cols-8 h-auto gap-1 p-1">
@@ -2142,10 +2306,10 @@ export default function Journal() {
                     variant="outline"
                     size="sm"
                     className="h-8 gap-1.5 text-xs"
-                    onClick={() => setIsReportBuilderOpen(true)}
+                    onClick={() => setIsReportsDialogOpen(true)}
                   >
-                    <Plus className="h-3.5 w-3.5" />
-                    Build Report
+                    <FileText className="h-3.5 w-3.5" />
+                    Reports
                   </Button>
 
                   <ReportDateRangeFilter
@@ -2154,150 +2318,8 @@ export default function Journal() {
                     firstTradeDate={firstTradeDate}
                     lastTradeDate={lastTradeDate}
                   />
-
-                  {canExportReports ? (
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 gap-1.5 text-xs"
-                        onClick={handleExportAllReports}
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        Export All
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 gap-1.5 text-xs"
-                        onClick={() => {
-                          setSelectedSectionIds(REPORT_SECTIONS.map((s) => s.id));
-                          setExportFormat("pdf");
-                          setIsExportModalOpen(true);
-                        }}
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        Export Selected Stats
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs opacity-60" disabled>
-                        <Lock className="h-3 w-3" />
-                        Export All
-                      </Button>
-                      <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs opacity-60" disabled>
-                        <Lock className="h-3 w-3" />
-                        Export Selected Stats
-                      </Button>
-                    </div>
-                  )}
                 </div>
               </div>
-
-              <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
-                <DialogContent className="max-w-lg">
-                  <DialogHeader>
-                    <DialogTitle>Export Selected Stats</DialogTitle>
-                  </DialogHeader>
-
-                  <div className="space-y-5 pt-2">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Export format</Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setExportFormat("pdf")}
-                          className={`py-2 px-3 text-sm font-medium rounded-md border transition-all ${
-                            exportFormat === "pdf"
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "bg-muted/50 border-border hover:bg-muted"
-                          }`}
-                        >
-                          PDF
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setExportFormat("csv")}
-                          className={`py-2 px-3 text-sm font-medium rounded-md border transition-all ${
-                            exportFormat === "csv"
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "bg-muted/50 border-border hover:bg-muted"
-                          }`}
-                        >
-                          CSV
-                        </button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        PDF preserves the report layout. CSV is a clean data export (best for spreadsheets).
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-medium">Choose sections</Label>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            className="text-xs text-primary hover:underline"
-                            onClick={() => setSelectedSectionIds(REPORT_SECTIONS.map((s) => s.id))}
-                          >
-                            Select all
-                          </button>
-                          <button
-                            type="button"
-                            className="text-xs text-primary hover:underline"
-                            onClick={() => setSelectedSectionIds([])}
-                          >
-                            Clear
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-2">
-                        {REPORT_SECTIONS.map((s) => {
-                          const checked = selectedSectionIds.includes(s.id);
-                          return (
-                            <label
-                              key={s.id}
-                              className="flex items-center justify-between p-3 rounded-md border border-border bg-muted/20 hover:bg-muted/30 transition-colors cursor-pointer"
-                            >
-                              <div className="flex items-center gap-3">
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() => toggleSection(s.id)}
-                                  className="h-4 w-4"
-                                />
-                                <span className="text-sm text-foreground">{s.title}</span>
-                              </div>
-                              {s.id === "reports-tradelog" && (
-                                <Badge variant="outline" className="text-[10px]">
-                                  rows
-                                </Badge>
-                              )}
-                            </label>
-                          );
-                        })}
-                      </div>
-
-                      <p className="text-xs text-muted-foreground">
-                        You can deselect anything you don’t want included before exporting.
-                      </p>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-2 pt-2">
-                      <Button variant="outline" onClick={() => setIsExportModalOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button onClick={handleExportSelected} disabled={selectedSectionIds.length === 0}>
-                        Export
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
 
               <TabsContent value="overview" className="mt-5">
                 <ReportsOverview
