@@ -36,6 +36,7 @@ import {
   startOfWeek,
   endOfWeek,
   addDays,
+  subDays,
   isSameMonth,
   addMonths,
   subMonths,
@@ -44,6 +45,7 @@ import {
 } from "date-fns";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { ReportsOverview } from "@/components/reports/ReportsOverview";
+import { ReportPreview } from "@/components/reports/ReportPreview";
 import { ReportsPerformance } from "@/components/reports/ReportsPerformance";
 import { ReportsSessions } from "@/components/reports/ReportsSessions";
 import { ReportsAssets } from "@/components/reports/ReportsAssets";
@@ -593,6 +595,17 @@ export default function Journal() {
   const [exportFormat, setExportFormat] = useState<ExportFormat>("pdf");
   const defaultSelectedSectionIds = useMemo(() => REPORT_SECTIONS.map((s) => s.id), []);
   const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>(defaultSelectedSectionIds);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewKey, setPreviewKey] = useState(0);
+  const reportPreviewDateRange = useMemo(() => {
+    const today = new Date();
+    switch (reportDatePreset) {
+      case "this-week": return { from: startOfWeek(today, { weekStartsOn: 1 as const }), to: today };
+      case "this-month": return { from: startOfMonth(today), to: today };
+      case "last-90": return { from: subDays(today, 90), to: today };
+      default: return { from: subDays(today, 30), to: today };
+    }
+  }, [reportDatePreset]);
 
   useEffect(() => {
     setSelectedSectionIds((prev) => {
@@ -2125,7 +2138,7 @@ export default function Journal() {
           <TabsContent value="reports" className="space-y-6 mt-5">
             {/* Reports Dialog */}
             <Dialog open={isReportsDialogOpen} onOpenChange={setIsReportsDialogOpen}>
-              <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+              <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
                 <DialogHeader>
                   <DialogTitle>Reports</DialogTitle>
                 </DialogHeader>
@@ -2270,13 +2283,26 @@ export default function Journal() {
                       </Select>
                     </div>
                   </div>
+
+                  {previewVisible && (
+                    <ReportPreview
+                      key={previewKey}
+                      reportType={reportType ?? "overview"}
+                      selectedStats={selectedSectionIds}
+                      dateRange={reportPreviewDateRange}
+                      trades={viewTrades}
+                    />
+                  )}
                 </div>
 
                 <div className="border-t border-border pt-4 mt-2 shrink-0 flex items-center justify-end gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => toast.info("Report preview coming soon.")}
+                    onClick={() => {
+                    setPreviewVisible(true);
+                    setPreviewKey((k) => k + 1);
+                  }}
                   >
                     Preview Report
                   </Button>
