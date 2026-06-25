@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ShieldCheck, AlertTriangle } from "lucide-react";
+import { ShieldCheck, AlertTriangle, Lock } from "lucide-react";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 import { useJournalTrades } from "@/hooks/use-journal-trades";
@@ -67,7 +67,10 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
 
   // Numeric values for calculations (blank => 0)
   const dailyLimit = useMemo(() => toNumberOrZero(dailyLimitInput), [dailyLimitInput]);
-  const accountBalance = useMemo(() => toNumberOrZero(accountBalanceInput), [accountBalanceInput]);
+  const accountBalance = useMemo(
+    () => (isLinked && activeAccount ? activeAccount.balance : toNumberOrZero(accountBalanceInput)),
+    [isLinked, activeAccount, accountBalanceInput],
+  );
   const lossToday = useMemo(() => toNumberOrZero(lossTodayInput), [lossTodayInput]);
 
   // Load saved settings
@@ -208,15 +211,29 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
 
             {/* Account Balance */}
             <div className="space-y-2">
-              <Label className="text-sm">Account Balance ({currencySymbol})</Label>
-              <Input
-                type="number"
-                value={accountBalanceInput}
-                onChange={(e) => setAccountBalanceInput(e.target.value)}
-                className="h-9"
-                placeholder="10000"
-                min={0}
-              />
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">Account Balance ({currencySymbol})</Label>
+                {isLinked && (
+                  <Badge variant="outline" className="text-xs gap-1">
+                    <Lock className="h-3 w-3" />
+                    Linked
+                  </Badge>
+                )}
+              </div>
+              {isLinked && activeAccount ? (
+                <div className="h-9 px-3 rounded-md border border-border bg-muted/50 flex items-center text-sm text-muted-foreground select-none cursor-not-allowed">
+                  {currencySymbol}{activeAccount.balance.toLocaleString()}
+                </div>
+              ) : (
+                <Input
+                  type="number"
+                  value={accountBalanceInput}
+                  onChange={(e) => setAccountBalanceInput(e.target.value)}
+                  className="h-9"
+                  placeholder="10000"
+                  min={0}
+                />
+              )}
             </div>
 
             {/* Today's Loss */}

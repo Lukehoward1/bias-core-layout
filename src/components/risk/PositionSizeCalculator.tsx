@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Ruler } from "lucide-react";
+import { Ruler, Lock } from "lucide-react";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { getFXInstruments, getFuturesInstruments, getInstrumentBySymbol } from "@/data/tradingInstruments";
 import { useMarketQuote } from "@/hooks/use-market-quotes";
@@ -85,7 +85,10 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
 
   const quote = useMarketQuote(instrument);
 
-  const accountBalance = useMemo(() => toNumberOrZero(accountBalanceInput), [accountBalanceInput]);
+  const accountBalance = useMemo(
+    () => (isLinked && activeAccount ? activeAccount.balance : toNumberOrZero(accountBalanceInput)),
+    [isLinked, activeAccount, accountBalanceInput],
+  );
   const riskPercent = useMemo(() => toNumberOrZero(riskPercentInput), [riskPercentInput]);
   const entryPrice = useMemo(() => toNumberOrZero(entryPriceInput), [entryPriceInput]);
   const stopLoss = useMemo(() => toNumberOrZero(stopLossInput), [stopLossInput]);
@@ -262,16 +265,30 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm">Account Size ({currencySymbol})</Label>
-              <Input
-                type="number"
-                value={accountBalanceInput}
-                onChange={(e) => setAccountBalanceInput(e.target.value)}
-                className="h-9"
-                placeholder="10000"
-                min={0}
-                step={1}
-              />
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">Account Size ({currencySymbol})</Label>
+                {isLinked && (
+                  <Badge variant="outline" className="text-xs gap-1">
+                    <Lock className="h-3 w-3" />
+                    Linked
+                  </Badge>
+                )}
+              </div>
+              {isLinked && activeAccount ? (
+                <div className="h-9 px-3 rounded-md border border-border bg-muted/50 flex items-center text-sm text-muted-foreground select-none cursor-not-allowed">
+                  {currencySymbol}{activeAccount.balance.toLocaleString()}
+                </div>
+              ) : (
+                <Input
+                  type="number"
+                  value={accountBalanceInput}
+                  onChange={(e) => setAccountBalanceInput(e.target.value)}
+                  className="h-9"
+                  placeholder="10000"
+                  min={0}
+                  step={1}
+                />
+              )}
             </div>
 
             <div className="space-y-2">

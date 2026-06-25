@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Shield, AlertTriangle, TrendingDown } from "lucide-react";
+import { Shield, AlertTriangle, TrendingDown, Lock } from "lucide-react";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 import { cn } from "@/lib/utils";
@@ -73,7 +73,7 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
 
   const results = useMemo(() => {
     const sBal = toNumber(startingBalance, 0);
-    const cBal = toNumber(currentBalance, 0);
+    const cBal = isLinked && activeAccount ? activeAccount.balance : toNumber(currentBalance, 0);
     const limitVal = toNumber(maxDrawdown, 0);
 
     const drawdownCash = sBal - cBal;
@@ -95,7 +95,7 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
       isNearLimit: percentOfLimit >= 70,
       isAtLimit: percentOfLimit >= 100,
     };
-  }, [limitType, maxDrawdown, startingBalance, currentBalance]);
+  }, [limitType, maxDrawdown, startingBalance, currentBalance, isLinked, activeAccount]);
 
   const getStatusColor = () => {
     if (results.isAtLimit) return "bg-destructive";
@@ -211,14 +211,28 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
 
             {/* Current Balance */}
             <div className="space-y-2">
-              <Label className="text-sm">Current Balance ({currencySymbol})</Label>
-              <Input
-                type="number"
-                value={currentBalance ?? ""}
-                onChange={(e) => setCurrentBalance(parseNumberOrNull(e.target.value))}
-                className="h-9"
-                placeholder="10000"
-              />
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">Current Balance ({currencySymbol})</Label>
+                {isLinked && (
+                  <Badge variant="outline" className="text-xs gap-1">
+                    <Lock className="h-3 w-3" />
+                    Linked
+                  </Badge>
+                )}
+              </div>
+              {isLinked && activeAccount ? (
+                <div className="h-9 px-3 rounded-md border border-border bg-muted/50 flex items-center text-sm text-muted-foreground select-none cursor-not-allowed">
+                  {currencySymbol}{activeAccount.balance.toLocaleString()}
+                </div>
+              ) : (
+                <Input
+                  type="number"
+                  value={currentBalance ?? ""}
+                  onChange={(e) => setCurrentBalance(parseNumberOrNull(e.target.value))}
+                  className="h-9"
+                  placeholder="10000"
+                />
+              )}
             </div>
           </div>
 
