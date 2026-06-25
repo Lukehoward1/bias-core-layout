@@ -6,6 +6,7 @@ import { PositionSizeCalculator } from "@/components/risk/PositionSizeCalculator
 import { RiskRewardCalculator } from "@/components/risk/RiskRewardCalculator";
 import { DailyRiskLimitTracker } from "@/components/risk/DailyRiskLimitTracker";
 import { MaxDrawdownGuard } from "@/components/risk/MaxDrawdownGuard";
+import { DynamicRiskAdvisor } from "@/components/risk/DynamicRiskAdvisor";
 
 export default function RiskTools() {
   const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
@@ -15,12 +16,14 @@ export default function RiskTools() {
   const rrCalcCardId = "rr-calculator";
   const dailyLimitCardId = "daily-risk-limit";
   const maxDrawdownCardId = "max-drawdown-guard";
+  const dynamicAdvisorCardId = "dynamic-risk-advisor";
 
   const isQuickCalcAdded = isCardOnDashboard(quickCalcCardId);
   const isPositionSizeAdded = isCardOnDashboard(positionSizeCardId);
   const isRRCalcAdded = isCardOnDashboard(rrCalcCardId);
   const isDailyLimitAdded = isCardOnDashboard(dailyLimitCardId);
   const isMaxDrawdownAdded = isCardOnDashboard(maxDrawdownCardId);
+  const isDynamicAdvisorAdded = isCardOnDashboard(dynamicAdvisorCardId);
 
   const handleAddCard = (cardId: string) => {
     addCard(cardId);
@@ -65,6 +68,12 @@ export default function RiskTools() {
           isAdded={isMaxDrawdownAdded}
           onAdd={() => handleAddCard(maxDrawdownCardId)}
           onRemove={() => handleRemoveCard(maxDrawdownCardId)}
+        />
+
+        <DynamicRiskAdvisor
+          isAdded={isDynamicAdvisorAdded}
+          onAdd={() => handleAddCard(dynamicAdvisorCardId)}
+          onRemove={() => handleRemoveCard(dynamicAdvisorCardId)}
         />
       </div>
     </div>
