@@ -62,6 +62,12 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates, isLocked = 
   const avgRR = avgLoss > 0 ? avgWin / avgLoss : 0;
   const expectancy = (winRate / 100) * avgWin - ((100 - winRate) / 100) * avgLoss;
 
+  const posSum = winningTrades.reduce((sum, t) => sum + t.pnl, 0);
+  const negSum = Math.abs(losingTrades.reduce((sum, t) => sum + t.pnl, 0));
+  const profitFactor = posSum === 0 ? "0.00" : negSum === 0 ? "∞" : (posSum / negSum).toFixed(2);
+  const avgWinner = winningTrades.length > 0 ? posSum / winningTrades.length : 0;
+  const avgLoser = losingTrades.length > 0 ? negSum / losingTrades.length : 0;
+
   // Group by date for best/worst day
   const dailyPnl = trades.reduce((acc, t) => {
     acc[t.date] = (acc[t.date] || 0) + t.pnl;
@@ -85,6 +91,14 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates, isLocked = 
     cumulative += t.pnl;
     return { date: t.date, equity: cumulative };
   });
+
+  // Consecutive streaks (sortedTrades already ordered by date)
+  let maxConsecWins = 0, maxConsecLosses = 0, curW = 0, curL = 0;
+  for (const t of sortedTrades) {
+    if (t.pnl > 0) { curW++; maxConsecWins = Math.max(maxConsecWins, curW); curL = 0; }
+    else if (t.pnl < 0) { curL++; maxConsecLosses = Math.max(maxConsecLosses, curL); curW = 0; }
+    else { curW = 0; curL = 0; }
+  }
 
   // Rolling 30-day data (simplified)
   const rollingData = equityData.slice(-30).map((d, i) => ({
@@ -220,6 +234,79 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates, isLocked = 
               <p className={`text-2xl font-bold ${expectancy >= 0 ? 'text-success' : 'text-destructive'}`}>
                 £{expectancy.toFixed(0)}/trade
               </p>
+            </CardContent>
+          </CardFeatureGate>
+        </Card>
+      </div>
+
+      {/* Additional Metrics */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Profit Factor</CardTitle>
+              {isLocked && <TierBadge requiredPlan="standard" />}
+            </div>
+          </CardHeader>
+          <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+            <CardContent className="pt-0">
+              <p className="text-2xl font-bold text-foreground">{profitFactor}</p>
+            </CardContent>
+          </CardFeatureGate>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Max Consec. Wins</CardTitle>
+              {isLocked && <TierBadge requiredPlan="standard" />}
+            </div>
+          </CardHeader>
+          <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+            <CardContent className="pt-0">
+              <p className="text-2xl font-bold text-success">{maxConsecWins}</p>
+            </CardContent>
+          </CardFeatureGate>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Max Consec. Losses</CardTitle>
+              {isLocked && <TierBadge requiredPlan="standard" />}
+            </div>
+          </CardHeader>
+          <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+            <CardContent className="pt-0">
+              <p className="text-2xl font-bold text-destructive">{maxConsecLosses}</p>
+            </CardContent>
+          </CardFeatureGate>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Avg Winner</CardTitle>
+              {isLocked && <TierBadge requiredPlan="standard" />}
+            </div>
+          </CardHeader>
+          <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+            <CardContent className="pt-0">
+              <p className="text-2xl font-bold text-success">£{avgWinner.toFixed(0)}</p>
+            </CardContent>
+          </CardFeatureGate>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Avg Loser</CardTitle>
+              {isLocked && <TierBadge requiredPlan="standard" />}
+            </div>
+          </CardHeader>
+          <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+            <CardContent className="pt-0">
+              <p className="text-2xl font-bold text-destructive">£{avgLoser.toFixed(0)}</p>
             </CardContent>
           </CardFeatureGate>
         </Card>

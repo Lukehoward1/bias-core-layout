@@ -489,7 +489,22 @@ export default function Journal() {
       losingTrades.length > 0 ? Math.abs(losingTrades.reduce((s, t) => s + t.pnl, 0) / losingTrades.length) : 1;
     const avgRR = avgLoss > 0 ? avgWin / avgLoss : 0;
 
-    return { totalTrades, winRate, totalPnl, avgRR };
+    const posSum = winningTrades.reduce((s, t) => s + t.pnl, 0);
+    const negSum = Math.abs(losingTrades.reduce((s, t) => s + t.pnl, 0));
+    const profitFactor = posSum === 0 ? "0.00" : negSum === 0 ? "∞" : (posSum / negSum).toFixed(2);
+
+    const avgWinner = winningTrades.length > 0 ? posSum / winningTrades.length : 0;
+    const avgLoser = losingTrades.length > 0 ? negSum / losingTrades.length : 0;
+
+    const sorted = [...base].sort((a, b) => a.date.localeCompare(b.date));
+    let maxConsecWins = 0, maxConsecLosses = 0, curW = 0, curL = 0;
+    for (const t of sorted) {
+      if (t.pnl > 0) { curW++; maxConsecWins = Math.max(maxConsecWins, curW); curL = 0; }
+      else if (t.pnl < 0) { curL++; maxConsecLosses = Math.max(maxConsecLosses, curL); curW = 0; }
+      else { curW = 0; curL = 0; }
+    }
+
+    return { totalTrades, winRate, totalPnl, avgRR, profitFactor, maxConsecWins, maxConsecLosses, avgWinner, avgLoser };
   }, [viewTrades, filterSetup, filterTags]);
 
   const tradeSummary = useMemo(() => {
@@ -1080,7 +1095,7 @@ export default function Journal() {
             </div>
 
             {/* Top stats (active scope) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">Total Trades</CardTitle>
@@ -1116,6 +1131,15 @@ export default function Journal() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-foreground">{topStats.avgRR.toFixed(1)}</div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Profit Factor</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-foreground">{topStats.profitFactor}</div>
                 </CardContent>
               </Card>
             </div>
