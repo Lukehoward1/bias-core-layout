@@ -7,7 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Shield, AlertTriangle, TrendingDown, Lock } from "lucide-react";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
-import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
+import { useRiskToolMode } from "@/hooks/use-risk-tool-mode";
+import { RiskToolModeToggle } from "@/components/risk/RiskToolModeToggle";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 interface MaxDrawdownGuardProps {
@@ -31,12 +33,20 @@ const toNumber = (n: number | null, fallback = 0) => (n === null ? fallback : n)
 
 export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: MaxDrawdownGuardProps) {
   // ── Account awareness ────────────────────────────────────────────────────
-  const { primaryAccount, isLoading: isAccountLoading } = useLinkedAccounts();
-  const activeAccount = primaryAccount;
-  const currency = activeAccount?.currency ?? "GBP";
+  const {
+    mode,
+    setMode,
+    selectedAccount,
+    selectedAccountId,
+    setSelectedAccountId,
+    connectedAccounts,
+    isEffectivelyLinked,
+    hasMultipleAccounts,
+    isLoading: isAccountLoading,
+  } = useRiskToolMode("mdg");
+
+  const currency = selectedAccount?.currency ?? "GBP";
   const currencySymbol = currency === "GBP" ? "£" : "$";
-  const isLinked = activeAccount?.isConnected ?? false;
-  const mode = isLinked ? "Linked" : "Manual";
 
   const [limitType, setLimitType] = useState<"percent" | "cash">("percent");
 
@@ -48,12 +58,12 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
   // Starting balance defaults to the account's current balance (user adjusts to their period start).
   const balancesInitRef = useRef(false);
   useEffect(() => {
-    if (!balancesInitRef.current && activeAccount && !isAccountLoading) {
-      setCurrentBalance(activeAccount.balance);
-      setStartingBalance(activeAccount.balance);
+    if (!balancesInitRef.current && selectedAccount && !isAccountLoading) {
+      setCurrentBalance(selectedAccount.balance);
+      setStartingBalance(selectedAccount.balance);
       balancesInitRef.current = true;
     }
-  }, [activeAccount, isAccountLoading]);
+  }, [selectedAccount, isAccountLoading]);
 
   // Load saved drawdown setting
   useEffect(() => {
@@ -73,7 +83,7 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
 
   const results = useMemo(() => {
     const sBal = toNumber(startingBalance, 0);
-    const cBal = isLinked && activeAccount ? activeAccount.balance : toNumber(currentBalance, 0);
+    const cBal = isEffectivelyLinked && selectedAccount ? selectedAccount.balance : toNumber(currentBalance, 0);
     const limitVal = toNumber(maxDrawdown, 0);
 
     const drawdownCash = sBal - cBal;
@@ -95,7 +105,7 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
       isNearLimit: percentOfLimit >= 70,
       isAtLimit: percentOfLimit >= 100,
     };
-  }, [limitType, maxDrawdown, startingBalance, currentBalance, isLinked, activeAccount]);
+  }, [limitType, maxDrawdown, startingBalance, currentBalance, isEffectivelyLinked, selectedAccount]);
 
   const getStatusColor = () => {
     if (results.isAtLimit) return "bg-destructive";
@@ -146,9 +156,7 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
           <div className="flex items-center gap-3">
             <Shield className="h-5 w-5 text-primary" />
             <CardTitle>Max Drawdown Guard</CardTitle>
-            <Badge variant="secondary" className="text-xs font-normal">
-              Mode: {mode}
-            </Badge>
+            <RiskToolModeToggle mode={mode} onChange={setMode} />
           </div>
           {onAdd && onRemove && <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />}
         </div>
@@ -213,17 +221,35 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-sm">Current Balance ({currencySymbol})</Label>
-                {isLinked && (
+                {isEffectivelyLinked && (
                   <Badge variant="outline" className="text-xs gap-1">
                     <Lock className="h-3 w-3" />
                     Linked
                   </Badge>
                 )}
               </div>
-              {isLinked && activeAccount ? (
-                <div className="h-9 px-3 rounded-md border border-border bg-muted/50 flex items-center text-sm text-muted-foreground select-none cursor-not-allowed">
-                  {currencySymbol}{activeAccount.balance.toLocaleString()}
+              {isEffectivelyLinked && selectedAccount ? (
+                <div className="space-y-1.5">
+                  <div className="h-9 px-3 rounded-md border border-border bg-muted/50 flex items-center text-sm text-muted-foreground select-none cursor-not-allowed">
+                    {currencySymbol}{selectedAccount.balance.toLocaleString()}
+                  </div>
+                  {hasMultipleAccounts && (
+                    <Select value={selectedAccountId ?? ""} onValueChange={setSelectedAccountId}>
+                      <SelectTrigger className="h-7 w-full text-xs">
+                        <SelectValue placeholder="Select account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {connectedAccounts.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
+              ) : mode === "linked" && !isAccountLoading ? (
+                <p className="text-xs text-muted-foreground py-1">
+                  No account linked — connect one in Broker Settings.
+                </p>
               ) : (
                 <Input
                   type="number"

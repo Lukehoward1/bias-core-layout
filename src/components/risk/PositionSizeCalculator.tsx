@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +9,8 @@ import { Ruler, Lock } from "lucide-react";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { getFXInstruments, getFuturesInstruments, getInstrumentBySymbol } from "@/data/tradingInstruments";
 import { useMarketQuote } from "@/hooks/use-market-quotes";
-import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
+import { useRiskToolMode } from "@/hooks/use-risk-tool-mode";
+import { RiskToolModeToggle } from "@/components/risk/RiskToolModeToggle";
 
 interface PositionSizeCalculatorProps {
   isAdded?: boolean;
@@ -47,13 +49,22 @@ const formatPriceNoCommas = (raw: string | number) => {
 };
 
 export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = false }: PositionSizeCalculatorProps) {
+  const navigate = useNavigate();
   // ── Account awareness ────────────────────────────────────────────────────
-  const { primaryAccount, isLoading: isAccountLoading } = useLinkedAccounts();
-  const activeAccount = primaryAccount;
-  const currency = activeAccount?.currency ?? "GBP";
+  const {
+    mode,
+    setMode,
+    selectedAccount,
+    selectedAccountId,
+    setSelectedAccountId,
+    connectedAccounts,
+    isEffectivelyLinked,
+    hasMultipleAccounts,
+    isLoading: isAccountLoading,
+  } = useRiskToolMode("psc");
+
+  const currency = selectedAccount?.currency ?? "GBP";
   const currencySymbol = currency === "GBP" ? "£" : "$";
-  const isLinked = activeAccount?.isConnected ?? false;
-  const mode = isLinked ? "Linked" : "Manual";
 
   const [assetCategory, setAssetCategory] = useState<"FX" | "Futures">("FX");
   const [instrument, setInstrument] = useState<string>("EURUSD");
@@ -66,14 +77,14 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
 
   const [hasManualEntryEdit, setHasManualEntryEdit] = useState<boolean>(false);
 
-  // Populate balance from account once on first load; user edits are sticky after that
+  // Pre-seed manual input from account balance on first load (useful when user switches to Manual)
   const balanceInitRef = useRef(false);
   useEffect(() => {
-    if (!balanceInitRef.current && activeAccount && !isAccountLoading) {
-      setAccountBalanceInput(activeAccount.balance.toString());
+    if (!balanceInitRef.current && selectedAccount && !isAccountLoading) {
+      setAccountBalanceInput(selectedAccount.balance.toString());
       balanceInitRef.current = true;
     }
-  }, [activeAccount, isAccountLoading]);
+  }, [selectedAccount, isAccountLoading]);
 
   const instruments = useMemo(() => {
     return assetCategory === "FX" ? getFXInstruments() : getFuturesInstruments();
@@ -86,8 +97,8 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
   const quote = useMarketQuote(instrument);
 
   const accountBalance = useMemo(
-    () => (isLinked && activeAccount ? activeAccount.balance : toNumberOrZero(accountBalanceInput)),
-    [isLinked, activeAccount, accountBalanceInput],
+    () => (isEffectivelyLinked && selectedAccount ? selectedAccount.balance : toNumberOrZero(accountBalanceInput)),
+    [isEffectivelyLinked, selectedAccount, accountBalanceInput],
   );
   const riskPercent = useMemo(() => toNumberOrZero(riskPercentInput), [riskPercentInput]);
   const entryPrice = useMemo(() => toNumberOrZero(entryPriceInput), [entryPriceInput]);
@@ -211,9 +222,7 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
           <div className="flex items-center gap-3">
             <Ruler className="h-5 w-5 text-primary" />
             <CardTitle>Position Size Calculator</CardTitle>
-            <Badge variant="secondary" className="text-xs font-normal">
-              Mode: {mode}
-            </Badge>
+            <RiskToolModeToggle mode={mode} onChange={setMode} />
           </div>
           {onAdd && onRemove && <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />}
         </div>
@@ -267,17 +276,38 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-sm">Account Size ({currencySymbol})</Label>
-                {isLinked && (
+                {isEffectivelyLinked && (
                   <Badge variant="outline" className="text-xs gap-1">
                     <Lock className="h-3 w-3" />
                     Linked
                   </Badge>
                 )}
               </div>
-              {isLinked && activeAccount ? (
-                <div className="h-9 px-3 rounded-md border border-border bg-muted/50 flex items-center text-sm text-muted-foreground select-none cursor-not-allowed">
-                  {currencySymbol}{activeAccount.balance.toLocaleString()}
+              {isEffectivelyLinked && selectedAccount ? (
+                <div className="space-y-1.5">
+                  <div className="h-9 px-3 rounded-md border border-border bg-muted/50 flex items-center text-sm text-muted-foreground select-none cursor-not-allowed">
+                    {currencySymbol}{selectedAccount.balance.toLocaleString()}
+                  </div>
+                  {hasMultipleAccounts && (
+                    <Select value={selectedAccountId ?? ""} onValueChange={setSelectedAccountId}>
+                      <SelectTrigger className="h-7 w-full text-xs">
+                        <SelectValue placeholder="Select account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {connectedAccounts.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
+              ) : mode === "linked" && !isAccountLoading ? (
+                <p className="text-xs text-muted-foreground py-2">
+                  No account linked —{" "}
+                  <button type="button" className="text-primary underline" onClick={() => navigate("/brokerage")}>
+                    connect one in Broker Settings
+                  </button>
+                </p>
               ) : (
                 <Input
                   type="number"

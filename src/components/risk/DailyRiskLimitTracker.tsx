@@ -8,8 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ShieldCheck, AlertTriangle, Lock } from "lucide-react";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
-import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 import { useJournalTrades } from "@/hooks/use-journal-trades";
+import { useRiskToolMode } from "@/hooks/use-risk-tool-mode";
+import { RiskToolModeToggle } from "@/components/risk/RiskToolModeToggle";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 interface DailyRiskLimitTrackerProps {
@@ -28,15 +30,24 @@ const toNumberOrZero = (v: string) => {
 
 export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = false }: DailyRiskLimitTrackerProps) {
   // ── Account awareness ────────────────────────────────────────────────────
-  const { primaryAccount, accounts, isLoading: isAccountLoading } = useLinkedAccounts();
+  const {
+    mode,
+    setMode,
+    selectedAccount,
+    selectedAccountId,
+    setSelectedAccountId,
+    connectedAccounts,
+    accounts,
+    isEffectivelyLinked,
+    hasMultipleAccounts,
+    isLoading: isAccountLoading,
+  } = useRiskToolMode("drl");
+
   const accountIds = useMemo(() => accounts.map((a) => a.id), [accounts]);
   const { trades } = useJournalTrades(accountIds);
 
-  const activeAccount = primaryAccount;
-  const currency = activeAccount?.currency ?? "GBP";
+  const currency = selectedAccount?.currency ?? "GBP";
   const currencySymbol = currency === "GBP" ? "£" : "$";
-  const isLinked = activeAccount?.isConnected ?? false;
-  const mode = isLinked ? "Linked" : "Manual";
 
   const [limitType, setLimitType] = useState<"percent" | "cash">("percent");
 
@@ -44,14 +55,14 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
   const [accountBalanceInput, setAccountBalanceInput] = useState<string>("10000");
   const [lossTodayInput, setLossTodayInput] = useState<string>("0");
 
-  // Populate balance from account once on first load; user edits are sticky after that
+  // Pre-seed manual input from account balance on first load
   const balanceInitRef = useRef(false);
   useEffect(() => {
-    if (!balanceInitRef.current && activeAccount && !isAccountLoading) {
-      setAccountBalanceInput(activeAccount.balance.toString());
+    if (!balanceInitRef.current && selectedAccount && !isAccountLoading) {
+      setAccountBalanceInput(selectedAccount.balance.toString());
       balanceInitRef.current = true;
     }
-  }, [activeAccount, isAccountLoading]);
+  }, [selectedAccount, isAccountLoading]);
 
   // Refresh today's loss once trades are loaded (covers synced/broker trades not in localStorage)
   const lossInitRef = useRef(false);
@@ -68,8 +79,8 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
   // Numeric values for calculations (blank => 0)
   const dailyLimit = useMemo(() => toNumberOrZero(dailyLimitInput), [dailyLimitInput]);
   const accountBalance = useMemo(
-    () => (isLinked && activeAccount ? activeAccount.balance : toNumberOrZero(accountBalanceInput)),
-    [isLinked, activeAccount, accountBalanceInput],
+    () => (isEffectivelyLinked && selectedAccount ? selectedAccount.balance : toNumberOrZero(accountBalanceInput)),
+    [isEffectivelyLinked, selectedAccount, accountBalanceInput],
   );
   const lossToday = useMemo(() => toNumberOrZero(lossTodayInput), [lossTodayInput]);
 
@@ -159,9 +170,7 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
           <div className="flex items-center gap-3">
             <ShieldCheck className="h-5 w-5 text-primary" />
             <CardTitle>Daily Risk Limit Tracker</CardTitle>
-            <Badge variant="secondary" className="text-xs font-normal">
-              Mode: {mode}
-            </Badge>
+            <RiskToolModeToggle mode={mode} onChange={setMode} />
           </div>
           {onAdd && onRemove && <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />}
         </div>
@@ -213,17 +222,35 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-sm">Account Balance ({currencySymbol})</Label>
-                {isLinked && (
+                {isEffectivelyLinked && (
                   <Badge variant="outline" className="text-xs gap-1">
                     <Lock className="h-3 w-3" />
                     Linked
                   </Badge>
                 )}
               </div>
-              {isLinked && activeAccount ? (
-                <div className="h-9 px-3 rounded-md border border-border bg-muted/50 flex items-center text-sm text-muted-foreground select-none cursor-not-allowed">
-                  {currencySymbol}{activeAccount.balance.toLocaleString()}
+              {isEffectivelyLinked && selectedAccount ? (
+                <div className="space-y-1.5">
+                  <div className="h-9 px-3 rounded-md border border-border bg-muted/50 flex items-center text-sm text-muted-foreground select-none cursor-not-allowed">
+                    {currencySymbol}{selectedAccount.balance.toLocaleString()}
+                  </div>
+                  {hasMultipleAccounts && (
+                    <Select value={selectedAccountId ?? ""} onValueChange={setSelectedAccountId}>
+                      <SelectTrigger className="h-7 w-full text-xs">
+                        <SelectValue placeholder="Select account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {connectedAccounts.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
+              ) : mode === "linked" && !isAccountLoading ? (
+                <p className="text-xs text-muted-foreground py-1">
+                  No account linked — connect one in Broker Settings.
+                </p>
               ) : (
                 <Input
                   type="number"

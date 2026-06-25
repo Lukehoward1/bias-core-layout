@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Calculator, DollarSign, TrendingUp, LinkIcon, RefreshCw, ArrowRight } from "lucide-react";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
+import { useRiskToolMode } from "@/hooks/use-risk-tool-mode";
+import { RiskToolModeToggle } from "@/components/risk/RiskToolModeToggle";
 import { useMarketQuote } from "@/hooks/use-market-quotes";
 import {
   getFXInstruments,
@@ -54,13 +56,20 @@ const formatPriceNoCommas = (raw: string | number) => {
 export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false }: QuickRiskCalculatorProps) {
   const navigate = useNavigate();
 
-  const { accounts, primaryAccount, isLoading: isAccountLoading, refreshAccount } = useLinkedAccounts();
+  const { refreshAccount, isLoading: isAccountLoading } = useLinkedAccounts();
+  const {
+    mode,
+    setMode,
+    selectedAccount,
+    selectedAccountId,
+    setSelectedAccountId,
+    connectedAccounts,
+    isEffectivelyLinked,
+    hasMultipleAccounts,
+    isLoading,
+  } = useRiskToolMode("qrc");
 
-  const hasLinkedAccounts = accounts.length > 0;
-  const activeAccount = primaryAccount;
-  const isConnected = hasLinkedAccounts && activeAccount?.isConnected;
-  const balance = activeAccount?.balance ?? null;
-  const currency = activeAccount?.currency ?? "GBP";
+  const currency = selectedAccount?.currency ?? "GBP";
 
   const [manualBalanceInput, setManualBalanceInput] = useState<string>("10000");
   const [stopDistanceInput, setStopDistanceInput] = useState<string>("30");
@@ -77,7 +86,6 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
 
   const quote = useMarketQuote(selectedInstrument);
 
-  const mode = isConnected ? "Linked" : "Manual";
 
   const instruments = useMemo(() => {
     return assetCategory === "FX" ? getFXInstruments() : getFuturesInstruments();
@@ -92,13 +100,12 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
   const spread = useMemo(() => toNumberOrZero(spreadInput), [spreadInput]);
   const customRisk = useMemo(() => toNumberOrZero(customRiskInput), [customRiskInput]);
 
-  const effectiveBalance = isConnected && balance !== null ? balance : manualBalance;
+  const effectiveBalance = isEffectivelyLinked && selectedAccount ? selectedAccount.balance : manualBalance;
   const effectiveRiskPercent = isCustomRisk ? customRisk : riskPercent;
 
   useEffect(() => {
-    if (isConnected) setIncludeSpread(true);
-    if (!isConnected) setIncludeSpread(false);
-  }, [isConnected]);
+    setIncludeSpread(isEffectivelyLinked);
+  }, [isEffectivelyLinked]);
 
   useEffect(() => {
     const saved = localStorage.getItem(RISK_STORAGE_KEY);
@@ -196,9 +203,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
           <div className="flex items-center gap-3">
             <Calculator className="h-5 w-5 text-primary" />
             <CardTitle>Quick Risk Calculator</CardTitle>
-            <Badge variant="secondary" className="text-xs font-normal gap-1">
-              Mode: {mode}
-            </Badge>
+            <RiskToolModeToggle mode={mode} onChange={setMode} />
           </div>
           {onAdd && onRemove && <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />}
         </div>
@@ -208,46 +213,39 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-5">
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium">Account Balance</Label>
-                {isConnected && (
-                  <Badge variant="outline" className="text-xs gap-1">
-                    <LinkIcon className="h-3 w-3" />
-                    Linked
-                  </Badge>
-                )}
-              </div>
+              <Label className="text-sm font-medium">Account Balance</Label>
 
-              {isConnected && balance !== null && activeAccount ? (
+              {isEffectivelyLinked && selectedAccount ? (
                 <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-2xl font-bold text-foreground">
-                          {currency === "GBP" ? "£" : "$"}
-                          {balance.toLocaleString()}
+                      <p className="text-2xl font-bold text-foreground">
+                        {currency === "GBP" ? "£" : "$"}
+                        {selectedAccount.balance.toLocaleString()}
+                      </p>
+                      {hasMultipleAccounts ? (
+                        <Select value={selectedAccountId ?? ""} onValueChange={setSelectedAccountId}>
+                          <SelectTrigger className="h-6 w-auto max-w-[220px] border-none bg-transparent p-0 mt-1 text-xs text-muted-foreground shadow-none focus:ring-0 gap-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {connectedAccounts.map((a) => (
+                              <SelectItem key={a.id} value={a.id}>
+                                {a.name} • {a.broker}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="text-xs text-muted-foreground mt-1 truncate">
+                          {selectedAccount.name} • {selectedAccount.broker}
                         </p>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <p className="text-xs text-muted-foreground truncate">
-                          {activeAccount.name} • {activeAccount.broker}
-                        </p>
-                        {accounts.length > 1 && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs text-primary hover:text-primary/80 h-auto py-0.5 px-1"
-                            onClick={() => navigate("/brokerage")}
-                          >
-                            Change
-                          </Button>
-                        )}
-                      </div>
+                      )}
                     </div>
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => refreshAccount(activeAccount.id)}
+                      onClick={() => refreshAccount(selectedAccount.id)}
                       disabled={isAccountLoading}
                       className="h-8 w-8 shrink-0"
                     >
@@ -255,48 +253,41 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                     </Button>
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="p-4 rounded-lg bg-muted/50 border border-border">
-                    <div className="flex items-start gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                        <LinkIcon className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-foreground">No account linked</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Link a trading account to auto-sync your balance, or enter it manually below.
-                        </p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="mt-3 gap-2"
-                          onClick={() => navigate("/brokerage")}
-                        >
-                          <LinkIcon className="h-3 w-3" />
-                          Link account
-                          <ArrowRight className="h-3 w-3" />
-                        </Button>
-                      </div>
+              ) : mode === "linked" && !isLoading ? (
+                <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                  <div className="flex items-start gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                      <LinkIcon className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">No account linked</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Connect an account in Broker Settings to use live data.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 gap-2"
+                        onClick={() => navigate("/brokerage")}
+                      >
+                        <LinkIcon className="h-3 w-3" />
+                        Broker Settings
+                        <ArrowRight className="h-3 w-3" />
+                      </Button>
                     </div>
                   </div>
-
-                  <div>
-                    <Label htmlFor="manual-balance" className="text-xs text-muted-foreground">
-                      Manual Balance (£)
-                    </Label>
-                    <Input
-                      id="manual-balance"
-                      type="number"
-                      value={manualBalanceInput}
-                      onChange={(e) => setManualBalanceInput(e.target.value)}
-                      className="h-9 mt-1"
-                      placeholder="10000"
-                      min={0}
-                      step={1}
-                    />
-                  </div>
                 </div>
+              ) : (
+                <Input
+                  id="manual-balance"
+                  type="number"
+                  value={manualBalanceInput}
+                  onChange={(e) => setManualBalanceInput(e.target.value)}
+                  className="h-9"
+                  placeholder="10000"
+                  min={0}
+                  step={1}
+                />
               )}
             </div>
 
@@ -425,7 +416,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                 placeholder={assetCategory === "FX" ? "30" : "10"}
               />
 
-              {isConnected && (
+              {isEffectivelyLinked && (
                 <div className="flex items-center justify-between gap-3 pt-1">
                   <label className="flex items-center gap-2 text-xs text-muted-foreground select-none">
                     <input
@@ -453,7 +444,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                 </div>
               )}
 
-              {isConnected && includeSpread && (
+              {isEffectivelyLinked && includeSpread && (
                 <p className="text-[11px] text-muted-foreground">
                   Effective stop distance used: <span className="font-medium">{effectiveStopDistance || 0}</span>{" "}
                   {currentInstrument?.unitLabel || "pips"}

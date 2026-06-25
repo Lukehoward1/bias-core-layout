@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/table";
 import { Brain, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
-import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
+import { useRiskToolMode } from "@/hooks/use-risk-tool-mode";
+import { RiskToolModeToggle } from "@/components/risk/RiskToolModeToggle";
 import { useJournalTrades } from "@/hooks/use-journal-trades";
 import { cn } from "@/lib/utils";
 import type { Trade } from "@/hooks/use-journal-trades";
@@ -240,9 +241,23 @@ export function DynamicRiskAdvisor({
   onRemove,
   compact = false,
 }: DynamicRiskAdvisorProps) {
-  const { accounts } = useLinkedAccounts();
+  const {
+    mode,
+    setMode,
+    selectedAccount,
+    isEffectivelyLinked,
+    accounts,
+  } = useRiskToolMode("dra");
+
   const accountIds = useMemo(() => accounts.map((a) => a.id), [accounts]);
   const { trades } = useJournalTrades(accountIds);
+
+  const filteredTrades = useMemo(() => {
+    if (isEffectivelyLinked && selectedAccount) {
+      return trades.filter((t) => t.accountId === selectedAccount.id);
+    }
+    return trades;
+  }, [trades, isEffectivelyLinked, selectedAccount]);
 
   const [baseRisk, setBaseRisk] = useState<number>(1);
 
@@ -254,46 +269,46 @@ export function DynamicRiskAdvisor({
     }
   }, []);
 
-  const overall = useMemo(() => computeStats(trades), [trades]);
+  const overall = useMemo(() => computeStats(filteredTrades), [filteredTrades]);
 
   const sessionRows = useMemo<SegmentRow[]>(() => {
     return SESSIONS.map((session) => {
-      const filtered = trades.filter((t) => getSession(t.entryTime) === session);
+      const filtered = filteredTrades.filter((t) => getSession(t.entryTime) === session);
       const stats = computeStats(filtered);
       const rec = stats.count >= MIN_TRADES
         ? getRecommendation(stats, overall, baseRisk)
         : null;
       return { label: session, stats, rec };
     });
-  }, [trades, overall, baseRisk]);
+  }, [filteredTrades, overall, baseRisk]);
 
   const setupRows = useMemo<SegmentRow[]>(() => {
     const setupNames = [
       ...new Set(
-        trades.map((t) => t.setup).filter((s): s is string => !!s),
+        filteredTrades.map((t) => t.setup).filter((s): s is string => !!s),
       ),
     ].sort();
 
     return setupNames.map((setup) => {
-      const filtered = trades.filter((t) => t.setup === setup);
+      const filtered = filteredTrades.filter((t) => t.setup === setup);
       const stats = computeStats(filtered);
       const rec = stats.count >= MIN_TRADES
         ? getRecommendation(stats, overall, baseRisk)
         : null;
       return { label: setup, stats, rec };
     });
-  }, [trades, overall, baseRisk]);
+  }, [filteredTrades, overall, baseRisk]);
 
   const dayRows = useMemo<SegmentRow[]>(() => {
     return DAYS.map((day) => {
-      const filtered = trades.filter((t) => getDayName(t.date) === day);
+      const filtered = filteredTrades.filter((t) => getDayName(t.date) === day);
       const stats = computeStats(filtered);
       const rec = stats.count >= MIN_TRADES
         ? getRecommendation(stats, overall, baseRisk)
         : null;
       return { label: day, stats, rec };
     });
-  }, [trades, overall, baseRisk]);
+  }, [filteredTrades, overall, baseRisk]);
 
   // Top insight across all segments (for compact view and header badge)
   const topInsight = useMemo(() => {
@@ -308,7 +323,7 @@ export function DynamicRiskAdvisor({
     return { best, worst };
   }, [sessionRows, setupRows, dayRows]);
 
-  const hasEnoughData = overall.count >= MIN_TRADES;
+  const hasEnoughData = filteredTrades.length >= MIN_TRADES;
 
   if (compact) {
     return (
@@ -376,6 +391,7 @@ export function DynamicRiskAdvisor({
                 Personalised risk recommendations based on your trading history
               </p>
             </div>
+            <RiskToolModeToggle mode={mode} onChange={setMode} />
             <Badge variant="secondary" className="text-xs font-normal">
               Base {fmtPct(baseRisk)}
             </Badge>
@@ -397,7 +413,7 @@ export function DynamicRiskAdvisor({
                 recommendations.
               </p>
               <p className="text-xs text-muted-foreground mt-2">
-                {overall.count} / {MIN_TRADES} trades logged
+                {filteredTrades.length} / {MIN_TRADES} trades logged
               </p>
             </div>
           </div>
