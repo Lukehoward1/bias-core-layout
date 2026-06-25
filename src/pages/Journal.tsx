@@ -590,6 +590,8 @@ export default function Journal() {
   const [isReportsDialogOpen, setIsReportsDialogOpen] = useState(false);
   const [reportType, setReportType] = useState<string | null>(null);
   const [reportDatePreset, setReportDatePreset] = useState("last-30");
+  const [customFrom, setCustomFrom] = useState<string>("");
+  const [customTo, setCustomTo] = useState<string>("");
   const [reportAccountId, setReportAccountId] = useState<string>(ACTIVE_ACCOUNT_ALL);
   const [reportPair, setReportPair] = useState("__all__");
   const [exportFormat, setExportFormat] = useState<ExportFormat>("pdf");
@@ -603,9 +605,13 @@ export default function Journal() {
       case "this-week": return { from: startOfWeek(today, { weekStartsOn: 1 as const }), to: today };
       case "this-month": return { from: startOfMonth(today), to: today };
       case "last-90": return { from: subDays(today, 90), to: today };
+      case "custom": return {
+        from: customFrom ? new Date(customFrom) : subDays(today, 30),
+        to: customTo ? new Date(customTo) : today,
+      };
       default: return { from: subDays(today, 30), to: today };
     }
-  }, [reportDatePreset]);
+  }, [reportDatePreset, customFrom, customTo]);
 
   useEffect(() => {
     setSelectedSectionIds((prev) => {
@@ -2239,6 +2245,7 @@ export default function Journal() {
                           { id: "this-month", label: "This Month" },
                           { id: "last-30",    label: "Last 30 Days" },
                           { id: "last-90",    label: "Last 90 Days" },
+                          { id: "custom",     label: "Custom Range" },
                         ] as const
                       ).map((p) => (
                         <button
@@ -2255,6 +2262,28 @@ export default function Journal() {
                         </button>
                       ))}
                     </div>
+                    {reportDatePreset === "custom" && (
+                      <div className="flex items-center gap-2 pt-1">
+                        <div className="flex items-center gap-1.5">
+                          <label className="text-xs text-muted-foreground shrink-0">From</label>
+                          <input
+                            type="date"
+                            value={customFrom}
+                            onChange={(e) => setCustomFrom(e.target.value)}
+                            className="text-xs h-7 px-2 rounded-md border border-border bg-muted/30 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <label className="text-xs text-muted-foreground shrink-0">To</label>
+                          <input
+                            type="date"
+                            value={customTo}
+                            onChange={(e) => setCustomTo(e.target.value)}
+                            className="text-xs h-7 px-2 rounded-md border border-border bg-muted/30 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-2 pt-1">
                       <Select value={reportAccountId} onValueChange={setReportAccountId}>
                         <SelectTrigger className="h-7 w-auto min-w-[150px] text-xs gap-1.5">
