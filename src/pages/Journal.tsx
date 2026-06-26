@@ -636,6 +636,11 @@ export default function Journal() {
 
   const [previewKey, setPreviewKey] = useState(0);
 
+  const [activeJournalTab, setActiveJournalTab] = useState<string>(() => {
+    try { return localStorage.getItem("journal_active_tab") ?? "journal"; } catch { return "journal"; }
+  });
+  useEffect(() => { localStorage.setItem("journal_active_tab", activeJournalTab); }, [activeJournalTab]);
+
   const resetReportBuilder = () => {
     ["rb_open", "rb_type", "rb_sections", "rb_date_preset", "rb_custom_from", "rb_custom_to", "rb_preview_visible"]
       .forEach((k) => localStorage.removeItem(k));
@@ -646,6 +651,8 @@ export default function Journal() {
     setCustomFrom("");
     setCustomTo("");
     setPreviewVisible(false);
+    setActiveJournalTab("journal");
+    localStorage.removeItem("journal_active_tab");
   };
   const reportPreviewDateRange = useMemo(() => {
     const today = new Date();
@@ -1037,7 +1044,7 @@ export default function Journal() {
       <AppHeader title="Journal" />
 
       <div className="max-w-7xl mx-auto space-y-6">
-        <Tabs defaultValue="journal" className="w-full">
+        <Tabs value={activeJournalTab} onValueChange={setActiveJournalTab} className="w-full">
           <TabsList className="grid w-full max-w-xs grid-cols-2">
             <TabsTrigger value="journal" className="text-sm">
               Journal
