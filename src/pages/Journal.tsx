@@ -587,9 +587,7 @@ export default function Journal() {
   };
 
   // Reports dialog
-  const [isReportsDialogOpen, setIsReportsDialogOpen] = useState<boolean>(() => {
-    try { return JSON.parse(localStorage.getItem("rb_open") ?? "false"); } catch { return false; }
-  });
+  const [isReportsDialogOpen, setIsReportsDialogOpen] = useState(false);
   useEffect(() => { localStorage.setItem("rb_open", JSON.stringify(isReportsDialogOpen)); }, [isReportsDialogOpen]);
 
   const [reportType, setReportType] = useState<string | null>(() => {
