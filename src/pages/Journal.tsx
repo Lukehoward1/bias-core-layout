@@ -587,18 +587,66 @@ export default function Journal() {
   };
 
   // Reports dialog
-  const [isReportsDialogOpen, setIsReportsDialogOpen] = useState(false);
-  const [reportType, setReportType] = useState<string | null>(null);
-  const [reportDatePreset, setReportDatePreset] = useState("last-30");
-  const [customFrom, setCustomFrom] = useState<string>("");
-  const [customTo, setCustomTo] = useState<string>("");
+  const [isReportsDialogOpen, setIsReportsDialogOpen] = useState<boolean>(() => {
+    try { return JSON.parse(localStorage.getItem("rb_open") ?? "false"); } catch { return false; }
+  });
+  useEffect(() => { localStorage.setItem("rb_open", JSON.stringify(isReportsDialogOpen)); }, [isReportsDialogOpen]);
+
+  const [reportType, setReportType] = useState<string | null>(() => {
+    try { return localStorage.getItem("rb_type") ?? null; } catch { return null; }
+  });
+  useEffect(() => {
+    if (reportType != null) localStorage.setItem("rb_type", reportType);
+    else localStorage.removeItem("rb_type");
+  }, [reportType]);
+
+  const [reportDatePreset, setReportDatePreset] = useState<string>(() => {
+    try { return localStorage.getItem("rb_date_preset") ?? "last-30"; } catch { return "last-30"; }
+  });
+  useEffect(() => { localStorage.setItem("rb_date_preset", reportDatePreset); }, [reportDatePreset]);
+
+  const [customFrom, setCustomFrom] = useState<string>(() => {
+    try { return localStorage.getItem("rb_custom_from") ?? ""; } catch { return ""; }
+  });
+  useEffect(() => { localStorage.setItem("rb_custom_from", customFrom); }, [customFrom]);
+
+  const [customTo, setCustomTo] = useState<string>(() => {
+    try { return localStorage.getItem("rb_custom_to") ?? ""; } catch { return ""; }
+  });
+  useEffect(() => { localStorage.setItem("rb_custom_to", customTo); }, [customTo]);
+
   const [reportAccountId, setReportAccountId] = useState<string>(ACTIVE_ACCOUNT_ALL);
   const [reportPair, setReportPair] = useState("__all__");
   const [exportFormat, setExportFormat] = useState<ExportFormat>("pdf");
   const defaultSelectedSectionIds = useMemo(() => REPORT_SECTIONS.map((s) => s.id), []);
-  const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>(defaultSelectedSectionIds);
-  const [previewVisible, setPreviewVisible] = useState(false);
+
+  const [selectedSectionIds, setSelectedSectionIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem("rb_sections");
+      if (stored) return JSON.parse(stored) as string[];
+    } catch { /* ignore */ }
+    return REPORT_SECTIONS.map((s) => s.id);
+  });
+  useEffect(() => { localStorage.setItem("rb_sections", JSON.stringify(selectedSectionIds)); }, [selectedSectionIds]);
+
+  const [previewVisible, setPreviewVisible] = useState<boolean>(() => {
+    try { return JSON.parse(localStorage.getItem("rb_preview_visible") ?? "false"); } catch { return false; }
+  });
+  useEffect(() => { localStorage.setItem("rb_preview_visible", JSON.stringify(previewVisible)); }, [previewVisible]);
+
   const [previewKey, setPreviewKey] = useState(0);
+
+  const resetReportBuilder = () => {
+    ["rb_open", "rb_type", "rb_sections", "rb_date_preset", "rb_custom_from", "rb_custom_to", "rb_preview_visible"]
+      .forEach((k) => localStorage.removeItem(k));
+    setIsReportsDialogOpen(false);
+    setReportType(null);
+    setSelectedSectionIds(REPORT_SECTIONS.map((s) => s.id));
+    setReportDatePreset("last-30");
+    setCustomFrom("");
+    setCustomTo("");
+    setPreviewVisible(false);
+  };
   const reportPreviewDateRange = useMemo(() => {
     const today = new Date();
     switch (reportDatePreset) {
@@ -613,12 +661,6 @@ export default function Journal() {
     }
   }, [reportDatePreset, customFrom, customTo]);
 
-  useEffect(() => {
-    setSelectedSectionIds((prev) => {
-      if (prev.length > 0) return prev;
-      return REPORT_SECTIONS.map((s) => s.id);
-    });
-  }, []);
 
   const toggleSection = (id: string) => {
     setSelectedSectionIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -2143,7 +2185,7 @@ export default function Journal() {
           {/* Reports */}
           <TabsContent value="reports" className="space-y-6 mt-5">
             {/* Reports Dialog */}
-            <Dialog open={isReportsDialogOpen} onOpenChange={setIsReportsDialogOpen}>
+            <Dialog open={isReportsDialogOpen} onOpenChange={(open) => { if (!open) resetReportBuilder(); }}>
               <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
                 <DialogHeader>
                   <DialogTitle>Reports</DialogTitle>
