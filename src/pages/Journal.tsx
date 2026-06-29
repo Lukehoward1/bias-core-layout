@@ -22,6 +22,7 @@ import {
   Pencil,
   Trash2,
   FileText,
+  Upload,
 } from "lucide-react";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { useSubscription } from "@/hooks/use-subscription";
@@ -46,6 +47,7 @@ import {
 import { AreaChart, Area, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { ReportsOverview } from "@/components/reports/ReportsOverview";
 import { ReportPreview } from "@/components/reports/ReportPreview";
+import { ImportTradesDialog } from "@/components/journal/ImportTradesDialog";
 import { ReportsPerformance } from "@/components/reports/ReportsPerformance";
 import { ReportsSessions } from "@/components/reports/ReportsSessions";
 import { ReportsAssets } from "@/components/reports/ReportsAssets";
@@ -602,6 +604,8 @@ export default function Journal() {
     setPairIsManual(false);
     setIsAddTradeOpen(true);
   };
+
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   // Reports dialog
   const [isReportsDialogOpen, setIsReportsDialogOpen] = useState(false);
@@ -1336,10 +1340,16 @@ export default function Journal() {
                 <DialogHeader>
                   <div className="flex items-center justify-between pr-8">
                     <DialogTitle>Trades for {selectedDay ? format(selectedDay, "EEEE, MMMM d, yyyy") : ""}</DialogTitle>
-                    <Button size="sm" className="h-8" onClick={openAddTrade}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Trade
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" className="h-8" onClick={() => setIsImportOpen(true)}>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Import
+                      </Button>
+                      <Button size="sm" className="h-8" onClick={openAddTrade}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Trade
+                      </Button>
+                    </div>
                   </div>
                 </DialogHeader>
 
@@ -1574,6 +1584,9 @@ export default function Journal() {
                 </div>
               </DialogContent>
             </Dialog>
+
+            {/* Import trades */}
+            <ImportTradesDialog open={isImportOpen} onOpenChange={setIsImportOpen} />
 
             {/* Add trade modal */}
             <Dialog open={isAddTradeOpen} onOpenChange={setIsAddTradeOpen}>
