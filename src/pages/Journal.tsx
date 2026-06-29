@@ -163,6 +163,22 @@ function StarRating({ rating, onRatingChange }: { rating: number; onRatingChange
   );
 }
 
+function EquityCurveTooltip({ active, payload }: any) {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+        <p className="text-xs text-muted-foreground mb-1">{data.formattedDate}</p>
+        <p className={`text-sm font-semibold ${data.equity >= 0 ? "text-success" : "text-destructive"}`}>
+          {data.equity >= 0 ? "+" : ""}£{Number(data.equity || 0).toLocaleString()}
+        </p>
+        <p className="text-xs text-muted-foreground mt-1">{data.tradeCount} trades total</p>
+      </div>
+    );
+  }
+  return null;
+}
+
 interface EquityCurveCardProps {
   trades: Trade[];
   isAdded: boolean;
@@ -199,21 +215,6 @@ function EquityCurveCard({ trades, isAdded, onAdd, onRemove }: EquityCurveCardPr
     });
   }, [trades]);
 
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
-          <p className="text-xs text-muted-foreground mb-1">{data.formattedDate}</p>
-          <p className={`text-sm font-semibold ${data.equity >= 0 ? "text-success" : "text-destructive"}`}>
-            {data.equity >= 0 ? "+" : ""}£{Number(data.equity || 0).toLocaleString()}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">{data.tradeCount} trades total</p>
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
     <Card>
@@ -252,7 +253,7 @@ function EquityCurveCard({ trades, isAdded, onAdd, onRemove }: EquityCurveCardPr
                 tickLine={{ stroke: "hsl(var(--border))" }}
                 tickFormatter={(value) => `£${value}`}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={EquityCurveTooltip} />
               <Area
                 type="monotone"
                 dataKey="equity"
