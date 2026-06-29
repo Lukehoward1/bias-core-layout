@@ -43,7 +43,7 @@ import {
   isWithinInterval,
   parseISO,
 } from "date-fns";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { ReportsOverview } from "@/components/reports/ReportsOverview";
 import { ReportPreview } from "@/components/reports/ReportPreview";
 import { ReportsPerformance } from "@/components/reports/ReportsPerformance";
@@ -254,7 +254,7 @@ function EquityCurveCard({ trades, isAdded, onAdd, onRemove }: EquityCurveCardPr
                 tickLine={{ stroke: "hsl(var(--border))" }}
                 tickFormatter={(value) => `£${value}`}
               />
-              <Tooltip
+              <RechartsTooltip
                 cursor={{ stroke: 'rgba(255,255,255,0.2)', strokeWidth: 1 }}
                 content={({ active, payload }) => {
                   console.log('[InlineTooltip]', active, payload?.length);
