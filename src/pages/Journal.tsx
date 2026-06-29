@@ -164,7 +164,6 @@ function StarRating({ rating, onRatingChange }: { rating: number; onRatingChange
 }
 
 function EquityCurveTooltip({ active, payload }: any) {
-  console.log('[EquityCurveTooltip]', active, payload?.length);
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
@@ -257,7 +256,6 @@ function EquityCurveCard({ trades, isAdded, onAdd, onRemove }: EquityCurveCardPr
               <RechartsTooltip
                 cursor={{ stroke: 'rgba(255,255,255,0.2)', strokeWidth: 1 }}
                 content={({ active, payload }) => {
-                  console.log('[InlineTooltip]', active, payload?.length);
                   if (!active || !payload?.length) return null;
                   const data = payload[0].payload;
                   return (
