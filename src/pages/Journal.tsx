@@ -164,6 +164,7 @@ function StarRating({ rating, onRatingChange }: { rating: number; onRatingChange
 }
 
 function EquityCurveTooltip({ active, payload }: any) {
+  console.log('[EquityCurveTooltip]', active, payload?.length);
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
