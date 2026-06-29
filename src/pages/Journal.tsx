@@ -233,7 +233,7 @@ function EquityCurveCard({ trades, isAdded, onAdd, onRemove }: EquityCurveCardPr
       <CardContent>
         <div className="h-56">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={equityData}>
+            <AreaChart data={equityData} margin={{ top: 5, right: 5, bottom: 5, left: 10 }}>
               <defs>
                 <linearGradient id="journalEquityGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
@@ -277,6 +277,7 @@ function EquityCurveCard({ trades, isAdded, onAdd, onRemove }: EquityCurveCardPr
                 stroke="hsl(var(--primary))"
                 fill="url(#journalEquityGradient)"
                 strokeWidth={2}
+                isAnimationActive={false}
                 dot={{ fill: "hsl(var(--primary))", strokeWidth: 0, r: 0 }}
                 activeDot={{ fill: "hsl(var(--primary))", strokeWidth: 2, stroke: "hsl(var(--background))", r: 5 }}
               />
