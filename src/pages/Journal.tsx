@@ -254,7 +254,23 @@ function EquityCurveCard({ trades, isAdded, onAdd, onRemove }: EquityCurveCardPr
                 tickLine={{ stroke: "hsl(var(--border))" }}
                 tickFormatter={(value) => `£${value}`}
               />
-              <Tooltip content={(props) => <EquityCurveTooltip {...props} />} />
+              <Tooltip
+                cursor={{ stroke: 'rgba(255,255,255,0.2)', strokeWidth: 1 }}
+                content={({ active, payload }) => {
+                  console.log('[InlineTooltip]', active, payload?.length);
+                  if (!active || !payload?.length) return null;
+                  const data = payload[0].payload;
+                  return (
+                    <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+                      <p className="text-xs text-muted-foreground mb-1">{data.formattedDate}</p>
+                      <p className={`text-sm font-semibold ${data.equity >= 0 ? 'text-success' : 'text-destructive'}`}>
+                        {data.equity >= 0 ? '+' : ''}£{Number(data.equity || 0).toLocaleString()}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">{data.tradeCount} trades total</p>
+                    </div>
+                  );
+                }}
+              />
               <Area
                 type="monotone"
                 dataKey="equity"
