@@ -191,7 +191,6 @@ export function useJournalTrades(accountIds: string[] = []) {
       if (!cancelled) {
         if (!error && data) {
           setManualTrades((data as SupabaseTradeRow[]).map(fromRow));
-          console.log("[useJournalTrades] fetched", data.length, "trades. Most recent dates:", data.slice(0, 3).map(r => r.date));
         }
         setIsLoaded(true);
       }
