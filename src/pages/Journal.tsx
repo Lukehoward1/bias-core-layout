@@ -254,7 +254,7 @@ function EquityCurveCard({ trades, isAdded, onAdd, onRemove }: EquityCurveCardPr
                 tickLine={{ stroke: "hsl(var(--border))" }}
                 tickFormatter={(value) => `£${value}`}
               />
-              <Tooltip content={EquityCurveTooltip} />
+              <Tooltip content={(props) => <EquityCurveTooltip {...props} />} />
               <Area
                 type="monotone"
                 dataKey="equity"
