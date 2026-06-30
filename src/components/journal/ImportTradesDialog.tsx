@@ -97,17 +97,68 @@ function normalisePnl(raw: string): { value: number; warn: boolean } {
 }
 
 function normaliseDate(raw: string): { value: string; warn: boolean } {
-  const d1 = new Date(raw);
+  const s = String(raw).trim();
+
+  // Try DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY first
+  const ddmm = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+  if (ddmm) {
+    const [, dd, mm, yyyy] = ddmm;
+    const fullYear = yyyy.length === 2 ? "20" + yyyy : yyyy;
+    const d = new Date(`${fullYear}-${mm.padStart(2,"0")}-${dd.padStart(2,"0")}`);
+    if (!isNaN(d.getTime())) return { value: d.toISOString().split("T")[0], warn: false };
+  }
+
+  // Try formats with full or abbreviated month names
+  const MONTHS: Record<string, string> = {
+    jan:"01",january:"01",feb:"02",february:"02",mar:"03",march:"03",
+    apr:"04",april:"04",may:"05",jun:"06",june:"06",
+    jul:"07",july:"07",aug:"08",august:"08",sep:"09",september:"09",
+    oct:"10",october:"10",nov:"11",november:"11",dec:"12",december:"12"
+  };
+
+  const stripped = s.replace(/(\d+)(st|nd|rd|th)/gi, "$1");
+
+  // "D Month YYYY" or "D Month, YYYY"
+  const dmy = stripped.match(/^(\d{1,2})\s+([a-z]+)[,\s]+(\d{4})$/i);
+  if (dmy) {
+    const [, dd, mon, yyyy] = dmy;
+    const mm = MONTHS[mon.toLowerCase()];
+    if (mm) {
+      const d = new Date(`${yyyy}-${mm}-${dd.padStart(2,"0")}`);
+      if (!isNaN(d.getTime())) return { value: d.toISOString().split("T")[0], warn: false };
+    }
+  }
+
+  // "Month D YYYY" or "Month D, YYYY" (US style with month name)
+  const mdy = stripped.match(/^([a-z]+)\s+(\d{1,2})[,\s]+(\d{4})$/i);
+  if (mdy) {
+    const [, mon, dd, yyyy] = mdy;
+    const mm = MONTHS[mon.toLowerCase()];
+    if (mm) {
+      const d = new Date(`${yyyy}-${mm}-${dd.padStart(2,"0")}`);
+      if (!isNaN(d.getTime())) return { value: d.toISOString().split("T")[0], warn: false };
+    }
+  }
+
+  // "D-Mon-YYYY" or "D-Mon-YY" (e.g. 07-Jul-2026)
+  const dmonth = stripped.match(/^(\d{1,2})[\/\-\.]([a-z]+)[\/\-\.](\d{2,4})$/i);
+  if (dmonth) {
+    const [, dd, mon, yyyy] = dmonth;
+    const mm = MONTHS[mon.toLowerCase()];
+    if (mm) {
+      const fullYear = yyyy.length === 2 ? "20" + yyyy : yyyy;
+      const d = new Date(`${fullYear}-${mm}-${dd.padStart(2,"0")}`);
+      if (!isNaN(d.getTime())) return { value: d.toISOString().split("T")[0], warn: false };
+    }
+  }
+
+  // Fall back to native parser (handles ISO format YYYY-MM-DD etc)
+  const d1 = new Date(s);
   if (!isNaN(d1.getTime())) {
     return { value: d1.toISOString().split("T")[0], warn: false };
   }
-  const ddmm = raw.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
-  if (ddmm) {
-    const [, dd, mm, yyyy] = ddmm;
-    const d2 = new Date(`${yyyy.length === 2 ? "20" + yyyy : yyyy}-${mm.padStart(2,"0")}-${dd.padStart(2,"0")}`);
-    if (!isNaN(d2.getTime())) return { value: d2.toISOString().split("T")[0], warn: false };
-  }
-  return { value: raw, warn: true };
+
+  return { value: s, warn: true };
 }
 
 function normaliseStatus(raw: string): "win" | "loss" | "breakeven" {
