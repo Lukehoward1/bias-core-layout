@@ -57,9 +57,22 @@ function findHeaderRow(rows: string[][]): number {
   return 0;
 }
 
+const SUMMARY_ROW_RE = /\b(balance|outcome|total|sum|closing|opening|p&l)\b/i;
+
+function isSummaryCell(value: string): boolean {
+  const v = value.trim();
+  if (!v) return true;
+  return SUMMARY_ROW_RE.test(v);
+}
+
 function rawRowsFrom2D(hdrs: string[], dataRows: string[][]): RawRow[] {
   return dataRows
-    .filter((row) => row.some((cell) => String(cell ?? "").trim()))
+    .filter((row) => {
+      const firstCell = String(row[0] ?? "").trim();
+      if (!firstCell) return false;
+      if (isSummaryCell(firstCell)) return false;
+      return true;
+    })
     .map((row) => {
       const obj: RawRow = {};
       hdrs.forEach((h, i) => { obj[h] = String(row[i] ?? "").trim(); });
@@ -161,12 +174,25 @@ function transformRow(raw: RawRow, mapping: Record<string, string>): Transformed
   const actualRRaw = get("actualR");
 
   const statusRaw = get("status");
-  const status = statusRaw ? normaliseStatus(statusRaw) : deriveStatus(pnl);
+  let status: "win" | "loss" | "breakeven";
+  if (!statusRaw) {
+    status = deriveStatus(pnl);
+  } else {
+    const statusNumeric = parseFloat(statusRaw.replace(/[£$€,\s]/g, ""));
+    if (Number.isFinite(statusNumeric)) {
+      status = deriveStatus(statusNumeric);
+    } else {
+      status = normaliseStatus(statusRaw);
+    }
+  }
+
+  const pair = get("pair") || "—";
+  const hasRequiredWarn = dateWarn || directionWarn || pnlWarn || (pair === "—" && dateWarn);
 
   return {
     date,
     dateWarn,
-    pair: get("pair") || "—",
+    pair,
     direction,
     directionWarn,
     pnl,
@@ -179,7 +205,7 @@ function transformRow(raw: RawRow, mapping: Record<string, string>): Transformed
     setup: get("setup") || null,
     rating: ratingRaw ? parseInt(ratingRaw) || null : null,
     actualR: actualRRaw ? parseFloat(actualRRaw) || null : null,
-    hasRequiredWarn: dateWarn || directionWarn || pnlWarn,
+    hasRequiredWarn,
   };
 }
 

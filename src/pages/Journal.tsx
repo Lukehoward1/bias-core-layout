@@ -605,7 +605,12 @@ export default function Journal() {
     setIsAddTradeOpen(true);
   };
 
-  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState<boolean>(() => {
+    try {
+      const step = JSON.parse(localStorage.getItem("import_step") ?? "1");
+      return step > 1;
+    } catch { return false; }
+  });
   useEffect(() => { localStorage.setItem("import_open", JSON.stringify(isImportOpen)); }, [isImportOpen]);
 
   // Reports dialog
