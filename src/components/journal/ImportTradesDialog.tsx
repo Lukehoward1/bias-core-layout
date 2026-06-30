@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
@@ -24,12 +24,12 @@ interface FieldDef {
 
 const FIELDS: FieldDef[] = [
   { key: "date",      label: "Date",             required: true,  matchers: ["date","time","open time","close time","datetime","entry date","exit date"] },
-  { key: "pair",      label: "Pair / Symbol",    required: true,  matchers: ["pair","symbol","instrument","asset","ticker","market"] },
-  { key: "direction", label: "Direction",        required: true,  matchers: ["type","direction","side","action","buy/sell","long/short","trade type"] },
+  { key: "pair",      label: "Pair / Symbol",    required: true,  matchers: ["pair","symbol","instrument","asset","ticker","market","currency pair","ccy pair"] },
+  { key: "direction", label: "Direction",        required: true,  matchers: ["type","direction","side","action","buy/sell","long/short","trade type","trade direction","order type","order side"] },
   { key: "pnl",       label: "P&L",              required: true,  matchers: ["pnl","p&l","profit","profit/loss","result","gain","return","net p&l","net pnl"] },
   { key: "entry",     label: "Entry Price",      required: false, matchers: ["entry","open","open price","entry price"] },
   { key: "exit",      label: "Exit Price",       required: false, matchers: ["exit","close","close price","exit price"] },
-  { key: "lots",      label: "Lots / Size",      required: false, matchers: ["lots","size","volume","quantity","units","position size"] },
+  { key: "lots",      label: "Lots / Size",      required: false, matchers: ["lots","size","volume","quantity","units","position size","lot size","contract size"] },
   { key: "status",    label: "Status",           required: false, matchers: ["status","outcome","result","win/loss"] },
   { key: "notes",     label: "Notes",            required: false, matchers: ["notes","comment","comments","description","remark"] },
   { key: "setup",     label: "Setup / Strategy", required: false, matchers: ["setup","strategy","pattern","signal"] },
@@ -38,6 +38,34 @@ const FIELDS: FieldDef[] = [
 ];
 
 const SKIP = "__skip__";
+const LS_KEYS = ["import_step", "import_filename", "import_headers", "import_raw_rows", "import_mapping"] as const;
+
+// ── Header row detection ──────────────────────────────────────────────────────
+
+function findHeaderRow(rows: string[][]): number {
+  for (let i = 0; i < Math.min(5, rows.length); i++) {
+    const row = rows[i];
+    const nonNumericNonEmpty = row.filter((cell) => {
+      const v = String(cell ?? "").trim();
+      if (!v) return false;
+      if (/^-?\d+(\.\d+)?$/.test(v)) return false;
+      return true;
+    });
+    const unique = new Set(nonNumericNonEmpty.map((v) => v.toLowerCase()));
+    if (nonNumericNonEmpty.length >= 3 && unique.size > 1) return i;
+  }
+  return 0;
+}
+
+function rawRowsFrom2D(hdrs: string[], dataRows: string[][]): RawRow[] {
+  return dataRows
+    .filter((row) => row.some((cell) => String(cell ?? "").trim()))
+    .map((row) => {
+      const obj: RawRow = {};
+      hdrs.forEach((h, i) => { obj[h] = String(row[i] ?? "").trim(); });
+      return obj;
+    });
+}
 
 // ── Normalisation helpers ─────────────────────────────────────────────────────
 
@@ -56,12 +84,10 @@ function normalisePnl(raw: string): { value: number; warn: boolean } {
 }
 
 function normaliseDate(raw: string): { value: string; warn: boolean } {
-  // Try native
   const d1 = new Date(raw);
   if (!isNaN(d1.getTime())) {
     return { value: d1.toISOString().split("T")[0], warn: false };
   }
-  // Try DD/MM/YYYY
   const ddmm = raw.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
   if (ddmm) {
     const [, dd, mm, yyyy] = ddmm;
@@ -182,6 +208,21 @@ function StepIndicator({ step }: { step: number }) {
   );
 }
 
+// ── localStorage helpers ──────────────────────────────────────────────────────
+
+function lsGet<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw != null ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function clearImportStorage() {
+  LS_KEYS.forEach((k) => localStorage.removeItem(k));
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export interface ImportTradesDialogProps {
@@ -192,17 +233,27 @@ export interface ImportTradesDialogProps {
 export function ImportTradesDialog({ open, onOpenChange }: ImportTradesDialogProps) {
   const { addManualTrade } = useJournalTrades();
 
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState<number>(() => lsGet("import_step", 1));
   const [isDragging, setIsDragging] = useState(false);
-  const [fileName, setFileName] = useState("");
-  const [headers, setHeaders] = useState<string[]>([]);
-  const [rawRows, setRawRows] = useState<RawRow[]>([]);
-  const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [fileName, setFileName] = useState<string>(() => lsGet("import_filename", ""));
+  const [headers, setHeaders] = useState<string[]>(() => lsGet("import_headers", []));
+  const [rawRows, setRawRows] = useState<RawRow[]>(() => lsGet("import_raw_rows", []));
+  const [mapping, setMapping] = useState<Record<string, string>>(() => lsGet("import_mapping", {}));
   const [importing, setImporting] = useState(false);
   const [importedCount, setImportedCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => { localStorage.setItem("import_step", JSON.stringify(step)); }, [step]);
+  useEffect(() => { localStorage.setItem("import_filename", JSON.stringify(fileName)); }, [fileName]);
+  useEffect(() => { localStorage.setItem("import_headers", JSON.stringify(headers)); }, [headers]);
+  useEffect(() => {
+    if (rawRows.length > 0) localStorage.setItem("import_raw_rows", JSON.stringify(rawRows));
+    else localStorage.removeItem("import_raw_rows");
+  }, [rawRows]);
+  useEffect(() => { localStorage.setItem("import_mapping", JSON.stringify(mapping)); }, [mapping]);
+
   const reset = () => {
+    clearImportStorage();
     setStep(1);
     setIsDragging(false);
     setFileName("");
@@ -226,12 +277,15 @@ export function ImportTradesDialog({ open, onOpenChange }: ImportTradesDialogPro
 
     if (ext === "csv") {
       Papa.parse(file, {
-        header: true,
+        header: false,
         skipEmptyLines: true,
         complete: (result) => {
-          const hdrs = result.meta.fields ?? [];
+          const allRows = result.data as string[][];
+          const headerIdx = findHeaderRow(allRows);
+          const hdrs = allRows[headerIdx].map(String);
+          const rows = rawRowsFrom2D(hdrs, allRows.slice(headerIdx + 1));
           setHeaders(hdrs);
-          setRawRows(result.data as RawRow[]);
+          setRawRows(rows);
           setMapping(autoMap(hdrs));
           setStep(2);
         },
@@ -243,10 +297,12 @@ export function ImportTradesDialog({ open, onOpenChange }: ImportTradesDialogPro
         try {
           const wb = XLSX.read(e.target?.result, { type: "array" });
           const ws = wb.Sheets[wb.SheetNames[0]];
-          const json = XLSX.utils.sheet_to_json<RawRow>(ws, { defval: "", raw: false });
-          const hdrs = json.length > 0 ? Object.keys(json[0]) : [];
+          const raw2D = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: "", raw: false }) as string[][];
+          const headerIdx = findHeaderRow(raw2D);
+          const hdrs = raw2D[headerIdx].map(String);
+          const rows = rawRowsFrom2D(hdrs, raw2D.slice(headerIdx + 1));
           setHeaders(hdrs);
-          setRawRows(json);
+          setRawRows(rows);
           setMapping(autoMap(hdrs));
           setStep(2);
         } catch {
@@ -270,6 +326,7 @@ export function ImportTradesDialog({ open, onOpenChange }: ImportTradesDialogPro
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
     if (file) processFile(file);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Mapping validation ────────────────────────────────────────────────────

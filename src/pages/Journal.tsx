@@ -606,6 +606,7 @@ export default function Journal() {
   };
 
   const [isImportOpen, setIsImportOpen] = useState(false);
+  useEffect(() => { localStorage.setItem("import_open", JSON.stringify(isImportOpen)); }, [isImportOpen]);
 
   // Reports dialog
   const [isReportsDialogOpen, setIsReportsDialogOpen] = useState(false);
@@ -1179,6 +1180,11 @@ export default function Journal() {
                   ))}
                 </SelectContent>
               </Select>
+
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setIsImportOpen(true)}>
+                <Upload className="h-3.5 w-3.5 mr-1.5" />
+                Import
+              </Button>
             </div>
 
             {/* Top stats (active scope) */}
