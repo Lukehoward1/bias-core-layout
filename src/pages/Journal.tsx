@@ -59,6 +59,7 @@ import { ReportDateRangeFilter, DateRange } from "@/components/reports/ReportDat
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { Link } from "react-router-dom";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { StrategyManager } from "@/components/journal/StrategyManager";
@@ -295,6 +296,11 @@ function EquityCurveCard({ trades, isAdded, onAdd, onRemove }: EquityCurveCardPr
 
 export default function Journal() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [showWeekends, setShowWeekends] = useState<boolean>(() => {
+    try { return JSON.parse(localStorage.getItem("cal_show_weekends") ?? "false"); }
+    catch { return false; }
+  });
+  useEffect(() => { localStorage.setItem("cal_show_weekends", JSON.stringify(showWeekends)); }, [showWeekends]);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAddTradeOpen, setIsAddTradeOpen] = useState(false);
@@ -1256,7 +1262,15 @@ export default function Journal() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle>Daily Performance</CardTitle>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <span className="text-xs text-muted-foreground">Weekends</span>
+                      <Switch
+                        checked={showWeekends}
+                        onCheckedChange={setShowWeekends}
+                        className="scale-75 origin-right"
+                      />
+                    </label>
                     <AddToDashboardButton
                       isAdded={isDailyPerformanceAdded}
                       onAdd={handleAddDailyPerformance}
@@ -1285,64 +1299,138 @@ export default function Journal() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-7 gap-2 mb-2">
-                  {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((dayName) => (
-                    <div key={dayName} className="text-center text-xs font-medium text-muted-foreground py-2">
-                      {dayName}
-                    </div>
-                  ))}
-                </div>
+                {(() => {
+                  const dayNames = showWeekends
+                    ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+                    : ["Mon", "Tue", "Wed", "Thu", "Fri"];
+                  const numDayCols = dayNames.length;
+                  const gridTemplate = `repeat(${numDayCols}, 1fr) 0.5rem 0.8fr`;
 
-                <div className="grid grid-cols-7 gap-2">
-                  {calendarDays.map((date, idx) => {
-                    const summary = getDailySummary(date);
-                    const isCurrentMonth = isSameMonth(date, currentMonth);
-                    const hasTrades = summary.tradeCount > 0;
+                  // Split calendarDays into weeks of 7 (Mon–Sun), then optionally drop Sat/Sun
+                  const weeks: Date[][] = [];
+                  for (let i = 0; i < calendarDays.length; i += 7) {
+                    weeks.push(calendarDays.slice(i, i + 7));
+                  }
 
-                    let bgClass = "bg-muted/20";
-                    let pnlColorClass = "text-muted-foreground";
-
-                    if (hasTrades) {
-                      if (summary.totalPnl > 0) {
-                        bgClass = "bg-success/10 hover:bg-success/20";
-                        pnlColorClass = "text-success";
-                      } else if (summary.totalPnl < 0) {
-                        bgClass = "bg-destructive/10 hover:bg-destructive/20";
-                        pnlColorClass = "text-destructive";
-                      } else {
-                        bgClass = "bg-muted/30 hover:bg-muted/40";
-                        pnlColorClass = "text-muted-foreground";
-                      }
-                    }
-
-                    return (
-                      <div
-                        key={idx}
-                        onClick={() => isCurrentMonth && handleDayClick(date)}
-                        className={`
-                          min-h-[80px] p-2 rounded-lg border border-border/50 flex flex-col
-                          ${bgClass}
-                          ${!isCurrentMonth ? "opacity-30" : "cursor-pointer"}
-                          transition-colors
-                        `}
-                      >
-                        <span className={`text-xs ${isCurrentMonth ? "text-foreground" : "text-muted-foreground"}`}>
-                          {format(date, "d")}
-                        </span>
-                        {hasTrades && isCurrentMonth && (
-                          <>
-                            <span className={`text-sm font-bold mt-auto ${pnlColorClass}`}>
-                              {summary.totalPnl >= 0 ? "+" : ""}£{Number(summary.totalPnl || 0).toLocaleString()}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {summary.tradeCount} trade{summary.tradeCount !== 1 ? "s" : ""}
-                            </span>
-                          </>
-                        )}
+                  return (
+                    <>
+                      {/* Header row */}
+                      <div className="grid gap-2 mb-2" style={{ gridTemplateColumns: gridTemplate }}>
+                        {dayNames.map((dayName) => (
+                          <div key={dayName} className="text-center text-xs font-medium text-muted-foreground py-2">
+                            {dayName}
+                          </div>
+                        ))}
+                        {/* spacer */}
+                        <div />
+                        {/* Week header */}
+                        <div className="text-center text-xs font-medium text-muted-foreground py-2">Week</div>
                       </div>
-                    );
-                  })}
-                </div>
+
+                      {/* Week rows */}
+                      {weeks.map((week, weekIdx) => {
+                        const visibleDays = showWeekends ? week : week.slice(0, 5);
+
+                        // Weekly totals across visible days only (Mon–Fri or Mon–Sun)
+                        const weekSummary = visibleDays.reduce(
+                          (acc, d) => {
+                            const s = getDailySummary(d);
+                            return { pnl: acc.pnl + s.totalPnl, trades: acc.trades + s.tradeCount };
+                          },
+                          { pnl: 0, trades: 0 },
+                        );
+
+                        let weekBg = "";
+                        let weekPnlClass = "text-muted-foreground";
+                        if (weekSummary.trades > 0) {
+                          if (weekSummary.pnl > 0) {
+                            weekBg = "bg-success/7";
+                            weekPnlClass = "text-success";
+                          } else if (weekSummary.pnl < 0) {
+                            weekBg = "bg-destructive/7";
+                            weekPnlClass = "text-destructive";
+                          } else {
+                            weekBg = "bg-muted/20";
+                          }
+                        }
+
+                        return (
+                          <div
+                            key={weekIdx}
+                            className="grid gap-2 mb-2"
+                            style={{ gridTemplateColumns: gridTemplate }}
+                          >
+                            {visibleDays.map((date, dIdx) => {
+                              const summary = getDailySummary(date);
+                              const isCurrentMonth = isSameMonth(date, currentMonth);
+                              const hasTrades = summary.tradeCount > 0;
+
+                              let bgClass = "bg-muted/20";
+                              let pnlColorClass = "text-muted-foreground";
+                              if (hasTrades) {
+                                if (summary.totalPnl > 0) {
+                                  bgClass = "bg-success/10 hover:bg-success/20";
+                                  pnlColorClass = "text-success";
+                                } else if (summary.totalPnl < 0) {
+                                  bgClass = "bg-destructive/10 hover:bg-destructive/20";
+                                  pnlColorClass = "text-destructive";
+                                } else {
+                                  bgClass = "bg-muted/30 hover:bg-muted/40";
+                                }
+                              }
+
+                              return (
+                                <div
+                                  key={dIdx}
+                                  onClick={() => isCurrentMonth && handleDayClick(date)}
+                                  className={`
+                                    min-h-[80px] p-2 rounded-lg border border-border/50 flex flex-col
+                                    ${bgClass}
+                                    ${!isCurrentMonth ? "opacity-30" : "cursor-pointer"}
+                                    transition-colors
+                                  `}
+                                >
+                                  <span className={`text-xs ${isCurrentMonth ? "text-foreground" : "text-muted-foreground"}`}>
+                                    {format(date, "d")}
+                                  </span>
+                                  {hasTrades && isCurrentMonth && (
+                                    <>
+                                      <span className={`text-sm font-bold mt-auto ${pnlColorClass}`}>
+                                        {summary.totalPnl >= 0 ? "+" : ""}£{Number(summary.totalPnl || 0).toLocaleString()}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {summary.tradeCount} trade{summary.tradeCount !== 1 ? "s" : ""}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })}
+
+                            {/* Spacer cell */}
+                            <div />
+
+                            {/* Weekly total cell */}
+                            <div
+                              className={`min-h-[80px] p-2 rounded-lg border border-border/30 flex flex-col justify-center items-center ${weekBg}`}
+                            >
+                              {weekSummary.trades > 0 && (
+                                <>
+                                  <span className={`text-xs font-semibold ${weekPnlClass}`}>
+                                    {weekSummary.pnl >= 0 ? "+" : ""}£{Number(weekSummary.pnl || 0).toLocaleString()}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground mt-0.5">
+                                    {weekSummary.trades} trade{weekSummary.trades !== 1 ? "s" : ""}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>
+                  );
+                })()}
               </CardContent>
             </Card>
 
