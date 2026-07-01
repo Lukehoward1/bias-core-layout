@@ -184,12 +184,12 @@ export function SessionPlanningTab() {
         </div>
       </div>
 
-      {/* Morning Plan */}
+      {/* Pre-Session Plan */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <Sun className="h-4 w-4 text-yellow-500" />
-            Morning Plan
+            Pre-Session Plan
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
