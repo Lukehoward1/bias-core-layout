@@ -1,9 +1,9 @@
 export const PRICE_IDS = {
-  STANDARD_MONTHLY:  "price_1TglgoCKkT3ytOGoAoMiNkN5",
-  STANDARD_ANNUAL:   "price_1TglkFCKkT3ytOGo9PIz5API",
-  PRO_MONTHLY:       "price_1TgllWCKkT3ytOGov6NHnnGz",
-  PRO_ANNUAL:        "price_1Tglm3CKkT3ytOGoHBg4g07x",
-  FOUNDING_MEMBER:   "price_1TglprCKkT3ytOGoCBfIoJCG",
+  STANDARD_MONTHLY:  "price_1ToPk0Fjbj4UzaeOs3fEC3n5",
+  STANDARD_ANNUAL:   "price_1ToPjzFjbj4UzaeODiPuLxMc",
+  PRO_MONTHLY:       "price_1ToPk1Fjbj4UzaeOxx5MhFFZ",
+  PRO_ANNUAL:        "price_1ToPk0Fjbj4UzaeO0snhbCO6",
+  FOUNDING_MEMBER:   "price_1ToPjyFjbj4UzaeOacbzWn5p",
 } as const;
 
 export async function createCheckoutSession(
