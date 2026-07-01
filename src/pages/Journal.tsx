@@ -1344,10 +1344,10 @@ export default function Journal() {
                         let weekPnlClass = "text-muted-foreground";
                         if (weekSummary.trades > 0) {
                           if (weekSummary.pnl > 0) {
-                            weekBg = "bg-success/7";
+                            weekBg = "bg-success/15";
                             weekPnlClass = "text-success";
                           } else if (weekSummary.pnl < 0) {
-                            weekBg = "bg-destructive/7";
+                            weekBg = "bg-destructive/15";
                             weekPnlClass = "text-destructive";
                           } else {
                             weekBg = "bg-muted/20";
