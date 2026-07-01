@@ -1334,6 +1334,7 @@ export default function Journal() {
                         // Weekly totals across visible days only (Mon–Fri or Mon–Sun)
                         const weekSummary = visibleDays.reduce(
                           (acc, d) => {
+                            if (!isSameMonth(d, currentMonth)) return acc;
                             const s = getDailySummary(d);
                             return { pnl: acc.pnl + s.totalPnl, trades: acc.trades + s.tradeCount };
                           },
