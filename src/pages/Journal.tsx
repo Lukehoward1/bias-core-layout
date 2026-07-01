@@ -64,6 +64,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { StrategyManager } from "@/components/journal/StrategyManager";
 import { TagManager } from "@/components/journal/TagManager";
+import { SessionPlanningTab } from "@/components/journal/SessionPlanningTab";
 import { useStrategies } from "@/hooks/use-strategies";
 import { useTags } from "@/hooks/use-tags";
 
@@ -1077,9 +1078,12 @@ export default function Journal() {
 
       <div className="max-w-7xl mx-auto space-y-6">
         <Tabs value={activeJournalTab} onValueChange={setActiveJournalTab} className="w-full">
-          <TabsList className="grid w-full max-w-xs grid-cols-2">
+          <TabsList className="grid w-full max-w-sm grid-cols-3">
             <TabsTrigger value="journal" className="text-sm">
               Journal
+            </TabsTrigger>
+            <TabsTrigger value="planner" className="text-sm">
+              Planner
             </TabsTrigger>
             <TabsTrigger value="reports" className="text-sm">
               Reports
@@ -2343,6 +2347,11 @@ export default function Journal() {
               <TagManager />
             </SheetContent>
           </Sheet>
+
+          {/* Pre-Session Planner */}
+          <TabsContent value="planner" className="mt-5">
+            <SessionPlanningTab />
+          </TabsContent>
 
           {/* Reports */}
           <TabsContent value="reports" className="space-y-6 mt-5">
