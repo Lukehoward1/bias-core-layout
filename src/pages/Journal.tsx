@@ -1044,6 +1044,7 @@ export default function Journal() {
       : legacyFallbackPnl(editingTrade.type, entry, exit, lots);
 
     updateManualTrade(editingTrade.id, {
+      date: editingTrade.date,
       pair: symbol,
       type: editingTrade.type,
       entry,
@@ -1645,6 +1646,18 @@ export default function Journal() {
                     </p>
                   </div>
 
+                  {/* Date */}
+                  <div className="space-y-2">
+                    <Label htmlFor="add-date">Date</Label>
+                    <input
+                      id="add-date"
+                      type="date"
+                      value={newTrade.date}
+                      onChange={(e) => setNewTrade({ ...newTrade, date: e.target.value })}
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    />
+                  </div>
+
                   {/* Pair + Direction */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -2004,6 +2017,20 @@ export default function Journal() {
                             ))}
                         </SelectContent>
                       </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-date">Date</Label>
+                      <input
+                        id="edit-date"
+                        type="date"
+                        value={editingTrade.date}
+                        onChange={(e) =>
+                          setEditingTrade((p) => (p ? { ...p, date: e.target.value } : p))
+                        }
+                        disabled={isSyncedTrade(editingTrade)}
+                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                      />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
