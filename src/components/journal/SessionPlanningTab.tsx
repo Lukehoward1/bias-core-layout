@@ -178,7 +178,10 @@ export function SessionPlanningTab() {
             </Button>
           )}
         </div>
-        <SaveIndicator status={saveStatus} />
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Autosaves as you type</span>
+          <SaveIndicator status={saveStatus} />
+        </div>
       </div>
 
       {/* Morning Plan */}
