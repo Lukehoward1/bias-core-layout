@@ -482,7 +482,7 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          {/* Plan Switcher */}
+          {import.meta.env.DEV && (
           <Card className="border-dashed border-primary/30">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
@@ -516,6 +516,7 @@ export default function Settings() {
               </div>
             </CardContent>
           </Card>
+          )}
 
           {/* Connected Accounts */}
           <Card>

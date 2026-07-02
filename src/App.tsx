@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route, useLocation, useParams } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { SessionLockProvider } from "@/hooks/use-session-lock";
 import { AlertsProvider } from "@/contexts/AlertsContext";
@@ -83,7 +83,7 @@ function AppRoutes() {
             <Route path="/journal" element={<Journal />} />
             <Route path="/education" element={<Education />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/billing" element={<Billing />} />
+            <Route path="/billing" element={<Navigate to="/settings" replace />} />
 
             {!backgroundLocation && <Route path="/markets/:symbol" element={<AssetDetailWithBoundary />} />}
             {!backgroundLocation && <Route path="/asset/:symbol" element={<AssetDetailWithBoundary />} />}
