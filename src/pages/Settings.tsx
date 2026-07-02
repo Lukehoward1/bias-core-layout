@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Link2, ArrowRight, Sparkles, ShieldOff, RefreshCw, Lock, KeyRound, SlidersHorizontal } from "lucide-react";
+import { Link2, ArrowRight, Sparkles, ShieldOff, RefreshCw, Lock, KeyRound, SlidersHorizontal, User } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useSubscription as useStripeSubscription } from "@/contexts/SubscriptionContext";
 import { createPortalSession } from "@/lib/stripe";
 import { CreditCard } from "lucide-react";
 import { useSessionLock } from "@/hooks/use-session-lock";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -150,6 +153,74 @@ export default function Settings() {
     { value: "standard", label: "Standard", color: "bg-primary/20 text-primary" },
     { value: "premium", label: "Premium", color: "bg-accent text-accent-foreground" },
   ];
+
+  // ── Account Settings state ───────────────────────────────────────────────────
+  const { user } = useAuth();
+  const [fullName, setFullName] = useState("");
+  const [nameLoading, setNameLoading] = useState(false);
+
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+
+  // Load full_name from profiles on mount
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.full_name) setFullName(data.full_name);
+      });
+  }, [user]);
+
+  const handleSaveName = async () => {
+    if (!user) return;
+    setNameLoading(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ full_name: fullName.trim() || null })
+      .eq("id", user.id);
+    setNameLoading(false);
+    if (error) toast.error("Failed to save name");
+    else toast.success("Profile updated");
+  };
+
+  const handleChangePassword = async () => {
+    setPasswordError(null);
+    if (newPassword.length < 8) {
+      setPasswordError("New password must be at least 8 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Passwords do not match");
+      return;
+    }
+    setPasswordLoading(true);
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: user?.email ?? "",
+      password: currentPassword,
+    });
+    if (signInError) {
+      setPasswordLoading(false);
+      setPasswordError("Current password is incorrect");
+      return;
+    }
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+    setPasswordLoading(false);
+    if (updateError) {
+      setPasswordError(updateError.message);
+    } else {
+      toast.success("Password updated");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+  };
 
   const activeAccountLabel = useMemo(() => {
     if (activeAccountId === ACTIVE_ACCOUNT_ALL) return "All Accounts";
@@ -538,13 +609,92 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          {/* Placeholder */}
+          {/* Account Settings */}
           <Card>
-            <CardHeader>
-              <CardTitle>Account Settings</CardTitle>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <User className="h-5 w-5 text-primary" />
+                <CardTitle className="text-base">Account Settings</CardTitle>
+              </div>
+              <CardDescription className="text-xs">Manage your profile and account security.</CardDescription>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Coming soon - account preferences and settings</p>
+            <CardContent className="space-y-6">
+
+              {/* Profile subsection */}
+              <div className="space-y-4">
+                <p className="text-sm font-medium text-foreground">Profile</p>
+                <div className="space-y-2">
+                  <Label htmlFor="account-email">Email</Label>
+                  <Input
+                    id="account-email"
+                    type="email"
+                    value={user?.email ?? ""}
+                    disabled
+                    className="bg-muted/40 text-muted-foreground"
+                  />
+                  <p className="text-xs text-muted-foreground">Contact support to change your email.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="account-name">Full Name</Label>
+                  <Input
+                    id="account-name"
+                    type="text"
+                    placeholder="Your name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                  />
+                </div>
+                <Button size="sm" onClick={handleSaveName} disabled={nameLoading}>
+                  {nameLoading ? "Saving…" : "Save Changes"}
+                </Button>
+              </div>
+
+              <div className="border-t border-border" />
+
+              {/* Change Password subsection */}
+              <div className="space-y-4">
+                <p className="text-sm font-medium text-foreground">Change Password</p>
+                <div className="space-y-2">
+                  <Label htmlFor="current-password">Current Password</Label>
+                  <Input
+                    id="current-password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    autoComplete="current-password"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">New Password</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password">Confirm New Password</Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                </div>
+                {passwordError && (
+                  <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{passwordError}</p>
+                )}
+                <Button size="sm" onClick={handleChangePassword} disabled={passwordLoading}>
+                  {passwordLoading ? "Updating…" : "Update Password"}
+                </Button>
+              </div>
+
             </CardContent>
           </Card>
         </div>

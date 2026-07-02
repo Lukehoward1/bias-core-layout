@@ -336,7 +336,7 @@ export function AppHeader({ title, rightContent }: AppHeaderProps) {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="py-2">
+            <DropdownMenuItem className="py-2" onClick={() => navigate("/settings")}>
               <User className="mr-2.5 h-4 w-4" />
               Profile
             </DropdownMenuItem>
