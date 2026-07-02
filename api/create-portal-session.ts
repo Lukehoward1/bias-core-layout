@@ -13,7 +13,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
-      return_url: `${process.env.VITE_APP_URL}/settings`,
+      return_url: "https://streambias.com/settings",
     });
     return res.status(200).json({ url: session.url });
   } catch (err: unknown) {

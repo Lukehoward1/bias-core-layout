@@ -42,7 +42,7 @@ const learningItems: Item[] = [
 
 const accountItems: Item[] = [
   { title: "Settings", url: "/settings", icon: Settings },
-  { title: "Subscriptions", url: "/billing", icon: CreditCard },
+  { title: "Billing", url: "/settings", icon: CreditCard },
 ];
 
 export function AppSidebar() {
