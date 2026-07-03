@@ -11,7 +11,6 @@ import {
   Settings,
   Inbox,
   Bell,
-  FlaskConical,
   Target,
   CalendarDays,
   Radio,
@@ -21,7 +20,6 @@ import {
 } from "lucide-react";
 import { AlertPreferencesPanel } from "@/components/alerts/AlertPreferencesPanel";
 import { AlertInbox } from "@/components/alerts/AlertInbox";
-import { TestAlertsPanel } from "@/components/alerts/TestAlertsPanel";
 import { ManualTimerPanel } from "@/components/alerts/ManualTimerPanel";
 import { PriceAlertsPanel } from "@/components/alerts/PriceAlertsPanel";
 import { AlertsSoundToggle } from "@/components/alerts/AlertsSoundToggle";
@@ -745,10 +743,6 @@ export default function Alerts() {
                 Preferences
               </TabsTrigger>
 
-              <TabsTrigger value="testing" className="text-sm gap-2">
-                <FlaskConical className="h-4 w-4" />
-                Test
-              </TabsTrigger>
             </TabsList>
 
             <AlertsSoundToggle />
@@ -1263,12 +1257,6 @@ export default function Alerts() {
             </div>
           </TabsContent>
 
-          <TabsContent value="testing" className="mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <TestAlertsPanel onTriggerAlert={addAlert} />
-              <ManualTimerPanel onTimerComplete={handleTimerComplete} />
-            </div>
-          </TabsContent>
         </Tabs>
       </div>
 
