@@ -8,7 +8,6 @@ import {
   FileText,
   Lightbulb,
   Settings,
-  CreditCard,
   Moon,
   Sun,
   ChevronLeft,
@@ -42,7 +41,6 @@ const learningItems: Item[] = [
 
 const accountItems: Item[] = [
   { title: "Settings", url: "/settings", icon: Settings },
-  { title: "Billing", url: "/settings", icon: CreditCard },
 ];
 
 export function AppSidebar() {
