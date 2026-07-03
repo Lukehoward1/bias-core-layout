@@ -23,6 +23,7 @@ interface FmpEconomicEvent {
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 let _cache: { data: CalendarEvent[]; expiresAt: number } | null = null;
+let _inFlightPromise: Promise<CalendarEvent[]> | null = null;
 
 // ── Mapping helpers ───────────────────────────────────────────
 
@@ -95,13 +96,14 @@ function mapFmpEvent(raw: FmpEconomicEvent, index: number): CalendarEvent {
 
 // ── Public API ────────────────────────────────────────────────
 
-export async function getLiveCalendarEvents(): Promise<CalendarEvent[]> {
-  if (_cache && Date.now() < _cache.expiresAt) return _cache.data;
+export function getLiveCalendarEvents(): Promise<CalendarEvent[]> {
+  if (_cache && Date.now() < _cache.expiresAt) return Promise.resolve(_cache.data);
+  if (_inFlightPromise) return _inFlightPromise;
 
   const apiKey = import.meta.env.VITE_FMP_API_KEY;
   if (!apiKey) {
     console.warn("[calendarService] VITE_FMP_API_KEY is not set — falling back to static calendar data");
-    return [];
+    return Promise.resolve([]);
   }
 
   const now = new Date();
@@ -115,17 +117,24 @@ export async function getLiveCalendarEvents(): Promise<CalendarEvent[]> {
     `https://financialmodelingprep.com/api/v3/economic_calendar` +
     `?from=${fmt(from)}&to=${fmt(to)}&apikey=${apiKey}`;
 
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data: unknown = await res.json();
-    if (!Array.isArray(data)) throw new Error("Unexpected FMP response — expected array");
+  _inFlightPromise = fetch(url)
+    .then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json() as Promise<unknown>;
+    })
+    .then((data) => {
+      if (!Array.isArray(data)) throw new Error("Unexpected FMP response — expected array");
+      const events = (data as FmpEconomicEvent[]).map(mapFmpEvent);
+      _cache = { data: events, expiresAt: Date.now() + CACHE_TTL_MS };
+      return events;
+    })
+    .catch((err) => {
+      console.error("[calendarService] Failed to fetch live calendar events:", err);
+      return [] as CalendarEvent[];
+    })
+    .finally(() => {
+      _inFlightPromise = null;
+    });
 
-    const events = (data as FmpEconomicEvent[]).map(mapFmpEvent);
-    _cache = { data: events, expiresAt: Date.now() + CACHE_TTL_MS };
-    return events;
-  } catch (err) {
-    console.error("[calendarService] Failed to fetch live calendar events:", err);
-    return [];
-  }
+  return _inFlightPromise;
 }
