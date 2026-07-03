@@ -1691,7 +1691,7 @@ export default function Journal() {
             </Dialog>
 
             {/* Import trades */}
-            <ImportTradesDialog open={isImportOpen} onOpenChange={setIsImportOpen} />
+            <ImportTradesDialog open={isImportOpen} onOpenChange={setIsImportOpen} activeAccountId={activeAccountId} primaryAccount={primaryAccount} />
 
             {/* Add trade modal */}
             <Dialog open={isAddTradeOpen} onOpenChange={setIsAddTradeOpen}>

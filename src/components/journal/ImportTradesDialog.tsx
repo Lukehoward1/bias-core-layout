@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useJournalTrades } from "@/hooks/use-journal-trades";
+import { ACTIVE_ACCOUNT_ALL } from "@/hooks/use-active-trading-account";
+import type { LinkedAccount } from "@/hooks/use-linked-accounts";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -305,9 +307,11 @@ function clearImportStorage() {
 export interface ImportTradesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  activeAccountId?: string;
+  primaryAccount?: LinkedAccount | null;
 }
 
-export function ImportTradesDialog({ open, onOpenChange }: ImportTradesDialogProps) {
+export function ImportTradesDialog({ open, onOpenChange, activeAccountId, primaryAccount }: ImportTradesDialogProps) {
   const { addManualTrade } = useJournalTrades();
 
   const [step, setStep] = useState<number>(() => lsGet("import_step", 1));
@@ -423,6 +427,10 @@ export function ImportTradesDialog({ open, onOpenChange }: ImportTradesDialogPro
   const handleImport = async () => {
     setImporting(true);
     let count = 0;
+    const resolvedAccountId =
+      (activeAccountId && activeAccountId !== ACTIVE_ACCOUNT_ALL ? activeAccountId : undefined) ??
+      primaryAccount?.id ??
+      undefined;
     for (const row of validRows) {
       await addManualTrade({
         id: crypto.randomUUID(),
@@ -438,6 +446,7 @@ export function ImportTradesDialog({ open, onOpenChange }: ImportTradesDialogPro
         setup: row.setup ?? undefined,
         rating: row.rating ?? undefined,
         actualR: row.actualR ?? undefined,
+        accountId: resolvedAccountId,
         source: "manual",
       });
       count++;
