@@ -20,10 +20,12 @@ interface FmpEconomicEvent {
 
 // ── Cache ─────────────────────────────────────────────────────
 
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const CACHE_TTL_MS = 30 * 60 * 1000;      // 30 minutes
+const FAILURE_COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
 
 let _cache: { data: CalendarEvent[]; expiresAt: number } | null = null;
 let _inFlightPromise: Promise<CalendarEvent[]> | null = null;
+let _failedAt: number | null = null;
 
 // ── Mapping helpers ───────────────────────────────────────────
 
@@ -99,6 +101,7 @@ function mapFmpEvent(raw: FmpEconomicEvent, index: number): CalendarEvent {
 export function getLiveCalendarEvents(): Promise<CalendarEvent[]> {
   if (_cache && Date.now() < _cache.expiresAt) return Promise.resolve(_cache.data);
   if (_inFlightPromise) return _inFlightPromise;
+  if (_failedAt && Date.now() - _failedAt < FAILURE_COOLDOWN_MS) return Promise.resolve([]);
 
   const apiKey = import.meta.env.VITE_FMP_API_KEY;
   if (!apiKey) {
@@ -126,10 +129,12 @@ export function getLiveCalendarEvents(): Promise<CalendarEvent[]> {
       if (!Array.isArray(data)) throw new Error("Unexpected FMP response — expected array");
       const events = (data as FmpEconomicEvent[]).map(mapFmpEvent);
       _cache = { data: events, expiresAt: Date.now() + CACHE_TTL_MS };
+      _failedAt = null;
       return events;
     })
     .catch((err) => {
       console.error("[calendarService] Failed to fetch live calendar events:", err);
+      _failedAt = Date.now();
       return [] as CalendarEvent[];
     })
     .finally(() => {
