@@ -1086,7 +1086,7 @@ export default function Journal() {
               Planner
             </TabsTrigger>
             <TabsTrigger value="reports" className="text-sm">
-              Reports
+              Analytics
             </TabsTrigger>
           </TabsList>
 
