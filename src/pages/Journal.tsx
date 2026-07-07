@@ -683,8 +683,6 @@ export default function Journal() {
     setCustomFrom("");
     setCustomTo("");
     setPreviewVisible(false);
-    setActiveJournalTab("journal");
-    localStorage.removeItem("journal_active_tab");
   };
   const reportPreviewDateRange = useMemo(() => {
     const today = new Date();
