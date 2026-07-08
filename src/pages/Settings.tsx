@@ -230,6 +230,13 @@ export default function Settings() {
 
   const primaryLabel = useMemo(() => primaryAccount?.name ?? "None", [primaryAccount]);
 
+  const formatTier = (tier: string) => {
+    if (tier === "founding_member") return "Founding Member";
+    return tier.charAt(0).toUpperCase() + tier.slice(1);
+  };
+  const formatStatus = (status: string) =>
+    status.charAt(0).toUpperCase() + status.slice(1);
+
   return (
     <div className="flex flex-col min-h-full bg-background">
       <AppHeader title="Settings" />
@@ -507,18 +514,16 @@ export default function Settings() {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-foreground capitalize">
-                    {subscriptionTier
-                      ? subscriptionTier.replace(/_/g, " ")
-                      : "No active plan"}
+                  <p className="text-sm font-medium text-foreground">
+                    {subscriptionTier ? formatTier(subscriptionTier) : "No active plan"}
                     {isFoundingMember && (
                       <Badge className="ml-2 text-[10px] bg-primary/20 text-primary border-primary/30" variant="outline">
                         Founding Member
                       </Badge>
                     )}
                   </p>
-                  <p className="text-xs text-muted-foreground capitalize mt-0.5">
-                    Status: {subscriptionStatus ?? "inactive"}
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Status: {formatStatus(subscriptionStatus ?? "inactive")}
                   </p>
                 </div>
                 <div className="text-right text-xs text-muted-foreground">
