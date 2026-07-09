@@ -51,7 +51,7 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
   const [limitType, setLimitType] = useState<"percent" | "cash">("percent");
 
   const [maxDrawdown, setMaxDrawdown] = useState<number | null>(10);
-  const [startingBalance, setStartingBalance] = useState<number | null>(10000);
+  const [startingBalance, setStartingBalance] = useState<number | null>(null);
   const [currentBalance, setCurrentBalance] = useState<number | null>(null);
 
   // Populate both balances from account once on first load; user edits are sticky after that.
