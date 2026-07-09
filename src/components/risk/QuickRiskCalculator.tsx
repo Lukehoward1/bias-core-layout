@@ -262,18 +262,8 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                     <div className="flex-1">
                       <p className="text-sm font-medium text-foreground">No account linked</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Connect an account in Broker Settings to use live data.
+                        Broker connections are coming soon.
                       </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-3 gap-2"
-                        onClick={() => navigate("/brokerage")}
-                      >
-                        <LinkIcon className="h-3 w-3" />
-                        Broker Settings
-                        <ArrowRight className="h-3 w-3" />
-                      </Button>
                     </div>
                   </div>
                 </div>

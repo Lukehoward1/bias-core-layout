@@ -605,11 +605,7 @@ export default function Settings() {
 
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                To link a broker account, go to{" "}
-                <Link to="/brokerage" className="text-primary hover:underline inline-flex items-center gap-1">
-                  Brokerage → Connections
-                  <ArrowRight className="h-3 w-3" />
-                </Link>
+                Broker account connections are coming soon.
               </p>
             </CardContent>
           </Card>

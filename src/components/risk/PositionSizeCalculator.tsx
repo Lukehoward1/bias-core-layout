@@ -303,10 +303,7 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
                 </div>
               ) : mode === "linked" && !isAccountLoading ? (
                 <p className="text-xs text-muted-foreground py-2">
-                  No account linked —{" "}
-                  <button type="button" className="text-primary underline" onClick={() => navigate("/brokerage")}>
-                    connect one in Broker Settings
-                  </button>
+                  No account linked — broker connections are coming soon.
                 </p>
               ) : (
                 <Input
