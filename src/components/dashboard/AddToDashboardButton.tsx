@@ -44,6 +44,7 @@ export function AddToDashboardButton({
           variant="ghost"
           size="icon"
           onClick={handleClick}
+          aria-label={isAdded ? "Unpin from Dashboard" : "Pin to Dashboard"}
           className={cn(
             buttonSize,
             'rounded-full transition-colors',
