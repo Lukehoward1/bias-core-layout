@@ -222,6 +222,8 @@ function AccountCard({
   onRefresh,
   onUnlink,
 }: AccountCardProps) {
+  const [confirming, setConfirming] = useState(false);
+
   return (
     <Card className={cn("bg-card border-border", isActive && "ring-1 ring-primary/50")}>
       <CardContent className="p-4">
@@ -264,30 +266,56 @@ function AccountCard({
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            {!isActive && (
-              <Button variant="ghost" size="sm" onClick={onSetActive} className="text-xs">
-                Set Active
-              </Button>
+            {confirming ? (
+              <>
+                <span className="text-sm text-destructive shrink-0">
+                  Delete &ldquo;{account.name}&rdquo;?
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-destructive hover:text-destructive shrink-0"
+                  onClick={() => { onUnlink(); setConfirming(false); }}
+                >
+                  Yes, delete
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs shrink-0"
+                  onClick={() => setConfirming(false)}
+                >
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <>
+                {!isActive && (
+                  <Button variant="ghost" size="sm" onClick={onSetActive} className="text-xs">
+                    Set Active
+                  </Button>
+                )}
+
+                {!isPrimary && (
+                  <Button variant="ghost" size="sm" onClick={onSetPrimary} className="text-xs">
+                    Set Primary
+                  </Button>
+                )}
+
+                <Button variant="ghost" size="icon" onClick={onRefresh} className="h-8 w-8">
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setConfirming(true)}
+                  className="h-8 w-8 text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </>
             )}
-
-            {!isPrimary && (
-              <Button variant="ghost" size="sm" onClick={onSetPrimary} className="text-xs">
-                Set Primary
-              </Button>
-            )}
-
-            <Button variant="ghost" size="icon" onClick={onRefresh} className="h-8 w-8">
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onUnlink}
-              className="h-8 w-8 text-destructive hover:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
           </div>
         </div>
       </CardContent>
