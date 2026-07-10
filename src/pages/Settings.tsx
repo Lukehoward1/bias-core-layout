@@ -21,6 +21,8 @@ import { SubscriptionPlan } from "@/types/subscription";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 import { useActiveTradingAccount, ACTIVE_ACCOUNT_ALL } from "@/hooks/use-active-trading-account";
+import { ConnectedAccountsList } from "@/components/account/ConnectedAccountsList";
+import { ConnectAccountModal } from "@/components/account/ConnectAccountModal";
 import { useTraderBiasMode, getBiasTimeframesForStyle, type BiasTimeframe } from "@/hooks/use-trader-style";
 
 type TraderStyle = "scalper" | "intraday" | "swing";
@@ -49,6 +51,7 @@ export default function Settings() {
     stripeCustomerId,
   } = useStripeSubscription();
   const [portalLoading, setPortalLoading] = useState(false);
+  const [showConnectModal, setShowConnectModal] = useState(false);
   const { pinEnabled, setPinEnabled, pinSet, setPin, clearPin } = useSessionLock();
 
   const { accounts, primaryAccount } = useLinkedAccounts();
@@ -603,12 +606,12 @@ export default function Settings() {
               </div>
             </CardHeader>
 
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Broker account connections are coming soon.
-              </p>
+            <CardContent>
+              <ConnectedAccountsList onConnectClick={() => setShowConnectModal(true)} />
             </CardContent>
           </Card>
+
+          <ConnectAccountModal open={showConnectModal} onOpenChange={setShowConnectModal} />
 
           {/* Account Settings */}
           <Card>
