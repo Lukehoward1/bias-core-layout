@@ -906,8 +906,8 @@ function RiskSnapshotCard() {
 
 function ReportsKpiLiveCard({ metric }: { metric: "pnl" | "rr" | "winrate" | "expectancy" }) {
   const { viewTrades } = useTradingData();
-  const { activeAccount } = useLinkedAccounts();
-  const sym = activeAccount?.currency === "GBP" ? "£" : "$";
+  const { primaryAccount } = useLinkedAccounts();
+  const sym = currencySymbol(primaryAccount?.currency);
   const winners = viewTrades.filter((t) => (t.pnl ?? 0) > 0);
   const totalPnl = viewTrades.reduce((s, t) => s + (t.pnl ?? 0), 0);
   const winRate = viewTrades.length > 0 ? ((winners.length / viewTrades.length) * 100).toFixed(1) : "0.0";
