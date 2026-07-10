@@ -100,27 +100,29 @@ export function ConnectedAccountsList({ onConnectClick }: ConnectedAccountsListP
   // Empty state
   if (accounts.length === 0) {
     return (
-      <div className="text-center py-12">
-        <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-          <Link2 className="h-8 w-8 text-muted-foreground" />
+      <>
+        <div className="text-center py-12">
+          <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+            <Link2 className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-medium text-foreground mb-2">No accounts connected</h3>
+          <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
+            Connect a trading account to automatically sync your balance for risk calculations.
+          </p>
+          <div className="flex items-center gap-2 justify-center">
+            <Button onClick={onConnectClick} className="gap-2">
+              <Link2 className="h-4 w-4" />
+              Add Manual Account
+            </Button>
+            <Button variant="outline" onClick={() => setShowBrokerModal(true)} className="gap-2">
+              <Plug className="h-4 w-4" />
+              Connect Broker
+            </Button>
+          </div>
         </div>
-        <h3 className="text-lg font-medium text-foreground mb-2">No accounts connected</h3>
-        <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
-          Connect a trading account to automatically sync your balance for risk calculations.
-        </p>
-        <div className="flex items-center gap-2 justify-center">
-          <Button onClick={onConnectClick} className="gap-2">
-            <Link2 className="h-4 w-4" />
-            Add Manual Account
-          </Button>
-          <Button variant="outline" onClick={() => setShowBrokerModal(true)} className="gap-2">
-            <Plug className="h-4 w-4" />
-            Connect Broker
-          </Button>
-        </div>
-      </div>
 
-      <ConnectBrokerComingSoonModal open={showBrokerModal} onOpenChange={setShowBrokerModal} />
+        <ConnectBrokerComingSoonModal open={showBrokerModal} onOpenChange={setShowBrokerModal} />
+      </>
     );
   }
 
