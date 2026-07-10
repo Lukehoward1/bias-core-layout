@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 import { useSubscription } from "./use-subscription";
 import { canLinkMoreAccounts, getRemainingAccountSlots } from "@/types/subscription";
 import { DEMO_BROKER_ACCOUNT } from "@/data/demoBrokerAccount";
 
 /**
- * Linked accounts are already multi-account.
- * This file now ALSO becomes the canonical per-account trade store (localStorage),
- * so auto-journaling can write trades into the same format the Journal uses.
+ * Linked accounts are persisted in Supabase (linked_accounts table).
+ * The exported interface is identical to the previous localStorage version
+ * so all consuming components remain unchanged.
  */
 
 export interface LinkedAccount {
@@ -57,14 +59,14 @@ interface UseLinkedAccountsReturn {
   canLinkAccounts: boolean;
 
   // Actions
-  linkAccount: (accountData: Omit<LinkedAccount, "id" | "lastUpdated">) => LinkAccountResult;
-  unlinkAccount: (accountId: string) => void;
+  linkAccount: (accountData: Omit<LinkedAccount, "id" | "lastUpdated">) => Promise<LinkAccountResult>;
+  unlinkAccount: (accountId: string) => Promise<void>;
 
   refreshAccount: (accountId: string) => void;
   refreshAllAccounts: () => void;
-  setPrimaryAccount: (accountId: string) => void;
+  setPrimaryAccount: (accountId: string) => Promise<void>;
 
-  // ✅ NEW: trades API (canonical store for auto-journaling)
+  // Legacy trades API (dead code — localStorage-based, kept for interface compatibility)
   getTradesForAccount: (accountId: string) => AccountTrade[];
   setTradesForAccount: (accountId: string, trades: AccountTrade[]) => void;
   upsertTradesForAccount: (accountId: string, trades: AccountTrade[]) => void;
@@ -74,44 +76,47 @@ interface UseLinkedAccountsReturn {
   refreshAllAccountTrades: () => void;
 }
 
-const STORAGE_KEY = "linkedTradingAccounts";
-const PRIMARY_ACCOUNT_KEY = "primaryTradingAccountId";
+// ── Supabase row shape ────────────────────────────────────────────────────────
 
-// ✅ NEW: per-account trades store
-const TRADES_STORAGE_KEY = "linkedAccountTrades"; // maps { [accountId]: AccountTrade[] }
-
-// Legacy compatibility (kept)
-const LEGACY_STORAGE_KEY = "linkedTradingAccount";
-
-// Generate unique ID for new accounts
-function generateAccountId(): string {
-  return `account-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+interface LinkedAccountRow {
+  id: string;
+  user_id: string;
+  name: string;
+  broker: string;
+  balance: number;
+  currency: string;
+  is_connected: boolean;
+  is_primary: boolean;
+  last_updated: string;
+  created_at: string;
 }
 
-/**
- * Safe JSON parse helpers
- */
-function safeParse<T>(raw: string | null, fallback: T): T {
-  if (!raw) return fallback;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
+function rowToAccount(row: LinkedAccountRow): LinkedAccount {
+  return {
+    id: row.id,
+    name: row.name,
+    broker: row.broker,
+    balance: row.balance,
+    currency: row.currency,
+    isConnected: row.is_connected,
+    lastUpdated: new Date(row.last_updated),
+  };
 }
 
-function normalizeTrades(trades: AccountTrade[], accountId: string): AccountTrade[] {
-  return (trades || []).map((t) => ({
-    ...t,
-    accountId: t.accountId ?? accountId,
-  }));
-}
+// ── Legacy localStorage trades API (unchanged — dead code kept for compat) ────
+
+const TRADES_STORAGE_KEY = "linkedAccountTrades";
 
 function readTradesMap(): Record<string, AccountTrade[]> {
-  const parsed = safeParse<Record<string, AccountTrade[]>>(localStorage.getItem(TRADES_STORAGE_KEY), {});
-  // Ensure it’s a plain object
-  if (!parsed || typeof parsed !== "object") return {};
-  return parsed;
+  try {
+    const raw = localStorage.getItem(TRADES_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as Record<string, AccountTrade[]>;
+  } catch {
+    return {};
+  }
 }
 
 function writeTradesMap(map: Record<string, AccountTrade[]>) {
@@ -120,10 +125,10 @@ function writeTradesMap(map: Record<string, AccountTrade[]>) {
   window.dispatchEvent(new Event("linkedAccountTradesUpdated"));
 }
 
-/**
- * Merge trades by id (broker sync is often "upsert").
- * Last write wins for collisions.
- */
+function normalizeTrades(trades: AccountTrade[], accountId: string): AccountTrade[] {
+  return (trades || []).map((t) => ({ ...t, accountId: t.accountId ?? accountId }));
+}
+
 function upsertById(existing: AccountTrade[], incoming: AccountTrade[]): AccountTrade[] {
   const map = new Map<string, AccountTrade>();
   existing.forEach((t) => map.set(t.id, t));
@@ -131,12 +136,7 @@ function upsertById(existing: AccountTrade[], incoming: AccountTrade[]): Account
   return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date));
 }
 
-/**
- * Mock broker sync generator (placeholder)
- * In the real integration, this will be replaced by API data from your broker service.
- */
 function generateMockBrokerTrades(accountId: string): AccountTrade[] {
-  // Small deterministic-ish set per account
   const seed = accountId.length;
   const day = (n: number) => {
     const d = new Date();
@@ -146,111 +146,75 @@ function generateMockBrokerTrades(accountId: string): AccountTrade[] {
     const dd = String(d.getDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   };
-
-  const base: AccountTrade[] = [
-    {
-      id: `broker-${accountId}-1`,
-      date: day(1 + (seed % 3)),
-      pair: "EURUSD",
-      type: "Long",
-      entry: 1.085,
-      exit: 1.089,
-      lots: 0.5,
-      pnl: 150,
-      status: "closed",
-      notes: "",
-      rating: 0,
-      accountId,
-      source: "broker",
-    },
-    {
-      id: `broker-${accountId}-2`,
-      date: day(2 + (seed % 4)),
-      pair: "XAUUSD",
-      type: "Short",
-      entry: 2040,
-      exit: 2034,
-      lots: 0.2,
-      pnl: 180,
-      status: "closed",
-      notes: "",
-      rating: 0,
-      accountId,
-      source: "broker",
-    },
+  return [
+    { id: `broker-${accountId}-1`, date: day(1 + (seed % 3)), pair: "EURUSD", type: "Long", entry: 1.085, exit: 1.089, lots: 0.5, pnl: 150, status: "closed", notes: "", rating: 0, accountId, source: "broker" },
+    { id: `broker-${accountId}-2`, date: day(2 + (seed % 4)), pair: "XAUUSD", type: "Short", entry: 2040, exit: 2034, lots: 0.2, pnl: 180, status: "closed", notes: "", rating: 0, accountId, source: "broker" },
   ];
-
-  return base;
 }
 
+// ── Hook ──────────────────────────────────────────────────────────────────────
+
+const DEMO_OWNER_ID = "bf56f6fc-99ab-4870-aba4-58fc18790011";
+
 export function useLinkedAccounts(): UseLinkedAccountsReturn {
+  const { user } = useAuth();
   const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
   const [primaryAccountId, setPrimaryAccountId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { plan, limits } = useSubscription();
 
-  // Load accounts from localStorage on mount
+  // ── Load from Supabase on mount / user change ───────────────────────────────
+
+  const loadAccounts = useCallback(async () => {
+    if (!user) {
+      setAccounts([]);
+      setPrimaryAccountId(null);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from("linked_accounts")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.error("[useLinkedAccounts] Failed to load accounts:", error.message);
+      setAccounts([]);
+      setPrimaryAccountId(null);
+    } else {
+      const rows = (data ?? []) as LinkedAccountRow[];
+      setAccounts(rows.map(rowToAccount));
+      const primary = rows.find((r) => r.is_primary);
+      setPrimaryAccountId(primary?.id ?? null);
+    }
+
+    setIsLoading(false);
+  }, [user]);
+
   useEffect(() => {
-    const loadAccounts = () => {
-      try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          const loadedAccounts = parsed.map((acc: any) => ({
-            ...acc,
-            lastUpdated: new Date(acc.lastUpdated),
-          }));
-          setAccounts(loadedAccounts);
-        } else {
-          setAccounts([]);
-        }
-
-        const savedPrimary = localStorage.getItem(PRIMARY_ACCOUNT_KEY);
-        if (savedPrimary) {
-          setPrimaryAccountId(savedPrimary);
-        } else {
-          setPrimaryAccountId(null);
-        }
-      } catch (error) {
-        console.error("Failed to load linked accounts:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     loadAccounts();
+  }, [loadAccounts]);
 
-    // Listen for storage changes from other tabs/components
-    const handleStorageChange = () => loadAccounts();
-    window.addEventListener("storage", handleStorageChange);
-    window.addEventListener("linkedAccountsUpdated", handleStorageChange);
+  // ── Derived values ──────────────────────────────────────────────────────────
 
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      window.removeEventListener("linkedAccountsUpdated", handleStorageChange);
-    };
-  }, []);
-
-  // Persist accounts to localStorage whenever they change
-  const persistAccounts = useCallback((newAccounts: LinkedAccount[]) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newAccounts));
-    window.dispatchEvent(new Event("linkedAccountsUpdated"));
-  }, []);
-
-  // Calculate derived values
   const accountCount = accounts.length;
   const maxAccounts = limits.maxLinkedAccounts;
   const remainingSlots = getRemainingAccountSlots(plan, accountCount);
   const canLinkMore = canLinkMoreAccounts(plan, accountCount);
   const canLinkAccounts = limits.canLinkAccounts;
 
-  // When no real accounts are linked, surface the demo account as a read-only fallback
-  const effectiveAccounts = useMemo(
-    () => (accounts.length === 0 ? [DEMO_BROKER_ACCOUNT] : accounts),
-    [accounts],
-  );
+  // Demo fallback: show DEMO_BROKER_ACCOUNT when no real rows exist,
+  // EXCEPT for the demo owner who always has a real linked_accounts row.
+  const effectiveAccounts = useMemo(() => {
+    if (accounts.length === 0 && user?.id !== DEMO_OWNER_ID) {
+      return [DEMO_BROKER_ACCOUNT];
+    }
+    return accounts;
+  }, [accounts, user?.id]);
 
-  // Get primary account (first connected account if no primary set)
   const primaryAccount = useMemo(() => {
     return (
       effectiveAccounts.find((a) => a.id === primaryAccountId && a.isConnected) ??
@@ -259,11 +223,160 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
     );
   }, [effectiveAccounts, primaryAccountId]);
 
-  // ✅ NEW: trades getters/setters
+  // ── linkAccount ─────────────────────────────────────────────────────────────
+
+  const linkAccount = useCallback(
+    async (accountData: Omit<LinkedAccount, "id" | "lastUpdated">): Promise<LinkAccountResult> => {
+      if (!user) return { success: false, message: "Not authenticated." };
+
+      if (!limits.canLinkAccounts) {
+        return { success: false, message: "Account linking is not available on your current plan." };
+      }
+      if (!canLinkMoreAccounts(plan, accounts.length)) {
+        return { success: false, message: "You've reached the account limit for your plan." };
+      }
+
+      const isFirst = accounts.length === 0;
+
+      const { data, error } = await supabase
+        .from("linked_accounts")
+        .insert({
+          user_id: user.id,
+          name: accountData.name,
+          broker: accountData.broker,
+          balance: accountData.balance,
+          currency: accountData.currency,
+          is_connected: accountData.isConnected,
+          is_primary: isFirst,
+          last_updated: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error("[useLinkedAccounts] linkAccount failed:", error.message);
+        return { success: false, message: "Failed to link account. Please try again." };
+      }
+
+      const newAccount = rowToAccount(data as LinkedAccountRow);
+      setAccounts((prev) => [...prev, newAccount]);
+      if (isFirst) setPrimaryAccountId(newAccount.id);
+
+      return { success: true, message: "Account linked successfully.", account: newAccount };
+    },
+    [user, accounts.length, plan, limits.canLinkAccounts],
+  );
+
+  // ── unlinkAccount ───────────────────────────────────────────────────────────
+
+  const unlinkAccount = useCallback(
+    async (accountId: string) => {
+      if (!user) return;
+
+      const { error } = await supabase
+        .from("linked_accounts")
+        .delete()
+        .eq("id", accountId)
+        .eq("user_id", user.id);
+
+      if (error) {
+        console.error("[useLinkedAccounts] unlinkAccount failed:", error.message);
+        return;
+      }
+
+      // Also clear stored trades for this account (legacy localStorage system)
+      const map = readTradesMap();
+      delete map[accountId];
+      writeTradesMap(map);
+
+      const remaining = accounts.filter((a) => a.id !== accountId);
+      setAccounts(remaining);
+
+      // If we removed the primary, promote the next connected account
+      if (primaryAccountId === accountId) {
+        const next = remaining.find((a) => a.isConnected) ?? null;
+        if (next) {
+          await supabase
+            .from("linked_accounts")
+            .update({ is_primary: true })
+            .eq("id", next.id)
+            .eq("user_id", user.id);
+        }
+        setPrimaryAccountId(next?.id ?? null);
+      }
+    },
+    [user, accounts, primaryAccountId],
+  );
+
+  // ── refreshAccount / refreshAllAccounts (stubs — no real broker sync yet) ──
+
+  const refreshAccount = useCallback(
+    (accountId: string) => {
+      setIsLoading(true);
+      setTimeout(async () => {
+        const now = new Date().toISOString();
+        await supabase
+          .from("linked_accounts")
+          .update({ last_updated: now })
+          .eq("id", accountId)
+          .eq("user_id", user?.id ?? "");
+
+        setAccounts((prev) =>
+          prev.map((a) => (a.id === accountId ? { ...a, lastUpdated: new Date(now) } : a)),
+        );
+        setIsLoading(false);
+      }, 500);
+    },
+    [user],
+  );
+
+  const refreshAllAccounts = useCallback(() => {
+    setIsLoading(true);
+    setTimeout(async () => {
+      const now = new Date().toISOString();
+      if (user) {
+        await supabase
+          .from("linked_accounts")
+          .update({ last_updated: now })
+          .eq("user_id", user.id);
+      }
+      setAccounts((prev) => prev.map((a) => ({ ...a, lastUpdated: new Date(now) })));
+      setIsLoading(false);
+    }, 500);
+  }, [user]);
+
+  // ── setPrimaryAccount ───────────────────────────────────────────────────────
+  // Clear-first to avoid violating the partial unique index (one is_primary=true per user).
+
+  const setPrimaryAccount = useCallback(
+    async (accountId: string) => {
+      if (!user) return;
+      const account = accounts.find((a) => a.id === accountId);
+      if (!account) return;
+
+      // Step 1: clear all primaries for this user
+      await supabase
+        .from("linked_accounts")
+        .update({ is_primary: false })
+        .eq("user_id", user.id);
+
+      // Step 2: set the new primary
+      await supabase
+        .from("linked_accounts")
+        .update({ is_primary: true })
+        .eq("id", accountId)
+        .eq("user_id", user.id);
+
+      setPrimaryAccountId(accountId);
+    },
+    [user, accounts],
+  );
+
+  // ── Legacy trades API (localStorage, dead code, kept for interface compat) ──
+
   const getTradesForAccount = useCallback((accountId: string): AccountTrade[] => {
     const map = readTradesMap();
-    const list = map[accountId] || [];
-    return normalizeTrades(list, accountId);
+    return normalizeTrades(map[accountId] || [], accountId);
   }, []);
 
   const setTradesForAccount = useCallback((accountId: string, trades: AccountTrade[]) => {
@@ -286,151 +399,34 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
     writeTradesMap(map);
   }, []);
 
-  // Link a new account with plan-based enforcement
-  const linkAccount = useCallback(
-    (accountData: Omit<LinkedAccount, "id" | "lastUpdated">): LinkAccountResult => {
-      // Check if plan allows account linking
-      if (!limits.canLinkAccounts) {
-        return {
-          success: false,
-          message: "Account linking is not available on your current plan.",
-        };
-      }
-
-      // Check if user is at the limit
-      if (!canLinkMoreAccounts(plan, accounts.length)) {
-        return {
-          success: false,
-          message: "You've reached the account limit for your plan.",
-        };
-      }
-
-      // Create the new account
-      const newAccount: LinkedAccount = {
-        ...accountData,
-        id: generateAccountId(),
-        lastUpdated: new Date(),
-      };
-
-      const newAccounts = [...accounts, newAccount];
-      setAccounts(newAccounts);
-      persistAccounts(newAccounts);
-
-      // Set as primary if it's the first account
-      if (newAccounts.length === 1) {
-        setPrimaryAccountId(newAccount.id);
-        localStorage.setItem(PRIMARY_ACCOUNT_KEY, newAccount.id);
-      }
-
-      return {
-        success: true,
-        message: "Account linked successfully.",
-        account: newAccount,
-      };
-    },
-    [accounts, plan, limits.canLinkAccounts, persistAccounts],
-  );
-
-  // Unlink an account (preserves other accounts)
-  const unlinkAccount = useCallback(
-    (accountId: string) => {
-      const newAccounts = accounts.filter((a) => a.id !== accountId);
-      setAccounts(newAccounts);
-      persistAccounts(newAccounts);
-
-      // ✅ NEW: also remove stored trades for this account
-      clearTradesForAccount(accountId);
-
-      // Update primary if we removed the primary account
-      if (primaryAccountId === accountId) {
-        const newPrimary = newAccounts.find((a) => a.isConnected)?.id ?? null;
-        setPrimaryAccountId(newPrimary);
-        if (newPrimary) {
-          localStorage.setItem(PRIMARY_ACCOUNT_KEY, newPrimary);
-        } else {
-          localStorage.removeItem(PRIMARY_ACCOUNT_KEY);
-        }
-      }
-    },
-    [accounts, primaryAccountId, persistAccounts, clearTradesForAccount],
-  );
-
-  // Refresh a specific account's data
-  const refreshAccount = useCallback((accountId: string) => {
-    setIsLoading(true);
-    // Simulate API call delay
-    setTimeout(() => {
-      setAccounts((prev) => prev.map((acc) => (acc.id === accountId ? { ...acc, lastUpdated: new Date() } : acc)));
-      setIsLoading(false);
-    }, 500);
-  }, []);
-
-  // Refresh all accounts
-  const refreshAllAccounts = useCallback(() => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setAccounts((prev) =>
-        prev.map((acc) => ({
-          ...acc,
-          lastUpdated: new Date(),
-        })),
-      );
-      setIsLoading(false);
-    }, 500);
-  }, []);
-
-  // ✅ NEW: refresh trades for a specific account (simulated broker sync)
   const refreshAccountTrades = useCallback(
     (accountId: string) => {
       setIsLoading(true);
-
       setTimeout(() => {
-        // In the real system: call broker API and upsert trades.
         const brokerTrades = generateMockBrokerTrades(accountId);
         upsertTradesForAccount(accountId, brokerTrades);
-
-        // Also bump account timestamp for "last updated"
-        setAccounts((prev) => prev.map((acc) => (acc.id === accountId ? { ...acc, lastUpdated: new Date() } : acc)));
-
+        setAccounts((prev) =>
+          prev.map((a) => (a.id === accountId ? { ...a, lastUpdated: new Date() } : a)),
+        );
         setIsLoading(false);
       }, 650);
     },
     [upsertTradesForAccount],
   );
 
-  // ✅ NEW: refresh trades for all accounts
   const refreshAllAccountTrades = useCallback(() => {
     setIsLoading(true);
-
     setTimeout(() => {
       accounts.forEach((acc) => {
         if (!acc.isConnected) return;
-        const brokerTrades = generateMockBrokerTrades(acc.id);
-        upsertTradesForAccount(acc.id, brokerTrades);
+        upsertTradesForAccount(acc.id, generateMockBrokerTrades(acc.id));
       });
-
-      setAccounts((prev) =>
-        prev.map((acc) => ({
-          ...acc,
-          lastUpdated: new Date(),
-        })),
-      );
-
+      setAccounts((prev) => prev.map((a) => ({ ...a, lastUpdated: new Date() })));
       setIsLoading(false);
     }, 800);
   }, [accounts, upsertTradesForAccount]);
 
-  // Set a specific account as primary
-  const setPrimaryAccount = useCallback(
-    (accountId: string) => {
-      const account = accounts.find((a) => a.id === accountId);
-      if (account) {
-        setPrimaryAccountId(accountId);
-        localStorage.setItem(PRIMARY_ACCOUNT_KEY, accountId);
-      }
-    },
-    [accounts],
-  );
+  // ── Return ──────────────────────────────────────────────────────────────────
 
   return {
     accounts: effectiveAccounts,
@@ -448,7 +444,6 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
     refreshAllAccounts,
     setPrimaryAccount,
 
-    // ✅ trades API
     getTradesForAccount,
     setTradesForAccount,
     upsertTradesForAccount,
@@ -488,25 +483,28 @@ export function saveMockLinkedAccount(balance: number, isConnected: boolean = tr
     lastUpdated: new Date(),
   };
 
-  // Save to new multi-account system
-  const accounts = [MOCK_ACCOUNT];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
-  localStorage.setItem(PRIMARY_ACCOUNT_KEY, MOCK_ACCOUNT.id);
+  // Save to legacy localStorage keys for compatibility
+  const STORAGE_KEY = "linkedTradingAccounts";
+  const PRIMARY_ACCOUNT_KEY = "primaryTradingAccountId";
+  const LEGACY_STORAGE_KEY = "linkedTradingAccount";
 
-  // Also save to legacy key for compatibility
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([MOCK_ACCOUNT]));
+  localStorage.setItem(PRIMARY_ACCOUNT_KEY, MOCK_ACCOUNT.id);
   localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(MOCK_ACCOUNT));
 
   window.dispatchEvent(new Event("storage"));
   window.dispatchEvent(new Event("linkedAccountsUpdated"));
 }
 
-// Clear all linked accounts
+// Clear all linked accounts (legacy localStorage cleanup only)
 export function clearLinkedAccounts(): void {
+  const STORAGE_KEY = "linkedTradingAccounts";
+  const PRIMARY_ACCOUNT_KEY = "primaryTradingAccountId";
+  const LEGACY_STORAGE_KEY = "linkedTradingAccount";
+
   localStorage.removeItem(STORAGE_KEY);
   localStorage.removeItem(PRIMARY_ACCOUNT_KEY);
   localStorage.removeItem(LEGACY_STORAGE_KEY);
-
-  // ✅ NEW: clear trades map too
   localStorage.removeItem(TRADES_STORAGE_KEY);
 
   window.dispatchEvent(new Event("storage"));

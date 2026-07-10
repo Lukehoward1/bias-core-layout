@@ -64,8 +64,8 @@ export function ConnectAccountModal({ open, onOpenChange }: ConnectAccountModalP
     setIsSubmitting(true);
 
     // Simulate connection delay
-    setTimeout(() => {
-      const result = linkAccount({
+    setTimeout(async () => {
+      const result = await linkAccount({
         name: accountName.trim(),
         broker: selectedProvider.name,
         balance,
