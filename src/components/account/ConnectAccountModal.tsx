@@ -98,10 +98,10 @@ export function ConnectAccountModal({ open, onOpenChange }: ConnectAccountModalP
             <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
               <Link2 className="h-5 w-5 text-primary" />
             </div>
-            <DialogTitle className="text-lg">Connect Account</DialogTitle>
+            <DialogTitle className="text-lg">Add Manual Account</DialogTitle>
           </div>
           <DialogDescription className="text-sm text-muted-foreground">
-            Link a trading account to auto-sync your balance for risk calculations.
+            Manually add a trading account to track your balance for risk calculations.
           </DialogDescription>
         </DialogHeader>
 

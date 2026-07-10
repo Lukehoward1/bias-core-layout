@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Link2, Trash2, RefreshCw, Star, AlertCircle } from "lucide-react";
+import { Link2, Plug, Trash2, RefreshCw, Star, AlertCircle } from "lucide-react";
 import { useLinkedAccounts, type LinkedAccount } from "@/hooks/use-linked-accounts";
+import { ConnectBrokerComingSoonModal } from "@/components/account/ConnectBrokerComingSoonModal";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -45,6 +46,7 @@ export function ConnectedAccountsList({ onConnectClick }: ConnectedAccountsListP
   } = useLinkedAccounts();
 
   const [activeAccountId, setActiveAccountId] = useState<string>(ALL_ACCOUNTS_VALUE);
+  const [showBrokerModal, setShowBrokerModal] = useState(false);
 
   // Load active selection on mount + listen for changes (other tabs/components)
   useEffect(() => {
@@ -106,11 +108,19 @@ export function ConnectedAccountsList({ onConnectClick }: ConnectedAccountsListP
         <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
           Connect a trading account to automatically sync your balance for risk calculations.
         </p>
-        <Button onClick={onConnectClick} className="gap-2">
-          <Link2 className="h-4 w-4" />
-          Connect Account
-        </Button>
+        <div className="flex items-center gap-2 justify-center">
+          <Button onClick={onConnectClick} className="gap-2">
+            <Link2 className="h-4 w-4" />
+            Add Manual Account
+          </Button>
+          <Button variant="outline" onClick={() => setShowBrokerModal(true)} className="gap-2">
+            <Plug className="h-4 w-4" />
+            Connect Broker
+          </Button>
+        </div>
       </div>
+
+      <ConnectBrokerComingSoonModal open={showBrokerModal} onOpenChange={setShowBrokerModal} />
     );
   }
 
@@ -136,10 +146,16 @@ export function ConnectedAccountsList({ onConnectClick }: ConnectedAccountsListP
           </div>
         </div>
 
-        <Button onClick={onConnectClick} disabled={!canLinkMore || !canLinkAccounts} size="sm" className="gap-2">
-          <Link2 className="h-4 w-4" />
-          Connect Account
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={onConnectClick} disabled={!canLinkMore || !canLinkAccounts} size="sm" className="gap-2">
+            <Link2 className="h-4 w-4" />
+            Add Manual Account
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowBrokerModal(true)} className="gap-2">
+            <Plug className="h-4 w-4" />
+            Connect Broker
+          </Button>
+        </div>
       </div>
 
       {/* Limit warning */}
@@ -199,6 +215,8 @@ export function ConnectedAccountsList({ onConnectClick }: ConnectedAccountsListP
           />
         ))}
       </div>
+
+      <ConnectBrokerComingSoonModal open={showBrokerModal} onOpenChange={setShowBrokerModal} />
     </div>
   );
 }
