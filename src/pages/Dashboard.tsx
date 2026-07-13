@@ -31,6 +31,8 @@ import { getLiveCalendarEvents } from "@/services/calendarService";
 import { getEventImpact } from "@/data/eventImpactRules";
 import { buildMarketContext, type MarketContext, type TimeframeState } from "@/services/contextEngine";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 type TradingSessionName = "Sydney" | "Asia" | "London" | "New York";
 
@@ -197,6 +199,21 @@ const getStateDotClass = (state: TimeframeState) => {
 };
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const [fullName, setFullName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.full_name) setFullName(data.full_name);
+      });
+  }, [user]);
+
   const [showAddCardsModal, setShowAddCardsModal] = useState(false);
 
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
@@ -391,7 +408,7 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h1 className="text-3xl font-bold text-foreground">Welcome, Trader</h1>
+            <h1 className="text-3xl font-bold text-foreground">Welcome, {fullName ?? "Trader"}</h1>
             {isEditMode && (
               <p className="text-sm text-muted-foreground">
                 Drag cards to reorder • Click × to remove • Change row layouts
