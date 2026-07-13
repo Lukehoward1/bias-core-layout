@@ -24,6 +24,7 @@ import { useActiveTradingAccount, ACTIVE_ACCOUNT_ALL } from "@/hooks/use-active-
 import { ConnectedAccountsList } from "@/components/account/ConnectedAccountsList";
 import { ConnectAccountModal } from "@/components/account/ConnectAccountModal";
 import { useTraderBiasMode, getBiasTimeframesForStyle, type BiasTimeframe } from "@/hooks/use-trader-style";
+import { SUPPORTED_CURRENCIES, currencySymbol } from "@/lib/currency";
 
 type TraderStyle = "scalper" | "intraday" | "swing";
 
@@ -168,18 +169,32 @@ export default function Settings() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordLoading, setPasswordLoading] = useState(false);
 
-  // Load full_name from profiles on mount
+  const [homeCurrency, setHomeCurrency] = useState<string>("GBP");
+
+  // Load full_name and home_currency from profiles on mount
   useEffect(() => {
     if (!user) return;
     supabase
       .from("profiles")
-      .select("full_name")
+      .select("full_name, home_currency")
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data }) => {
         if (data?.full_name) setFullName(data.full_name);
+        if (data?.home_currency) setHomeCurrency(data.home_currency);
       });
   }, [user]);
+
+  const handleCurrencyChange = async (value: string) => {
+    if (!user) return;
+    setHomeCurrency(value);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ home_currency: value })
+      .eq("id", user.id);
+    if (error) toast.error("Failed to save currency preference");
+    else toast.success("Home currency updated");
+  };
 
   const handleSaveName = async () => {
     if (!user) return;
@@ -309,6 +324,28 @@ export default function Settings() {
                 <p className="text-xs text-muted-foreground">
                   Current mode: <span className="font-medium text-foreground">{traderStyleLabel}</span> • Timeframes:{" "}
                   <span className="font-medium text-foreground">{biasTimeframes.join(" / ")}</span>
+                </p>
+              </div>
+
+              {/* Home Currency */}
+              <div className="space-y-2">
+                <Label className="text-sm">Home Currency</Label>
+
+                <Select value={homeCurrency} onValueChange={handleCurrencyChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SUPPORTED_CURRENCIES.map((code) => (
+                      <SelectItem key={code} value={code}>
+                        {code} ({currencySymbol(code).trim()})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <p className="text-xs text-muted-foreground">
+                  Used to display your P&L, balances, and risk calculations across the app.
                 </p>
               </div>
 
