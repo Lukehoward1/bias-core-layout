@@ -50,7 +50,7 @@ interface QuoteCacheEntry {
 }
 
 const cache = new Map<string, QuoteCacheEntry>();
-const QUOTE_TTL_MS = 5_000; // 5 seconds
+const QUOTE_TTL_MS = 20_000; // 20 seconds — matches 15s client poll with buffer for timing drift
 
 function getFresh(sym: string): Record<string, unknown> | null {
   const entry = cache.get(sym);
@@ -148,8 +148,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  // s-maxage tells Vercel's edge CDN to cache for 5s; stale-while-revalidate
-  // lets it serve the stale response for another 10s while it re-validates.
-  res.setHeader("Cache-Control", "s-maxage=5, stale-while-revalidate=10");
+  // s-maxage tells Vercel's edge CDN to cache for 15s; stale-while-revalidate
+  // lets it serve the stale response for another 20s while it re-validates.
+  res.setHeader("Cache-Control", "s-maxage=15, stale-while-revalidate=20");
   return res.status(200).json(result);
 }
