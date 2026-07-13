@@ -639,7 +639,7 @@ export default function Settings() {
                   <p className="text-xs text-muted-foreground">Contact support to change your email.</p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="account-name">Full Name</Label>
+                  <Label htmlFor="account-name">Display Name</Label>
                   <Input
                     id="account-name"
                     type="text"
@@ -647,6 +647,7 @@ export default function Settings() {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                   />
+                  <p className="text-xs text-muted-foreground">Shown in the "Welcome, …" greeting on your Dashboard.</p>
                 </div>
                 <Button size="sm" onClick={handleSaveName} disabled={nameLoading}>
                   {nameLoading ? "Saving…" : "Save Changes"}

@@ -201,9 +201,13 @@ const getStateDotClass = (state: TimeframeState) => {
 export default function Dashboard() {
   const { user } = useAuth();
   const [fullName, setFullName] = useState<string | null>(null);
+  const [isNameLoading, setIsNameLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setIsNameLoading(false);
+      return;
+    }
     supabase
       .from("profiles")
       .select("full_name")
@@ -211,7 +215,8 @@ export default function Dashboard() {
       .maybeSingle()
       .then(({ data }) => {
         if (data?.full_name) setFullName(data.full_name);
-      });
+      })
+      .finally(() => setIsNameLoading(false));
   }, [user]);
 
   const [showAddCardsModal, setShowAddCardsModal] = useState(false);
@@ -408,7 +413,9 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h1 className="text-3xl font-bold text-foreground">Welcome, {fullName ?? "Trader"}</h1>
+            <h1 className="text-3xl font-bold text-foreground">
+              {isNameLoading ? "Welcome" : `Welcome, ${fullName ?? "Trader"}`}
+            </h1>
             {isEditMode && (
               <p className="text-sm text-muted-foreground">
                 Drag cards to reorder • Click × to remove • Change row layouts
