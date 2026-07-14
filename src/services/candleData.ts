@@ -295,7 +295,7 @@ function analyzeBias(candles: MarketCandle[], interval: string): TimeframeBias {
 
 export async function getDailyBias(symbol: string): Promise<TimeframeBias> {
   try {
-    const candles = await fetchCandles(symbol, "1day", 3);
+    const candles = await fetchCandles(symbol, "1day", 20);
     return analyzeBias(candles, "1day");
   } catch {
     return { bias: "neutral", confidence: 0, reason: "Error fetching daily data" };
@@ -304,7 +304,7 @@ export async function getDailyBias(symbol: string): Promise<TimeframeBias> {
 
 export async function get4HBias(symbol: string): Promise<TimeframeBias> {
   try {
-    const candles = await fetchCandles(symbol, "4h", 3);
+    const candles = await fetchCandles(symbol, "4h", 20);
     return analyzeBias(candles, "4h");
   } catch {
     return { bias: "neutral", confidence: 0, reason: "Error fetching 4H data" };
