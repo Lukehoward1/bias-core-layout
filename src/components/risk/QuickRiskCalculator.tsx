@@ -19,6 +19,8 @@ import {
   calculatePositionSize,
 } from "@/data/tradingInstruments";
 import { cn } from "@/lib/utils";
+import { useHomeCurrency } from "@/hooks/use-home-currency";
+import { currencySymbol } from "@/lib/currency";
 
 interface QuickRiskCalculatorProps {
   isAdded?: boolean;
@@ -69,7 +71,8 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
     isLoading,
   } = useRiskToolMode("qrc");
 
-  const currency = selectedAccount?.currency ?? "GBP";
+  const { homeCurrency } = useHomeCurrency();
+  const sym = currencySymbol(homeCurrency);
 
   const [manualBalanceInput, setManualBalanceInput] = useState<string>("10000");
   const [stopDistanceInput, setStopDistanceInput] = useState<string>("30");
@@ -169,8 +172,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
             <div>
               <Label className="text-xs text-muted-foreground">Balance</Label>
               <p className="text-sm font-medium">
-                {currency === "GBP" ? "£" : "$"}
-                {effectiveBalance.toLocaleString()}
+                {sym}{effectiveBalance.toLocaleString()}
               </p>
             </div>
             <div>
@@ -186,8 +188,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
             <div className="flex justify-between items-center mt-1">
               <span className="text-xs text-muted-foreground">Risk Amount</span>
               <span className="text-sm font-medium text-destructive">
-                {currency === "GBP" ? "£" : "$"}
-                {results.riskAmount.toFixed(2)}
+                {sym}{results.riskAmount.toFixed(2)}
               </span>
             </div>
           </div>
@@ -220,8 +221,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <p className="text-2xl font-bold text-foreground">
-                        {currency === "GBP" ? "£" : "$"}
-                        {selectedAccount.balance.toLocaleString()}
+                        {sym}{selectedAccount.balance.toLocaleString()}
                       </p>
                       {hasMultipleAccounts ? (
                         <Select value={selectedAccountId ?? ""} onValueChange={setSelectedAccountId}>
@@ -377,8 +377,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
               {currentInstrument && (
                 <div className="flex gap-4 text-xs text-muted-foreground">
                   <span>
-                    {currentInstrument.type === "Futures" ? "Tick" : "Pip"} value: £
-                    {currentInstrument.pipValue.toFixed(2)}
+                    {currentInstrument.type === "Futures" ? "Tick" : "Pip"} value: {sym}{currentInstrument.pipValue.toFixed(2)}
                   </span>
                   <span>{currentInstrument.type === "Futures" ? "Per contract" : "Per standard lot"}</span>
                 </div>
@@ -456,8 +455,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                     <span className="text-sm text-muted-foreground">Account Balance</span>
                   </div>
                   <span className="text-lg font-semibold text-foreground">
-                    {currency === "GBP" ? "£" : "$"}
-                    {effectiveBalance.toLocaleString()}
+                    {sym}{effectiveBalance.toLocaleString()}
                   </span>
                 </div>
 
@@ -469,10 +467,9 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                 </div>
 
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">£ Risked</span>
+                  <span className="text-sm text-muted-foreground">{sym} Risked</span>
                   <span className="text-xl font-bold text-destructive">
-                    {currency === "GBP" ? "£" : "$"}
-                    {results.riskAmount.toFixed(2)}
+                    {sym}{results.riskAmount.toFixed(2)}
                   </span>
                 </div>
 
@@ -513,7 +510,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                     <span className="text-muted-foreground">
                       {currentInstrument.type === "Futures" ? "Tick Value" : "Pip Value"}
                     </span>
-                    <p className="font-medium text-foreground">£{currentInstrument.pipValue.toFixed(2)}</p>
+                    <p className="font-medium text-foreground">{sym}{currentInstrument.pipValue.toFixed(2)}</p>
                   </div>
                   <div>
                     <span className="text-muted-foreground">

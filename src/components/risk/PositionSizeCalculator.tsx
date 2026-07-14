@@ -11,6 +11,8 @@ import { getFXInstruments, getFuturesInstruments, getInstrumentBySymbol } from "
 import { useMarketQuote } from "@/hooks/use-market-quotes";
 import { useRiskToolMode } from "@/hooks/use-risk-tool-mode";
 import { RiskToolModeToggle } from "@/components/risk/RiskToolModeToggle";
+import { useHomeCurrency } from "@/hooks/use-home-currency";
+import { currencySymbol } from "@/lib/currency";
 
 interface PositionSizeCalculatorProps {
   isAdded?: boolean;
@@ -63,8 +65,8 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
     isLoading: isAccountLoading,
   } = useRiskToolMode("psc");
 
-  const currency = selectedAccount?.currency ?? "GBP";
-  const currencySymbol = currency === "GBP" ? "£" : "$";
+  const { homeCurrency } = useHomeCurrency();
+  const sym = currencySymbol(homeCurrency);
 
   const [assetCategory, setAssetCategory] = useState<"FX" | "Futures">("FX");
   const [instrument, setInstrument] = useState<string>("EURUSD");
@@ -275,7 +277,7 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-sm">Account Size ({currencySymbol})</Label>
+                <Label className="text-sm">Account Size ({sym})</Label>
                 {isEffectivelyLinked && (
                   <Badge variant="outline" className="text-xs gap-1">
                     <Lock className="h-3 w-3" />
@@ -286,7 +288,7 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
               {isEffectivelyLinked && selectedAccount ? (
                 <div className="space-y-1.5">
                   <div className="h-9 px-3 rounded-md border border-border bg-muted/50 flex items-center text-sm text-muted-foreground select-none cursor-not-allowed">
-                    {currencySymbol}{selectedAccount.balance.toLocaleString()}
+                    {sym}{selectedAccount.balance.toLocaleString()}
                   </div>
                   {hasMultipleAccounts && (
                     <Select value={selectedAccountId ?? ""} onValueChange={setSelectedAccountId}>
@@ -396,14 +398,14 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Risk Amount</span>
                   <span className="text-lg font-bold text-destructive">
-                    {currencySymbol}{results.riskAmount}
+                    {sym}{results.riskAmount}
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Reward Amount</span>
                   <span className="text-lg font-bold text-success">
-                    {currencySymbol}{results.rewardAmount}
+                    {sym}{results.rewardAmount}
                   </span>
                 </div>
 
@@ -463,7 +465,7 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
                       {currentInstrument.type === "Futures" ? "Tick Value" : "Pip Value"}
                     </span>
                     <p className="font-medium text-foreground">
-                      {currencySymbol}{currentInstrument.pipValue.toFixed(2)}
+                      {sym}{currentInstrument.pipValue.toFixed(2)}
                     </p>
                   </div>
                   <div>

@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Scale, ArrowDown, ArrowUp } from "lucide-react";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { cn } from "@/lib/utils";
+import { useHomeCurrency } from "@/hooks/use-home-currency";
+import { currencySymbol } from "@/lib/currency";
 
 interface RiskRewardCalculatorProps {
   isAdded?: boolean;
@@ -23,6 +25,9 @@ const toNumberOrZero = (v: string) => {
 };
 
 export function RiskRewardCalculator({ isAdded, onAdd, onRemove, compact = false }: RiskRewardCalculatorProps) {
+  const { homeCurrency } = useHomeCurrency();
+  const sym = currencySymbol(homeCurrency);
+
   // ✅ Keep slider values as numbers (sliders can’t be empty)
   const [stopDistance, setStopDistance] = useState<number>(30);
   const [targetDistance, setTargetDistance] = useState<number>(60);
@@ -79,12 +84,12 @@ export function RiskRewardCalculator({ isAdded, onAdd, onRemove, compact = false
             <div className="flex items-center gap-1">
               <ArrowDown className="h-3 w-3 text-destructive" />
               <span className="text-muted-foreground">Risk:</span>
-              <span className="text-destructive font-medium">£{results.riskAmount}</span>
+              <span className="text-destructive font-medium">{sym}{results.riskAmount}</span>
             </div>
             <div className="flex items-center gap-1">
               <ArrowUp className="h-3 w-3 text-success" />
               <span className="text-muted-foreground">Reward:</span>
-              <span className="text-success font-medium">£{results.rewardAmount}</span>
+              <span className="text-success font-medium">{sym}{results.rewardAmount}</span>
             </div>
           </div>
         </CardContent>
@@ -180,7 +185,7 @@ export function RiskRewardCalculator({ isAdded, onAdd, onRemove, compact = false
 
             {/* Account Balance */}
             <div className="space-y-2">
-              <Label className="text-sm">Account Balance (£)</Label>
+              <Label className="text-sm">Account Balance ({sym})</Label>
               <Input
                 type="number"
                 value={accountBalanceInput}
@@ -225,14 +230,14 @@ export function RiskRewardCalculator({ isAdded, onAdd, onRemove, compact = false
                   <ArrowDown className="h-4 w-4 text-destructive" />
                   <span className="text-xs text-muted-foreground">Risk</span>
                 </div>
-                <p className="text-xl font-bold text-destructive">£{results.riskAmount}</p>
+                <p className="text-xl font-bold text-destructive">{sym}{results.riskAmount}</p>
               </div>
               <div className="p-4 bg-success/10 border border-success/20 rounded-lg text-center">
                 <div className="flex items-center justify-center gap-1 mb-1">
                   <ArrowUp className="h-4 w-4 text-success" />
                   <span className="text-xs text-muted-foreground">Reward</span>
                 </div>
-                <p className="text-xl font-bold text-success">£{results.rewardAmount}</p>
+                <p className="text-xl font-bold text-success">{sym}{results.rewardAmount}</p>
               </div>
             </div>
 

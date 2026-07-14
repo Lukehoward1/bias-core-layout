@@ -11,6 +11,8 @@ import { useRiskToolMode } from "@/hooks/use-risk-tool-mode";
 import { RiskToolModeToggle } from "@/components/risk/RiskToolModeToggle";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useHomeCurrency } from "@/hooks/use-home-currency";
+import { currencySymbol } from "@/lib/currency";
 
 interface MaxDrawdownGuardProps {
   isAdded?: boolean;
@@ -45,8 +47,8 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
     isLoading: isAccountLoading,
   } = useRiskToolMode("mdg");
 
-  const currency = selectedAccount?.currency ?? "GBP";
-  const currencySymbol = currency === "GBP" ? "£" : "$";
+  const { homeCurrency } = useHomeCurrency();
+  const sym = currencySymbol(homeCurrency);
 
   const [limitType, setLimitType] = useState<"percent" | "cash">("percent");
 
@@ -140,7 +142,7 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
           <div className="space-y-1.5">
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>Limit: {results.limitPercent}%</span>
-              <span>{currencySymbol}{results.remainingCash} left</span>
+              <span>{sym}{results.remainingCash} left</span>
             </div>
             <Progress value={parseFloat(results.percentOfLimit)} className="h-2" />
           </div>
@@ -190,7 +192,7 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
             {/* Max Drawdown */}
             <div className="space-y-2">
               <Label className="text-sm">
-                Max Drawdown {limitType === "percent" ? "(%)" : `(${currencySymbol})`}
+                Max Drawdown {limitType === "percent" ? "(%)" : `(${sym})`}
               </Label>
               <Input
                 type="number"
@@ -204,7 +206,7 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
 
             {/* Starting Balance */}
             <div className="space-y-2">
-              <Label className="text-sm">Starting Balance ({currencySymbol})</Label>
+              <Label className="text-sm">Starting Balance ({sym})</Label>
               <Input
                 type="number"
                 value={startingBalance ?? ""}
@@ -220,7 +222,7 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
             {/* Current Balance */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-sm">Current Balance ({currencySymbol})</Label>
+                <Label className="text-sm">Current Balance ({sym})</Label>
                 {isEffectivelyLinked && (
                   <Badge variant="outline" className="text-xs gap-1">
                     <Lock className="h-3 w-3" />
@@ -231,7 +233,7 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
               {isEffectivelyLinked && selectedAccount ? (
                 <div className="space-y-1.5">
                   <div className="h-9 px-3 rounded-md border border-border bg-muted/50 flex items-center text-sm text-muted-foreground select-none cursor-not-allowed">
-                    {currencySymbol}{selectedAccount.balance.toLocaleString()}
+                    {sym}{selectedAccount.balance.toLocaleString()}
                   </div>
                   {hasMultipleAccounts && (
                     <Select value={selectedAccountId ?? ""} onValueChange={setSelectedAccountId}>
@@ -292,7 +294,7 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
                     {results.drawdownPercent}%
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {currencySymbol}{results.drawdownCash} loss
+                    {sym}{results.drawdownCash} loss
                   </p>
                 </div>
 
@@ -315,7 +317,7 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
                   <div>
                     <p className="text-xs text-muted-foreground">Max Limit</p>
                     <p className="text-lg font-bold text-foreground">
-                      {currencySymbol}{results.limitCash}
+                      {sym}{results.limitCash}
                     </p>
                   </div>
                   <div>
@@ -326,7 +328,7 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
                         parseFloat(results.remainingCash) <= 0 ? "text-destructive" : "text-success",
                       )}
                     >
-                      {currencySymbol}{results.remainingCash}
+                      {sym}{results.remainingCash}
                     </p>
                   </div>
                 </div>
