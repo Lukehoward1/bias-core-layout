@@ -29,8 +29,7 @@ import { getAllCalendarEvents, getEventDateTime } from "@/services/calendarData"
 
 import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
 import { useMarketQuotes } from "@/hooks/use-market-quotes";
-import { normalizeSymbol } from "@/services/marketData";
-import { buildMarketContext, type MarketContext } from "@/services/contextEngine";
+import { useMarketData } from "@/context/MarketDataProvider";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
 import { useTradingData } from "@/hooks/use-trading-data";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
@@ -322,34 +321,17 @@ function TodaysBiasDashboardCard() {
   }, [watchlistAssets, assets]);
 
   const symbols = useMemo(() => basisAssets.map((asset) => asset.symbol), [basisAssets]);
-  const quotes = useMarketQuotes(symbols);
+  useMarketQuotes(symbols); // subscribe symbols for quote polling used by the provider's context build
 
-  const [contexts, setContexts] = useState<MarketContext[]>([]);
+  const { contextMap, subscribeContextSymbols } = useMarketData();
 
   useEffect(() => {
-    let cancelled = false;
-    Promise.all(
-      basisAssets.map((asset) =>
-        buildMarketContext({
-          asset,
-          quote: quotes[normalizeSymbol(asset.symbol)],
-          upcomingRelevantEvents: [],
-          traderStyle,
-        }),
-      ),
-    )
-      .then((result) => {
-        if (!cancelled) setContexts(result);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [basisAssets, traderStyle]); // quotes intentionally omitted — new ref every render would cause infinite loop
+    subscribeContextSymbols(basisAssets, traderStyle);
+  }, [basisAssets, traderStyle, subscribeContextSymbols]);
 
-  const bullishCount = contexts.filter((ctx) => ctx.biasState.includes("Bullish")).length;
-  const bearishCount = contexts.filter((ctx) => ctx.biasState.includes("Bearish")).length;
-  const weakeningCount = contexts.filter((ctx) => ctx.biasState.includes("Weakening")).length;
+  const bullishCount = basisAssets.filter((a) => contextMap[a.symbol]?.biasState.includes("Bullish")).length;
+  const bearishCount = basisAssets.filter((a) => contextMap[a.symbol]?.biasState.includes("Bearish")).length;
+  const weakeningCount = basisAssets.filter((a) => contextMap[a.symbol]?.biasState.includes("Weakening")).length;
 
   const dominantBias =
     bullishCount > bearishCount

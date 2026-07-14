@@ -28,9 +28,9 @@ import { getFormattedMarketChange, normalizeSymbol, type MarketQuote } from "@/s
 
 import { calendarEvents, type CalendarEvent } from "@/data/calendarEvents";
 import { getLiveCalendarEvents } from "@/services/calendarService";
-import { getEventImpact } from "@/data/eventImpactRules";
-import { buildMarketContext, type MarketContext, type TimeframeState } from "@/services/contextEngine";
+import { type TimeframeState } from "@/services/contextEngine";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
+import { useMarketData } from "@/context/MarketDataProvider";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 
@@ -154,33 +154,6 @@ const formatDashboardDate = (event: CalendarEvent) => {
     day: "2-digit",
     month: "short",
   });
-};
-
-const normalizeMarketSymbol = (symbol: string) => symbol.toUpperCase().replace(/[^A-Z0-9]/g, "");
-const isFxPairSymbol = (symbol: string) => /^[A-Z]{6}$/.test(symbol);
-
-const getFxCurrencies = (symbol: string) => {
-  const normalized = normalizeMarketSymbol(symbol);
-  if (!isFxPairSymbol(normalized)) return [];
-  return [normalized.slice(0, 3), normalized.slice(3, 6)];
-};
-
-const isEventRelevantToSymbol = (symbol: string, event: CalendarEvent) => {
-  const normalizedSymbol = normalizeMarketSymbol(symbol);
-  const impact = getEventImpact({
-    title: event.event,
-    currency: event.currency,
-  });
-
-  if (impact.affectedPairs.includes(normalizedSymbol)) return true;
-  if (impact.affectedAssets.includes(normalizedSymbol)) return true;
-
-  if (isFxPairSymbol(normalizedSymbol)) {
-    const pairCurrencies = getFxCurrencies(normalizedSymbol);
-    return pairCurrencies.some((currency) => impact.affectedCurrencies.includes(currency));
-  }
-
-  return false;
 };
 
 const getStateDotClass = (state: TimeframeState) => {
@@ -539,34 +512,11 @@ function DashboardWatchlistCard({
     return quotes[normalizeSymbol(symbol)];
   };
 
-  const [calendarSource, setCalendarSource] = useState<CalendarEvent[]>(calendarEvents);
+  const { contextMap, subscribeContextSymbols } = useMarketData();
 
   useEffect(() => {
-    getLiveCalendarEvents()
-      .then((events) => { if (events.length > 0) setCalendarSource(events); })
-      .catch(() => {});
-  }, []);
-
-  const [contextMap, setContextMap] = useState<Record<string, MarketContext>>({});
-
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all(
-      displayAssets.map(async (asset) => {
-        const quote = quotes[normalizeSymbol(asset.symbol)];
-        const relevantEvents = calendarSource.filter((event) => isEventRelevantToSymbol(asset.symbol, event));
-        const ctx = await buildMarketContext({ asset, quote, upcomingRelevantEvents: relevantEvents, traderStyle });
-        return [asset.symbol, ctx] as const;
-      }),
-    )
-      .then((entries) => {
-        if (!cancelled) setContextMap(Object.fromEntries(entries));
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [displayAssets, traderStyle, calendarSource]); // quotes intentionally omitted — new ref every render would cause infinite loop
+    subscribeContextSymbols(displayAssets, traderStyle);
+  }, [displayAssets, traderStyle, subscribeContextSymbols]);
 
   const getChangeColor = (quote: MarketQuote | undefined, fallbackChange?: string) => {
     if (quote) {
