@@ -88,12 +88,23 @@ export default function Settings() {
     setPendingTimeframes(getBiasTimeframesForStyle(traderStyle));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (pendingTimeframes.length === 0) {
       clearCustomTimeframes();
     } else {
       setCustomTimeframes(pendingTimeframes);
     }
+    if (user) {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ home_currency: homeCurrency })
+        .eq("id", user.id);
+      if (error) {
+        toast.error("Failed to save currency preference");
+        return;
+      }
+    }
+    toast.success("Preferences saved");
     navigate("/dashboard");
   };
 
@@ -184,17 +195,6 @@ export default function Settings() {
         if (data?.home_currency) setHomeCurrency(data.home_currency);
       });
   }, [user]);
-
-  const handleCurrencyChange = async (value: string) => {
-    if (!user) return;
-    setHomeCurrency(value);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ home_currency: value })
-      .eq("id", user.id);
-    if (error) toast.error("Failed to save currency preference");
-    else toast.success("Home currency updated");
-  };
 
   const handleSaveName = async () => {
     if (!user) return;
@@ -331,7 +331,7 @@ export default function Settings() {
               <div className="space-y-2">
                 <Label className="text-sm">Home Currency</Label>
 
-                <Select value={homeCurrency} onValueChange={handleCurrencyChange}>
+                <Select value={homeCurrency} onValueChange={setHomeCurrency}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select currency" />
                   </SelectTrigger>
