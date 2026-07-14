@@ -33,6 +33,7 @@ interface ReportsOverviewProps {
   trades: Trade[];
   dateRangeLabel: string;
   isLocked?: boolean;
+  sym?: string;
   pinStates?: {
     totalPnl: PinState;
     avgRR: PinState;
@@ -46,7 +47,7 @@ interface ReportsOverviewProps {
   };
 }
 
-export function ReportsOverview({ trades, dateRangeLabel, pinStates, isLocked = false }: ReportsOverviewProps) {
+export function ReportsOverview({ trades, dateRangeLabel, pinStates, isLocked = false, sym = '£' }: ReportsOverviewProps) {
   const { exportToPdf } = usePdfExport();
   const totalPnl = trades.reduce((sum, t) => sum + t.pnl, 0);
   const winningTrades = trades.filter(t => t.pnl > 0);
@@ -158,7 +159,7 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates, isLocked = 
           <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
             <CardContent className="pt-0">
               <p className={`text-2xl font-bold ${totalPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                {totalPnl >= 0 ? '+' : ''}£{totalPnl.toLocaleString()}
+                {totalPnl >= 0 ? '+' : ''}{sym}{totalPnl.toLocaleString()}
               </p>
             </CardContent>
           </CardFeatureGate>
@@ -232,7 +233,7 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates, isLocked = 
           <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
             <CardContent className="pt-0">
               <p className={`text-2xl font-bold ${expectancy >= 0 ? 'text-success' : 'text-destructive'}`}>
-                £{expectancy.toFixed(0)}/trade
+                {sym}{expectancy.toFixed(0)}/trade
               </p>
             </CardContent>
           </CardFeatureGate>
@@ -292,7 +293,7 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates, isLocked = 
           </CardHeader>
           <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
             <CardContent className="pt-0">
-              <p className="text-2xl font-bold text-success">£{avgWinner.toFixed(0)}</p>
+              <p className="text-2xl font-bold text-success">{sym}{avgWinner.toFixed(0)}</p>
             </CardContent>
           </CardFeatureGate>
         </Card>
@@ -306,7 +307,7 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates, isLocked = 
           </CardHeader>
           <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
             <CardContent className="pt-0">
-              <p className="text-2xl font-bold text-destructive">£{avgLoser.toFixed(0)}</p>
+              <p className="text-2xl font-bold text-destructive">{sym}{avgLoser.toFixed(0)}</p>
             </CardContent>
           </CardFeatureGate>
         </Card>
@@ -337,7 +338,7 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates, isLocked = 
           <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
             <CardContent>
               <p className="text-2xl font-bold text-success">
-                +£{bestDay?.pnl?.toLocaleString() || 0}
+                +{sym}{bestDay?.pnl?.toLocaleString() || 0}
               </p>
               <p className="text-xs text-muted-foreground mt-1">{bestDay?.date || 'N/A'}</p>
             </CardContent>
@@ -367,7 +368,7 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates, isLocked = 
           <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
             <CardContent>
               <p className="text-2xl font-bold text-destructive">
-                £{worstDay?.pnl?.toLocaleString() || 0}
+                {sym}{worstDay?.pnl?.toLocaleString() || 0}
               </p>
               <p className="text-xs text-muted-foreground mt-1">{worstDay?.date || 'N/A'}</p>
             </CardContent>
@@ -411,7 +412,7 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates, isLocked = 
                       border: '1px solid hsl(var(--border))',
                       borderRadius: '8px'
                     }}
-                    formatter={(value: number) => [`£${value.toLocaleString()}`, 'Equity']}
+                    formatter={(value: number) => [`${sym}${value.toLocaleString()}`, 'Equity']}
                   />
                   <Area 
                     type="monotone" 
@@ -457,7 +458,7 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates, isLocked = 
                       border: '1px solid hsl(var(--border))',
                       borderRadius: '8px'
                     }}
-                    formatter={(value: number) => [`£${value.toLocaleString()}`, 'Cumulative P&L']}
+                    formatter={(value: number) => [`${sym}${value.toLocaleString()}`, 'Cumulative P&L']}
                   />
                   <Area 
                     type="monotone" 

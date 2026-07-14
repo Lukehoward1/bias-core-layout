@@ -84,6 +84,8 @@ const CONFLUENCE_OPTIONS = [
 // ✅ Trading data (active account scope + stats)
 import { useTradingData } from "@/hooks/use-trading-data";
 import { ACTIVE_ACCOUNT_ALL } from "@/hooks/use-active-trading-account";
+import { useHomeCurrency } from "@/hooks/use-home-currency";
+import { currencySymbol } from "@/lib/currency";
 
 // ✅ Canonical trade type
 import { type Trade as JournalTrade } from "@/hooks/use-journal-trades";
@@ -167,14 +169,14 @@ function StarRating({ rating, onRatingChange }: { rating: number; onRatingChange
   );
 }
 
-function EquityCurveTooltip({ active, payload }: any) {
+function EquityCurveTooltip({ active, payload, sym }: any) {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
       <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
         <p className="text-xs text-muted-foreground mb-1">{data.formattedDate}</p>
         <p className={`text-sm font-semibold ${data.equity >= 0 ? "text-success" : "text-destructive"}`}>
-          {data.equity >= 0 ? "+" : ""}£{Number(data.equity || 0).toLocaleString()}
+          {data.equity >= 0 ? "+" : ""}{sym}{Number(data.equity || 0).toLocaleString()}
         </p>
         <p className="text-xs text-muted-foreground mt-1">{data.tradeCount} trades total</p>
       </div>
@@ -188,9 +190,10 @@ interface EquityCurveCardProps {
   isAdded: boolean;
   onAdd: () => void;
   onRemove: () => void;
+  sym: string;
 }
 
-function EquityCurveCard({ trades, isAdded, onAdd, onRemove }: EquityCurveCardProps) {
+function EquityCurveCard({ trades, isAdded, onAdd, onRemove, sym }: EquityCurveCardProps) {
   // ✅ daily aggregation so curve shows day-by-day moves
   const equityData = useMemo(() => {
     const daily = trades.reduce(
@@ -255,7 +258,7 @@ function EquityCurveCard({ trades, isAdded, onAdd, onRemove }: EquityCurveCardPr
                 stroke="hsl(var(--muted-foreground))"
                 axisLine={{ stroke: "hsl(var(--border))" }}
                 tickLine={{ stroke: "hsl(var(--border))" }}
-                tickFormatter={(value) => `£${value}`}
+                tickFormatter={(value) => `${sym}${value}`}
               />
               <RechartsTooltip
                 cursor={{ stroke: 'rgba(255,255,255,0.2)', strokeWidth: 1 }}
@@ -266,7 +269,7 @@ function EquityCurveCard({ trades, isAdded, onAdd, onRemove }: EquityCurveCardPr
                     <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
                       <p className="text-xs text-muted-foreground mb-1">{data.formattedDate}</p>
                       <p className={`text-sm font-semibold ${data.equity >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        {data.equity >= 0 ? '+' : ''}£{Number(data.equity || 0).toLocaleString()}
+                        {data.equity >= 0 ? '+' : ''}{sym}{Number(data.equity || 0).toLocaleString()}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">{data.tradeCount} trades total</p>
                     </div>
@@ -305,6 +308,9 @@ export default function Journal() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAddTradeOpen, setIsAddTradeOpen] = useState(false);
+
+  const { homeCurrency } = useHomeCurrency();
+  const sym = currencySymbol(homeCurrency);
 
   // ✅ Active account scope + canonical journal actions
   const { activeAccountId, setActiveAccountId, activeAccountLabel, accounts, primaryAccount, viewTrades, journal } = useTradingData();
@@ -1227,7 +1233,7 @@ export default function Journal() {
                 </CardHeader>
                 <CardContent>
                   <div className={`text-2xl font-bold ${topStats.totalPnl >= 0 ? "text-success" : "text-destructive"}`}>
-                    {topStats.totalPnl >= 0 ? "+" : ""}£{Number(topStats.totalPnl || 0).toLocaleString()}
+                    {topStats.totalPnl >= 0 ? "+" : ""}{sym}{Number(topStats.totalPnl || 0).toLocaleString()}
                   </div>
                 </CardContent>
               </Card>
@@ -1257,6 +1263,7 @@ export default function Journal() {
               isAdded={isEquityCurveAdded}
               onAdd={handleAddEquityCurve}
               onRemove={handleRemoveEquityCurve}
+              sym={sym}
             />
 
             {/* Daily Performance calendar (active scope) */}
@@ -1399,7 +1406,7 @@ export default function Journal() {
                                   {hasTrades && isCurrentMonth && (
                                     <>
                                       <span className={`text-sm font-bold mt-auto ${pnlColorClass}`}>
-                                        {summary.totalPnl >= 0 ? "+" : ""}£{Number(summary.totalPnl || 0).toLocaleString()}
+                                        {summary.totalPnl >= 0 ? "+" : ""}{sym}{Number(summary.totalPnl || 0).toLocaleString()}
                                       </span>
                                       <span className="text-xs text-muted-foreground">
                                         {summary.tradeCount} trade{summary.tradeCount !== 1 ? "s" : ""}
@@ -1420,7 +1427,7 @@ export default function Journal() {
                               {weekSummary.trades > 0 && (
                                 <>
                                   <span className={`text-xs font-semibold ${weekPnlClass}`}>
-                                    {weekSummary.pnl >= 0 ? "+" : ""}£{Number(weekSummary.pnl || 0).toLocaleString()}
+                                    {weekSummary.pnl >= 0 ? "+" : ""}{sym}{Number(weekSummary.pnl || 0).toLocaleString()}
                                   </span>
                                   <span className="text-xs text-muted-foreground mt-0.5">
                                     {weekSummary.trades} trade{weekSummary.trades !== 1 ? "s" : ""}
@@ -1525,7 +1532,7 @@ export default function Journal() {
                                 <span
                                   className={`text-sm font-medium ${trade.pnl >= 0 ? "text-success" : "text-destructive"}`}
                                 >
-                                  {trade.pnl >= 0 ? "+" : ""}£{Number(trade.pnl || 0).toLocaleString()}
+                                  {trade.pnl >= 0 ? "+" : ""}{sym}{Number(trade.pnl || 0).toLocaleString()}
                                 </span>
                               </td>
 
@@ -2605,6 +2612,7 @@ export default function Journal() {
                   dateRangeLabel={dateRangeLabel}
                   pinStates={overviewPinStates}
                   isLocked={!canAccessReports}
+                  sym={sym}
                 />
               </TabsContent>
               <TabsContent value="performance" className="mt-5">
@@ -2613,6 +2621,7 @@ export default function Journal() {
                   dateRangeLabel={dateRangeLabel}
                   pinStates={performancePinStates}
                   isLocked={!canAccessReports}
+                  sym={sym}
                 />
               </TabsContent>
               <TabsContent value="sessions" className="mt-5">
@@ -2621,6 +2630,7 @@ export default function Journal() {
                   dateRangeLabel={dateRangeLabel}
                   pinStates={sessionsPinStates}
                   isLocked={!canAccessReports}
+                  sym={sym}
                 />
               </TabsContent>
               <TabsContent value="assets" className="mt-5">
@@ -2629,6 +2639,7 @@ export default function Journal() {
                   dateRangeLabel={dateRangeLabel}
                   pinStates={assetsPinStates}
                   isLocked={!canAccessReports}
+                  sym={sym}
                 />
               </TabsContent>
               <TabsContent value="setup" className="mt-5">
@@ -2637,6 +2648,7 @@ export default function Journal() {
                   dateRangeLabel={dateRangeLabel}
                   pinStates={setupPinStates}
                   isLocked={!canAccessReports}
+                  sym={sym}
                 />
               </TabsContent>
               <TabsContent value="psychology" className="mt-5">
@@ -2645,6 +2657,7 @@ export default function Journal() {
                   dateRangeLabel={dateRangeLabel}
                   pinStates={psychologyPinStates}
                   isLocked={!canAccessReports}
+                  sym={sym}
                 />
               </TabsContent>
               <TabsContent value="risk" className="mt-5">
@@ -2653,10 +2666,11 @@ export default function Journal() {
                   dateRangeLabel={dateRangeLabel}
                   pinStates={riskPinStates}
                   isLocked={!canAccessReports}
+                  sym={sym}
                 />
               </TabsContent>
               <TabsContent value="tradelog" className="mt-5">
-                <ReportsTradeLog trades={filteredTrades} dateRangeLabel={dateRangeLabel} />
+                <ReportsTradeLog trades={filteredTrades} dateRangeLabel={dateRangeLabel} sym={sym} />
               </TabsContent>
             </Tabs>
           </TabsContent>

@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils";
 import { useJournalTrades } from "@/hooks/use-journal-trades";
 import { ACTIVE_ACCOUNT_ALL } from "@/hooks/use-active-trading-account";
 import type { LinkedAccount } from "@/hooks/use-linked-accounts";
+import { useHomeCurrency } from "@/hooks/use-home-currency";
+import { currencySymbol } from "@/lib/currency";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -313,6 +315,8 @@ export interface ImportTradesDialogProps {
 
 export function ImportTradesDialog({ open, onOpenChange, activeAccountId, primaryAccount }: ImportTradesDialogProps) {
   const { addManualTrade } = useJournalTrades();
+  const { homeCurrency } = useHomeCurrency();
+  const sym = currencySymbol(homeCurrency);
 
   const [step, setStep] = useState<number>(() => lsGet("import_step", 1));
   const [isDragging, setIsDragging] = useState(false);
@@ -587,7 +591,7 @@ export function ImportTradesDialog({ open, onOpenChange, activeAccountId, primar
                             : <span className={row.direction === "Long" ? "text-success" : "text-destructive"}>{row.direction}</span>}
                         </td>
                         <td className={cn("px-3 py-2 text-right font-medium", row.pnlWarn ? "text-destructive" : row.pnl >= 0 ? "text-success" : "text-destructive")}>
-                          {row.pnlWarn ? "⚠ Invalid" : `${row.pnl >= 0 ? "+" : ""}£${row.pnl.toLocaleString()}`}
+                          {row.pnlWarn ? "⚠ Invalid" : `${row.pnl >= 0 ? "+" : ""}${sym}${row.pnl.toLocaleString()}`}
                         </td>
                         <td className="px-3 py-2 capitalize">{row.status}</td>
                       </tr>

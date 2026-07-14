@@ -33,6 +33,7 @@ interface ReportsSetupQualityProps {
   trades: Trade[];
   dateRangeLabel: string;
   isLocked?: boolean;
+  sym?: string;
   pinStates?: {
     bestWorst: PinState;
     patterns: PinState;
@@ -41,7 +42,7 @@ interface ReportsSetupQualityProps {
 
 const KEYWORDS = ['late entry', 'fear', 'hesitation', 'fomo', 'missed level', 'early exit', 'overtrading', 'revenge', 'perfect', 'patient'];
 
-export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates, isLocked = false }: ReportsSetupQualityProps) {
+export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates, isLocked = false, sym = '£' }: ReportsSetupQualityProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats
@@ -168,7 +169,7 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates, isLocke
                   </span>
                 </div>
                 <p className="text-2xl font-bold text-success mt-2">
-                  £{bestSetup?.expectancy?.toLocaleString() || 0}/trade expectancy
+                  {sym}{bestSetup?.expectancy?.toLocaleString() || 0}/trade expectancy
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {bestSetup?.winRate || 0}% profit rate
@@ -191,7 +192,7 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates, isLocke
                   </span>
                 </div>
                 <p className="text-2xl font-bold text-destructive mt-2">
-                  £{worstSetup?.expectancy?.toLocaleString() || 0}/trade expectancy
+                  {sym}{worstSetup?.expectancy?.toLocaleString() || 0}/trade expectancy
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {worstSetup?.winRate || 0}% profit rate
@@ -224,7 +225,7 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates, isLocke
                       borderRadius: '8px'
                     }}
                     formatter={(value: number, name: string) => {
-                      if (name === 'expectancy') return [`£${value}`, 'Expectancy'];
+                      if (name === 'expectancy') return [`${sym}${value}`, 'Expectancy'];
                       if (name === 'winRate') return [`${value}%`, 'Profit Rate'];
                       return [value, name];
                     }}
@@ -277,17 +278,17 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates, isLocke
                       <td className="py-3 px-3 text-sm text-foreground">{s.winRate}%</td>
                       <td className="py-3 px-3">
                         <span className={`text-sm font-medium ${s.totalPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                          {s.totalPnl >= 0 ? '+' : ''}£{s.totalPnl.toLocaleString()}
+                          {s.totalPnl >= 0 ? '+' : ''}{sym}{s.totalPnl.toLocaleString()}
                         </span>
                       </td>
                       <td className="py-3 px-3">
                         <span className={`text-sm ${s.avgPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                          £{s.avgPnl}
+                          {sym}{s.avgPnl}
                         </span>
                       </td>
                       <td className="py-3 px-3">
                         <span className={`text-sm font-medium ${s.expectancy >= 0 ? 'text-success' : 'text-destructive'}`}>
-                          £{s.expectancy}
+                          {sym}{s.expectancy}
                         </span>
                       </td>
                     </tr>
@@ -364,7 +365,7 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates, isLocke
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px'
                       }}
-                      formatter={(value: number) => [`£${value.toLocaleString()}`, 'Cumulative P&L']}
+                      formatter={(value: number) => [`${sym}${value.toLocaleString()}`, 'Cumulative P&L']}
                     />
                     <Line 
                       type="monotone" 

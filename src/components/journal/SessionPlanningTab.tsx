@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useSessionPlan } from "@/hooks/use-session-plans";
 import { useJournalTrades } from "@/hooks/use-journal-trades";
+import { useHomeCurrency } from "@/hooks/use-home-currency";
+import { currencySymbol } from "@/lib/currency";
 import { getAllCalendarEvents } from "@/services/calendarData";
 import type { CalendarEvent } from "@/data/calendarEvents";
 
@@ -62,7 +64,7 @@ function EconomicEventsCard({ date }: { date: string }) {
 
 // ── Day stats card ────────────────────────────────────────────────────────────
 
-function DayStatsCard({ date }: { date: string }) {
+function DayStatsCard({ date, sym }: { date: string; sym: string }) {
   const { trades } = useJournalTrades();
   const dayTrades = trades.filter((t) => t.date === date);
 
@@ -97,7 +99,7 @@ function DayStatsCard({ date }: { date: string }) {
       <div className={cn("rounded-lg border p-3 text-center", pnlPositive ? "border-success/30 bg-success/10" : "border-destructive/30 bg-destructive/10")}>
         <p className="text-xs text-muted-foreground mb-1">P&L</p>
         <p className={cn("text-lg font-bold", pnlPositive ? "text-success" : "text-destructive")}>
-          {pnlPositive ? "+" : ""}£{totalPnl.toLocaleString()}
+          {pnlPositive ? "+" : ""}{sym}{totalPnl.toLocaleString()}
         </p>
       </div>
     </div>
@@ -142,6 +144,9 @@ function SaveIndicator({ status }: { status: "idle" | "saving" | "saved" }) {
 // ── Main tab component ────────────────────────────────────────────────────────
 
 export function SessionPlanningTab() {
+  const { homeCurrency } = useHomeCurrency();
+  const sym = currencySymbol(homeCurrency);
+
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     try { return localStorage.getItem("planning_date") ?? format(new Date(), "yyyy-MM-dd"); }
     catch { return format(new Date(), "yyyy-MM-dd"); }
@@ -254,7 +259,7 @@ export function SessionPlanningTab() {
 
           <div className="space-y-2">
             <Label>Today's Trading Summary</Label>
-            <DayStatsCard date={selectedDate} />
+            <DayStatsCard date={selectedDate} sym={sym} />
           </div>
         </CardContent>
       </Card>

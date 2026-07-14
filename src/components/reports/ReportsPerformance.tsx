@@ -32,6 +32,7 @@ interface ReportsPerformanceProps {
   trades: Trade[];
   dateRangeLabel: string;
   isLocked?: boolean;
+  sym?: string;
   pinStates?: {
     byDay: PinState;
     bySession: PinState;
@@ -41,7 +42,7 @@ interface ReportsPerformanceProps {
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked = false }: ReportsPerformanceProps) {
+export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked = false, sym = '£' }: ReportsPerformanceProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats
@@ -311,7 +312,7 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked
                       borderRadius: '8px'
                     }}
                     formatter={(value: number, name: string) => {
-                      if (name === 'pnl') return [`£${value.toLocaleString()}`, 'P&L'];
+                      if (name === 'pnl') return [`${sym}${value.toLocaleString()}`, 'P&L'];
                       return [value, 'Trades'];
                     }}
                   />
@@ -343,7 +344,7 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked
                 >
                   <p className="text-xs text-muted-foreground">{m.month}</p>
                   <p className={`text-sm font-bold ${m.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                    {m.pnl >= 0 ? '+' : ''}£{m.pnl.toLocaleString()}
+                    {m.pnl >= 0 ? '+' : ''}{sym}{m.pnl.toLocaleString()}
                   </p>
                   <p className="text-xs text-muted-foreground">{m.trades} trades</p>
                 </div>

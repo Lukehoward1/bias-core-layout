@@ -32,6 +32,7 @@ interface ReportsPsychologyProps {
   trades: Trade[];
   dateRangeLabel: string;
   isLocked?: boolean;
+  sym?: string;
   pinStates?: {
     sentiment: PinState;
     triggers: PinState;
@@ -42,7 +43,7 @@ interface ReportsPsychologyProps {
 const POSITIVE_KEYWORDS = ['patient', 'perfect', 'confident', 'disciplined', 'calm', 'good setup', 'followed plan', 'great'];
 const NEGATIVE_KEYWORDS = ['fear', 'fomo', 'hesitation', 'revenge', 'late entry', 'early exit', 'overtrading', 'impatient', 'greedy', 'emotional'];
 
-export function ReportsPsychology({ trades, dateRangeLabel, pinStates, isLocked = false }: ReportsPsychologyProps) {
+export function ReportsPsychology({ trades, dateRangeLabel, pinStates, isLocked = false, sym = '£' }: ReportsPsychologyProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats
@@ -119,7 +120,7 @@ export function ReportsPsychology({ trades, dateRangeLabel, pinStates, isLocked 
   const getImprovementFocus = () => {
     if (topMistakes.length > 0) {
       const worst = topMistakes[0];
-      return `Focus on eliminating "${worst.trigger}" - it has cost you £${Math.abs(worst.totalPnl).toLocaleString()} across ${worst.count} trades.`;
+      return `Focus on eliminating "${worst.trigger}" - it has cost you ${sym}${Math.abs(worst.totalPnl).toLocaleString()} across ${worst.count} trades.`;
     }
     if (tradesWithNotes.length < trades.length * 0.3) {
       return "Start adding notes to more trades to identify psychological patterns.";
@@ -304,10 +305,10 @@ export function ReportsPsychology({ trades, dateRangeLabel, pinStates, isLocked 
                     </div>
                     <div className="text-right">
                       <p className={`text-sm font-bold ${t.avgPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        {t.avgPnl >= 0 ? '+' : ''}£{Math.round(t.avgPnl)}/trade
+                        {t.avgPnl >= 0 ? '+' : ''}{sym}{Math.round(t.avgPnl)}/trade
                       </p>
                       <p className={`text-xs ${t.totalPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        Total: {t.totalPnl >= 0 ? '+' : ''}£{t.totalPnl.toLocaleString()}
+                        Total: {t.totalPnl >= 0 ? '+' : ''}{sym}{t.totalPnl.toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -343,7 +344,7 @@ export function ReportsPsychology({ trades, dateRangeLabel, pinStates, isLocked 
                     <div className="flex-1">
                       <p className="text-sm font-medium capitalize">{m.trigger}</p>
                       <p className="text-xs text-destructive">
-                        Cost: £{Math.abs(m.totalPnl).toLocaleString()} ({m.count} trades)
+                        Cost: {sym}{Math.abs(m.totalPnl).toLocaleString()} ({m.count} trades)
                       </p>
                     </div>
                   </div>
@@ -375,7 +376,7 @@ export function ReportsPsychology({ trades, dateRangeLabel, pinStates, isLocked 
                       <Badge variant="outline">{t.pair}</Badge>
                       <span className="text-xs text-muted-foreground ml-2">{t.date}</span>
                     </div>
-                    <span className="text-sm font-bold text-success">+£{t.pnl.toLocaleString()}</span>
+                    <span className="text-sm font-bold text-success">+{sym}{t.pnl.toLocaleString()}</span>
                   </div>
                 ))}
               </div>
@@ -433,7 +434,7 @@ export function ReportsPsychology({ trades, dateRangeLabel, pinStates, isLocked 
                         <div>
                           <p className="text-xs text-muted-foreground">P&L</p>
                           <p className={`text-sm font-medium ${b.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                            {b.pnl >= 0 ? '+' : ''}£{b.pnl.toLocaleString()}
+                            {b.pnl >= 0 ? '+' : ''}{sym}{b.pnl.toLocaleString()}
                           </p>
                         </div>
                       </div>

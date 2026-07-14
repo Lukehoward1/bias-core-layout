@@ -33,13 +33,14 @@ interface ReportsAssetsProps {
   trades: Trade[];
   dateRangeLabel: string;
   isLocked?: boolean;
+  sym?: string;
   pinStates?: {
     pnlChart: PinState;
     table: PinState;
   };
 }
 
-export function ReportsAssets({ trades, dateRangeLabel, pinStates, isLocked = false }: ReportsAssetsProps) {
+export function ReportsAssets({ trades, dateRangeLabel, pinStates, isLocked = false, sym = '£' }: ReportsAssetsProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats
@@ -121,7 +122,7 @@ export function ReportsAssets({ trades, dateRangeLabel, pinStates, isLocked = fa
             <div className="flex items-center gap-4">
               <Badge className="text-lg px-3 py-1">{bestPair?.pair || 'N/A'}</Badge>
               <span className="text-2xl font-bold text-success">
-                +£{bestPair?.pnl?.toLocaleString() || 0}
+                +{sym}{bestPair?.pnl?.toLocaleString() || 0}
               </span>
               <span className="text-sm text-muted-foreground">
                 ({bestPair?.trades || 0} trades, {bestPair?.winRate || 0}% profit rate)
@@ -161,7 +162,7 @@ export function ReportsAssets({ trades, dateRangeLabel, pinStates, isLocked = fa
                       border: '1px solid hsl(var(--border))',
                       borderRadius: '8px'
                     }}
-                    formatter={(value: number) => [`£${value.toLocaleString()}`, 'P&L']}
+                    formatter={(value: number) => [`${sym}${value.toLocaleString()}`, 'P&L']}
                   />
                   <Bar 
                     dataKey="pnl" 
@@ -196,7 +197,7 @@ export function ReportsAssets({ trades, dateRangeLabel, pinStates, isLocked = fa
                       <span className="text-xs text-muted-foreground">#{idx + 1}</span>
                       <Badge variant="outline">{p.pair}</Badge>
                     </div>
-                    <span className="text-sm font-bold text-success">+£{p.pnl.toLocaleString()}</span>
+                    <span className="text-sm font-bold text-success">+{sym}{p.pnl.toLocaleString()}</span>
                   </div>
                 ))}
               </div>
@@ -224,7 +225,7 @@ export function ReportsAssets({ trades, dateRangeLabel, pinStates, isLocked = fa
                       <Badge variant="outline">{p.pair}</Badge>
                     </div>
                     <span className={`text-sm font-bold ${p.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                      {p.pnl >= 0 ? '+' : ''}£{p.pnl.toLocaleString()}
+                      {p.pnl >= 0 ? '+' : ''}{sym}{p.pnl.toLocaleString()}
                     </span>
                   </div>
                 ))}
@@ -275,7 +276,7 @@ export function ReportsAssets({ trades, dateRangeLabel, pinStates, isLocked = fa
                       <td className="py-3 px-3 text-sm text-foreground">{p.winRate}%</td>
                       <td className="py-3 px-3">
                         <span className={`text-sm font-medium ${p.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                          {p.pnl >= 0 ? '+' : ''}£{p.pnl.toLocaleString()}
+                          {p.pnl >= 0 ? '+' : ''}{sym}{p.pnl.toLocaleString()}
                         </span>
                       </td>
                       <td className="py-3 px-3">

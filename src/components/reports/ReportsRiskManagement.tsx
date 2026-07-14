@@ -33,6 +33,7 @@ interface ReportsRiskManagementProps {
   trades: Trade[];
   dateRangeLabel: string;
   isLocked?: boolean;
+  sym?: string;
   pinStates?: {
     kpis: PinState;
     distribution: PinState;
@@ -40,7 +41,7 @@ interface ReportsRiskManagementProps {
   };
 }
 
-export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLocked = false }: ReportsRiskManagementProps) {
+export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLocked = false, sym = '£' }: ReportsRiskManagementProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats for PDF export
@@ -76,11 +77,11 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLoc
   
   // Risk distribution
   const riskBuckets = [
-    { range: '£0-50', count: risks.filter(r => r <= 50).length },
-    { range: '£50-100', count: risks.filter(r => r > 50 && r <= 100).length },
-    { range: '£100-150', count: risks.filter(r => r > 100 && r <= 150).length },
-    { range: '£150-200', count: risks.filter(r => r > 150 && r <= 200).length },
-    { range: '£200+', count: risks.filter(r => r > 200).length },
+    { range: `${sym}0-50`, count: risks.filter(r => r <= 50).length },
+    { range: `${sym}50-100`, count: risks.filter(r => r > 50 && r <= 100).length },
+    { range: `${sym}100-150`, count: risks.filter(r => r > 100 && r <= 150).length },
+    { range: `${sym}150-200`, count: risks.filter(r => r > 150 && r <= 200).length },
+    { range: `${sym}200+`, count: risks.filter(r => r > 200).length },
   ];
 
   // Trades exceeding planned risk (assume >150 is excessive)
@@ -154,19 +155,19 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLoc
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <p className="text-xs text-muted-foreground">Avg Risk/Trade</p>
-                <p className="text-2xl font-bold text-foreground">£{Math.round(avgRisk)}</p>
+                <p className="text-2xl font-bold text-foreground">{sym}{Math.round(avgRisk)}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Max Risk Taken</p>
-                <p className="text-2xl font-bold text-foreground">£{Math.round(maxRisk)}</p>
+                <p className="text-2xl font-bold text-foreground">{sym}{Math.round(maxRisk)}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Max Single Loss</p>
-                <p className="text-2xl font-bold text-destructive">-£{maxLoss.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-destructive">-{sym}{maxLoss.toLocaleString()}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Total Losses</p>
-                <p className="text-2xl font-bold text-destructive">-£{totalLoss.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-destructive">-{sym}{totalLoss.toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground mt-1">{losingTrades.length} losing trades</p>
               </div>
             </div>
@@ -230,7 +231,7 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLoc
             {excessiveRiskTrades.length > 0 ? (
               <div className="space-y-2">
                 <p className="text-sm text-amber-500 font-medium">
-                  {excessiveRiskTrades.length} trades exceeded normal risk levels (&gt;£150)
+                  {excessiveRiskTrades.length} trades exceeded normal risk levels (&gt;{sym}150)
                 </p>
                 <div className="space-y-2 mt-3">
                   {excessiveRiskTrades.slice(0, 5).map((t) => (
@@ -240,9 +241,9 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLoc
                         <span className="text-xs text-muted-foreground ml-2">{t.date}</span>
                       </div>
                       <div className="text-right">
-                        <span className="text-sm font-medium">£{Math.round(t.lots * 100)} risk</span>
+                        <span className="text-sm font-medium">{sym}{Math.round(t.lots * 100)} risk</span>
                         <span className={`text-xs ml-2 ${t.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                          {t.pnl >= 0 ? '+' : ''}£{t.pnl}
+                          {t.pnl >= 0 ? '+' : ''}{sym}{t.pnl}
                         </span>
                       </div>
                     </div>

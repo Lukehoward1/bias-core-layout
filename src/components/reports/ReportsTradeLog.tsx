@@ -32,6 +32,7 @@ interface Trade {
 interface ReportsTradeLogProps {
   trades: Trade[];
   dateRangeLabel: string;
+  sym?: string;
 }
 
 type SortOption = "date-desc" | "date-asc" | "pnl-desc" | "pnl-asc" | "rating-desc" | "rating-asc";
@@ -51,7 +52,7 @@ const csvEscape = (v: unknown) => {
   return s;
 };
 
-export function ReportsTradeLog({ trades, dateRangeLabel }: ReportsTradeLogProps) {
+export function ReportsTradeLog({ trades, dateRangeLabel, sym = '£' }: ReportsTradeLogProps) {
   const { exportToPdf } = usePdfExport();
   const { accounts, primaryAccount } = useLinkedAccounts();
 
@@ -322,8 +323,8 @@ export function ReportsTradeLog({ trades, dateRangeLabel }: ReportsTradeLogProps
       <div className="flex items-center gap-4 text-sm text-muted-foreground">
         <span>{filteredTrades.length} trades found</span>
         <span>|</span>
-        <span className="text-success">+£{profit.toLocaleString()} profit</span>
-        <span className="text-destructive">-£{loss.toLocaleString()} loss</span>
+        <span className="text-success">+{sym}{profit.toLocaleString()} profit</span>
+        <span className="text-destructive">-{sym}{loss.toLocaleString()} loss</span>
       </div>
 
       {/* Trade Table */}
@@ -385,7 +386,7 @@ export function ReportsTradeLog({ trades, dateRangeLabel }: ReportsTradeLogProps
 
                       <td className="py-3 px-3">
                         <span className={`text-sm font-medium ${trade.pnl >= 0 ? "text-success" : "text-destructive"}`}>
-                          {trade.pnl >= 0 ? "+" : ""}£{trade.pnl.toLocaleString()}
+                          {trade.pnl >= 0 ? "+" : ""}{sym}{trade.pnl.toLocaleString()}
                         </span>
                       </td>
 

@@ -33,13 +33,14 @@ interface ReportsSessionsProps {
   trades: Trade[];
   dateRangeLabel: string;
   isLocked?: boolean;
+  sym?: string;
   pinStates?: {
     comparison: PinState;
     recommendations: PinState;
   };
 }
 
-export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = false }: ReportsSessionsProps) {
+export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = false, sym = '£' }: ReportsSessionsProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats
@@ -158,7 +159,7 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = 
                     <div>
                       <p className="text-xs text-muted-foreground">Total P&L</p>
                       <p className={`text-lg font-bold ${session.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        {session.pnl >= 0 ? '+' : ''}£{session.pnl.toLocaleString()}
+                        {session.pnl >= 0 ? '+' : ''}{sym}{session.pnl.toLocaleString()}
                       </p>
                     </div>
                     <div>
@@ -209,7 +210,7 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = 
                     }}
                     formatter={(value: number, name: string) => {
                       if (name === 'winRate') return [`${value}%`, 'Profit Rate'];
-                      if (name === 'pnl') return [`£${value.toLocaleString()}`, 'P&L'];
+                      if (name === 'pnl') return [`${sym}${value.toLocaleString()}`, 'P&L'];
                       if (name === 'avgRR') return [`${(value / 100).toFixed(1)}`, 'Avg R:R'];
                       return [value, name];
                     }}
@@ -243,7 +244,7 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = 
                       border: '1px solid hsl(var(--border))',
                       borderRadius: '8px'
                     }}
-                    formatter={(value: number) => [`£${value.toLocaleString()}`, 'P&L']}
+                    formatter={(value: number) => [`${sym}${value.toLocaleString()}`, 'P&L']}
                   />
                   <Bar dataKey="pnl" fill="hsl(var(--success))" radius={[0, 4, 4, 0]} />
                 </BarChart>
@@ -285,7 +286,7 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = 
                   </div>
                   <p className="text-sm text-foreground font-medium">{strongest.name} Session</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Your highest profit rate ({strongest.winRate}%) and best P&L (£{strongest.pnl.toLocaleString()}).
+                    Your highest profit rate ({strongest.winRate}%) and best P&L ({sym}{strongest.pnl.toLocaleString()}).
                     Consider increasing position sizes during this session.
                   </p>
                 </div>
@@ -297,7 +298,7 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = 
                   </div>
                   <p className="text-sm text-foreground font-medium">{weakest.name} Session</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Lowest profit rate ({weakest.winRate}%) and P&L (£{weakest.pnl.toLocaleString()}).
+                    Lowest profit rate ({weakest.winRate}%) and P&L ({sym}{weakest.pnl.toLocaleString()}).
                     Review your setups for this session or reduce size.
                   </p>
                 </div>
