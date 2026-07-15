@@ -13,6 +13,8 @@ import { useRiskToolMode } from "@/hooks/use-risk-tool-mode";
 import { RiskToolModeToggle } from "@/components/risk/RiskToolModeToggle";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useHomeCurrency } from "@/hooks/use-home-currency";
+import { currencySymbol } from "@/lib/currency";
 
 interface DailyRiskLimitTrackerProps {
   isAdded?: boolean;
@@ -46,8 +48,8 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
   const accountIds = useMemo(() => accounts.map((a) => a.id), [accounts]);
   const { trades } = useJournalTrades(accountIds);
 
-  const currency = selectedAccount?.currency ?? "GBP";
-  const currencySymbol = currency === "GBP" ? "£" : "$";
+  const { homeCurrency } = useHomeCurrency();
+  const sym = currencySymbol(homeCurrency);
 
   const [limitType, setLimitType] = useState<"percent" | "cash">("percent");
 
@@ -147,7 +149,7 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
                   results.isAtLimit ? "text-destructive" : results.isNearLimit ? "text-warning" : "text-success",
                 )}
               >
-                {currencySymbol}{results.remaining} left
+                {sym}{results.remaining} left
               </span>
             </div>
             <Progress value={parseFloat(results.percentUsed)} className="h-2" />
@@ -205,7 +207,7 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
             {/* Daily Limit */}
             <div className="space-y-2">
               <Label className="text-sm">
-                Daily Loss Limit {limitType === "percent" ? "(%)" : `(${currencySymbol})`}
+                Daily Loss Limit {limitType === "percent" ? "(%)" : `(${sym})`}
               </Label>
               <Input
                 type="number"
@@ -221,7 +223,7 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
             {/* Account Balance */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-sm">Account Balance ({currencySymbol})</Label>
+                <Label className="text-sm">Account Balance ({sym})</Label>
                 {isEffectivelyLinked && (
                   <Badge variant="outline" className="text-xs gap-1">
                     <Lock className="h-3 w-3" />
@@ -232,7 +234,7 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
               {isEffectivelyLinked && selectedAccount ? (
                 <div className="space-y-1.5">
                   <div className="h-9 px-3 rounded-md border border-border bg-muted/50 flex items-center text-sm text-muted-foreground select-none cursor-not-allowed">
-                    {currencySymbol}{selectedAccount.balance.toLocaleString()}
+                    {sym}{selectedAccount.balance.toLocaleString()}
                   </div>
                   {hasMultipleAccounts && (
                     <Select value={selectedAccountId ?? ""} onValueChange={setSelectedAccountId}>
@@ -265,7 +267,7 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
 
             {/* Today's Loss */}
             <div className="space-y-2">
-              <Label className="text-sm">Today's Loss ({currencySymbol})</Label>
+              <Label className="text-sm">Today's Loss ({sym})</Label>
               <Input
                 type="number"
                 value={lossTodayInput}
@@ -305,7 +307,7 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
                   <div>
                     <p className="text-xs text-muted-foreground">Daily Limit</p>
                     <p className="text-lg font-bold text-foreground">
-                      {currencySymbol}{results.limitCash}
+                      {sym}{results.limitCash}
                     </p>
                   </div>
                   <div>
@@ -316,7 +318,7 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
                         parseFloat(results.remaining) <= 0 ? "text-destructive" : "text-success",
                       )}
                     >
-                      {currencySymbol}{results.remaining}
+                      {sym}{results.remaining}
                     </p>
                   </div>
                 </div>
