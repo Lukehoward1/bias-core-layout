@@ -4,6 +4,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+import { PRICE_IDS } from "../src/lib/stripe";
 
 export const config = { api: { bodyParser: false } };
 
@@ -17,8 +18,8 @@ async function getRawBody(req: VercelRequest): Promise<Buffer> {
 }
 
 function tierFromPriceId(priceId: string): string {
-  if (priceId === "price_1ToPjyFjbj4UzaeOacbzWn5p") return "founding_member";
-  if (["price_1ToPk1Fjbj4UzaeOxx5MhFFZ", "price_1ToPk0Fjbj4UzaeO0snhbCO6"].includes(priceId)) return "pro";
+  if (priceId === PRICE_IDS.FOUNDING_MEMBER) return "founding_member";
+  if ([PRICE_IDS.PRO_MONTHLY, PRICE_IDS.PRO_ANNUAL].includes(priceId)) return "pro";
   return "standard";
 }
 
