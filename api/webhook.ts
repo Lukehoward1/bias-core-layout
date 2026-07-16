@@ -4,7 +4,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
-import { PRICE_IDS } from "../src/lib/stripe";
+import { PRICE_IDS } from "../src/lib/stripe.js";
 
 export const config = { api: { bodyParser: false } };
 
@@ -51,7 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const userId = session.metadata?.userId;
         if (!userId || !session.subscription) break;
 
-        const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
+        const subscription = await stripe.subscriptions.retrieve(session.subscription as string) as Stripe.Subscription & { current_period_end: number | null };
         const isFoundingMember = session.metadata?.isFoundingMember === "true";
         const priceId = subscription.items?.data?.[0]?.price?.id ?? "";
         const tier = isFoundingMember ? "founding_member" : tierFromPriceId(priceId);
@@ -77,7 +77,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       case "customer.subscription.updated": {
-        const subscription = event.data.object as Stripe.Subscription;
+        const subscription = event.data.object as Stripe.Subscription & { current_period_end: number | null };
         const { data: rows } = await supabase
           .from("profiles")
           .select("id, is_founding_member")
