@@ -41,6 +41,7 @@ const PLANS: Plan[] = [
       "Economic calendar (filtered by pairs)",
       "Risk tools & position calculator",
       "Trading journal with analytics",
+      "1 broker account",
       "Education library",
       "Price & session alerts",
     ],
@@ -60,6 +61,7 @@ const PLANS: Plan[] = [
     features: [
       "Everything in Standard",
       "Broker sync & auto-journaling",
+      "Up to 3 broker accounts",
       "Advanced analytics & reports",
       "Deep aggregation & comparisons",
       "Priority support",
@@ -243,6 +245,7 @@ export default function Pricing() {
           <ul className="space-y-2 text-left w-full max-w-xs">
             {[
               "Everything in Pro",
+              "1 broker account",
               "Price locked forever",
               "Exclusive founding member badge",
               "Direct feedback line to founders",
