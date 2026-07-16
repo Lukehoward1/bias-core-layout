@@ -17,6 +17,7 @@ interface Plan {
   monthlyPrice: string;
   annualPrice: string;
   annualMonthly: string;
+  annualSavings: string;
   features: string[];
   cta: string;
   priceIdMonthly: string;
@@ -32,9 +33,10 @@ const PLANS: Plan[] = [
   {
     name: "Standard",
     description: "Everything you need to trade with clarity.",
-    monthlyPrice: "£19",
-    annualPrice: "£190",
-    annualMonthly: "£15.83",
+    monthlyPrice: "£29",
+    annualPrice: "£299",
+    annualMonthly: "£24.92",
+    annualSavings: "Save 14%",
     features: [
       "Live bias engine (all timeframes)",
       "Economic calendar (filtered by pairs)",
@@ -52,9 +54,10 @@ const PLANS: Plan[] = [
   {
     name: "Pro",
     description: "For serious traders who want the full edge.",
-    monthlyPrice: "£29",
-    annualPrice: "£290",
-    annualMonthly: "£24.17",
+    monthlyPrice: "£45",
+    annualPrice: "£495",
+    annualMonthly: "£41.25",
+    annualSavings: "Save 8%",
     features: [
       "Everything in Standard",
       "Broker sync & auto-journaling",
@@ -141,16 +144,13 @@ export default function Pricing() {
           <button
             type="button"
             onClick={() => setBilling("annual")}
-            className={`px-5 py-1.5 rounded-full text-sm font-semibold transition-colors flex items-center gap-2 ${
+            className={`px-5 py-1.5 rounded-full text-sm font-semibold transition-colors ${
               billing === "annual"
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
             Annual
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-success/20 text-success font-bold">
-              Save 33%
-            </span>
           </button>
         </div>
       </section>
@@ -191,9 +191,12 @@ export default function Pricing() {
                     </span>
                   </div>
                   {billing === "annual" && (
-                    <p className="text-xs text-success mt-1">
-                      {plan.annualMonthly}/month — billed annually
-                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className="text-xs text-success">{plan.annualMonthly}/month — billed annually</p>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-success/20 text-success font-bold">
+                        {plan.annualSavings}
+                      </span>
+                    </div>
                   )}
                 </div>
 
@@ -245,7 +248,7 @@ export default function Pricing() {
           </div>
 
           <div className="flex items-end gap-1">
-            <span className="text-4xl font-bold text-foreground">£197</span>
+            <span className="text-4xl font-bold text-foreground">£299</span>
             <span className="text-muted-foreground mb-1 text-sm">/year</span>
           </div>
 
@@ -296,7 +299,7 @@ export default function Pricing() {
           </Button>
 
           <p className="text-xs text-muted-foreground">
-            One-time annual payment · No trial · Renews at £197/year
+            One-time annual payment · No trial · Renews at £299/year
           </p>
         </div>
       </section>
