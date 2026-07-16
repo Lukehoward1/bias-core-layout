@@ -16,7 +16,10 @@ export default function StartTrial() {
       return;
     }
 
-    createCheckoutSession(PRICE_IDS.STANDARD_MONTHLY, userId, email, false)
+    const priceId = searchParams.get("priceId") ?? PRICE_IDS.STANDARD_MONTHLY;
+    const founding = searchParams.get("founding") === "true";
+
+    createCheckoutSession(priceId, userId, email, founding)
       .catch(() => {
         setError(true);
       });

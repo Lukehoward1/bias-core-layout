@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,9 @@ import sbLogo from "@/assets/sb-logo.svg";
 
 export default function Register() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const chosenPriceId = searchParams.get("priceId") ?? PRICE_IDS.STANDARD_MONTHLY;
+  const chosenFounding = searchParams.get("founding") === "true";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -44,10 +47,12 @@ export default function Register() {
     }
 
     if (!data.session) {
-      // Email confirmation is ON — store checkout intent, show confirmation message
+      // Email confirmation is ON — store checkout intent (including chosen plan), show confirmation message
       localStorage.setItem("pendingCheckout", "true");
       localStorage.setItem("pendingUserId", data.user.id);
       localStorage.setItem("pendingEmail", email);
+      localStorage.setItem("pendingPriceId", chosenPriceId);
+      localStorage.setItem("pendingFounding", String(chosenFounding));
       setIsLoading(false);
       setNeedsConfirmation(true);
       return;
@@ -57,10 +62,10 @@ export default function Register() {
     setTrialSetup(true);
     try {
       await createCheckoutSession(
-        PRICE_IDS.STANDARD_MONTHLY,
+        chosenPriceId,
         data.user.id,
         data.user.email ?? email,
-        false,
+        chosenFounding,
       );
     } catch {
       navigate("/dashboard");

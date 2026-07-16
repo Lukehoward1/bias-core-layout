@@ -96,7 +96,7 @@ export default function Pricing() {
 
   async function handleCheckout(priceId: string, isFoundingMember = false) {
     if (!user) {
-      navigate("/register");
+      navigate(`/register?priceId=${encodeURIComponent(priceId)}&founding=${isFoundingMember}`);
       return;
     }
     setLoadingPriceId(priceId);

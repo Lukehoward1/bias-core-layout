@@ -37,13 +37,18 @@ export default function AuthCallback() {
       const pending = localStorage.getItem("pendingCheckout");
 
       if (pending) {
-        // Clear localStorage
+        const pendingPriceId = localStorage.getItem("pendingPriceId") ?? "";
+        const pendingFounding = localStorage.getItem("pendingFounding") ?? "false";
         localStorage.removeItem("pendingCheckout");
         localStorage.removeItem("pendingUserId");
         localStorage.removeItem("pendingEmail");
+        localStorage.removeItem("pendingPriceId");
+        localStorage.removeItem("pendingFounding");
 
-        // Redirect to a dedicated checkout page
-        navigate("/start-trial?userId=" + userId + "&email=" + encodeURIComponent(email));
+        let url = "/start-trial?userId=" + userId + "&email=" + encodeURIComponent(email);
+        if (pendingPriceId) url += "&priceId=" + encodeURIComponent(pendingPriceId);
+        if (pendingFounding === "true") url += "&founding=true";
+        navigate(url);
         return;
       }
 

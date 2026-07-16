@@ -570,7 +570,7 @@ function NavBar({ onNavigate }: { onNavigate: (path: string) => void }) {
       </button>
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={() => onNavigate("/login")}>Sign in</Button>
-        <Button size="sm" onClick={() => onNavigate("/register")}>Start Free Trial</Button>
+        <Button size="sm" onClick={() => onNavigate("/pricing")}>Start Free Trial</Button>
       </div>
     </nav>
   );
@@ -677,7 +677,7 @@ export default function Landing() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center gap-3 mt-2">
-            <Button size="lg" className="h-12 px-8 text-base font-semibold" onClick={() => navigate("/register")}>
+            <Button size="lg" className="h-12 px-8 text-base font-semibold" onClick={() => navigate("/pricing")}>
               Start Free Trial
             </Button>
             <Button size="lg" variant="outline" className="h-12 px-8 text-base" onClick={scrollToFeatures}>
@@ -1091,7 +1091,7 @@ export default function Landing() {
               <Button
                 size="lg"
                 className="h-12 px-10 text-base font-semibold mt-1"
-                onClick={() => navigate("/register")}
+                onClick={() => navigate("/pricing")}
               >
                 Claim Your Spot
               </Button>
@@ -1131,7 +1131,7 @@ export default function Landing() {
           <Button
             size="lg"
             className="h-14 px-10 text-lg font-semibold mt-2"
-            onClick={() => navigate("/register")}
+            onClick={() => navigate("/pricing")}
           >
             Start Free Trial
           </Button>
