@@ -103,12 +103,6 @@ export function getLiveCalendarEvents(): Promise<CalendarEvent[]> {
   if (_inFlightPromise) return _inFlightPromise;
   if (_failedAt && Date.now() - _failedAt < FAILURE_COOLDOWN_MS) return Promise.resolve([]);
 
-  const apiKey = import.meta.env.VITE_FMP_API_KEY;
-  if (!apiKey) {
-    console.warn("[calendarService] VITE_FMP_API_KEY is not set — falling back to static calendar data");
-    return Promise.resolve([]);
-  }
-
   const now = new Date();
   const from = new Date(now);
   from.setDate(from.getDate() - 3);
@@ -116,9 +110,7 @@ export function getLiveCalendarEvents(): Promise<CalendarEvent[]> {
   to.setDate(to.getDate() + 11);
 
   const fmt = (d: Date) => d.toISOString().slice(0, 10);
-  const url =
-    `https://financialmodelingprep.com/api/v3/economic_calendar` +
-    `?from=${fmt(from)}&to=${fmt(to)}&apikey=${apiKey}`;
+  const url = `/api/economic-calendar?from=${fmt(from)}&to=${fmt(to)}`;
 
   _inFlightPromise = fetch(url)
     .then((res) => {
