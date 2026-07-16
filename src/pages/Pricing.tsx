@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Check, ChevronLeft, Zap } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { createCheckoutSession, PRICE_IDS } from "@/lib/stripe";
 
@@ -82,17 +81,6 @@ export default function Pricing() {
   const { user } = useAuth();
   const [billing, setBilling] = useState<Billing>("monthly");
   const [loadingPriceId, setLoadingPriceId] = useState<string | null>(null);
-  const [foundingCount, setFoundingCount] = useState(0);
-
-  useEffect(() => {
-    supabase
-      .from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("is_founding_member", true)
-      .then(({ count }) => setFoundingCount(count ?? 0));
-  }, []);
-
-  const spotsRemaining = Math.max(0, 100 - foundingCount);
 
   async function handleCheckout(priceId: string, isFoundingMember = false) {
     if (!user) {
@@ -266,30 +254,18 @@ export default function Pricing() {
             ))}
           </ul>
 
-          {/* Spot counter */}
-          <div className="w-full max-w-sm space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium text-foreground">{spotsRemaining} of 100 spots remaining</span>
-              <span className="text-xs text-primary font-semibold">{100 - spotsRemaining}% claimed</span>
-            </div>
-            <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full bg-primary rounded-full transition-all"
-                style={{ width: `${100 - spotsRemaining}%` }}
-              />
-            </div>
-          </div>
+          <p className="text-sm text-muted-foreground">
+            Limited to the first 100 founding members — spots are filling up.
+          </p>
 
           <Button
             size="lg"
             className="h-12 px-10 font-semibold"
-            disabled={loadingPriceId === PRICE_IDS.FOUNDING_MEMBER || spotsRemaining === 0}
+            disabled={loadingPriceId === PRICE_IDS.FOUNDING_MEMBER}
             onClick={() => handleCheckout(PRICE_IDS.FOUNDING_MEMBER, true)}
           >
             {loadingPriceId === PRICE_IDS.FOUNDING_MEMBER ? (
               "Redirecting…"
-            ) : spotsRemaining === 0 ? (
-              "Sold Out"
             ) : (
               <>
                 <Zap className="h-4 w-4 mr-2" />
