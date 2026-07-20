@@ -21,6 +21,7 @@ export function OnboardingModal() {
   const [fullName, setFullName] = useState("");
   const [localStyle, setLocalStyle] = useState<TraderStyle>(traderStyle);
   const [submitting, setSubmitting] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -37,6 +38,7 @@ export function OnboardingModal() {
   async function handleSubmit() {
     if (!user || !fullName.trim()) return;
     setSubmitting(true);
+    setSaveError(null);
     try {
       const { error } = await supabase
         .from("profiles")
@@ -44,6 +46,7 @@ export function OnboardingModal() {
         .eq("id", user.id);
       if (error) {
         console.error("[OnboardingModal] Failed to save:", error.message);
+        setSaveError("Something went wrong saving your details. Please try again.");
         return;
       }
       setTraderStyle(localStyle);
@@ -111,6 +114,10 @@ export function OnboardingModal() {
               </Select>
             </div>
           </div>
+
+          {saveError && (
+            <p className="text-sm text-destructive">{saveError}</p>
+          )}
 
           <Button
             onClick={() => void handleSubmit()}
