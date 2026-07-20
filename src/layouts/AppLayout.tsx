@@ -4,6 +4,7 @@ import { AppSidebarProvider } from "@/hooks/use-app-sidebar";
 import { useSessionLock } from "@/hooks/use-session-lock";
 import { LockScreen } from "@/components/LockScreen";
 import { TrialBanner } from "@/components/TrialBanner";
+import { OnboardingModal } from "@/components/onboarding/OnboardingModal";
 import { useEffect } from "react";
 
 function AppLayoutInner() {
@@ -40,6 +41,9 @@ function AppLayoutInner() {
           <Outlet />
         </main>
       </div>
+
+      {/* Onboarding — must be completed before using the app */}
+      <OnboardingModal />
 
       {/* Lock screen ALWAYS on top */}
       {isLocked && (
