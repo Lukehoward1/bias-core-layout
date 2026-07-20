@@ -366,7 +366,9 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
             onPointerDown={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-              <span className="text-sm font-medium text-muted-foreground">Calendar Event</span>
+              <DialogPrimitive.Title asChild>
+                <span className="text-sm font-medium text-muted-foreground">Calendar Event</span>
+              </DialogPrimitive.Title>
               <button
                 type="button"
                 onClick={onClose}
@@ -376,6 +378,9 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
                 <X className="h-4 w-4" />
               </button>
             </div>
+            <DialogPrimitive.Description className="sr-only">
+              This calendar event could not be found or is no longer available.
+            </DialogPrimitive.Description>
             <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
               <AlertCircle className="h-10 w-10 text-muted-foreground/50" />
               <h2 className="text-base font-semibold text-foreground">Event not found</h2>
@@ -409,6 +414,9 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
           className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 max-w-6xl w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border border-border p-0 rounded-lg z-[10001]"
           onPointerDown={(e) => e.stopPropagation()}
         >
+          <DialogPrimitive.Description className="sr-only">
+            Details, figures, and market interpretation for this economic calendar event.
+          </DialogPrimitive.Description>
           <div className="sticky top-0 z-10 bg-background border-b border-border">
             {openedFromAlert && (
               <div className="px-8 py-3 border-b border-primary/15 bg-primary/5">
@@ -430,7 +438,9 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
                     {safeEvent.impact.toUpperCase()} IMPACT
                   </Badge>
 
-                  <h2 className="text-2xl font-bold text-foreground">{safeEvent.event}</h2>
+                  <DialogPrimitive.Title asChild>
+                    <h2 className="text-2xl font-bold text-foreground">{safeEvent.event}</h2>
+                  </DialogPrimitive.Title>
                 </div>
 
                 <div className="flex items-center gap-4">
