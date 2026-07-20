@@ -26,7 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const url =
-    `https://financialmodelingprep.com/api/v3/economic_calendar` +
+    `https://financialmodelingprep.com/stable/economic-calendar` +
     `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&apikey=${API_KEY}`;
 
   try {
