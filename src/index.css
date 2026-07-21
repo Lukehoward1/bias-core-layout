@@ -60,6 +60,13 @@ Spacing System:
     --sidebar-accent-foreground: 222 47% 11%;
     --sidebar-border: 214 32% 91%;
     --sidebar-ring: 195 100% 40%;
+
+    --account-color-1: 262 60% 45%;
+    --account-color-2: 346 75% 50%;
+    --account-color-3: 84 55% 40%;
+    --account-color-4: 231 70% 55%;
+    --account-color-5: 300 55% 48%;
+    --account-color-6: 17 75% 50%;
   }
 
   .dark {
@@ -105,6 +112,13 @@ Spacing System:
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 217 33% 15%;
     --sidebar-ring: 195 100% 50%;
+
+    --account-color-1: 262 72% 68%;
+    --account-color-2: 346 84% 70%;
+    --account-color-3: 84 65% 55%;
+    --account-color-4: 231 80% 72%;
+    --account-color-5: 300 65% 68%;
+    --account-color-6: 17 85% 65%;
   }
 }
 

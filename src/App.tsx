@@ -11,7 +11,6 @@ import { AlertsProvider } from "@/contexts/AlertsContext";
 import { GlobalNotifications } from "@/components/alerts/GlobalNotifications";
 import { AppLayout } from "@/layouts/AppLayout";
 
-import { ActiveTradingAccountProvider } from "@/context/ActiveTradingAccountProvider";
 import { TraderStyleProvider } from "@/context/TraderStyleProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
@@ -138,15 +137,13 @@ export default function App() {
               <AlertsProvider>
                 <SessionLockProvider>
                   <TraderStyleProvider>
-                    <ActiveTradingAccountProvider>
-                      <GlobalNotifications />
-                      <Toaster />
-                      <Sonner />
-                      <AnalyticsLoader />
-                      <SubscriptionActivatingGuard />
-                      <CookieConsentBanner />
-                      <AppRoutes />
-                    </ActiveTradingAccountProvider>
+                    <GlobalNotifications />
+                    <Toaster />
+                    <Sonner />
+                    <AnalyticsLoader />
+                    <SubscriptionActivatingGuard />
+                    <CookieConsentBanner />
+                    <AppRoutes />
                   </TraderStyleProvider>
                 </SessionLockProvider>
               </AlertsProvider>
