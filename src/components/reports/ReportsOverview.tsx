@@ -6,6 +6,11 @@ import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { CardFeatureGate, TierBadge } from "@/components/journal/FeatureGate";
+import type { LinkedAccount } from "@/hooks/use-linked-accounts";
+import type { Trade as JournalTrade } from "@/hooks/use-journal-trades";
+import { useAccountAwareStats } from "@/hooks/use-account-aware-stats";
+import { AccountAwareEquityChart } from "@/components/shared/AccountAwareEquityChart";
+import { ACTIVE_ACCOUNT_ALL } from "@/hooks/use-active-trading-account";
 
 interface Trade {
   id: string;
@@ -31,6 +36,8 @@ interface PinState {
 
 interface ReportsOverviewProps {
   trades: Trade[];
+  accounts: LinkedAccount[];
+  activeAccountId: string;
   dateRangeLabel: string;
   isLocked?: boolean;
   sym?: string;
@@ -47,7 +54,7 @@ interface ReportsOverviewProps {
   };
 }
 
-export function ReportsOverview({ trades, dateRangeLabel, pinStates, isLocked = false, sym = '£' }: ReportsOverviewProps) {
+export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLabel, pinStates, isLocked = false, sym = '£' }: ReportsOverviewProps) {
   const { exportToPdf } = usePdfExport();
   const totalPnl = trades.reduce((sum, t) => sum + t.pnl, 0);
   const winningTrades = trades.filter(t => t.pnl > 0);
@@ -106,6 +113,11 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates, isLocked = 
     day: i + 1,
     pnl: d.equity,
   }));
+
+  // Per-account equity curves for the equity chart section
+  const { perAccount: equityPerAccount, combined: equityCombined, canCombine: equityCanCombine } =
+    useAccountAwareStats(trades as unknown as JournalTrade[], accounts);
+  const resolvedActiveAccountId = activeAccountId ?? ACTIVE_ACCOUNT_ALL;
 
   // Best edge detection
   const ratedTrades = trades.filter(t => t.rating && t.rating >= 4 && t.pnl > 0);
@@ -395,35 +407,14 @@ export function ReportsOverview({ trades, dateRangeLabel, pinStates, isLocked = 
         </CardHeader>
         <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
           <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={equityData}>
-                  <defs>
-                    <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
-                    formatter={(value: number) => [`${sym}${value.toLocaleString()}`, 'Equity']}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="equity" 
-                    stroke="hsl(var(--primary))" 
-                    fill="url(#equityGradient)"
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            <AccountAwareEquityChart
+              perAccount={equityPerAccount}
+              combined={equityCombined}
+              canCombine={equityCanCombine}
+              activeAccountId={resolvedActiveAccountId}
+              chartHeight="h-64"
+              curveType="relative"
+            />
           </CardContent>
         </CardFeatureGate>
       </Card>

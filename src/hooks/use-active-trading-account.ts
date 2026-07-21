@@ -2,6 +2,39 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+const COMBINE_KEY = "accountCombineMode:v1";
+const COMBINE_EVENT = "accountCombineModeChanged";
+
+function readCombineStored(): boolean {
+  try { return localStorage.getItem(COMBINE_KEY) === "true"; } catch { return false; }
+}
+function writeCombineStored(v: boolean) {
+  try { localStorage.setItem(COMBINE_KEY, v ? "true" : "false"); } catch {}
+}
+
+export function useAccountCombineMode(): [boolean, (v: boolean) => void] {
+  const [combineMode, setCombineModeState] = useState<boolean>(() => readCombineStored());
+
+  useEffect(() => {
+    const sync = () => setCombineModeState(readCombineStored());
+    const onStorage = (e: StorageEvent) => { if (!e.key || e.key === COMBINE_KEY) sync(); };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener(COMBINE_EVENT, sync);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(COMBINE_EVENT, sync);
+    };
+  }, []);
+
+  const setCombineMode = useCallback((v: boolean) => {
+    writeCombineStored(v);
+    setCombineModeState(v);
+    window.dispatchEvent(new Event(COMBINE_EVENT));
+  }, []);
+
+  return [combineMode, setCombineMode];
+}
+
 export const ACTIVE_ACCOUNT_ALL = "__all__";
 
 const STORAGE_KEY = "activeTradingAccountId:v1";

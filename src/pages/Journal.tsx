@@ -86,9 +86,12 @@ import { useTradingData } from "@/hooks/use-trading-data";
 import { ACTIVE_ACCOUNT_ALL } from "@/hooks/use-active-trading-account";
 import { useHomeCurrency } from "@/hooks/use-home-currency";
 import { currencySymbol } from "@/lib/currency";
+import { useAccountAwareStats } from "@/hooks/use-account-aware-stats";
+import { AccountAwareEquityChart } from "@/components/shared/AccountAwareEquityChart";
 
 // ✅ Canonical trade type
 import { type Trade as JournalTrade } from "@/hooks/use-journal-trades";
+import type { LinkedAccount } from "@/hooks/use-linked-accounts";
 
 // ✅ Instrument-aware P&L
 import { getInstrumentBySymbol, calculateTradePnl } from "@/data/tradingInstruments";
@@ -186,42 +189,16 @@ function EquityCurveTooltip({ active, payload, sym }: any) {
 }
 
 interface EquityCurveCardProps {
-  trades: Trade[];
+  trades: JournalTrade[];
+  accounts: LinkedAccount[];
+  activeAccountId: string;
   isAdded: boolean;
   onAdd: () => void;
   onRemove: () => void;
-  sym: string;
 }
 
-function EquityCurveCard({ trades, isAdded, onAdd, onRemove, sym }: EquityCurveCardProps) {
-  // ✅ daily aggregation so curve shows day-by-day moves
-  const equityData = useMemo(() => {
-    const daily = trades.reduce(
-      (acc, t) => {
-        acc[t.date] = (acc[t.date] || 0) + (t.pnl || 0);
-        return acc;
-      },
-      {} as Record<string, number>,
-    );
-
-    const days = Object.keys(daily).sort((a, b) => a.localeCompare(b));
-
-    let cumulative = 0;
-    let tradeCount = 0;
-
-    return days.map((date) => {
-      cumulative += daily[date];
-      const tradesThatDay = trades.filter((t) => t.date === date).length;
-      tradeCount += tradesThatDay;
-      return {
-        date,
-        equity: cumulative,
-        tradeCount,
-        formattedDate: format(parseISO(date), "MMM d"),
-      };
-    });
-  }, [trades]);
-
+function EquityCurveCard({ trades, accounts, activeAccountId, isAdded, onAdd, onRemove }: EquityCurveCardProps) {
+  const { perAccount, combined, canCombine } = useAccountAwareStats(trades, accounts);
 
   return (
     <Card>
@@ -237,58 +214,14 @@ function EquityCurveCard({ trades, isAdded, onAdd, onRemove, sym }: EquityCurveC
         </div>
       </CardHeader>
       <CardContent>
-        <div className="h-56">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={equityData} margin={{ top: 5, right: 5, bottom: 5, left: 10 }}>
-              <defs>
-                <linearGradient id="journalEquityGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis
-                dataKey="formattedDate"
-                tick={{ fontSize: 10 }}
-                stroke="hsl(var(--muted-foreground))"
-                axisLine={{ stroke: "hsl(var(--border))" }}
-                tickLine={{ stroke: "hsl(var(--border))" }}
-              />
-              <YAxis
-                tick={{ fontSize: 10 }}
-                stroke="hsl(var(--muted-foreground))"
-                axisLine={{ stroke: "hsl(var(--border))" }}
-                tickLine={{ stroke: "hsl(var(--border))" }}
-                tickFormatter={(value) => `${sym}${value}`}
-              />
-              <RechartsTooltip
-                cursor={{ stroke: 'rgba(255,255,255,0.2)', strokeWidth: 1 }}
-                content={({ active, payload }) => {
-                  if (!active || !payload?.length) return null;
-                  const data = payload[0].payload;
-                  return (
-                    <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
-                      <p className="text-xs text-muted-foreground mb-1">{data.formattedDate}</p>
-                      <p className={`text-sm font-semibold ${data.equity >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        {data.equity >= 0 ? '+' : ''}{sym}{Number(data.equity || 0).toLocaleString()}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">{data.tradeCount} trades total</p>
-                    </div>
-                  );
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="equity"
-                stroke="hsl(var(--primary))"
-                fill="url(#journalEquityGradient)"
-                strokeWidth={2}
-                isAnimationActive={false}
-                dot={{ fill: "hsl(var(--primary))", strokeWidth: 0, r: 0 }}
-                activeDot={{ fill: "hsl(var(--primary))", strokeWidth: 2, stroke: "hsl(var(--background))", r: 5 }}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+        <AccountAwareEquityChart
+          perAccount={perAccount}
+          combined={combined}
+          canCombine={canCombine}
+          activeAccountId={activeAccountId}
+          chartHeight="h-56"
+          curveType="relative"
+        />
       </CardContent>
     </Card>
   );
@@ -1260,10 +1193,11 @@ export default function Journal() {
             {/* ✅ Equity curve uses active scope */}
             <EquityCurveCard
               trades={viewTrades}
+              accounts={accounts}
+              activeAccountId={activeAccountId}
               isAdded={isEquityCurveAdded}
               onAdd={handleAddEquityCurve}
               onRemove={handleRemoveEquityCurve}
-              sym={sym}
             />
 
             {/* Daily Performance calendar (active scope) */}
@@ -2609,6 +2543,8 @@ export default function Journal() {
               <TabsContent value="overview" className="mt-5">
                 <ReportsOverview
                   trades={filteredTrades}
+                  accounts={accounts}
+                  activeAccountId={activeAccountId}
                   dateRangeLabel={dateRangeLabel}
                   pinStates={overviewPinStates}
                   isLocked={!canAccessReports}
