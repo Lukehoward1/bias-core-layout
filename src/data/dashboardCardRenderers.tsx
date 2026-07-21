@@ -33,6 +33,8 @@ import { useMarketData } from "@/context/MarketDataProvider";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
 import { useTradingData } from "@/hooks/use-trading-data";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
+import { ACTIVE_ACCOUNT_ALL } from "@/hooks/use-active-trading-account";
+import { useAccountAwareStats } from "@/hooks/use-account-aware-stats";
 
 export interface CardRenderContext {
   slotType: "wide" | "narrow" | "equal" | "hero" | "kpi" | "wide-narrow" | "three-equal" | "four-equal";
@@ -992,26 +994,29 @@ function BestWorstDayCard({ type }: { type: "best" | "worst" }) {
 }
 
 function LiveEquityCard({ slotType }: { slotType: string }) {
-  const { viewTrades, primaryAccount, stats } = useTradingData();
-  const sym = currencySymbol(primaryAccount?.currency);
+  const { viewTrades, accounts, activeAccountId } = useTradingData();
   const chartHeight = slotType === "hero" ? "h-64" : "h-40";
   const rawId = useId();
   const gradId = `equityGrad${rawId.replace(/:/g, "")}`;
 
-  const equityData = useMemo(() => {
-    const balance = primaryAccount?.balance ?? 100_000;
-    const startBalance = balance - stats.totalPnl;
-    const sorted = [...viewTrades].sort((a, b) => a.date.localeCompare(b.date));
-    let running = startBalance;
-    return sorted.map((t) => {
-      running += t.pnl ?? 0;
-      return {
-        date: t.date,
-        equity: Math.round(running),
-        formattedDate: t.date.slice(5).replace("-", "/"),
-      };
-    });
-  }, [viewTrades, primaryAccount, stats.totalPnl]);
+  const { perAccount, canCombine, combined } = useAccountAwareStats(viewTrades, accounts);
+
+  const isAllAccounts = activeAccountId === ACTIVE_ACCOUNT_ALL;
+
+  // Resolve the equity data and currency for this view
+  const resolved = (() => {
+    if (!isAllAccounts) {
+      const entry = perAccount.get(activeAccountId);
+      if (!entry) return null;
+      return { equityData: entry.equityCurveAbsolute, currency: entry.account.currency };
+    }
+    if (canCombine && combined) {
+      return { equityData: combined.equityCurveAbsolute, currency: combined.account.currency };
+    }
+    return null; // mixed currencies — render explicit empty state below
+  })();
+
+  const sym = currencySymbol(resolved?.currency);
 
   return (
     <Card className="h-full">
@@ -1019,12 +1024,16 @@ function LiveEquityCard({ slotType }: { slotType: string }) {
         <CardTitle className="text-sm font-medium">Equity Curve</CardTitle>
       </CardHeader>
       <CardContent>
-        {equityData.length === 0 ? (
+        {isAllAccounts && !canCombine ? (
+          <p className="text-sm text-muted-foreground">
+            Multiple currencies linked — select a single account to view its equity curve.
+          </p>
+        ) : !resolved || resolved.equityData.length === 0 ? (
           <p className="text-sm text-muted-foreground">No closed trades yet.</p>
         ) : (
           <div className={chartHeight}>
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={equityData}>
+              <AreaChart data={resolved.equityData}>
                 <defs>
                   <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
