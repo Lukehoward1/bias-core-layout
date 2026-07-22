@@ -82,22 +82,21 @@ export function ReportsPsychology({ trades, dateRangeLabel, pinStates, isLocked 
     NEGATIVE_KEYWORDS.some(kw => t.notes?.toLowerCase().includes(kw))
   );
 
-  // Word frequency
-  const wordFrequency = trades.reduce((acc, t) => {
-    if (!t.notes) return acc;
-    const words = t.notes.toLowerCase().split(/\s+/);
-    words.forEach(word => {
-      if (word.length > 3) {
-        acc[word] = (acc[word] || 0) + 1;
-      }
-    });
-    return acc;
-  }, {} as Record<string, number>);
+  // Curated psychology vocabulary scan — word-boundary match, case-insensitive
+  const PSYCH_VOCAB = [
+    'fomo', 'revenge', 'hesitation', 'hesitant', 'discipline', 'disciplined',
+    'confident', 'confidence', 'fear', 'greed', 'patience', 'impulsive',
+    'anxious', 'calm', 'rushed', 'overtrading',
+  ];
 
-  const topWords = Object.entries(wordFrequency)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 15)
-    .map(([word, count]) => ({ word, count }));
+  const topWords = PSYCH_VOCAB
+    .map(term => {
+      const re = new RegExp(`\\b${term}\\b`, 'i');
+      const count = trades.filter(t => t.notes && re.test(t.notes)).length;
+      return { word: term, count };
+    })
+    .filter(({ count }) => count > 0)
+    .sort((a, b) => b.count - a.count);
 
   // Emotional trigger analysis
   const triggerAnalysis = NEGATIVE_KEYWORDS.map(trigger => {

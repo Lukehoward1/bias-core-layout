@@ -35,7 +35,6 @@ interface ReportsPerformanceProps {
   sym?: string;
   pinStates?: {
     byDay: PinState;
-    bySession: PinState;
     distribution: PinState;
   };
 }
@@ -79,14 +78,6 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked
     return { day, winRate: Math.round(winRateVal), trades: dayTrades.length };
   });
 
-  // Win rate by session (simplified time-based)
-  const sessionStats = [
-    { name: 'Asian', winRate: 62, trades: 15 },
-    { name: 'London', winRate: 71, trades: 45 },
-    { name: 'New York', winRate: 65, trades: 38 },
-    { name: 'Overlap', winRate: 74, trades: 22 },
-  ];
-
   // Trade distribution Long/Short
   const longTrades = trades.filter(t => t.type === 'Long');
   const shortTrades = trades.filter(t => t.type === 'Short');
@@ -95,18 +86,49 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked
     { name: 'Short', value: shortTrades.length, fill: 'hsl(var(--destructive))' },
   ];
 
-  // Average hold time (placeholder - would need actual timestamps)
+  // Hold time from entryTime + exitTime — same logic as ReportsPsychology
+  const timedTrades = trades
+    .filter(t => t.entryTime && t.exitTime)
+    .map(t => {
+      const [eh, em] = t.entryTime!.split(':').map(Number);
+      const [xh, xm] = t.exitTime!.split(':').map(Number);
+      const entryMins = eh * 60 + em;
+      let exitMins = xh * 60 + xm;
+      if (exitMins < entryMins) exitMins += 24 * 60;
+      return { ...t, holdMins: exitMins - entryMins };
+    });
+
+  const hasHoldData = timedTrades.length > 0;
+
+  const holdWinners = timedTrades.filter(t => t.pnl > 0);
+  const holdLosers  = timedTrades.filter(t => t.pnl < 0);
+  const avgHoldWinnersH = holdWinners.length > 0
+    ? parseFloat((holdWinners.reduce((s, t) => s + t.holdMins, 0) / holdWinners.length / 60).toFixed(1))
+    : 0;
+  const avgHoldLosersH = holdLosers.length > 0
+    ? parseFloat((holdLosers.reduce((s, t) => s + t.holdMins, 0) / holdLosers.length / 60).toFixed(1))
+    : 0;
+
   const holdTimeData = [
-    { type: 'Winners', avgHours: 4.2 },
-    { type: 'Losers', avgHours: 1.8 },
+    { type: 'Winners', avgHours: avgHoldWinnersH },
+    { type: 'Losers',  avgHours: avgHoldLosersH  },
   ];
 
-  // P&L by duration (placeholder categories)
-  const durationPnl = [
-    { duration: 'Scalp (<1h)', pnl: 850, trades: 25 },
-    { duration: 'Intraday (1-8h)', pnl: 1200, trades: 45 },
-    { duration: 'Swing (>8h)', pnl: 450, trades: 12 },
+  // P&L by duration buckets from real hold times
+  const durationBuckets = [
+    { duration: 'Scalp (<1h)',      min: 0,   max: 59   },
+    { duration: 'Intraday (1-8h)', min: 60,  max: 480  },
+    { duration: 'Swing (>8h)',     min: 481, max: Infinity },
   ];
+
+  const durationPnl = durationBuckets.map(b => {
+    const bucket = timedTrades.filter(t => t.holdMins >= b.min && t.holdMins <= b.max);
+    return {
+      duration: b.duration,
+      pnl: Math.round(bucket.reduce((s, t) => s + t.pnl, 0)),
+      trades: bucket.length,
+    };
+  });
 
   // Monthly heatmap data
   const monthlyData = trades.reduce((acc, t) => {
@@ -167,97 +189,55 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked
         </CardFeatureGate>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Profit Rate by Session - with per-card pin */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Profit Rate by Session</CardTitle>
-              <div className="flex items-center gap-1.5">
-                {isLocked && <TierBadge requiredPlan="standard" />}
-                {!isLocked && pinStates?.bySession && (
-                  <AddToDashboardButton
-                    isAdded={pinStates.bySession.isAdded}
-                    onAdd={pinStates.bySession.onAdd}
-                    onRemove={pinStates.bySession.onRemove}
-                  />
-                )}
-              </div>
+      {/* Trade Distribution - with per-card pin */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Trade Distribution (Long/Short)</CardTitle>
+            <div className="flex items-center gap-1.5">
+              {isLocked && <TierBadge requiredPlan="standard" />}
+              {!isLocked && pinStates?.distribution && (
+                <AddToDashboardButton
+                  isAdded={pinStates.distribution.isAdded}
+                  onAdd={pinStates.distribution.onAdd}
+                  onRemove={pinStates.distribution.onRemove}
+                />
+              )}
             </div>
-          </CardHeader>
-          <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
-            <CardContent>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={sessionStats} layout="vertical">
-                    <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="%" />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={70} />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px'
-                      }}
-                      formatter={(value: number) => [`${value}%`, 'Profit Rate']}
-                    />
-                    <Bar dataKey="winRate" fill="hsl(var(--accent))" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </CardFeatureGate>
-        </Card>
-
-        {/* Trade Distribution - with per-card pin */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Trade Distribution (Long/Short)</CardTitle>
-              <div className="flex items-center gap-1.5">
-                {isLocked && <TierBadge requiredPlan="standard" />}
-                {!isLocked && pinStates?.distribution && (
-                  <AddToDashboardButton
-                    isAdded={pinStates.distribution.isAdded}
-                    onAdd={pinStates.distribution.onAdd}
-                    onRemove={pinStates.distribution.onRemove}
+          </div>
+        </CardHeader>
+        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={distributionData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                    label={({ name, value }) => `${name}: ${value}`}
+                  >
+                    {distributionData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
                   />
-                )}
-              </div>
+                </PieChart>
+              </ResponsiveContainer>
             </div>
-          </CardHeader>
-          <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
-            <CardContent>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={distributionData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                      label={({ name, value }) => `${name}: ${value}`}
-                    >
-                      {distributionData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px'
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </CardFeatureGate>
-        </Card>
-      </div>
+          </CardContent>
+        </CardFeatureGate>
+      </Card>
 
       {/* Average Hold Time */}
       <Card>
@@ -269,23 +249,29 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked
         </CardHeader>
         <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
           <CardContent>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={holdTimeData}>
-                  <XAxis dataKey="type" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="h" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
-                    formatter={(value: number) => [`${value} hours`, 'Avg Hold Time']}
-                  />
-                  <Bar dataKey="avgHours" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            {!hasHoldData ? (
+              <p className="text-sm text-muted-foreground">
+                Add entry and exit times to your trades to see hold-time analysis.
+              </p>
+            ) : (
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={holdTimeData}>
+                    <XAxis dataKey="type" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="h" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                      formatter={(value: number) => [`${value}h`, 'Avg Hold Time']}
+                    />
+                    <Bar dataKey="avgHours" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </CardContent>
         </CardFeatureGate>
       </Card>
@@ -300,26 +286,32 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked
         </CardHeader>
         <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
           <CardContent>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={durationPnl}>
-                  <XAxis dataKey="duration" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
-                    formatter={(value: number, name: string) => {
-                      if (name === 'pnl') return [`${sym}${value.toLocaleString()}`, 'P&L'];
-                      return [value, 'Trades'];
-                    }}
-                  />
-                  <Bar dataKey="pnl" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            {!hasHoldData ? (
+              <p className="text-sm text-muted-foreground">
+                Add entry and exit times to your trades to see duration breakdown.
+              </p>
+            ) : (
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={durationPnl}>
+                    <XAxis dataKey="duration" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                      formatter={(value: number, name: string) => {
+                        if (name === 'pnl') return [`${sym}${value.toLocaleString()}`, 'P&L'];
+                        return [value, 'Trades'];
+                      }}
+                    />
+                    <Bar dataKey="pnl" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </CardContent>
         </CardFeatureGate>
       </Card>

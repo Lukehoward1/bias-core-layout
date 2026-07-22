@@ -78,7 +78,7 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates, isLocke
     const winRateVal = ratedTrades.length > 0 ? (wins / ratedTrades.length) * 100 : 0;
     const totalPnlVal = ratedTrades.reduce((sum, t) => sum + t.pnl, 0);
     const avgPnl = ratedTrades.length > 0 ? totalPnlVal / ratedTrades.length : 0;
-    const expectancy = winRateVal / 100 * avgPnl;
+    const expectancy = avgPnl;
     
     return {
       rating: `${rating} Star`,
@@ -99,7 +99,7 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates, isLocke
     winRate: unratedTrades.length > 0 ? Math.round((unratedTrades.filter(t => t.pnl > 0).length / unratedTrades.length) * 100) : 0,
     totalPnl: unratedTrades.reduce((sum, t) => sum + t.pnl, 0),
     avgPnl: unratedTrades.length > 0 ? Math.round(unratedTrades.reduce((sum, t) => sum + t.pnl, 0) / unratedTrades.length) : 0,
-    expectancy: 0,
+    get expectancy() { return this.avgPnl; },
   };
 
   const allSetups = [...ratingGroups, unratedStats].filter(s => s.trades > 0);
