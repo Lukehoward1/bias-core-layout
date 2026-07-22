@@ -1,11 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { Shield, AlertTriangle, TrendingDown } from "lucide-react";
+import { Shield, AlertTriangle } from "lucide-react";
 import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { CardFeatureGate, TierBadge } from "@/components/journal/FeatureGate";
+import { calculateTradeRisk } from "@/lib/risk-calculations";
 
 interface Trade {
   id: string;
@@ -21,6 +22,8 @@ interface Trade {
   rating?: number;
   entryTime?: string;
   exitTime?: string;
+  stopLoss?: number;
+  actualR?: number | null;
 }
 
 interface PinState {
@@ -34,6 +37,7 @@ interface ReportsRiskManagementProps {
   dateRangeLabel: string;
   isLocked?: boolean;
   sym?: string;
+  accountBalance?: number;
   pinStates?: {
     kpis: PinState;
     distribution: PinState;
@@ -41,7 +45,7 @@ interface ReportsRiskManagementProps {
   };
 }
 
-export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLocked = false, sym = '£' }: ReportsRiskManagementProps) {
+export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLocked = false, sym = '£', accountBalance }: ReportsRiskManagementProps) {
   const { exportToPdf } = usePdfExport();
 
   // Calculate summary stats for PDF export
@@ -70,11 +74,18 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLoc
     });
   };
 
-  // Calculate risk metrics (using lots as proxy for risk)
-  const risks = trades.map(t => t.lots * 100); // Convert to pseudo £ risk
+  // Calculate risk per trade using real stop-loss data where available
+  const tradeRisks = trades.map(t => ({
+    trade: t,
+    risk: calculateTradeRisk(t.entry, t.stopLoss, t.lots, t.pair),
+  }));
+  const tradesWithRisk = tradeRisks.filter(r => r.risk !== null) as { trade: Trade; risk: number }[];
+  const risks = tradesWithRisk.map(r => r.risk);
+  const riskCoverage = trades.length > 0 ? tradesWithRisk.length : 0;
+
   const avgRisk = risks.length > 0 ? risks.reduce((a, b) => a + b, 0) / risks.length : 0;
   const maxRisk = risks.length > 0 ? Math.max(...risks) : 0;
-  
+
   // Risk distribution
   const riskBuckets = [
     { range: `${sym}0-50`, count: risks.filter(r => r <= 50).length },
@@ -84,8 +95,11 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLoc
     { range: `${sym}200+`, count: risks.filter(r => r > 200).length },
   ];
 
-  // Trades exceeding planned risk (assume >150 is excessive)
-  const excessiveRiskTrades = trades.filter(t => t.lots * 100 > 150);
+  // Trades exceeding planned risk: 2% of account balance when available, else no threshold
+  const excessiveThreshold = accountBalance != null && accountBalance > 0 ? accountBalance * 0.02 : null;
+  const excessiveRiskTrades = excessiveThreshold != null
+    ? tradesWithRisk.filter(r => r.risk > excessiveThreshold).map(r => r.trade)
+    : [];
   
   // Losing trades (potential risk realized)
   const losingTrades = trades.filter(t => t.pnl < 0);
@@ -120,11 +134,6 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLoc
     return 'Poor';
   };
 
-  // Risk of ruin estimation (simplified)
-  const winRate = trades.length > 0 
-    ? trades.filter(t => t.pnl > 0).length / trades.length 
-    : 0;
-  const riskOfRuin = ((1 - winRate) / winRate) * 100;
 
   return (
     <div id="reports-risk" className="space-y-6">
@@ -155,11 +164,15 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLoc
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <p className="text-xs text-muted-foreground">Avg Risk/Trade</p>
-                <p className="text-2xl font-bold text-foreground">{sym}{Math.round(avgRisk)}</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {risks.length > 0 ? `${sym}${Math.round(avgRisk)}` : '—'}
+                </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Max Risk Taken</p>
-                <p className="text-2xl font-bold text-foreground">{sym}{Math.round(maxRisk)}</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {risks.length > 0 ? `${sym}${Math.round(maxRisk)}` : '—'}
+                </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Max Single Loss</p>
@@ -171,6 +184,11 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLoc
                 <p className="text-xs text-muted-foreground mt-1">{losingTrades.length} losing trades</p>
               </div>
             </div>
+            {trades.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-3">
+                Risk figures based on {riskCoverage} of {trades.length} trades with a stop loss set.
+              </p>
+            )}
           </CardContent>
         </CardFeatureGate>
       </Card>
@@ -228,67 +246,40 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLoc
         </CardHeader>
         <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
           <CardContent>
-            {excessiveRiskTrades.length > 0 ? (
+            {excessiveThreshold == null ? (
+              <p className="text-sm text-muted-foreground">
+                Set an account balance to enable threshold detection (2% of balance).
+              </p>
+            ) : excessiveRiskTrades.length > 0 ? (
               <div className="space-y-2">
                 <p className="text-sm text-amber-500 font-medium">
-                  {excessiveRiskTrades.length} trades exceeded normal risk levels (&gt;{sym}150)
+                  {excessiveRiskTrades.length} trades exceeded 2% account risk ({sym}{Math.round(excessiveThreshold)})
                 </p>
                 <div className="space-y-2 mt-3">
-                  {excessiveRiskTrades.slice(0, 5).map((t) => (
-                    <div key={t.id} className="flex items-center justify-between p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                      <div>
-                        <Badge variant="outline">{t.pair}</Badge>
-                        <span className="text-xs text-muted-foreground ml-2">{t.date}</span>
+                  {excessiveRiskTrades.slice(0, 5).map((t) => {
+                    const tradeRisk = calculateTradeRisk(t.entry, t.stopLoss, t.lots, t.pair);
+                    return (
+                      <div key={t.id} className="flex items-center justify-between p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                        <div>
+                          <Badge variant="outline">{t.pair}</Badge>
+                          <span className="text-xs text-muted-foreground ml-2">{t.date}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-sm font-medium">{sym}{Math.round(tradeRisk ?? 0)} risk</span>
+                          <span className={`text-xs ml-2 ${t.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                            {t.pnl >= 0 ? '+' : ''}{sym}{t.pnl}
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <span className="text-sm font-medium">{sym}{Math.round(t.lots * 100)} risk</span>
-                        <span className={`text-xs ml-2 ${t.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                          {t.pnl >= 0 ? '+' : ''}{sym}{t.pnl}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ) : (
               <p className="text-sm text-success">
-                ✓ All trades within acceptable risk limits
+                ✓ All trades within 2% risk limit ({sym}{Math.round(excessiveThreshold)})
               </p>
             )}
-          </CardContent>
-        </CardFeatureGate>
-      </Card>
-
-      {/* Risk of Ruin */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <TrendingDown className="h-5 w-5 text-muted-foreground" />
-              <CardTitle>Risk of Ruin Estimation</CardTitle>
-            </div>
-            {isLocked && <TierBadge requiredPlan="standard" />}
-          </div>
-        </CardHeader>
-        <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
-          <CardContent>
-            <div className="flex items-center gap-4">
-              <div className="text-3xl font-bold text-foreground">
-                {riskOfRuin > 100 ? '>100' : Math.round(riskOfRuin)}%
-              </div>
-              <div className="flex-1">
-                <p className="text-sm text-muted-foreground">
-                  Based on your current profit rate of {Math.round(winRate * 100)}%
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {riskOfRuin < 10 
-                    ? 'Low risk - maintain current approach'
-                    : riskOfRuin < 30 
-                      ? 'Moderate risk - ensure proper position sizing'
-                      : 'High risk - review strategy and risk management'}
-                </p>
-              </div>
-            </div>
           </CardContent>
         </CardFeatureGate>
       </Card>

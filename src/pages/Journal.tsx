@@ -250,6 +250,12 @@ export default function Journal() {
   // ✅ Active account scope + canonical journal actions
   const { activeAccountId, setActiveAccountId, activeAccountLabel, accounts, primaryAccount, viewTrades, journal } = useTradingData();
 
+  const allAccountsShareCurrency = accounts.length > 0 && accounts.every(a => a.currency === accounts[0].currency);
+
+  const accountBalance = activeAccountId === ACTIVE_ACCOUNT_ALL
+    ? (allAccountsShareCurrency ? accounts.reduce((sum, a) => sum + (a.balance ?? 0), 0) : undefined)
+    : accounts.find(a => a.id === activeAccountId)?.balance;
+
 
   const {
     trades: allTrades,
@@ -2658,6 +2664,7 @@ export default function Journal() {
                   pinStates={riskPinStates}
                   isLocked={!canAccessReports}
                   sym={sym}
+                  accountBalance={accountBalance}
                 />
               </TabsContent>
               <TabsContent value="tradelog" className="mt-5">
