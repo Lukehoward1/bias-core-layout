@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, Calendar, Zap } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
@@ -10,7 +9,12 @@ import type { LinkedAccount } from "@/hooks/use-linked-accounts";
 import type { Trade as JournalTrade } from "@/hooks/use-journal-trades";
 import { useAccountAwareStats } from "@/hooks/use-account-aware-stats";
 import { AccountAwareEquityChart } from "@/components/shared/AccountAwareEquityChart";
-import { ACTIVE_ACCOUNT_ALL } from "@/hooks/use-active-trading-account";
+import { AccountAwareStat } from "@/components/shared/AccountAwareStat";
+import {
+  ACTIVE_ACCOUNT_ALL,
+  useAccountCombineMode,
+} from "@/hooks/use-active-trading-account";
+import { getAccountColor } from "@/lib/account-colors";
 
 interface Trade {
   id: string;
@@ -56,73 +60,61 @@ interface ReportsOverviewProps {
 
 export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLabel, pinStates, isLocked = false, sym = '£' }: ReportsOverviewProps) {
   const { exportToPdf } = usePdfExport();
+
+  // ── Inline stats kept only for the PDF export call ──────────────────────────
   const totalPnl = trades.reduce((sum, t) => sum + t.pnl, 0);
   const winningTrades = trades.filter(t => t.pnl > 0);
-  const losingTrades = trades.filter(t => t.pnl < 0);
+  const losingTrades  = trades.filter(t => t.pnl < 0);
   const winRate = trades.length > 0 ? (winningTrades.length / trades.length) * 100 : 0;
-  
-  const avgWin = winningTrades.length > 0 
-    ? winningTrades.reduce((sum, t) => sum + t.pnl, 0) / winningTrades.length 
-    : 0;
-  const avgLoss = losingTrades.length > 0 
-    ? Math.abs(losingTrades.reduce((sum, t) => sum + t.pnl, 0) / losingTrades.length)
-    : 1;
+  const avgWin  = winningTrades.length > 0
+    ? winningTrades.reduce((sum, t) => sum + t.pnl, 0) / winningTrades.length : 0;
+  const avgLoss = losingTrades.length > 0
+    ? Math.abs(losingTrades.reduce((sum, t) => sum + t.pnl, 0) / losingTrades.length) : 1;
   const avgRR = avgLoss > 0 ? avgWin / avgLoss : 0;
-  const expectancy = (winRate / 100) * avgWin - ((100 - winRate) / 100) * avgLoss;
 
-  const posSum = winningTrades.reduce((sum, t) => sum + t.pnl, 0);
-  const negSum = Math.abs(losingTrades.reduce((sum, t) => sum + t.pnl, 0));
-  const profitFactor = posSum === 0 ? "0.00" : negSum === 0 ? "∞" : (posSum / negSum).toFixed(2);
-  const avgWinner = winningTrades.length > 0 ? posSum / winningTrades.length : 0;
-  const avgLoser = losingTrades.length > 0 ? negSum / losingTrades.length : 0;
-
-  // Group by date for best/worst day
   const dailyPnl = trades.reduce((acc, t) => {
     acc[t.date] = (acc[t.date] || 0) + t.pnl;
     return acc;
   }, {} as Record<string, number>);
-
   const dailyEntries = Object.entries(dailyPnl);
-  const bestDay = dailyEntries.reduce((best, [date, pnl]) => 
-    pnl > (best?.pnl || -Infinity) ? { date, pnl } : best, 
-    null as { date: string; pnl: number } | null
+  const bestDayExport = dailyEntries.reduce((best, [date, pnl]) =>
+    pnl > (best?.pnl ?? -Infinity) ? { date, pnl } : best,
+    null as { date: string; pnl: number } | null,
   );
-  const worstDay = dailyEntries.reduce((worst, [date, pnl]) => 
-    pnl < (worst?.pnl || Infinity) ? { date, pnl } : worst, 
-    null as { date: string; pnl: number } | null
+  const worstDayExport = dailyEntries.reduce((worst, [date, pnl]) =>
+    pnl < (worst?.pnl ?? Infinity) ? { date, pnl } : worst,
+    null as { date: string; pnl: number } | null,
   );
 
-  // Equity curve data
-  const sortedTrades = [...trades].sort((a, b) => a.date.localeCompare(b.date));
-  let cumulative = 0;
-  const equityData = sortedTrades.map(t => {
-    cumulative += t.pnl;
-    return { date: t.date, equity: cumulative };
-  });
-
-  // Consecutive streaks (sortedTrades already ordered by date)
-  let maxConsecWins = 0, maxConsecLosses = 0, curW = 0, curL = 0;
-  for (const t of sortedTrades) {
-    if (t.pnl > 0) { curW++; maxConsecWins = Math.max(maxConsecWins, curW); curL = 0; }
-    else if (t.pnl < 0) { curL++; maxConsecLosses = Math.max(maxConsecLosses, curL); curW = 0; }
-    else { curW = 0; curL = 0; }
-  }
-
-  // Rolling 30-day data (simplified)
-  const rollingData = equityData.slice(-30).map((d, i) => ({
-    day: i + 1,
-    pnl: d.equity,
-  }));
-
-  // Per-account equity curves for the equity chart section
-  const { perAccount: equityPerAccount, combined: equityCombined, canCombine: equityCanCombine } =
-    useAccountAwareStats(trades as unknown as JournalTrade[], accounts);
+  // ── Per-account stats (full date range) — reused for all KPI cards ──────────
+  const {
+    perAccount: equityPerAccount,
+    combined: equityCombined,
+    canCombine: equityCanCombine,
+  } = useAccountAwareStats(trades as unknown as JournalTrade[], accounts);
   const resolvedActiveAccountId = activeAccountId ?? ACTIVE_ACCOUNT_ALL;
 
-  // Best edge detection
+  // ── Rolling 30-day subset ──────────────────────────────────────────────────
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const rolling30DateStr = thirtyDaysAgo.toISOString().split('T')[0];
+  const rolling30Trades = (trades as unknown as JournalTrade[]).filter(
+    (t) => t.date >= rolling30DateStr,
+  );
+  const {
+    perAccount: rolling30PerAccount,
+    combined: rolling30Combined,
+    canCombine: rolling30CanCombine,
+  } = useAccountAwareStats(rolling30Trades, accounts);
+
+  // ── Combine mode — read for Best/Worst Day three-mode logic ─────────────────
+  const [combineMode] = useAccountCombineMode();
+  const isAllAccounts = resolvedActiveAccountId === ACTIVE_ACCOUNT_ALL;
+
+  // ── Best edge stub — unchanged (see note at card below) ─────────────────────
   const ratedTrades = trades.filter(t => t.rating && t.rating >= 4 && t.pnl > 0);
-  const bestEdge = ratedTrades.length > 0 
-    ? "High-confidence setups with 4+ star ratings" 
+  const bestEdge = ratedTrades.length > 0
+    ? "High-confidence setups with 4+ star ratings"
     : "Build more trade history to identify your edge";
 
   const handleExportOverview = () => {
@@ -136,11 +128,102 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
         winRate,
         avgRR,
         tradeCount: trades.length,
-        bestDay,
-        worstDay,
+        bestDay: bestDayExport,
+        worstDay: worstDayExport,
       },
     });
   };
+
+  // ── Best/Worst Day render helpers ──────────────────────────────────────────
+
+  const fmtDay = (pnl: number) =>
+    `${pnl >= 0 ? '+' : ''}${sym}${Math.abs(pnl).toLocaleString()}`;
+
+  function SingleDay({
+    day,
+    colorClass,
+  }: {
+    day: { date: string; pnl: number } | null;
+    colorClass: string;
+  }) {
+    if (!day) return <p className="text-sm text-muted-foreground">No data</p>;
+    return (
+      <>
+        <p className={`text-2xl font-bold ${colorClass}`}>{fmtDay(day.pnl)}</p>
+        <p className="text-xs text-muted-foreground mt-1">{day.date}</p>
+      </>
+    );
+  }
+
+  function MultiDayRows({ isBest }: { isBest: boolean }) {
+    const entries = [...equityPerAccount.entries()];
+    if (entries.length === 0) return <p className="text-sm text-muted-foreground">No data</p>;
+    return (
+      <div className="space-y-1.5">
+        {entries.map(([accountId, entry], index) => {
+          const color = getAccountColor(index);
+          const day = isBest ? entry.stats.bestDay : entry.stats.worstDay;
+          const cls = isBest
+            ? "text-success"
+            : (day?.pnl ?? 0) < 0 ? "text-destructive" : "text-success";
+          return (
+            <div
+              key={accountId}
+              className="flex items-center justify-between px-2 py-1 rounded-md bg-muted/50"
+            >
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span
+                  className="flex-shrink-0 w-2 h-2 rounded-full"
+                  style={{ backgroundColor: color }}
+                />
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground truncate">{entry.account.name}</p>
+                  {day && <p className="text-xs text-muted-foreground">{day.date}</p>}
+                </div>
+              </div>
+              <span className={`text-sm font-semibold ml-2 flex-shrink-0 ${cls}`}>
+                {day ? fmtDay(day.pnl) : '—'}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function BestDayContent() {
+    if (!isAllAccounts) {
+      const entry = equityPerAccount.get(resolvedActiveAccountId);
+      return <SingleDay day={entry?.stats.bestDay ?? null} colorClass="text-success" />;
+    }
+    if (combineMode && equityCanCombine && equityCombined) {
+      return <SingleDay day={equityCombined.stats.bestDay} colorClass="text-success" />;
+    }
+    return <MultiDayRows isBest={true} />;
+  }
+
+  function WorstDayContent() {
+    if (!isAllAccounts) {
+      const entry = equityPerAccount.get(resolvedActiveAccountId);
+      const day = entry?.stats.worstDay ?? null;
+      return (
+        <SingleDay
+          day={day}
+          colorClass={day && day.pnl < 0 ? "text-destructive" : "text-success"}
+        />
+      );
+    }
+    if (combineMode && equityCanCombine && equityCombined) {
+      const day = equityCombined.stats.worstDay;
+      return (
+        <SingleDay
+          day={day}
+          colorClass={day && day.pnl < 0 ? "text-destructive" : "text-success"}
+        />
+      );
+    }
+    return <MultiDayRows isBest={false} />;
+  }
 
   return (
     <div id="reports-overview" className="space-y-6">
@@ -149,9 +232,8 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
         <PdfExportButton onClick={handleExportOverview} />
       </div>
 
-      {/* Key Metrics - 4 individual pinnable cards */}
+      {/* Key Metrics — 4 pinnable KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total P&L Card */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -170,14 +252,22 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
           </CardHeader>
           <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
             <CardContent className="pt-0">
-              <p className={`text-2xl font-bold ${totalPnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                {totalPnl >= 0 ? '+' : ''}{sym}{totalPnl.toLocaleString()}
-              </p>
+              <AccountAwareStat
+                perAccount={equityPerAccount}
+                combined={equityCombined}
+                canCombine={equityCanCombine}
+                activeAccountId={resolvedActiveAccountId}
+                select={(s) => s.totalPnl}
+                format={(v) => {
+                  const n = Number(v);
+                  return `${n >= 0 ? '+' : ''}${sym}${Math.abs(n).toLocaleString()}`;
+                }}
+                colorClass={(v) => Number(v) >= 0 ? 'text-success' : 'text-destructive'}
+              />
             </CardContent>
           </CardFeatureGate>
         </Card>
 
-        {/* Avg R:R Card */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -196,12 +286,18 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
           </CardHeader>
           <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
             <CardContent className="pt-0">
-              <p className="text-2xl font-bold text-foreground">{avgRR.toFixed(2)}</p>
+              <AccountAwareStat
+                perAccount={equityPerAccount}
+                combined={equityCombined}
+                canCombine={equityCanCombine}
+                activeAccountId={resolvedActiveAccountId}
+                select={(s) => s.avgRR}
+                format={(v) => Number(v).toFixed(2)}
+              />
             </CardContent>
           </CardFeatureGate>
         </Card>
 
-        {/* Profit Rate Card */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -220,12 +316,18 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
           </CardHeader>
           <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
             <CardContent className="pt-0">
-              <p className="text-2xl font-bold text-foreground">{winRate.toFixed(1)}%</p>
+              <AccountAwareStat
+                perAccount={equityPerAccount}
+                combined={equityCombined}
+                canCombine={equityCanCombine}
+                activeAccountId={resolvedActiveAccountId}
+                select={(s) => s.winRate}
+                format={(v) => `${Number(v).toFixed(1)}%`}
+              />
             </CardContent>
           </CardFeatureGate>
         </Card>
 
-        {/* Expectancy Card */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -244,15 +346,21 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
           </CardHeader>
           <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
             <CardContent className="pt-0">
-              <p className={`text-2xl font-bold ${expectancy >= 0 ? 'text-success' : 'text-destructive'}`}>
-                {sym}{expectancy.toFixed(0)}/trade
-              </p>
+              <AccountAwareStat
+                perAccount={equityPerAccount}
+                combined={equityCombined}
+                canCombine={equityCanCombine}
+                activeAccountId={resolvedActiveAccountId}
+                select={(s) => s.expectancy}
+                format={(v) => `${sym}${Number(v).toFixed(0)}/trade`}
+                colorClass={(v) => Number(v) >= 0 ? 'text-success' : 'text-destructive'}
+              />
             </CardContent>
           </CardFeatureGate>
         </Card>
       </div>
 
-      {/* Additional Metrics */}
+      {/* Additional Metrics — 5 unpinnable cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -263,7 +371,14 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
           </CardHeader>
           <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
             <CardContent className="pt-0">
-              <p className="text-2xl font-bold text-foreground">{profitFactor}</p>
+              <AccountAwareStat
+                perAccount={equityPerAccount}
+                combined={equityCombined}
+                canCombine={equityCanCombine}
+                activeAccountId={resolvedActiveAccountId}
+                select={(s) => s.profitFactor}
+                format={(v) => String(v)}
+              />
             </CardContent>
           </CardFeatureGate>
         </Card>
@@ -277,7 +392,15 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
           </CardHeader>
           <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
             <CardContent className="pt-0">
-              <p className="text-2xl font-bold text-success">{maxConsecWins}</p>
+              <AccountAwareStat
+                perAccount={equityPerAccount}
+                combined={equityCombined}
+                canCombine={equityCanCombine}
+                activeAccountId={resolvedActiveAccountId}
+                select={(s) => s.maxConsecWins}
+                format={(v) => String(v)}
+                colorClass={() => 'text-success'}
+              />
             </CardContent>
           </CardFeatureGate>
         </Card>
@@ -291,7 +414,15 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
           </CardHeader>
           <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
             <CardContent className="pt-0">
-              <p className="text-2xl font-bold text-destructive">{maxConsecLosses}</p>
+              <AccountAwareStat
+                perAccount={equityPerAccount}
+                combined={equityCombined}
+                canCombine={equityCanCombine}
+                activeAccountId={resolvedActiveAccountId}
+                select={(s) => s.maxConsecLosses}
+                format={(v) => String(v)}
+                colorClass={() => 'text-destructive'}
+              />
             </CardContent>
           </CardFeatureGate>
         </Card>
@@ -305,7 +436,15 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
           </CardHeader>
           <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
             <CardContent className="pt-0">
-              <p className="text-2xl font-bold text-success">{sym}{avgWinner.toFixed(0)}</p>
+              <AccountAwareStat
+                perAccount={equityPerAccount}
+                combined={equityCombined}
+                canCombine={equityCanCombine}
+                activeAccountId={resolvedActiveAccountId}
+                select={(s) => s.avgWinner}
+                format={(v) => `${sym}${Number(v).toFixed(0)}`}
+                colorClass={() => 'text-success'}
+              />
             </CardContent>
           </CardFeatureGate>
         </Card>
@@ -319,15 +458,22 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
           </CardHeader>
           <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
             <CardContent className="pt-0">
-              <p className="text-2xl font-bold text-destructive">{sym}{avgLoser.toFixed(0)}</p>
+              <AccountAwareStat
+                perAccount={equityPerAccount}
+                combined={equityCombined}
+                canCombine={equityCanCombine}
+                activeAccountId={resolvedActiveAccountId}
+                select={(s) => s.avgLoser}
+                format={(v) => `${sym}${Number(v).toFixed(0)}`}
+                colorClass={() => 'text-destructive'}
+              />
             </CardContent>
           </CardFeatureGate>
         </Card>
       </div>
 
-      {/* Best/Worst Day - 2 separate pinnable cards */}
+      {/* Best/Worst Day — bespoke three-mode (date+amount shape doesn't fit AccountAwareStat) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Best Winning Day Card */}
         <Card className="bg-success/5 border-success/20">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -349,15 +495,11 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
           </CardHeader>
           <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
             <CardContent>
-              <p className="text-2xl font-bold text-success">
-                +{sym}{bestDay?.pnl?.toLocaleString() || 0}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">{bestDay?.date || 'N/A'}</p>
+              <BestDayContent />
             </CardContent>
           </CardFeatureGate>
         </Card>
 
-        {/* Worst Losing Day Card */}
         <Card className="bg-destructive/5 border-destructive/20">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -379,16 +521,13 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
           </CardHeader>
           <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
             <CardContent>
-              <p className="text-2xl font-bold text-destructive">
-                {sym}{worstDay?.pnl?.toLocaleString() || 0}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">{worstDay?.date || 'N/A'}</p>
+              <WorstDayContent />
             </CardContent>
           </CardFeatureGate>
         </Card>
       </div>
 
-      {/* Equity Curve - with per-card pin */}
+      {/* Equity Curve */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -419,7 +558,9 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
         </CardFeatureGate>
       </Card>
 
-      {/* Rolling 30-Day */}
+      {/* Rolling 30-Day Performance — same three-mode pattern as equity curve,
+          but scoped to trades within the last 30 calendar days. Cumulative P&L
+          from zero over that window; Combine view shows % return per account. */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -438,35 +579,22 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
         </CardHeader>
         <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
           <CardContent>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={rollingData}>
-                  <XAxis dataKey="day" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
-                    formatter={(value: number) => [`${sym}${value.toLocaleString()}`, 'Cumulative P&L']}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="pnl" 
-                    stroke="hsl(var(--success))" 
-                    fill="hsl(var(--success))"
-                    fillOpacity={0.2}
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            <AccountAwareEquityChart
+              perAccount={rolling30PerAccount}
+              combined={rolling30Combined}
+              canCombine={rolling30CanCombine}
+              activeAccountId={resolvedActiveAccountId}
+              chartHeight="h-48"
+              curveType="relative"
+            />
           </CardContent>
         </CardFeatureGate>
       </Card>
 
-      {/* Strongest Edge Summary */}
+      {/* Strongest Edge Summary — left untouched: bestEdge is a static-string
+          stub derived only from ratedTrades.length, with no per-account or
+          per-setup breakdown. Forcing a per-account grid would require a
+          non-trivial rewrite of the edge-detection logic (out of scope here). */}
       <Card className="border-primary/30 bg-primary/5">
         <CardHeader>
           <div className="flex items-center justify-between">
