@@ -20,8 +20,6 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import {
   ACTIVE_ACCOUNT_ALL,
   useAccountCombineMode,
@@ -280,29 +278,6 @@ function MultiSeriesChart({ accounts, curveType, height, baseGradId }: MultiSeri
   );
 }
 
-// ── Combine toggle ────────────────────────────────────────────────────────────
-
-function CombineToggle({
-  checked,
-  onCheckedChange,
-}: {
-  checked: boolean;
-  onCheckedChange: (v: boolean) => void;
-}) {
-  return (
-    <div className="flex items-center justify-end gap-2 mb-2">
-      <Label htmlFor="combine-accounts-toggle" className="text-xs text-muted-foreground cursor-pointer">
-        Combine accounts
-      </Label>
-      <Switch
-        id="combine-accounts-toggle"
-        checked={checked}
-        onCheckedChange={onCheckedChange}
-      />
-    </div>
-  );
-}
-
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export function AccountAwareEquityChart({
@@ -311,7 +286,7 @@ export function AccountAwareEquityChart({
   chartHeight = "h-56",
   curveType = "relative",
 }: AccountAwareEquityChartProps) {
-  const [combineMode, setCombineMode] = useAccountCombineMode();
+  const [combineMode] = useAccountCombineMode();
   const isAllAccounts = activeAccountId === ACTIVE_ACCOUNT_ALL;
   const rawId = useId();
   const baseGradId = `aeGrad${rawId.replace(/:/g, "")}`;
@@ -344,57 +319,49 @@ export function AccountAwareEquityChart({
 
   // ── All accounts: combined % return view ────────────────────────────────────
   if (combineMode) {
+    if (nonEmpty.length === 0) {
+      return <p className="text-sm text-muted-foreground">No closed trades yet.</p>;
+    }
     return (
-      <div>
-        <CombineToggle checked={combineMode} onCheckedChange={setCombineMode} />
-        {nonEmpty.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No closed trades yet.</p>
-        ) : (
-          <MultiSeriesChart
-            accounts={nonEmpty}
-            curveType={curveType}
-            height={chartHeight}
-            baseGradId={baseGradId}
-          />
-        )}
-      </div>
+      <MultiSeriesChart
+        accounts={nonEmpty}
+        curveType={curveType}
+        height={chartHeight}
+        baseGradId={baseGradId}
+      />
     );
   }
 
   // ── All accounts: per-account mini-grid ────────────────────────────────────
+  if (nonEmpty.length === 0) {
+    return <p className="text-sm text-muted-foreground">No closed trades yet.</p>;
+  }
   return (
-    <div>
-      <CombineToggle checked={combineMode} onCheckedChange={setCombineMode} />
-      {nonEmpty.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No closed trades yet.</p>
-      ) : (
-        <div
-          className={
-            nonEmpty.length === 1
-              ? "grid grid-cols-1"
-              : "grid grid-cols-1 sm:grid-cols-2 gap-4"
-          }
-        >
-          {nonEmpty.map(([accountId, entry], index) => {
-            const color = getAccountColor(index);
-            const data = pickCurve(entry);
-            return (
-              <div key={accountId}>
-                <p className="text-xs font-medium mb-1" style={{ color }}>
-                  {entry.account.name}
-                </p>
-                <SingleChart
-                  data={data}
-                  color={color}
-                  sym={currencySymbol(entry.account.currency)}
-                  height="h-36"
-                  gradId={`${baseGradId}_${index}`}
-                />
-              </div>
-            );
-          })}
-        </div>
-      )}
+    <div
+      className={
+        nonEmpty.length === 1
+          ? "grid grid-cols-1"
+          : "grid grid-cols-1 sm:grid-cols-2 gap-4"
+      }
+    >
+      {nonEmpty.map(([accountId, entry], index) => {
+        const color = getAccountColor(index);
+        const data = pickCurve(entry);
+        return (
+          <div key={accountId}>
+            <p className="text-xs font-medium mb-1" style={{ color }}>
+              {entry.account.name}
+            </p>
+            <SingleChart
+              data={data}
+              color={color}
+              sym={currencySymbol(entry.account.currency)}
+              height="h-36"
+              gradId={`${baseGradId}_${index}`}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }

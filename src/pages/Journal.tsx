@@ -65,6 +65,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { StrategyManager } from "@/components/journal/StrategyManager";
 import { TagManager } from "@/components/journal/TagManager";
 import { SessionPlanningTab } from "@/components/journal/SessionPlanningTab";
+import { CombineAccountsToggle } from "@/components/shared/CombineAccountsToggle";
 import { useStrategies } from "@/hooks/use-strategies";
 import { useTags } from "@/hooks/use-tags";
 
@@ -1146,6 +1147,8 @@ export default function Journal() {
                   ))}
                 </SelectContent>
               </Select>
+
+              <CombineAccountsToggle />
 
               <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setIsImportOpen(true)}>
                 <Upload className="h-3.5 w-3.5 mr-1.5" />
@@ -2571,6 +2574,8 @@ export default function Journal() {
                 </TabsList>
 
                 <div className="flex items-center gap-3">
+                  <CombineAccountsToggle />
+
                   <Button
                     variant="outline"
                     size="sm"

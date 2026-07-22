@@ -11,6 +11,7 @@ import { Plus, Star, TrendingUp, TrendingDown, Minus, ChevronRight, Calendar as 
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { DashboardEditToolbar } from "@/components/dashboard/DashboardEditToolbar";
 import { DashboardRow } from "@/components/dashboard/DashboardRow";
+import { CombineAccountsToggle } from "@/components/shared/CombineAccountsToggle";
 import { AddCardsModal } from "@/components/dashboard/AddCardsModal";
 
 import { getCardRenderer, warnMissingRenderers } from "@/data/dashboardCardRenderers";
@@ -396,12 +397,15 @@ export default function Dashboard() {
             )}
           </div>
 
-          <DashboardEditToolbar
-            isEditMode={isEditMode}
-            onToggleEdit={toggleEditMode}
-            onReset={resetToDefault}
-            onOpenAddCards={() => setShowAddCardsModal(true)}
-          />
+          <div className="flex items-center gap-3">
+            <CombineAccountsToggle />
+            <DashboardEditToolbar
+              isEditMode={isEditMode}
+              onToggleEdit={toggleEditMode}
+              onReset={resetToDefault}
+              onOpenAddCards={() => setShowAddCardsModal(true)}
+            />
+          </div>
         </div>
 
         {layout.rows.map((row, index) => (
