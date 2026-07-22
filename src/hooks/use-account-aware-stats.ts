@@ -33,6 +33,7 @@ export interface AccountStats {
   totalPnl: number;
   weekPnl: number;
   monthPnl: number;
+  /** Average actual R-multiple across trades where actualR is defined; excludes trades without a stop-loss set. */
   avgRR: number;
   /** "0.00" | "∞" | decimal string — matches existing Journal/Reports rendering. */
   profitFactor: string;
@@ -118,8 +119,11 @@ function computeStats(trades: Trade[]): AccountStats {
   const posSum = wins.reduce((s, t) => s + (t.pnl ?? 0), 0);
   const negSum = Math.abs(losses.reduce((s, t) => s + (t.pnl ?? 0), 0));
   const avgWin = wins.length > 0 ? posSum / wins.length : 0;
-  const avgLossAbs = losses.length > 0 ? negSum / losses.length : 1;
-  const avgRR = avgLossAbs > 0 ? avgWin / avgLossAbs : 0;
+  const rTrades = trades.filter((t) => t.actualR != null);
+  const avgRR =
+    rTrades.length > 0
+      ? rTrades.reduce((s, t) => s + (t.actualR ?? 0), 0) / rTrades.length
+      : 0;
   const profitFactor =
     posSum === 0 ? "0.00" : negSum === 0 ? "∞" : (posSum / negSum).toFixed(2);
   const expectancy =

@@ -88,6 +88,7 @@ import { useHomeCurrency } from "@/hooks/use-home-currency";
 import { currencySymbol } from "@/lib/currency";
 import { useAccountAwareStats } from "@/hooks/use-account-aware-stats";
 import { AccountAwareEquityChart } from "@/components/shared/AccountAwareEquityChart";
+import { AccountAwareStat } from "@/components/shared/AccountAwareStat";
 
 // ✅ Canonical trade type
 import { type Trade as JournalTrade } from "@/hooks/use-journal-trades";
@@ -248,6 +249,7 @@ export default function Journal() {
   // ✅ Active account scope + canonical journal actions
   const { activeAccountId, setActiveAccountId, activeAccountLabel, accounts, primaryAccount, viewTrades, journal } = useTradingData();
 
+
   const {
     trades: allTrades,
     addManualTrade,
@@ -277,6 +279,17 @@ export default function Journal() {
   const { tags } = useTags();
   const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
   const [filterTags, setFilterTags] = useState<string[]>([]);
+
+  // Per-account stats for the KPI row, respecting setup/tag filters (mirrors topStats filter logic)
+  const kpiTrades = useMemo(
+    () =>
+      viewTrades
+        .filter((t) => filterSetup === "__all__" || t.setup === filterSetup)
+        .filter((t) => filterTags.length === 0 || filterTags.some((tag) => (t.tags ?? []).includes(tag))),
+    [viewTrades, filterSetup, filterTags],
+  );
+  const { perAccount: kpiPerAccount, combined: kpiCombined, canCombine: kpiCanCombine } =
+    useAccountAwareStats(kpiTrades, accounts);
 
   const availableSetups = useMemo(() => {
     const fromStrategies = strategies.map((s) => s.name);
@@ -1147,7 +1160,14 @@ export default function Journal() {
                   <CardTitle className="text-sm font-medium text-muted-foreground">Total Trades</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-foreground">{topStats.totalTrades}</div>
+                  <AccountAwareStat
+                    perAccount={kpiPerAccount}
+                    combined={kpiCombined}
+                    canCombine={kpiCanCombine}
+                    activeAccountId={activeAccountId}
+                    select={(s) => s.totalTrades}
+                    format={(v) => String(v)}
+                  />
                 </CardContent>
               </Card>
 
@@ -1156,7 +1176,14 @@ export default function Journal() {
                   <CardTitle className="text-sm font-medium text-muted-foreground">Profit Rate</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-foreground">{topStats.winRate}%</div>
+                  <AccountAwareStat
+                    perAccount={kpiPerAccount}
+                    combined={kpiCombined}
+                    canCombine={kpiCanCombine}
+                    activeAccountId={activeAccountId}
+                    select={(s) => s.winRate}
+                    format={(v) => `${v}%`}
+                  />
                 </CardContent>
               </Card>
 
@@ -1165,9 +1192,18 @@ export default function Journal() {
                   <CardTitle className="text-sm font-medium text-muted-foreground">Total P&amp;L</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className={`text-2xl font-bold ${topStats.totalPnl >= 0 ? "text-success" : "text-destructive"}`}>
-                    {topStats.totalPnl >= 0 ? "+" : ""}{sym}{Number(topStats.totalPnl || 0).toLocaleString()}
-                  </div>
+                  <AccountAwareStat
+                    perAccount={kpiPerAccount}
+                    combined={kpiCombined}
+                    canCombine={kpiCanCombine}
+                    activeAccountId={activeAccountId}
+                    select={(s) => s.totalPnl}
+                    format={(v) => {
+                      const n = Number(v);
+                      return `${n >= 0 ? "+" : ""}${sym}${Number(Math.abs(n)).toLocaleString()}`;
+                    }}
+                    colorClass={(v) => (Number(v) >= 0 ? "text-success" : "text-destructive")}
+                  />
                 </CardContent>
               </Card>
 
@@ -1176,7 +1212,14 @@ export default function Journal() {
                   <CardTitle className="text-sm font-medium text-muted-foreground">Avg R:R</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-foreground">{topStats.avgRR.toFixed(1)}</div>
+                  <AccountAwareStat
+                    perAccount={kpiPerAccount}
+                    combined={kpiCombined}
+                    canCombine={kpiCanCombine}
+                    activeAccountId={activeAccountId}
+                    select={(s) => s.avgRR}
+                    format={(v) => Number(v).toFixed(1)}
+                  />
                 </CardContent>
               </Card>
 
@@ -1185,7 +1228,14 @@ export default function Journal() {
                   <CardTitle className="text-sm font-medium text-muted-foreground">Profit Factor</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-foreground">{topStats.profitFactor}</div>
+                  <AccountAwareStat
+                    perAccount={kpiPerAccount}
+                    combined={kpiCombined}
+                    canCombine={kpiCanCombine}
+                    activeAccountId={activeAccountId}
+                    select={(s) => s.profitFactor}
+                    format={(v) => String(v)}
+                  />
                 </CardContent>
               </Card>
             </div>

@@ -33,9 +33,10 @@ import { useMarketData } from "@/context/MarketDataProvider";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
 import { useTradingData } from "@/hooks/use-trading-data";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
-import { ACTIVE_ACCOUNT_ALL } from "@/hooks/use-active-trading-account";
+import { ACTIVE_ACCOUNT_ALL, useAccountCombineMode } from "@/hooks/use-active-trading-account";
 import { useAccountAwareStats } from "@/hooks/use-account-aware-stats";
 import { AccountAwareEquityChart } from "@/components/shared/AccountAwareEquityChart";
+import { AccountAwareStat } from "@/components/shared/AccountAwareStat";
 
 export interface CardRenderContext {
   slotType: "wide" | "narrow" | "equal" | "hero" | "kpi" | "wide-narrow" | "three-equal" | "four-equal";
@@ -890,30 +891,53 @@ function RiskSnapshotCard() {
 }
 
 function ReportsKpiLiveCard({ metric }: { metric: "pnl" | "rr" | "winrate" | "expectancy" }) {
-  const { viewTrades } = useTradingData();
+  const { viewTrades, accounts, activeAccountId } = useTradingData();
   const { primaryAccount } = useLinkedAccounts();
   const sym = currencySymbol(primaryAccount?.currency);
-  const winners = viewTrades.filter((t) => (t.pnl ?? 0) > 0);
-  const totalPnl = viewTrades.reduce((s, t) => s + (t.pnl ?? 0), 0);
-  const winRate = viewTrades.length > 0 ? ((winners.length / viewTrades.length) * 100).toFixed(1) : "0.0";
-  const rTrades = viewTrades.filter((t) => t.actualR != null);
-  const avgRR = rTrades.length > 0
-    ? (rTrades.reduce((s, t) => s + (t.actualR ?? 0), 0) / rTrades.length).toFixed(2)
-    : "—";
-  const expectancy = viewTrades.length > 0 ? (totalPnl / viewTrades.length).toFixed(0) : "0";
-  const fmtPnl = `${totalPnl >= 0 ? "+" : ""}${sym}${Math.abs(totalPnl).toLocaleString("en-GB", { maximumFractionDigits: 0 })}`;
 
-  const configs = {
-    pnl: { title: "Total P&L", value: fmtPnl, color: totalPnl >= 0 ? "text-success" : "text-destructive" },
-    rr: { title: "Avg R:R", value: avgRR, color: "text-foreground" },
-    winrate: { title: "Profit Rate", value: `${winRate}%`, color: "text-foreground" },
+  const { perAccount, combined, canCombine } = useAccountAwareStats(viewTrades, accounts);
+
+  type MetricConfig = {
+    title: string;
+    select: (s: import("@/hooks/use-account-aware-stats").AccountStats) => string | number;
+    format: (v: string | number) => string;
+    colorClass: (v: string | number) => string;
+  };
+
+  const configs: Record<typeof metric, MetricConfig> = {
+    pnl: {
+      title: "Total P&L",
+      select: (s) => s.totalPnl,
+      format: (v) => {
+        const n = Number(v);
+        return `${n >= 0 ? "+" : ""}${sym}${Math.abs(n).toLocaleString("en-GB", { maximumFractionDigits: 0 })}`;
+      },
+      colorClass: (v) => (Number(v) >= 0 ? "text-success" : "text-destructive"),
+    },
+    rr: {
+      title: "Avg R:R",
+      select: (s) => s.avgRR,
+      format: (v) => Number(v).toFixed(2),
+      colorClass: () => "text-foreground",
+    },
+    winrate: {
+      title: "Profit Rate",
+      select: (s) => s.winRate,
+      format: (v) => `${v}%`,
+      colorClass: () => "text-foreground",
+    },
     expectancy: {
       title: "Avg Expectancy",
-      value: `${sym}${parseInt(expectancy).toLocaleString()}/trade`,
-      color: parseInt(expectancy) >= 0 ? "text-success" : "text-destructive",
+      select: (s) => s.expectancy,
+      format: (v) => {
+        const n = Number(v);
+        return `${sym}${Math.round(n).toLocaleString()}/trade`;
+      },
+      colorClass: (v) => (Number(v) >= 0 ? "text-success" : "text-destructive"),
     },
   };
-  const { title, value, color } = configs[metric];
+
+  const { title, select, format, colorClass } = configs[metric];
 
   return (
     <Card className="h-full">
@@ -921,75 +945,114 @@ function ReportsKpiLiveCard({ metric }: { metric: "pnl" | "rr" | "winrate" | "ex
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <p className={`text-2xl font-bold ${color}`}>{value}</p>
+        <AccountAwareStat
+          perAccount={perAccount}
+          combined={combined}
+          canCombine={canCombine}
+          activeAccountId={activeAccountId}
+          select={select}
+          format={format}
+          colorClass={colorClass}
+        />
       </CardContent>
     </Card>
   );
 }
 
 function BestWorstDayCard({ type }: { type: "best" | "worst" }) {
-  const { viewTrades, primaryAccount } = useTradingData();
+  const { viewTrades, accounts, activeAccountId } = useTradingData();
+  const { primaryAccount } = useLinkedAccounts();
   const sym = currencySymbol(primaryAccount?.currency);
+  const [combineMode] = useAccountCombineMode();
+  const isAllAccounts = activeAccountId === ACTIVE_ACCOUNT_ALL;
 
-  const { amount, date } = useMemo(() => {
-    const byDay = new Map<string, number>();
-    for (const t of viewTrades) {
-      byDay.set(t.date, (byDay.get(t.date) ?? 0) + (t.pnl ?? 0));
-    }
-    if (byDay.size === 0) return { amount: null as number | null, date: null as string | null };
-    const entries: [string, number][] = Array.from(byDay.entries());
-    const best = type === "best"
-      ? entries.reduce((a, b) => b[1] > a[1] ? b : a)
-      : entries.reduce((a, b) => b[1] < a[1] ? b : a);
-    return { amount: best[1], date: best[0] };
-  }, [viewTrades, type]);
+  const { perAccount, combined, canCombine } = useAccountAwareStats(viewTrades, accounts);
+
+  const isBest = type === "best";
+  const cardClass = isBest ? "h-full bg-success/5 border-success/20" : "h-full bg-destructive/5 border-destructive/20";
+  const icon = isBest
+    ? <TrendingUp className="h-4 w-4 text-success" />
+    : <TrendingDown className="h-4 w-4 text-destructive" />;
+  const title = isBest ? "Best Winning Day" : "Lowest Realised P&L Day";
 
   const fmtAmt = (v: number) =>
     `${v >= 0 ? "+" : ""}${sym}${Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
-  if (type === "best") {
+  // Resolves a { date, pnl } | null from stats for this card's type
+  const pickDay = (entry: import("@/hooks/use-account-aware-stats").AccountEntry) =>
+    isBest ? entry.stats.bestDay : entry.stats.worstDay;
+
+  // ── Render helpers ──────────────────────────────────────────────────────────
+
+  function SingleDay({ day }: { day: { date: string; pnl: number } | null }) {
+    if (!day) return <p className="text-sm text-muted-foreground">No data</p>;
+    const cls = isBest ? "text-success" : day.pnl >= 0 ? "text-success" : "text-destructive";
     return (
-      <Card className="h-full bg-success/5 border-success/20">
-        <CardHeader className="pb-2">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-success" />
-            <CardTitle className="text-sm font-medium text-muted-foreground">Best Winning Day</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {amount == null ? (
-            <p className="text-sm text-muted-foreground">No data</p>
-          ) : (
-            <>
-              <p className="text-2xl font-bold text-success">{fmtAmt(amount)}</p>
-              <p className="text-xs text-muted-foreground mt-1">{date}</p>
-            </>
-          )}
-        </CardContent>
-      </Card>
+      <>
+        <p className={`text-2xl font-bold ${cls}`}>{fmtAmt(day.pnl)}</p>
+        <p className="text-xs text-muted-foreground mt-1">{day.date}</p>
+      </>
     );
   }
 
+  function MultiDayRows() {
+    const entries = [...perAccount.entries()];
+    if (entries.length === 0) return <p className="text-sm text-muted-foreground">No data</p>;
+    return (
+      <div className="space-y-1.5">
+        {entries.map(([accountId, entry], index) => {
+          const color = getAccountColor(index);
+          const day = pickDay(entry);
+          if (!day) {
+            return (
+              <div key={accountId} className="flex items-center justify-between px-2 py-1 rounded-md bg-muted/50">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="flex-shrink-0 w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                  <span className="text-xs text-muted-foreground truncate">{entry.account.name}</span>
+                </div>
+                <span className="text-sm text-muted-foreground ml-2">—</span>
+              </div>
+            );
+          }
+          const cls = isBest ? "text-success" : day.pnl >= 0 ? "text-success" : "text-destructive";
+          return (
+            <div key={accountId} className="flex items-center justify-between px-2 py-1 rounded-md bg-muted/50">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="flex-shrink-0 w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground truncate">{entry.account.name}</p>
+                  <p className="text-xs text-muted-foreground">{day.date}</p>
+                </div>
+              </div>
+              <span className={`text-sm font-semibold ml-2 flex-shrink-0 ${cls}`}>{fmtAmt(day.pnl)}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // ── Resolve content ─────────────────────────────────────────────────────────
+
+  let content: React.ReactNode;
+  if (!isAllAccounts) {
+    const entry = perAccount.get(activeAccountId);
+    content = <SingleDay day={entry ? pickDay(entry) : null} />;
+  } else if (combineMode && canCombine && combined) {
+    content = <SingleDay day={pickDay(combined)} />;
+  } else {
+    content = <MultiDayRows />;
+  }
+
   return (
-    <Card className="h-full bg-destructive/5 border-destructive/20">
+    <Card className={cardClass}>
       <CardHeader className="pb-2">
         <div className="flex items-center gap-2">
-          <TrendingDown className="h-4 w-4 text-destructive" />
-          <CardTitle className="text-sm font-medium text-muted-foreground">Lowest Realised P&L Day</CardTitle>
+          {icon}
+          <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
         </div>
       </CardHeader>
-      <CardContent>
-        {amount == null ? (
-          <p className="text-sm text-muted-foreground">No data</p>
-        ) : (
-          <>
-            <p className={`text-2xl font-bold ${amount >= 0 ? "text-success" : "text-destructive"}`}>
-              {fmtAmt(amount)}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">{date}</p>
-          </>
-        )}
-      </CardContent>
+      <CardContent>{content}</CardContent>
     </Card>
   );
 }
