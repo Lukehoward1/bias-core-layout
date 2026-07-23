@@ -1,10 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { format, parseISO, getDay } from "date-fns";
 import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { CardFeatureGate, TierBadge } from "@/components/journal/FeatureGate";
+import type { LinkedAccount } from "@/hooks/use-linked-accounts";
+import { getAccountColor } from "@/lib/account-colors";
+import { currencySymbol } from "@/lib/currency";
 
 interface Trade {
   id: string;
@@ -22,6 +25,11 @@ interface Trade {
   exitTime?: string;
 }
 
+interface AccountTrades {
+  account: LinkedAccount;
+  trades: Trade[];
+}
+
 interface PinState {
   isAdded: boolean;
   onAdd: () => void;
@@ -33,6 +41,9 @@ interface ReportsPerformanceProps {
   dateRangeLabel: string;
   isLocked?: boolean;
   sym?: string;
+  tradesByAccount?: AccountTrades[];
+  combineMode?: boolean;
+  canCombine?: boolean;
   pinStates?: {
     byDay: PinState;
     distribution: PinState;
@@ -41,10 +52,37 @@ interface ReportsPerformanceProps {
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked = false, sym = '£' }: ReportsPerformanceProps) {
+const DURATION_BUCKETS = [
+  { duration: 'Scalp (<1h)',      min: 0,   max: 59   },
+  { duration: 'Intraday (1-8h)', min: 60,  max: 480  },
+  { duration: 'Swing (>8h)',     min: 481, max: Infinity },
+];
+
+function computeTimedTrades(ts: Trade[]) {
+  return ts
+    .filter(t => t.entryTime && t.exitTime)
+    .map(t => {
+      const [eh, em] = t.entryTime!.split(':').map(Number);
+      const [xh, xm] = t.exitTime!.split(':').map(Number);
+      const entryMins = eh * 60 + em;
+      let exitMins = xh * 60 + xm;
+      if (exitMins < entryMins) exitMins += 24 * 60;
+      return { ...t, holdMins: exitMins - entryMins };
+    });
+}
+
+export function ReportsPerformance({
+  trades,
+  dateRangeLabel,
+  pinStates,
+  isLocked = false,
+  sym = '£',
+  tradesByAccount,
+  combineMode = false,
+  canCombine = false,
+}: ReportsPerformanceProps) {
   const { exportToPdf } = usePdfExport();
 
-  // Calculate summary stats
   const totalPnl = trades.reduce((sum, t) => sum + t.pnl, 0);
   const winningTrades = trades.filter(t => t.pnl > 0);
   const losingTrades = trades.filter(t => t.pnl < 0);
@@ -59,96 +97,137 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked
       title: 'Performance Report',
       dateRange: dateRangeLabel,
       userName: 'John Trader',
-      trades: {
-        totalPnl,
-        winRate,
-        avgRR,
-        tradeCount: trades.length,
-        bestDay: null,
-        worstDay: null,
-      },
+      trades: { totalPnl, winRate, avgRR, tradeCount: trades.length, bestDay: null, worstDay: null },
     });
   };
 
-  // Win rate by day of week
+  // Single / combined view
   const dayStats = DAYS.map((day, idx) => {
-    const dayTrades = trades.filter(t => getDay(parseISO(t.date)) === idx);
-    const wins = dayTrades.filter(t => t.pnl > 0).length;
-    const winRateVal = dayTrades.length > 0 ? (wins / dayTrades.length) * 100 : 0;
-    return { day, winRate: Math.round(winRateVal), trades: dayTrades.length };
+    const dt = trades.filter(t => getDay(parseISO(t.date)) === idx);
+    const wins = dt.filter(t => t.pnl > 0).length;
+    return { day, winRate: dt.length > 0 ? Math.round((wins / dt.length) * 100) : 0, trades: dt.length };
   });
 
-  // Trade distribution Long/Short
-  const longTrades = trades.filter(t => t.type === 'Long');
-  const shortTrades = trades.filter(t => t.type === 'Short');
   const distributionData = [
-    { name: 'Long', value: longTrades.length, fill: 'hsl(var(--success))' },
-    { name: 'Short', value: shortTrades.length, fill: 'hsl(var(--destructive))' },
+    { name: 'Long',  value: trades.filter(t => t.type === 'Long').length,  fill: 'hsl(var(--success))' },
+    { name: 'Short', value: trades.filter(t => t.type === 'Short').length, fill: 'hsl(var(--destructive))' },
   ];
 
-  // Hold time from entryTime + exitTime — same logic as ReportsPsychology
-  const timedTrades = trades
-    .filter(t => t.entryTime && t.exitTime)
-    .map(t => {
-      const [eh, em] = t.entryTime!.split(':').map(Number);
-      const [xh, xm] = t.exitTime!.split(':').map(Number);
-      const entryMins = eh * 60 + em;
-      let exitMins = xh * 60 + xm;
-      if (exitMins < entryMins) exitMins += 24 * 60;
-      return { ...t, holdMins: exitMins - entryMins };
-    });
-
+  const timedTrades = computeTimedTrades(trades);
   const hasHoldData = timedTrades.length > 0;
 
   const holdWinners = timedTrades.filter(t => t.pnl > 0);
   const holdLosers  = timedTrades.filter(t => t.pnl < 0);
   const avgHoldWinnersH = holdWinners.length > 0
-    ? parseFloat((holdWinners.reduce((s, t) => s + t.holdMins, 0) / holdWinners.length / 60).toFixed(1))
-    : 0;
+    ? parseFloat((holdWinners.reduce((s, t) => s + t.holdMins, 0) / holdWinners.length / 60).toFixed(1)) : 0;
   const avgHoldLosersH = holdLosers.length > 0
-    ? parseFloat((holdLosers.reduce((s, t) => s + t.holdMins, 0) / holdLosers.length / 60).toFixed(1))
-    : 0;
+    ? parseFloat((holdLosers.reduce((s, t) => s + t.holdMins, 0) / holdLosers.length / 60).toFixed(1)) : 0;
 
   const holdTimeData = [
     { type: 'Winners', avgHours: avgHoldWinnersH },
     { type: 'Losers',  avgHours: avgHoldLosersH  },
   ];
 
-  // P&L by duration buckets from real hold times
-  const durationBuckets = [
-    { duration: 'Scalp (<1h)',      min: 0,   max: 59   },
-    { duration: 'Intraday (1-8h)', min: 60,  max: 480  },
-    { duration: 'Swing (>8h)',     min: 481, max: Infinity },
-  ];
-
-  const durationPnl = durationBuckets.map(b => {
+  const durationPnl = DURATION_BUCKETS.map(b => {
     const bucket = timedTrades.filter(t => t.holdMins >= b.min && t.holdMins <= b.max);
-    return {
-      duration: b.duration,
-      pnl: Math.round(bucket.reduce((s, t) => s + t.pnl, 0)),
-      trades: bucket.length,
-    };
+    return { duration: b.duration, pnl: Math.round(bucket.reduce((s, t) => s + t.pnl, 0)), trades: bucket.length };
   });
 
-  // Monthly heatmap data
-  const monthlyData = trades.reduce((acc, t) => {
-    const month = format(parseISO(t.date), 'MMM yyyy');
-    if (!acc[month]) acc[month] = { month, pnl: 0, trades: 0 };
-    acc[month].pnl += t.pnl;
-    acc[month].trades += 1;
-    return acc;
-  }, {} as Record<string, { month: string; pnl: number; trades: number }>);
+  const monthlyHeatmap = Object.values(
+    trades.reduce((acc, t) => {
+      const month = format(parseISO(t.date), 'MMM yyyy');
+      if (!acc[month]) acc[month] = { month, pnl: 0, trades: 0 };
+      acc[month].pnl += t.pnl;
+      acc[month].trades += 1;
+      return acc;
+    }, {} as Record<string, { month: string; pnl: number; trades: number }>)
+  );
 
-  const monthlyHeatmap = Object.values(monthlyData);
+  const isMultiAccountMode = (tradesByAccount?.length ?? 0) > 1 && !(combineMode && canCombine);
+
+  const accountSymByName = Object.fromEntries(
+    (tradesByAccount ?? []).map(({ account }) => [account.name, currencySymbol(account.currency)])
+  );
+
+  // Grouped day win-rate bars
+  const multiDayStats = isMultiAccountMode
+    ? DAYS.map((day, dayIdx) => {
+        const row: Record<string, string | number> = { day };
+        (tradesByAccount ?? []).forEach(({ account, trades: t }) => {
+          const dt = t.filter(tr => getDay(parseISO(tr.date)) === dayIdx);
+          row[account.name] = dt.length > 0 ? Math.round((dt.filter(tr => tr.pnl > 0).length / dt.length) * 100) : 0;
+        });
+        return row;
+      })
+    : [];
+
+  // Per-account Long/Short rows
+  const perAccountDistrib = isMultiAccountMode
+    ? (tradesByAccount ?? []).map(({ account, trades: t }, idx) => ({
+        account, idx,
+        long: t.filter(tr => tr.type === 'Long').length,
+        short: t.filter(tr => tr.type === 'Short').length,
+      }))
+    : [];
+
+  // Per-account hold-time rows
+  const perAccountHold = isMultiAccountMode
+    ? (tradesByAccount ?? []).map(({ account, trades: t }, idx) => {
+        const timed = computeTimedTrades(t);
+        const w = timed.filter(tr => tr.pnl > 0);
+        const l = timed.filter(tr => tr.pnl < 0);
+        return {
+          account, idx,
+          hasTimed: timed.length > 0,
+          avgWH: w.length > 0 ? parseFloat((w.reduce((s, tr) => s + tr.holdMins, 0) / w.length / 60).toFixed(1)) : null,
+          avgLH: l.length > 0 ? parseFloat((l.reduce((s, tr) => s + tr.holdMins, 0) / l.length / 60).toFixed(1)) : null,
+        };
+      })
+    : [];
+
+  // Grouped duration P&L bars
+  const multiDurationData = isMultiAccountMode
+    ? DURATION_BUCKETS.map(b => {
+        const row: Record<string, string | number> = { duration: b.duration };
+        (tradesByAccount ?? []).forEach(({ account, trades: t }) => {
+          const timed = computeTimedTrades(t);
+          const bucket = timed.filter(tr => tr.holdMins >= b.min && tr.holdMins <= b.max);
+          row[account.name] = Math.round(bucket.reduce((s, tr) => s + tr.pnl, 0));
+        });
+        return row;
+      })
+    : [];
+
+  // Per-account monthly heatmaps
+  const perAccountMonthly = isMultiAccountMode
+    ? (tradesByAccount ?? []).map(({ account, trades: t }, idx) => ({
+        account, idx,
+        acctSym: currencySymbol(account.currency),
+        data: Object.values(
+          t.reduce((acc, tr) => {
+            const month = format(parseISO(tr.date), 'MMM yyyy');
+            if (!acc[month]) acc[month] = { month, pnl: 0, trades: 0 };
+            acc[month].pnl += tr.pnl;
+            acc[month].trades += 1;
+            return acc;
+          }, {} as Record<string, { month: string; pnl: number; trades: number }>)
+        ),
+      }))
+    : [];
+
+  const tooltipStyle = {
+    backgroundColor: 'hsl(var(--card))',
+    border: '1px solid hsl(var(--border))',
+    borderRadius: '8px',
+  };
 
   return (
     <div id="reports-performance" className="space-y-6">
-      {/* Header with export */}
       <div className="flex items-center justify-end gap-2" data-pdf-exclude>
         <PdfExportButton onClick={handleExport} />
       </div>
 
-      {/* Profit Rate by Day - with per-card pin */}
+      {/* Profit Rate by Day of Week */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -169,27 +248,35 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked
           <CardContent>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dayStats}>
-                  <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="%" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
-                    formatter={(value: number) => [`${value}%`, 'Profit Rate']}
-                    labelFormatter={(label) => `${label} (${dayStats.find(d => d.day === label)?.trades || 0} trades)`}
-                  />
-                  <Bar dataKey="winRate" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                </BarChart>
+                {isMultiAccountMode ? (
+                  <BarChart data={multiDayStats}>
+                    <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="%" />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number, name: string) => [`${v}%`, name]} />
+                    <Legend />
+                    {(tradesByAccount ?? []).map(({ account }, idx) => (
+                      <Bar key={account.id} dataKey={account.name} fill={getAccountColor(idx)} radius={[4, 4, 0, 0]} />
+                    ))}
+                  </BarChart>
+                ) : (
+                  <BarChart data={dayStats}>
+                    <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="%" />
+                    <Tooltip
+                      contentStyle={tooltipStyle}
+                      formatter={(value: number) => [`${value}%`, 'Profit Rate']}
+                      labelFormatter={(label) => `${label} (${dayStats.find(d => d.day === label)?.trades || 0} trades)`}
+                    />
+                    <Bar dataKey="winRate" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                )}
               </ResponsiveContainer>
             </div>
           </CardContent>
         </CardFeatureGate>
       </Card>
 
-      {/* Trade Distribution - with per-card pin */}
+      {/* Trade Distribution (Long/Short) */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -208,33 +295,50 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked
         </CardHeader>
         <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
           <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={distributionData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}`}
-                  >
-                    {distributionData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+            {isMultiAccountMode ? (
+              <div className="space-y-2">
+                {perAccountDistrib.map(({ account, idx, long, short }) => {
+                  const color = getAccountColor(idx);
+                  const total = long + short;
+                  return (
+                    <div key={account.id} className="flex items-center gap-3">
+                      <span className="text-xs font-semibold w-24 truncate shrink-0" style={{ color }}>
+                        {account.name}
+                      </span>
+                      <span className="text-sm text-success font-medium">Long: {long}</span>
+                      <span className="text-sm text-destructive font-medium">Short: {short}</span>
+                      {total > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          ({Math.round((long / total) * 100)}% / {Math.round((short / total) * 100)}%)
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={distributionData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                      label={({ name, value }) => `${name}: ${value}`}
+                    >
+                      {distributionData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={tooltipStyle} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </CardContent>
         </CardFeatureGate>
       </Card>
@@ -249,7 +353,34 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked
         </CardHeader>
         <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
           <CardContent>
-            {!hasHoldData ? (
+            {isMultiAccountMode ? (
+              perAccountHold.some(r => r.hasTimed) ? (
+                <div className="space-y-3">
+                  {perAccountHold.map(({ account, idx, hasTimed, avgWH, avgLH }) => {
+                    const color = getAccountColor(idx);
+                    return (
+                      <div key={account.id} className="flex items-center gap-3">
+                        <span className="text-xs font-semibold w-24 truncate shrink-0" style={{ color }}>
+                          {account.name}
+                        </span>
+                        {hasTimed ? (
+                          <>
+                            <span className="text-sm text-success">Winners: {avgWH ?? '—'}h</span>
+                            <span className="text-sm text-destructive">Losers: {avgLH ?? '—'}h</span>
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">No time data</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Add entry and exit times to your trades to see hold-time analysis.
+                </p>
+              )
+            ) : !hasHoldData ? (
               <p className="text-sm text-muted-foreground">
                 Add entry and exit times to your trades to see hold-time analysis.
               </p>
@@ -259,14 +390,7 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked
                   <BarChart data={holdTimeData}>
                     <XAxis dataKey="type" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="h" />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px'
-                      }}
-                      formatter={(value: number) => [`${value}h`, 'Avg Hold Time']}
-                    />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(value: number) => [`${value}h`, 'Avg Hold Time']} />
                     <Bar dataKey="avgHours" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -286,7 +410,33 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked
         </CardHeader>
         <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
           <CardContent>
-            {!hasHoldData ? (
+            {isMultiAccountMode ? (
+              perAccountHold.some(r => r.hasTimed) ? (
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={multiDurationData}>
+                      <XAxis dataKey="duration" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip
+                        contentStyle={tooltipStyle}
+                        formatter={(v: number, name: string) => [
+                          `${accountSymByName[name] ?? sym}${v.toLocaleString()}`,
+                          name,
+                        ]}
+                      />
+                      <Legend />
+                      {(tradesByAccount ?? []).map(({ account }, idx) => (
+                        <Bar key={account.id} dataKey={account.name} fill={getAccountColor(idx)} radius={[4, 4, 0, 0]} />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Add entry and exit times to your trades to see duration breakdown.
+                </p>
+              )
+            ) : !hasHoldData ? (
               <p className="text-sm text-muted-foreground">
                 Add entry and exit times to your trades to see duration breakdown.
               </p>
@@ -297,11 +447,7 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked
                     <XAxis dataKey="duration" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                     <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px'
-                      }}
+                      contentStyle={tooltipStyle}
                       formatter={(value: number, name: string) => {
                         if (name === 'pnl') return [`${sym}${value.toLocaleString()}`, 'P&L'];
                         return [value, 'Trades'];
@@ -316,7 +462,7 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked
         </CardFeatureGate>
       </Card>
 
-      {/* Monthly Heatmap */}
+      {/* Monthly Performance Heatmap */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -326,22 +472,50 @@ export function ReportsPerformance({ trades, dateRangeLabel, pinStates, isLocked
         </CardHeader>
         <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
           <CardContent>
-            <div className="grid grid-cols-4 md:grid-cols-6 gap-3">
-              {monthlyHeatmap.map((m, idx) => (
-                <div 
-                  key={idx}
-                  className={`p-3 rounded-lg text-center border ${
-                    m.pnl > 0 ? 'bg-success/10 border-success/30' : 'bg-destructive/10 border-destructive/30'
-                  }`}
-                >
-                  <p className="text-xs text-muted-foreground">{m.month}</p>
-                  <p className={`text-sm font-bold ${m.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
-                    {m.pnl >= 0 ? '+' : ''}{sym}{m.pnl.toLocaleString()}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{m.trades} trades</p>
-                </div>
-              ))}
-            </div>
+            {isMultiAccountMode ? (
+              <div className="space-y-6">
+                {perAccountMonthly.map(({ account, idx, acctSym, data }) => (
+                  <div key={account.id}>
+                    <p className="text-xs font-semibold mb-2" style={{ color: getAccountColor(idx) }}>
+                      {account.name}
+                    </p>
+                    <div className="grid grid-cols-4 md:grid-cols-6 gap-3">
+                      {data.map((m, i) => (
+                        <div
+                          key={i}
+                          className={`p-3 rounded-lg text-center border ${
+                            m.pnl > 0 ? 'bg-success/10 border-success/30' : 'bg-destructive/10 border-destructive/30'
+                          }`}
+                        >
+                          <p className="text-xs text-muted-foreground">{m.month}</p>
+                          <p className={`text-sm font-bold ${m.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                            {m.pnl >= 0 ? '+' : ''}{acctSym}{m.pnl.toLocaleString()}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{m.trades} trades</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-4 md:grid-cols-6 gap-3">
+                {monthlyHeatmap.map((m, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-3 rounded-lg text-center border ${
+                      m.pnl > 0 ? 'bg-success/10 border-success/30' : 'bg-destructive/10 border-destructive/30'
+                    }`}
+                  >
+                    <p className="text-xs text-muted-foreground">{m.month}</p>
+                    <p className={`text-sm font-bold ${m.pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                      {m.pnl >= 0 ? '+' : ''}{sym}{m.pnl.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{m.trades} trades</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </CardFeatureGate>
       </Card>

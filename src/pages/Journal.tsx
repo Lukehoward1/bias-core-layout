@@ -84,7 +84,7 @@ const CONFLUENCE_OPTIONS = [
 
 // ✅ Trading data (active account scope + stats)
 import { useTradingData } from "@/hooks/use-trading-data";
-import { ACTIVE_ACCOUNT_ALL } from "@/hooks/use-active-trading-account";
+import { ACTIVE_ACCOUNT_ALL, useAccountCombineMode } from "@/hooks/use-active-trading-account";
 import { useHomeCurrency } from "@/hooks/use-home-currency";
 import { currencySymbol } from "@/lib/currency";
 import { useAccountAwareStats } from "@/hooks/use-account-aware-stats";
@@ -255,6 +255,8 @@ export default function Journal() {
   const accountBalance = activeAccountId === ACTIVE_ACCOUNT_ALL
     ? (allAccountsShareCurrency ? accounts.reduce((sum, a) => sum + (a.balance ?? 0), 0) : undefined)
     : accounts.find(a => a.id === activeAccountId)?.balance;
+
+  const [combineMode] = useAccountCombineMode();
 
 
   const {
@@ -458,6 +460,18 @@ export default function Journal() {
   }, [viewTrades, dateRange]);
 
   const dateRangeLabel = `${format(dateRange.from, "MMM d, yyyy")} - ${format(dateRange.to, "MMM d, yyyy")}`;
+
+  const tradesByAccount = useMemo(
+    () =>
+      accounts
+        .map(a => ({ account: a, trades: filteredTrades.filter(t => t.accountId === a.id) }))
+        .filter(({ trades }) => trades.length > 0),
+    [filteredTrades, accounts],
+  );
+
+  const canCombine =
+    tradesByAccount.length > 0 &&
+    new Set(tradesByAccount.map(({ account }) => account.currency)).size === 1;
 
   // ✅ Top cards use viewTrades scoped by account + optional setup/tag filters
   const topStats = useMemo(() => {
@@ -2619,6 +2633,9 @@ export default function Journal() {
                   pinStates={performancePinStates}
                   isLocked={!canAccessReports}
                   sym={sym}
+                  tradesByAccount={tradesByAccount}
+                  combineMode={combineMode}
+                  canCombine={canCombine}
                 />
               </TabsContent>
               <TabsContent value="sessions" className="mt-5">
@@ -2628,6 +2645,9 @@ export default function Journal() {
                   pinStates={sessionsPinStates}
                   isLocked={!canAccessReports}
                   sym={sym}
+                  tradesByAccount={tradesByAccount}
+                  combineMode={combineMode}
+                  canCombine={canCombine}
                 />
               </TabsContent>
               <TabsContent value="assets" className="mt-5">
@@ -2637,6 +2657,9 @@ export default function Journal() {
                   pinStates={assetsPinStates}
                   isLocked={!canAccessReports}
                   sym={sym}
+                  tradesByAccount={tradesByAccount}
+                  combineMode={combineMode}
+                  canCombine={canCombine}
                 />
               </TabsContent>
               <TabsContent value="setup" className="mt-5">
@@ -2646,6 +2669,9 @@ export default function Journal() {
                   pinStates={setupPinStates}
                   isLocked={!canAccessReports}
                   sym={sym}
+                  tradesByAccount={tradesByAccount}
+                  combineMode={combineMode}
+                  canCombine={canCombine}
                 />
               </TabsContent>
               <TabsContent value="psychology" className="mt-5">
@@ -2655,6 +2681,9 @@ export default function Journal() {
                   pinStates={psychologyPinStates}
                   isLocked={!canAccessReports}
                   sym={sym}
+                  tradesByAccount={tradesByAccount}
+                  combineMode={combineMode}
+                  canCombine={canCombine}
                 />
               </TabsContent>
               <TabsContent value="risk" className="mt-5">
@@ -2665,10 +2694,13 @@ export default function Journal() {
                   isLocked={!canAccessReports}
                   sym={sym}
                   accountBalance={accountBalance}
+                  tradesByAccount={tradesByAccount}
+                  combineMode={combineMode}
+                  canCombine={canCombine}
                 />
               </TabsContent>
               <TabsContent value="tradelog" className="mt-5">
-                <ReportsTradeLog trades={filteredTrades} dateRangeLabel={dateRangeLabel} sym={sym} />
+                <ReportsTradeLog trades={filteredTrades} dateRangeLabel={dateRangeLabel} sym={sym} activeAccountId={activeAccountId} />
               </TabsContent>
             </Tabs>
           </TabsContent>

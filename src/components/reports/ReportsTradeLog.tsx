@@ -1,5 +1,5 @@
 // src/components/reports/ReportsTradeLog.tsx
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Download, Search, TrendingUp, TrendingDown, Star } from "lucide-react";
 import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
+import { ACTIVE_ACCOUNT_ALL } from "@/hooks/use-active-trading-account";
 
 interface Trade {
   id: string;
@@ -33,6 +34,7 @@ interface ReportsTradeLogProps {
   trades: Trade[];
   dateRangeLabel: string;
   sym?: string;
+  activeAccountId?: string;
 }
 
 type SortOption = "date-desc" | "date-asc" | "pnl-desc" | "pnl-asc" | "rating-desc" | "rating-asc";
@@ -52,7 +54,7 @@ const csvEscape = (v: unknown) => {
   return s;
 };
 
-export function ReportsTradeLog({ trades, dateRangeLabel, sym = '£' }: ReportsTradeLogProps) {
+export function ReportsTradeLog({ trades, dateRangeLabel, sym = '£', activeAccountId }: ReportsTradeLogProps) {
   const { exportToPdf } = usePdfExport();
   const { accounts, primaryAccount } = useLinkedAccounts();
 
@@ -89,8 +91,20 @@ export function ReportsTradeLog({ trades, dateRangeLabel, sym = '£' }: ReportsT
   const [pnlFilter, setPnlFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<SortOption>("date-desc");
 
-  // ✅ Account filter
-  const [accountFilter, setAccountFilter] = useState<AccountFilter>("all");
+  // ✅ Account filter — seeded from global account selection, user can override
+  const [accountFilter, setAccountFilter] = useState<AccountFilter>(() =>
+    activeAccountId && activeAccountId !== ACTIVE_ACCOUNT_ALL
+      ? `account:${activeAccountId}` as AccountFilter
+      : "all"
+  );
+
+  useEffect(() => {
+    setAccountFilter(
+      activeAccountId && activeAccountId !== ACTIVE_ACCOUNT_ALL
+        ? `account:${activeAccountId}` as AccountFilter
+        : "all"
+    );
+  }, [activeAccountId]);
 
   const uniquePairs = useMemo(() => [...new Set(trades.map((t) => t.pair))], [trades]);
 
