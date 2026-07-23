@@ -37,6 +37,7 @@ import { ACTIVE_ACCOUNT_ALL, useAccountCombineMode } from "@/hooks/use-active-tr
 import { useAccountAwareStats } from "@/hooks/use-account-aware-stats";
 import { AccountAwareEquityChart } from "@/components/shared/AccountAwareEquityChart";
 import { AccountAwareStat } from "@/components/shared/AccountAwareStat";
+import { getAccountColor, shortAccountName } from "@/lib/account-colors";
 
 export interface CardRenderContext {
   slotType: "wide" | "narrow" | "equal" | "hero" | "kpi" | "wide-narrow" | "three-equal" | "four-equal";
@@ -1008,7 +1009,7 @@ function BestWorstDayCard({ type }: { type: "best" | "worst" }) {
               <div key={accountId} className="flex items-center justify-between px-2 py-1 rounded-md bg-muted/50">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <span className="flex-shrink-0 w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-                  <span className="text-xs text-muted-foreground truncate">{entry.account.name}</span>
+                  <span className="text-xs text-muted-foreground truncate" title={entry.account.name}>{shortAccountName(entry.account.name)}</span>
                 </div>
                 <span className="text-sm text-muted-foreground ml-2">—</span>
               </div>
@@ -1020,7 +1021,7 @@ function BestWorstDayCard({ type }: { type: "best" | "worst" }) {
               <div className="flex items-center gap-1.5 min-w-0">
                 <span className="flex-shrink-0 w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
                 <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">{entry.account.name}</p>
+                  <p className="text-xs text-muted-foreground truncate" title={entry.account.name}>{shortAccountName(entry.account.name)}</p>
                   <p className="text-xs text-muted-foreground">{day.date}</p>
                 </div>
               </div>

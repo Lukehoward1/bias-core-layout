@@ -14,7 +14,7 @@ import {
   ACTIVE_ACCOUNT_ALL,
   useAccountCombineMode,
 } from "@/hooks/use-active-trading-account";
-import { getAccountColor } from "@/lib/account-colors";
+import { getAccountColor, shortAccountName } from "@/lib/account-colors";
 import type { AccountEntry, AccountStats } from "@/hooks/use-account-aware-stats";
 
 export interface AccountAwareStatProps {
@@ -76,7 +76,7 @@ function AccountRows({
                 className="flex-shrink-0 w-2 h-2 rounded-full"
                 style={{ backgroundColor: color }}
               />
-              <span className="text-xs text-muted-foreground truncate">{entry.account.name}</span>
+              <span className="text-xs text-muted-foreground truncate" title={entry.account.name}>{shortAccountName(entry.account.name)}</span>
             </div>
             <span className={`text-sm font-semibold ml-2 flex-shrink-0 ${valColor}`}>
               {display}
