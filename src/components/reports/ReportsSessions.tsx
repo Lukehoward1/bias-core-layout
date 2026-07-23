@@ -289,6 +289,7 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = 
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="%" />
                     <Tooltip
                       contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                      cursor={{ fill: 'hsl(var(--muted))', opacity: 0.15 }}
                       formatter={(value: number, name: string) => [`${value}%`, shortAccountName(name)]}
                     />
                     <Legend formatter={(v: string) => shortAccountName(v)} />
@@ -302,6 +303,7 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = 
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                     <Tooltip
                       contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                      cursor={{ fill: 'hsl(var(--muted))', opacity: 0.15 }}
                       formatter={(value: number, name: string) => {
                         if (name === 'winRate') return [`${value}%`, 'Profit Rate'];
                         if (name === 'pnl') return [`${sym}${value.toLocaleString()}`, 'P&L'];
@@ -336,6 +338,7 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = 
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                     <Tooltip
                       contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                      cursor={{ fill: 'hsl(var(--muted))', opacity: 0.15 }}
                       formatter={(value: number, name: string) => {
                         const acctSym = accountSymByName[name] ?? sym;
                         return [`${acctSym}${value.toLocaleString()}`, shortAccountName(name)];
@@ -352,6 +355,7 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = 
                     <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" width={70} />
                     <Tooltip
                       contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                      cursor={{ fill: 'hsl(var(--muted))', opacity: 0.15 }}
                       formatter={(value: number) => [`${sym}${value.toLocaleString()}`, 'P&L']}
                     />
                     <Bar dataKey="pnl" fill="hsl(var(--success))" radius={[0, 4, 4, 0]} />

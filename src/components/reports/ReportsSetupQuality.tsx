@@ -305,6 +305,7 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates, isLocke
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                     <Tooltip
                       contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                      cursor={{ fill: 'hsl(var(--muted))', opacity: 0.15 }}
                       formatter={(value: number, name: string) => {
                         const acctSym = accountSymByName[name] ?? sym;
                         return [`${acctSym}${value}`, shortAccountName(name)];
@@ -321,6 +322,7 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates, isLocke
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                     <Tooltip
                       contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
+                      cursor={{ fill: 'hsl(var(--muted))', opacity: 0.15 }}
                       formatter={(value: number, name: string) => {
                         if (name === 'expectancy') return [`${sym}${value}`, 'Expectancy'];
                         if (name === 'winRate') return [`${value}%`, 'Profit Rate'];

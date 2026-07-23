@@ -252,7 +252,7 @@ export function ReportsPerformance({
                   <BarChart data={multiDayStats}>
                     <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="%" />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number, name: string) => [`${v}%`, shortAccountName(name)]} />
+                    <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.15 }} formatter={(v: number, name: string) => [`${v}%`, shortAccountName(name)]} />
                     <Legend formatter={(v: string) => shortAccountName(v)} />
                     {(tradesByAccount ?? []).map(({ account }, idx) => (
                       <Bar key={account.id} dataKey={account.name} fill={getAccountColor(idx)} radius={[4, 4, 0, 0]} />
@@ -264,6 +264,7 @@ export function ReportsPerformance({
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="%" />
                     <Tooltip
                       contentStyle={tooltipStyle}
+                      cursor={{ fill: 'hsl(var(--muted))', opacity: 0.15 }}
                       formatter={(value: number) => [`${value}%`, 'Profit Rate']}
                       labelFormatter={(label) => `${label} (${dayStats.find(d => d.day === label)?.trades || 0} trades)`}
                     />
@@ -390,7 +391,7 @@ export function ReportsPerformance({
                   <BarChart data={holdTimeData}>
                     <XAxis dataKey="type" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="h" />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(value: number) => [`${value}h`, 'Avg Hold Time']} />
+                    <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.15 }} formatter={(value: number) => [`${value}h`, 'Avg Hold Time']} />
                     <Bar dataKey="avgHours" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -419,6 +420,7 @@ export function ReportsPerformance({
                       <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                       <Tooltip
                         contentStyle={tooltipStyle}
+                        cursor={{ fill: 'hsl(var(--muted))', opacity: 0.15 }}
                         formatter={(v: number, name: string) => [
                           `${accountSymByName[name] ?? sym}${v.toLocaleString()}`,
                           shortAccountName(name),
@@ -448,6 +450,7 @@ export function ReportsPerformance({
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                     <Tooltip
                       contentStyle={tooltipStyle}
+                      cursor={{ fill: 'hsl(var(--muted))', opacity: 0.15 }}
                       formatter={(value: number, name: string) => {
                         if (name === 'pnl') return [`${sym}${value.toLocaleString()}`, 'P&L'];
                         return [value, 'Trades'];
