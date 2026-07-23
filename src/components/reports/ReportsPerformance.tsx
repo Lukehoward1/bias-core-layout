@@ -185,6 +185,20 @@ export function ReportsPerformance({
       })
     : [];
 
+  // Hold time chart data — Winners/Losers bars per account (exclude accounts with no timed trades)
+  const holdTimeChartData = isMultiAccountMode
+    ? perAccountHold
+        .filter(r => r.hasTimed)
+        .map(({ account, avgWH, avgLH }) => ({
+          account: shortAccountName(account.name),
+          Winners: avgWH ?? 0,
+          Losers: avgLH ?? 0,
+        }))
+    : [];
+  const holdTimeNoDataAccounts = isMultiAccountMode
+    ? perAccountHold.filter(r => !r.hasTimed).map(r => shortAccountName(r.account.name))
+    : [];
+
   // Grouped duration P&L bars
   const multiDurationData = isMultiAccountMode
     ? DURATION_BUCKETS.map(b => {
@@ -375,26 +389,25 @@ export function ReportsPerformance({
           <CardContent>
             {isMultiAccountMode ? (
               perAccountHold.some(r => r.hasTimed) ? (
-                <div className="space-y-3">
-                  {perAccountHold.map(({ account, idx, hasTimed, avgWH, avgLH }) => {
-                    const color = getAccountColor(idx);
-                    return (
-                      <div key={account.id} className="flex items-center gap-3">
-                        <span className="text-xs font-semibold w-24 truncate shrink-0" style={{ color }} title={account.name}>
-                          {shortAccountName(account.name)}
-                        </span>
-                        {hasTimed ? (
-                          <>
-                            <span className="text-sm text-success">Winners: {avgWH ?? '—'}h</span>
-                            <span className="text-sm text-destructive">Losers: {avgLH ?? '—'}h</span>
-                          </>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">No time data</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                <>
+                  <div className="h-48">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={holdTimeChartData}>
+                        <XAxis dataKey="account" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                        <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="h" />
+                        <Tooltip contentStyle={tooltipStyle} cursor={false} formatter={(value: number, name: string) => [`${value}h`, name]} />
+                        <Legend />
+                        <Bar dataKey="Winners" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="Losers" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  {holdTimeNoDataAccounts.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      No time data: {holdTimeNoDataAccounts.join(', ')}
+                    </p>
+                  )}
+                </>
               ) : (
                 <p className="text-sm text-muted-foreground">
                   Add entry and exit times to your trades to see hold-time analysis.
