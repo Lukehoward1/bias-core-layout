@@ -7,7 +7,7 @@ import { usePdfExport } from "@/hooks/use-pdf-export";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { CardFeatureGate, TierBadge } from "@/components/journal/FeatureGate";
 import type { LinkedAccount } from "@/hooks/use-linked-accounts";
-import { getAccountColor } from "@/lib/account-colors";
+import { getAccountColor, shortAccountName } from "@/lib/account-colors";
 import { currencySymbol } from "@/lib/currency";
 
 interface Trade {
@@ -179,8 +179,8 @@ export function ReportsAssets({
                   const color = getAccountColor(idx);
                   return (
                     <div key={account.id} className="flex items-center gap-3 flex-wrap">
-                      <span className="text-xs font-semibold w-24 truncate shrink-0" style={{ color }}>
-                        {account.name}
+                      <span className="text-xs font-semibold w-24 truncate shrink-0" style={{ color }} title={account.name}>
+                        {shortAccountName(account.name)}
                       </span>
                       {best ? (
                         <>
@@ -250,7 +250,7 @@ export function ReportsAssets({
                         name,
                       ]}
                     />
-                    <Legend />
+                    <Legend formatter={(v: string) => shortAccountName(v)} />
                     {(tradesByAccount ?? []).map(({ account }, idx) => (
                       <Bar
                         key={account.id}
@@ -303,7 +303,7 @@ export function ReportsAssets({
                     return (
                       <div key={account.id} className="flex items-center justify-between p-2 rounded-lg bg-success/5 border border-success/20">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium" style={{ color }}>{account.name}</span>
+                          <span className="text-xs font-medium" style={{ color }} title={account.name}>{shortAccountName(account.name)}</span>
                           {best && <Badge variant="outline">{best.pair}</Badge>}
                         </div>
                         <span className="text-sm font-bold text-success">
@@ -350,7 +350,7 @@ export function ReportsAssets({
                     return (
                       <div key={account.id} className="flex items-center justify-between p-2 rounded-lg bg-destructive/5 border border-destructive/20">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium" style={{ color }}>{account.name}</span>
+                          <span className="text-xs font-medium" style={{ color }} title={account.name}>{shortAccountName(account.name)}</span>
                           {worst && <Badge variant="outline">{worst.pair}</Badge>}
                         </div>
                         <span className={`text-sm font-bold ${(worst?.pnl ?? 0) >= 0 ? 'text-success' : 'text-destructive'}`}>
@@ -422,10 +422,11 @@ export function ReportsAssets({
                         <tr key={`${p.pair}_${p.account.id}`} className="border-b border-border/50 hover:bg-muted/30">
                           <td className="py-3 px-3">
                             <span
-                              className="text-xs font-semibold"
+                              className="text-xs font-semibold block truncate"
                               style={{ color: getAccountColor(p.accountIdx) }}
+                              title={p.account.name}
                             >
-                              {p.account.name}
+                              {shortAccountName(p.account.name)}
                             </span>
                           </td>
                           <td className="py-3 px-3"><Badge variant="outline">{p.pair}</Badge></td>

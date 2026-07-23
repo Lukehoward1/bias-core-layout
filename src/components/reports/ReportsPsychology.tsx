@@ -5,7 +5,7 @@ import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { CardFeatureGate, TierBadge } from "@/components/journal/FeatureGate";
-import { getAccountColor } from "@/lib/account-colors";
+import { getAccountColor, shortAccountName } from "@/lib/account-colors";
 import { currencySymbol } from "@/lib/currency";
 import type { LinkedAccount } from "@/hooks/use-linked-accounts";
 
@@ -229,7 +229,7 @@ export function ReportsPsychology({ trades, dateRangeLabel, pinStates, isLocked 
               <div className="space-y-3">
                 {perAccountPsych.map(({ account, withNotes, posNotes, negNotes }, idx) => (
                   <div key={account.id} className="space-y-1">
-                    <p className="text-sm font-semibold" style={{ color: getAccountColor(idx) }}>{account.name}</p>
+                    <p className="text-sm font-semibold truncate" style={{ color: getAccountColor(idx) }} title={account.name}>{shortAccountName(account.name)}</p>
                     <div className="grid grid-cols-3 gap-2">
                       <div className="p-2 rounded-lg bg-muted/30 border text-center">
                         <p className="text-lg font-bold text-foreground">{withNotes.length}</p>
@@ -339,7 +339,7 @@ export function ReportsPsychology({ trades, dateRangeLabel, pinStates, isLocked 
               <div className="space-y-5">
                 {perAccountPsych.map(({ account, acctTriggers, acctSym }, idx) => (
                   <div key={account.id}>
-                    <p className="text-sm font-semibold mb-2" style={{ color: getAccountColor(idx) }}>{account.name}</p>
+                    <p className="text-sm font-semibold mb-2 truncate" style={{ color: getAccountColor(idx) }} title={account.name}>{shortAccountName(account.name)}</p>
                     {acctTriggers.length > 0 ? (
                       <div className="space-y-2">
                         {acctTriggers.map((t) => (
@@ -454,7 +454,7 @@ export function ReportsPsychology({ trades, dateRangeLabel, pinStates, isLocked 
               <div className="space-y-4">
                 {perAccountPsych.map(({ account, acctConfident, acctSym }, idx) => (
                   <div key={account.id}>
-                    <p className="text-sm font-semibold mb-2" style={{ color: getAccountColor(idx) }}>{account.name}</p>
+                    <p className="text-sm font-semibold mb-2 truncate" style={{ color: getAccountColor(idx) }} title={account.name}>{shortAccountName(account.name)}</p>
                     {acctConfident.length > 0 ? (
                       <div className="space-y-2">
                         {acctConfident.map((t) => (
@@ -512,7 +512,7 @@ export function ReportsPsychology({ trades, dateRangeLabel, pinStates, isLocked 
                   if (acctHold.length === 0) return null;
                   return (
                     <div key={account.id}>
-                      <p className="text-sm font-semibold mb-2" style={{ color: getAccountColor(idx) }}>{account.name}</p>
+                      <p className="text-sm font-semibold mb-2 truncate" style={{ color: getAccountColor(idx) }} title={account.name}>{shortAccountName(account.name)}</p>
                       <div className="grid grid-cols-2 gap-3">
                         <div className="p-3 rounded-lg bg-success/5 border border-success/20">
                           <p className="text-xs text-muted-foreground">Avg Hold — Winners</p>
@@ -608,7 +608,7 @@ export function ReportsPsychology({ trades, dateRangeLabel, pinStates, isLocked 
               <div className="space-y-3">
                 {perAccountPsych.map(({ account, improvement }, idx) => (
                   <div key={account.id}>
-                    <p className="text-xs font-semibold mb-1" style={{ color: getAccountColor(idx) }}>{account.name}</p>
+                    <p className="text-xs font-semibold mb-1 truncate" style={{ color: getAccountColor(idx) }} title={account.name}>{shortAccountName(account.name)}</p>
                     <p className="text-sm text-foreground">{improvement}</p>
                   </div>
                 ))}

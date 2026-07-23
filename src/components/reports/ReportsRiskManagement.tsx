@@ -7,7 +7,7 @@ import { usePdfExport } from "@/hooks/use-pdf-export";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { CardFeatureGate, TierBadge } from "@/components/journal/FeatureGate";
 import { calculateTradeRisk } from "@/lib/risk-calculations";
-import { getAccountColor } from "@/lib/account-colors";
+import { getAccountColor, shortAccountName } from "@/lib/account-colors";
 import { currencySymbol } from "@/lib/currency";
 import type { LinkedAccount } from "@/hooks/use-linked-accounts";
 
@@ -182,7 +182,7 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLoc
               <div className="space-y-4">
                 {perAccountRisk.map(({ account, acctSym, avgRisk, maxRisk, maxLoss, totalLoss, losingTrades: ld, coverage, risks }, idx) => (
                   <div key={account.id}>
-                    <p className="text-sm font-semibold mb-2" style={{ color: getAccountColor(idx) }}>{account.name}</p>
+                    <p className="text-sm font-semibold mb-2 truncate" style={{ color: getAccountColor(idx) }} title={account.name}>{shortAccountName(account.name)}</p>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                       <div>
                         <p className="text-xs text-muted-foreground">Avg Risk/Trade</p>
@@ -272,9 +272,9 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLoc
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                     <Tooltip
                       contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
-                      formatter={(value: number, name: string) => [value, name]}
+                      formatter={(value: number, name: string) => [value, shortAccountName(name)]}
                     />
-                    <Legend />
+                    <Legend formatter={(v: string) => shortAccountName(v)} />
                     {perAccountRisk.map(({ account }, idx) => (
                       <Bar key={account.id} dataKey={account.name} fill={getAccountColor(idx)} radius={[4, 4, 0, 0]} />
                     ))}
@@ -313,7 +313,7 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLoc
               <div className="space-y-5">
                 {perAccountRisk.map(({ account, acctSym, threshold, excessiveTrades }, idx) => (
                   <div key={account.id}>
-                    <p className="text-sm font-semibold mb-2" style={{ color: getAccountColor(idx) }}>{account.name}</p>
+                    <p className="text-sm font-semibold mb-2 truncate" style={{ color: getAccountColor(idx) }} title={account.name}>{shortAccountName(account.name)}</p>
                     {threshold == null ? (
                       <p className="text-xs text-muted-foreground">Set an account balance to enable threshold detection (2% of balance).</p>
                     ) : excessiveTrades.length > 0 ? (
@@ -427,7 +427,7 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLoc
                       </div>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold" style={{ color: getAccountColor(idx) }}>{account.name}</p>
+                      <p className="text-sm font-semibold truncate" style={{ color: getAccountColor(idx) }} title={account.name}>{shortAccountName(account.name)}</p>
                       <p className={`text-base font-bold ${disciplineScore >= 60 ? 'text-success' : 'text-destructive'}`}>
                         {getScoreLabel(disciplineScore)}
                       </p>

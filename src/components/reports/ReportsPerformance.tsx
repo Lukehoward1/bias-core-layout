@@ -6,7 +6,7 @@ import { usePdfExport } from "@/hooks/use-pdf-export";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { CardFeatureGate, TierBadge } from "@/components/journal/FeatureGate";
 import type { LinkedAccount } from "@/hooks/use-linked-accounts";
-import { getAccountColor } from "@/lib/account-colors";
+import { getAccountColor, shortAccountName } from "@/lib/account-colors";
 import { currencySymbol } from "@/lib/currency";
 
 interface Trade {
@@ -252,8 +252,8 @@ export function ReportsPerformance({
                   <BarChart data={multiDayStats}>
                     <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="%" />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number, name: string) => [`${v}%`, name]} />
-                    <Legend />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number, name: string) => [`${v}%`, shortAccountName(name)]} />
+                    <Legend formatter={(v: string) => shortAccountName(v)} />
                     {(tradesByAccount ?? []).map(({ account }, idx) => (
                       <Bar key={account.id} dataKey={account.name} fill={getAccountColor(idx)} radius={[4, 4, 0, 0]} />
                     ))}
@@ -302,8 +302,8 @@ export function ReportsPerformance({
                   const total = long + short;
                   return (
                     <div key={account.id} className="flex items-center gap-3">
-                      <span className="text-xs font-semibold w-24 truncate shrink-0" style={{ color }}>
-                        {account.name}
+                      <span className="text-xs font-semibold w-24 truncate shrink-0" style={{ color }} title={account.name}>
+                        {shortAccountName(account.name)}
                       </span>
                       <span className="text-sm text-success font-medium">Long: {long}</span>
                       <span className="text-sm text-destructive font-medium">Short: {short}</span>
@@ -360,8 +360,8 @@ export function ReportsPerformance({
                     const color = getAccountColor(idx);
                     return (
                       <div key={account.id} className="flex items-center gap-3">
-                        <span className="text-xs font-semibold w-24 truncate shrink-0" style={{ color }}>
-                          {account.name}
+                        <span className="text-xs font-semibold w-24 truncate shrink-0" style={{ color }} title={account.name}>
+                          {shortAccountName(account.name)}
                         </span>
                         {hasTimed ? (
                           <>
@@ -421,10 +421,10 @@ export function ReportsPerformance({
                         contentStyle={tooltipStyle}
                         formatter={(v: number, name: string) => [
                           `${accountSymByName[name] ?? sym}${v.toLocaleString()}`,
-                          name,
+                          shortAccountName(name),
                         ]}
                       />
-                      <Legend />
+                      <Legend formatter={(v: string) => shortAccountName(v)} />
                       {(tradesByAccount ?? []).map(({ account }, idx) => (
                         <Bar key={account.id} dataKey={account.name} fill={getAccountColor(idx)} radius={[4, 4, 0, 0]} />
                       ))}
@@ -476,8 +476,8 @@ export function ReportsPerformance({
               <div className="space-y-6">
                 {perAccountMonthly.map(({ account, idx, acctSym, data }) => (
                   <div key={account.id}>
-                    <p className="text-xs font-semibold mb-2" style={{ color: getAccountColor(idx) }}>
-                      {account.name}
+                    <p className="text-xs font-semibold mb-2 truncate" style={{ color: getAccountColor(idx) }} title={account.name}>
+                      {shortAccountName(account.name)}
                     </p>
                     <div className="grid grid-cols-4 md:grid-cols-6 gap-3">
                       {data.map((m, i) => (

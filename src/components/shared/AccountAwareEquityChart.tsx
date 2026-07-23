@@ -24,7 +24,7 @@ import {
   ACTIVE_ACCOUNT_ALL,
   useAccountCombineMode,
 } from "@/hooks/use-active-trading-account";
-import { getAccountColor } from "@/lib/account-colors";
+import { getAccountColor, shortAccountName } from "@/lib/account-colors";
 import { currencySymbol } from "@/lib/currency";
 import type { AccountEntry, EquityPoint } from "@/hooks/use-account-aware-stats";
 
@@ -241,7 +241,7 @@ function MultiSeriesChart({ accounts, curveType, height, baseGradId }: MultiSeri
                     const sign = pct >= 0 ? "+" : "";
                     return (
                       <p key={accountId} style={{ color, margin: "2px 0" }}>
-                        {entry?.account.name}: {sym}
+                        {shortAccountName(entry?.account.name ?? "")}: {sym}
                         {actual.toLocaleString()} ({sign}
                         {pct.toFixed(1)}%)
                       </p>
@@ -349,8 +349,8 @@ export function AccountAwareEquityChart({
         const data = pickCurve(entry);
         return (
           <div key={accountId}>
-            <p className="text-xs font-medium mb-1" style={{ color }}>
-              {entry.account.name}
+            <p className="text-xs font-medium mb-1 truncate" style={{ color }} title={entry.account.name}>
+              {shortAccountName(entry.account.name)}
             </p>
             <SingleChart
               data={data}

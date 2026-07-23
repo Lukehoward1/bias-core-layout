@@ -6,7 +6,7 @@ import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { CardFeatureGate, TierBadge } from "@/components/journal/FeatureGate";
-import { getAccountColor } from "@/lib/account-colors";
+import { getAccountColor, shortAccountName } from "@/lib/account-colors";
 import { currencySymbol } from "@/lib/currency";
 import type { LinkedAccount } from "@/hooks/use-linked-accounts";
 
@@ -213,7 +213,7 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates, isLocke
               <div className="space-y-4">
                 {perAccountSetup.map(({ account, acctSym, best, worst }, idx) => (
                   <div key={account.id}>
-                    <p className="text-sm font-semibold mb-2" style={{ color: getAccountColor(idx) }}>{account.name}</p>
+                    <p className="text-sm font-semibold mb-2 truncate" style={{ color: getAccountColor(idx) }} title={account.name}>{shortAccountName(account.name)}</p>
                     {!best && !worst ? (
                       <p className="text-xs text-muted-foreground">No rated trades yet.</p>
                     ) : (
@@ -307,10 +307,10 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates, isLocke
                       contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
                       formatter={(value: number, name: string) => {
                         const acctSym = accountSymByName[name] ?? sym;
-                        return [`${acctSym}${value}`, name];
+                        return [`${acctSym}${value}`, shortAccountName(name)];
                       }}
                     />
-                    <Legend />
+                    <Legend formatter={(v: string) => shortAccountName(v)} />
                     {perAccountSetup.map(({ account }, idx) => (
                       <Bar key={account.id} dataKey={account.name} fill={getAccountColor(idx)} radius={[4, 4, 0, 0]} />
                     ))}
@@ -366,7 +366,7 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates, isLocke
                     multiTableRows.map((s, i) => (
                       <tr key={`${s.accountName}-${s.rating}-${i}`} className="border-b border-border/50 hover:bg-muted/30">
                         <td className="py-3 px-3">
-                          <span className="text-xs font-medium" style={{ color: getAccountColor(s.colorIdx) }}>{s.accountName}</span>
+                          <span className="text-xs font-medium block truncate" style={{ color: getAccountColor(s.colorIdx) }} title={s.accountName}>{shortAccountName(s.accountName)}</span>
                         </td>
                         <td className="py-3 px-3">
                           <div className="flex items-center gap-1">
@@ -495,7 +495,7 @@ export function ReportsSetupQuality({ trades, dateRangeLabel, pinStates, isLocke
                     if (acctTimeData.length === 0) return null;
                     return (
                       <div key={account.id}>
-                        <p className="text-sm font-semibold mb-2" style={{ color: getAccountColor(idx) }}>{account.name}</p>
+                        <p className="text-sm font-semibold mb-2 truncate" style={{ color: getAccountColor(idx) }} title={account.name}>{shortAccountName(account.name)}</p>
                         <div className="h-36">
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={acctTimeData}>

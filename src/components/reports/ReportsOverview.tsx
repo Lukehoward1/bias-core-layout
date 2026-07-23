@@ -14,7 +14,7 @@ import {
   ACTIVE_ACCOUNT_ALL,
   useAccountCombineMode,
 } from "@/hooks/use-active-trading-account";
-import { getAccountColor } from "@/lib/account-colors";
+import { getAccountColor, shortAccountName } from "@/lib/account-colors";
 
 interface Trade {
   id: string;
@@ -177,7 +177,7 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
                   style={{ backgroundColor: color }}
                 />
                 <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">{entry.account.name}</p>
+                  <p className="text-xs text-muted-foreground truncate" title={entry.account.name}>{shortAccountName(entry.account.name)}</p>
                   {day && <p className="text-xs text-muted-foreground">{day.date}</p>}
                 </div>
               </div>

@@ -6,7 +6,7 @@ import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { CardFeatureGate, TierBadge } from "@/components/journal/FeatureGate";
-import { getAccountColor } from "@/lib/account-colors";
+import { getAccountColor, shortAccountName } from "@/lib/account-colors";
 import { currencySymbol } from "@/lib/currency";
 import type { LinkedAccount } from "@/hooks/use-linked-accounts";
 
@@ -194,7 +194,7 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = 
                       const acctSym = accountSymByName[account.name] ?? sym;
                       return (
                         <div key={account.id} className="flex items-center justify-between text-sm">
-                          <span className="font-medium" style={{ color: getAccountColor(idx) }}>{account.name}</span>
+                          <span className="font-medium" style={{ color: getAccountColor(idx) }} title={account.name}>{shortAccountName(account.name)}</span>
                           <span className="text-muted-foreground">{s.winRate}% · <span className={s.pnl >= 0 ? 'text-success' : 'text-destructive'}>{s.pnl >= 0 ? '+' : ''}{acctSym}{s.pnl.toLocaleString()}</span> · {s.trades}T</span>
                         </div>
                       );
@@ -289,9 +289,9 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = 
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="%" />
                     <Tooltip
                       contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
-                      formatter={(value: number, name: string) => [`${value}%`, name]}
+                      formatter={(value: number, name: string) => [`${value}%`, shortAccountName(name)]}
                     />
-                    <Legend />
+                    <Legend formatter={(v: string) => shortAccountName(v)} />
                     {perAccountSessions.map(({ account }, idx) => (
                       <Bar key={account.id} dataKey={account.name} fill={getAccountColor(idx)} radius={[4, 4, 0, 0]} />
                     ))}
@@ -338,10 +338,10 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = 
                       contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
                       formatter={(value: number, name: string) => {
                         const acctSym = accountSymByName[name] ?? sym;
-                        return [`${acctSym}${value.toLocaleString()}`, name];
+                        return [`${acctSym}${value.toLocaleString()}`, shortAccountName(name)];
                       }}
                     />
-                    <Legend />
+                    <Legend formatter={(v: string) => shortAccountName(v)} />
                     {perAccountSessions.map(({ account }, idx) => (
                       <Bar key={account.id} dataKey={account.name} fill={getAccountColor(idx)} radius={[4, 4, 0, 0]} />
                     ))}
@@ -394,7 +394,7 @@ export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = 
                     if (!str && !wk) return null;
                     return (
                       <div key={account.id}>
-                        <p className="text-sm font-semibold mb-2" style={{ color: getAccountColor(idx) }}>{account.name}</p>
+                        <p className="text-sm font-semibold mb-2 truncate" style={{ color: getAccountColor(idx) }} title={account.name}>{shortAccountName(account.name)}</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {str && (
                             <div className="p-3 rounded-lg border-success/30 bg-success/5 border">

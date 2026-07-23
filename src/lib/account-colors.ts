@@ -21,3 +21,11 @@ export const ACCOUNT_COLORS = [
 export function getAccountColor(index: number): string {
   return `hsl(var(${ACCOUNT_COLORS[index % ACCOUNT_COLORS.length]}))`;
 }
+
+/**
+ * Returns a display-safe account name by stripping any trailing
+ * parenthetical broker suffix, e.g. "Demo Account (StreamBias)" → "Demo Account".
+ */
+export function shortAccountName(name: string): string {
+  return name.replace(/\s*\([^)]*\)\s*$/, '').trim();
+}
