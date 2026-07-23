@@ -245,7 +245,7 @@ export function ReportsAssets({
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
                       }}
-                      cursor={{ fill: 'hsl(var(--muted))', opacity: 0.15 }}
+                      cursor={false}
                       formatter={(value: number, name: string) => [
                         `${accountSymByName[name] ?? sym}${value.toLocaleString()}`,
                         name,
@@ -271,7 +271,7 @@ export function ReportsAssets({
                         border: '1px solid hsl(var(--border))',
                         borderRadius: '8px',
                       }}
-                      cursor={{ fill: 'hsl(var(--muted))', opacity: 0.15 }}
+                      cursor={false}
                       formatter={(value: number) => [`${sym}${value.toLocaleString()}`, 'P&L']}
                     />
                     <Bar dataKey="pnl" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />

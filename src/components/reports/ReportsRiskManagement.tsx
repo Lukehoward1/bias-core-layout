@@ -272,7 +272,7 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLoc
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                     <Tooltip
                       contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
-                      cursor={{ fill: 'hsl(var(--muted))', opacity: 0.15 }}
+                      cursor={false}
                       formatter={(value: number, name: string) => [value, shortAccountName(name)]}
                     />
                     <Legend formatter={(v: string) => shortAccountName(v)} />
@@ -286,7 +286,7 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLoc
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                     <Tooltip
                       contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
-                      cursor={{ fill: 'hsl(var(--muted))', opacity: 0.15 }}
+                      cursor={false}
                       formatter={(value: number) => [value, 'Trades']}
                     />
                     <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />

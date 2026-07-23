@@ -252,7 +252,7 @@ export function ReportsPerformance({
                   <BarChart data={multiDayStats}>
                     <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="%" />
-                    <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.15 }} formatter={(v: number, name: string) => [`${v}%`, shortAccountName(name)]} />
+                    <Tooltip contentStyle={tooltipStyle} cursor={false} formatter={(v: number, name: string) => [`${v}%`, shortAccountName(name)]} />
                     <Legend formatter={(v: string) => shortAccountName(v)} />
                     {(tradesByAccount ?? []).map(({ account }, idx) => (
                       <Bar key={account.id} dataKey={account.name} fill={getAccountColor(idx)} radius={[4, 4, 0, 0]} />
@@ -264,7 +264,7 @@ export function ReportsPerformance({
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="%" />
                     <Tooltip
                       contentStyle={tooltipStyle}
-                      cursor={{ fill: 'hsl(var(--muted))', opacity: 0.15 }}
+                      cursor={false}
                       formatter={(value: number) => [`${value}%`, 'Profit Rate']}
                       labelFormatter={(label) => `${label} (${dayStats.find(d => d.day === label)?.trades || 0} trades)`}
                     />
@@ -297,21 +297,40 @@ export function ReportsPerformance({
         <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
           <CardContent>
             {isMultiAccountMode ? (
-              <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-4">
                 {perAccountDistrib.map(({ account, idx, long, short }) => {
-                  const color = getAccountColor(idx);
                   const total = long + short;
+                  const color = getAccountColor(idx);
+                  const data = [
+                    { name: 'Long',  value: long,  fill: 'hsl(var(--success))' },
+                    { name: 'Short', value: short, fill: 'hsl(var(--destructive))' },
+                  ];
                   return (
-                    <div key={account.id} className="flex items-center gap-3">
-                      <span className="text-xs font-semibold w-24 truncate shrink-0" style={{ color }} title={account.name}>
+                    <div key={account.id} className="flex flex-col items-center">
+                      <p className="text-xs font-semibold mb-1 truncate w-full text-center" style={{ color }} title={account.name}>
                         {shortAccountName(account.name)}
-                      </span>
-                      <span className="text-sm text-success font-medium">Long: {long}</span>
-                      <span className="text-sm text-destructive font-medium">Short: {short}</span>
-                      {total > 0 && (
-                        <span className="text-xs text-muted-foreground">
-                          ({Math.round((long / total) * 100)}% / {Math.round((short / total) * 100)}%)
-                        </span>
+                      </p>
+                      {total > 0 ? (
+                        <>
+                          <div className="h-28 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie data={data} cx="50%" cy="50%" innerRadius={30} outerRadius={44} paddingAngle={5} dataKey="value">
+                                  {data.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                                </Pie>
+                                <Tooltip contentStyle={tooltipStyle} />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
+                          <p className="text-xs text-muted-foreground text-center mt-1">
+                            <span className="text-success">L: {long}</span>
+                            {' · '}
+                            <span className="text-destructive">S: {short}</span>
+                            {' '}({Math.round((long / total) * 100)}% / {Math.round((short / total) * 100)}%)
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-xs text-muted-foreground mt-2">No trades</p>
                       )}
                     </div>
                   );
@@ -391,7 +410,7 @@ export function ReportsPerformance({
                   <BarChart data={holdTimeData}>
                     <XAxis dataKey="type" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" unit="h" />
-                    <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.15 }} formatter={(value: number) => [`${value}h`, 'Avg Hold Time']} />
+                    <Tooltip contentStyle={tooltipStyle} cursor={false} formatter={(value: number) => [`${value}h`, 'Avg Hold Time']} />
                     <Bar dataKey="avgHours" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -420,7 +439,7 @@ export function ReportsPerformance({
                       <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                       <Tooltip
                         contentStyle={tooltipStyle}
-                        cursor={{ fill: 'hsl(var(--muted))', opacity: 0.15 }}
+                        cursor={false}
                         formatter={(v: number, name: string) => [
                           `${accountSymByName[name] ?? sym}${v.toLocaleString()}`,
                           shortAccountName(name),
@@ -450,7 +469,7 @@ export function ReportsPerformance({
                     <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
                     <Tooltip
                       contentStyle={tooltipStyle}
-                      cursor={{ fill: 'hsl(var(--muted))', opacity: 0.15 }}
+                      cursor={false}
                       formatter={(value: number, name: string) => {
                         if (name === 'pnl') return [`${sym}${value.toLocaleString()}`, 'P&L'];
                         return [value, 'Trades'];
