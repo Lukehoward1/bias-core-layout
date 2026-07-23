@@ -111,11 +111,19 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
   const [combineMode] = useAccountCombineMode();
   const isAllAccounts = resolvedActiveAccountId === ACTIVE_ACCOUNT_ALL;
 
-  // ── Best edge stub — unchanged (see note at card below) ─────────────────────
-  const ratedTrades = trades.filter(t => t.rating && t.rating >= 4 && t.pnl > 0);
-  const bestEdge = ratedTrades.length > 0
-    ? "High-confidence setups with 4+ star ratings"
-    : "Build more trade history to identify your edge";
+  // ── Best edge: compare 4–5★ vs 1–3★ rated trades (unrated excluded) ─────────
+  const highConfTrades = trades.filter(t => t.rating != null && t.rating >= 4);
+  const lowerRatedTrades = trades.filter(t => t.rating != null && t.rating >= 1 && t.rating <= 3);
+  const EDGE_MIN_BUCKET = 5;
+  const hasEdgeData = highConfTrades.length >= EDGE_MIN_BUCKET && lowerRatedTrades.length >= EDGE_MIN_BUCKET;
+  const highConfStats = hasEdgeData ? {
+    winRate: Math.round(highConfTrades.filter(t => t.pnl > 0).length / highConfTrades.length * 100),
+    avgPnl: highConfTrades.reduce((s, t) => s + t.pnl, 0) / highConfTrades.length,
+  } : null;
+  const lowerRatedStats = hasEdgeData ? {
+    winRate: Math.round(lowerRatedTrades.filter(t => t.pnl > 0).length / lowerRatedTrades.length * 100),
+    avgPnl: lowerRatedTrades.reduce((s, t) => s + t.pnl, 0) / lowerRatedTrades.length,
+  } : null;
 
   const handleExportOverview = () => {
     exportToPdf('reports-overview', {
@@ -138,6 +146,9 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
 
   const fmtDay = (pnl: number) =>
     `${pnl >= 0 ? '+' : ''}${sym}${Math.abs(pnl).toLocaleString()}`;
+
+  const fmtAvgPnl = (v: number) =>
+    `${v >= 0 ? '' : '–'}${sym}${Math.abs(v).toFixed(0)}`;
 
   function SingleDay({
     day,
@@ -591,10 +602,8 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
         </CardFeatureGate>
       </Card>
 
-      {/* Strongest Edge Summary — left untouched: bestEdge is a static-string
-          stub derived only from ratedTrades.length, with no per-account or
-          per-setup breakdown. Forcing a per-account grid would require a
-          non-trivial rewrite of the edge-detection logic (out of scope here). */}
+      {/* Strongest Edge Summary — compares 4–5★ vs 1–3★ rated trades:
+          win rate and avg P&L per bucket. Requires ≥5 trades in each bucket. */}
       <Card className="border-primary/30 bg-primary/5">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -616,11 +625,28 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
         </CardHeader>
         <CardFeatureGate isLocked={isLocked} requiredPlan="standard">
           <CardContent>
-            <p className="text-sm text-muted-foreground">{bestEdge}</p>
-            <div className="flex gap-2 mt-3">
-              <Badge variant="outline" className="text-xs">Based on ratings</Badge>
-              <Badge variant="outline" className="text-xs">P&L consistency</Badge>
-            </div>
+            {hasEdgeData && highConfStats && lowerRatedStats ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Your 4–5★ trades win {highConfStats.winRate}% of the time vs {lowerRatedStats.winRate}% for
+                  1–3★ trades, averaging {fmtAvgPnl(highConfStats.avgPnl)} vs {fmtAvgPnl(lowerRatedStats.avgPnl)} per trade.
+                </p>
+                <div className="flex gap-2 mt-3">
+                  <Badge variant="outline" className="text-xs">Based on ratings</Badge>
+                  <Badge variant="outline" className="text-xs">Win rate & avg P&L</Badge>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Not enough rated trade history yet — rate at least {EDGE_MIN_BUCKET} trades in both the 4–5★ and 1–3★ buckets to unlock this comparison.
+                </p>
+                <div className="flex gap-2 mt-3">
+                  <Badge variant="outline" className="text-xs">Based on ratings</Badge>
+                  <Badge variant="outline" className="text-xs">Win rate & avg P&L</Badge>
+                </div>
+              </>
+            )}
           </CardContent>
         </CardFeatureGate>
       </Card>
