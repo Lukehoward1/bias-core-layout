@@ -196,6 +196,9 @@ function JournalShowcaseMockup() {
         <div className="flex-1 bg-muted/40 rounded h-5 flex items-center px-3">
           <span className="text-[10px] text-muted-foreground">app.streambias.com/journal</span>
         </div>
+        <span className="text-[9px] px-2 py-0.5 rounded-full bg-muted/60 border border-border text-muted-foreground font-medium shrink-0">
+          Sample data
+        </span>
       </div>
 
       <div className="bg-card p-4 space-y-3">
@@ -267,7 +270,7 @@ function JournalShowcaseMockup() {
           <div className="flex flex-col gap-2 shrink-0">
             <div>
               <p className="text-[10px] text-muted-foreground">Total P&L</p>
-              <p className="text-sm font-bold text-success">+£91,310</p>
+              <p className="text-sm font-bold text-success">+£4,210</p>
             </div>
             <div>
               <p className="text-[10px] text-muted-foreground">Win rate</p>
@@ -321,13 +324,12 @@ function QuickRiskMockup() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold text-foreground">Quick Risk Calculator</p>
-          <span className="flex items-center gap-1.5 text-[10px] px-2.5 py-0.5 rounded-full bg-success/10 text-success border border-success/20 font-semibold">
-            <span className="w-1.5 h-1.5 rounded-full bg-success" />
-            Linked
+          <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-muted/60 border border-border text-muted-foreground font-medium">
+            Illustration
           </span>
         </div>
 
-        <p className="text-[10px] text-muted-foreground">Mode: Linked — IG Demo Account</p>
+        <p className="text-[10px] text-muted-foreground">Sample data — broker sync coming soon</p>
 
         {/* Account Balance */}
         <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border">
@@ -385,9 +387,8 @@ function QuickRiskMockup() {
             <p className="text-[10px] text-muted-foreground mb-0.5">Entry Price</p>
             <p className="text-sm font-medium text-foreground font-mono">1.08442</p>
           </div>
-          <span className="flex items-center gap-1.5 text-[10px] text-success font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-            Live
+          <span className="text-[10px] text-muted-foreground font-medium">
+            Sample price
           </span>
         </div>
       </div>
@@ -428,6 +429,9 @@ function CalendarEventMockup() {
         <div className="flex-1 bg-muted/40 rounded h-5 flex items-center px-3">
           <span className="text-[10px] text-muted-foreground">app.streambias.com/calendar</span>
         </div>
+        <span className="text-[9px] px-2 py-0.5 rounded-full bg-muted/60 border border-border text-muted-foreground font-medium shrink-0">
+          Sample data
+        </span>
       </div>
 
       {/* Event detail panel */}
@@ -750,25 +754,39 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── SOCIAL PROOF / BUILT FOR EVERY MARKET ─────────────────────────── */}
+      {/* ── LIVE NOW / ROADMAP ────────────────────────────────────────────── */}
       <section className="py-12 px-6 bg-background">
-        <div className="max-w-4xl mx-auto flex flex-col items-center gap-6">
-          <AnimatedSection>
-            <p className="text-sm font-semibold text-muted-foreground text-center">Built for every market</p>
-          </AnimatedSection>
-          <AnimatedSection delay={100} className="flex items-center gap-3 flex-wrap justify-center">
-            {[
-              { label: "FX",      Icon: TrendingUp },
-              { label: "Gold",    Icon: Gem        },
-              { label: "Indices", Icon: BarChart2  },
-              { label: "Crypto",  Icon: Bitcoin    },
-              { label: "Stocks",  Icon: LineChart  },
-            ].map(({ label, Icon }) => (
-              <span key={label} className="flex items-center gap-2 px-6 py-3 rounded-full bg-muted/60 border border-border text-sm font-semibold text-foreground/80">
-                <Icon className="h-4 w-4 text-primary" />
-                {label}
-              </span>
-            ))}
+        <div className="max-w-4xl mx-auto flex flex-col items-center gap-8">
+          <AnimatedSection className="flex flex-col items-center gap-5 w-full">
+            <div className="flex flex-col items-center gap-3">
+              <p className="text-xs font-bold tracking-widest uppercase text-primary">Live now</p>
+              <div className="flex items-center gap-3 flex-wrap justify-center">
+                {[
+                  { label: "FX (EURUSD)", Icon: TrendingUp },
+                  { label: "Gold",        Icon: Gem        },
+                  { label: "Indices (NAS100)", Icon: BarChart2 },
+                ].map(({ label, Icon }) => (
+                  <span key={label} className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary/10 border border-primary/25 text-sm font-semibold text-foreground/80">
+                    <Icon className="h-4 w-4 text-primary" />
+                    {label}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-col items-center gap-3">
+              <p className="text-xs font-bold tracking-widest uppercase text-muted-foreground">On the roadmap</p>
+              <div className="flex items-center gap-3 flex-wrap justify-center">
+                {[
+                  { label: "Crypto", Icon: Bitcoin   },
+                  { label: "Stocks", Icon: LineChart },
+                ].map(({ label, Icon }) => (
+                  <span key={label} className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-muted/40 border border-border text-sm font-semibold text-foreground/50">
+                    <Icon className="h-4 w-4 text-muted-foreground" />
+                    {label}
+                  </span>
+                ))}
+              </div>
+            </div>
           </AnimatedSection>
         </div>
       </section>
@@ -903,8 +921,8 @@ export default function Landing() {
               A journal that analyses itself.
             </h2>
             <p className="text-muted-foreground leading-relaxed">
-              Log trades manually or sync your broker. StreamBias calculates profit rate, R:R, session performance
-              and emotional patterns — surfacing insights you'd never find manually.
+              Log trades manually. StreamBias calculates profit rate, R:R, session performance
+              and emotional patterns — surfacing insights you'd never find manually. Broker sync coming soon.
             </p>
             <div className="flex flex-wrap gap-2 mt-1">
               <FeaturePill label="Auto P&L calculation" />
@@ -928,7 +946,7 @@ export default function Landing() {
               Set your rules once and trade within them every session.
             </p>
             <div className="flex flex-wrap gap-2 mt-1">
-              <FeaturePill label="Live balance sync" />
+              <FeaturePill label="Balance sync (coming soon)" />
               <FeaturePill label="Position calculator" />
               <FeaturePill label="Drawdown guard" />
             </div>
@@ -953,8 +971,8 @@ export default function Landing() {
               Always know what's moving the market.
             </h2>
             <p className="text-muted-foreground leading-relaxed">
-              A live economic calendar automatically filters high-impact events to the exact pairs you trade —
-              so you're never caught off guard by a rate decision, inflation print, or jobs report.
+              An economic calendar that automatically filters high-impact events to the exact pairs you trade —
+              so you're never caught off guard by a rate decision, inflation print, or jobs report. Live data coming soon.
             </p>
             <div className="flex flex-wrap gap-2 mt-1">
               <FeaturePill label="Filtered by your pairs" />
@@ -983,50 +1001,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── TESTIMONIALS ──────────────────────────────────────────────────── */}
-      <section className="py-20 px-6 bg-background">
-        <div className="max-w-6xl mx-auto">
-          <AnimatedSection className="text-center mb-10 flex flex-col items-center gap-2">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground">What traders are saying.</h2>
-            <p className="text-muted-foreground">Real feedback from our beta traders.</p>
-          </AnimatedSection>
-
-          <div className="grid sm:grid-cols-3 gap-5">
-            {[
-              {
-                initials: "JM", name: "James M.", role: "FX Day Trader",
-                quote: "StreamBias completely changed how I approach my morning prep. The bias engine tells me exactly what I need to know before the London open.",
-              },
-              {
-                initials: "SR", name: "Sarah R.", role: "Swing Trader",
-                quote: "The journal reports showed me I was consistently losing on Fridays. I had no idea. That insight alone paid for the subscription.",
-              },
-              {
-                initials: "TK", name: "Tom K.", role: "Prop Trader",
-                quote: "Having bias, news, and my journal all in one place means I spend less time switching between tools and more time actually trading.",
-              },
-            ].map((t, i) => (
-              <AnimatedSection key={t.name} delay={i * 100}>
-                <div className="bg-card border border-border rounded-xl p-6 flex flex-col gap-4 h-full">
-                  <div className="flex gap-0.5 text-yellow-400 text-base">
-                    {"★★★★★".split("").map((star, j) => <span key={j}>{star}</span>)}
-                  </div>
-                  <p className="text-muted-foreground text-sm leading-relaxed flex-1">"{t.quote}"</p>
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-xs font-bold text-primary shrink-0">
-                      {t.initials}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">{t.name}</p>
-                      <p className="text-xs text-muted-foreground">{t.role}</p>
-                    </div>
-                  </div>
-                </div>
-              </AnimatedSection>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* ── EDUCATION ─────────────────────────────────────────────────────── */}
       <section className="py-20 px-6" style={{ background: "hsl(var(--muted)/0.2)" }}>
@@ -1077,16 +1051,6 @@ export default function Landing() {
                 Only available to the first 100 members. Start your 7-day free trial — cancel before day 7 and you won't be charged.
               </p>
 
-              {/* ── UPDATE BEFORE LAUNCH: adjust spot count, percentage, and progress bar width ── */}
-              <div className="w-full max-w-sm space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">67 of 100 spots remaining</span>
-                  <span className="text-xs text-primary font-semibold">33% claimed</span>
-                </div>
-                <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-primary rounded-full transition-all" style={{ width: "33%" }} />
-                </div>
-              </div>
 
               <Button
                 size="lg"
