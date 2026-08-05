@@ -28,7 +28,7 @@ async function getRawBody(req: VercelRequest): Promise<Buffer> {
 
 function tierFromPriceId(priceId: string): string {
   if (priceId === PRICE_IDS.FOUNDING_MEMBER) return "founding_member";
-  if ([PRICE_IDS.PRO_MONTHLY, PRICE_IDS.PRO_ANNUAL].includes(priceId)) return "pro";
+  if (priceId === PRICE_IDS.PRO_MONTHLY || priceId === PRICE_IDS.PRO_ANNUAL) return "pro";
   return "standard";
 }
 
