@@ -1,9 +1,81 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
-import { undeployExcessBrokerConnections } from "../_lib/undeploy.js";
+import { undeployExcessBrokerConnections } from "./_lib/undeploy.js";
 
-const ADMIN_EMAIL = "luke@hfx-capital.com";
+// ── Shared auth ────────────────────────────────────────────────────────────────
+
+function authorized(req: VercelRequest): boolean {
+  return req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`;
+}
+
+function makeSupabase() {
+  return createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
+
+// ── downgrade-enforce ─────────────────────────────────────────────────────────
+// Runs at 00:00 UTC daily. Finds profiles whose downgrade grace period has
+// expired and enforces the new account limit by undeploying excess connections.
+
+async function handleDowngradeEnforce(supabase: ReturnType<typeof makeSupabase>, res: VercelResponse) {
+  const { data: profiles, error } = await supabase
+    .from("profiles")
+    .select("id, downgrade_new_max")
+    .not("downgrade_grace_end_at", "is", null)
+    .lt("downgrade_grace_end_at", new Date().toISOString());
+
+  if (error) {
+    console.error("[cron/downgrade-enforce] failed to query profiles:", error.message);
+    return res.status(500).json({ error: error.message });
+  }
+
+  if (!profiles?.length) {
+    return res.status(200).json({ resolved: 0 });
+  }
+
+  let resolved = 0;
+  for (const profile of profiles) {
+    const newMax = profile.downgrade_new_max ?? 0;
+
+    // Self-resolve: user already within limit (disconnected manually during grace period)
+    const { count } = await supabase
+      .from("linked_accounts")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", profile.id);
+
+    if ((count ?? 0) <= newMax) {
+      await supabase.from("profiles").update({
+        downgrade_grace_end_at: null,
+        downgrade_new_max: null,
+        downgrade_account_chosen: null,
+      }).eq("id", profile.id);
+      resolved++;
+      console.log(`[cron/downgrade-enforce] user ${profile.id} already within limit — cleared`);
+      continue;
+    }
+
+    await undeployExcessBrokerConnections(supabase, profile.id, newMax);
+
+    await supabase.from("profiles").update({
+      downgrade_grace_end_at: null,
+      downgrade_new_max: null,
+      downgrade_account_chosen: null,
+    }).eq("id", profile.id);
+
+    resolved++;
+    console.log(`[cron/downgrade-enforce] enforced downgrade for user ${profile.id} (max=${newMax})`);
+  }
+
+  return res.status(200).json({ resolved });
+}
+
+// ── orphan-detect ─────────────────────────────────────────────────────────────
+// Runs at 06:00 UTC daily. Finds deployed MetaApi connections that exceed the
+// user's current plan limit (payment failure, manual admin action, etc.) and
+// undeployes them. Always emails admin with a full deployed-accounts summary.
 
 function maxAccountsForTier(tier: string | null, status: string | null): number {
   if (status !== "active" && status !== "trialing") return 0;
@@ -25,17 +97,9 @@ interface DeployedUser {
   orphanCount: number;
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
+const ADMIN_EMAIL = "luke@hfx-capital.com";
 
-  const supabase = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-
-  // All deployed broker connections (DEPLOYING counts as deployed — still billing)
+async function handleOrphanDetect(supabase: ReturnType<typeof makeSupabase>, res: VercelResponse) {
   const { data: connections, error: connErr } = await supabase
     .from("broker_connections")
     .select("id, user_id, account_id, deploy_state")
@@ -52,7 +116,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ swept: 0, deployedTotal: 0 });
   }
 
-  // Group deployed count per user
   const countByUser = new Map<string, number>();
   for (const c of connections) {
     countByUser.set(c.user_id, (countByUser.get(c.user_id) ?? 0) + 1);
@@ -60,7 +123,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const userIds = [...countByUser.keys()];
 
-  // Fetch profile + email for each user
   const { data: profiles, error: profErr } = await supabase
     .from("profiles")
     .select("id, subscription_tier, subscription_status")
@@ -71,7 +133,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: profErr.message });
   }
 
-  // Auth users for emails (requires service role)
   const { data: { users: authUsers }, error: authErr } = await supabase.auth.admin.listUsers({ perPage: 1000 });
   if (authErr) {
     console.error("[cron/orphan-detect] failed to list auth users:", authErr.message);
@@ -81,9 +142,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (u.email) emailById.set(u.id, u.email);
   }
 
-  const profileById = new Map(
-    (profiles ?? []).map((p) => [p.id, p]),
-  );
+  const profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
 
   const summary: DeployedUser[] = [];
   let totalOrphaned = 0;
@@ -95,15 +154,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const maxAllowed = maxAccountsForTier(tier, status);
     const orphanCount = Math.max(0, deployedCount - maxAllowed);
 
-    summary.push({
-      userId,
-      email: emailById.get(userId) ?? null,
-      tier,
-      status,
-      deployedCount,
-      maxAllowed,
-      orphanCount,
-    });
+    summary.push({ userId, email: emailById.get(userId) ?? null, tier, status, deployedCount, maxAllowed, orphanCount });
 
     if (orphanCount > 0) {
       console.log(
@@ -114,10 +165,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  // Always email admin with full deployed summary
   try {
     const resend = new Resend(process.env.RESEND_API_KEY!);
-
     const orphanRows = summary.filter((u) => u.orphanCount > 0);
     const allRows = summary.sort((a, b) => b.deployedCount - a.deployedCount);
 
@@ -135,10 +184,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       )
       .join("");
 
-    const subject =
-      orphanRows.length > 0
-        ? `[BIAS] Orphan sweep: ${totalOrphaned} account${totalOrphaned === 1 ? "" : "s"} undeployed`
-        : "[BIAS] Orphan sweep: all clear";
+    const subject = orphanRows.length > 0
+      ? `[BIAS] Orphan sweep: ${totalOrphaned} account${totalOrphaned === 1 ? "" : "s"} undeployed`
+      : "[BIAS] Orphan sweep: all clear";
 
     await resend.emails.send({
       from: "BIAS Alerts <alerts@streambias.com>",
@@ -153,13 +201,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     <div style="background:#141414;border:1px solid #262626;border-radius:12px;padding:32px">
       <h1 style="margin:0 0 4px;font-size:18px;font-weight:600;color:#fafafa">Daily orphan sweep</h1>
       <p style="margin:0 0 24px;font-size:13px;color:#525252">${new Date().toUTCString()}</p>
-
       ${
         orphanRows.length === 0
           ? `<p style="margin:0 0 24px;font-size:14px;color:#22c55e">✓ No orphaned accounts found. All deployed accounts are within plan limits.</p>`
           : `<p style="margin:0 0 16px;font-size:14px;color:#ef4444">⚠ ${totalOrphaned} account${totalOrphaned === 1 ? "" : "s"} undeployed across ${orphanRows.length} user${orphanRows.length === 1 ? "" : "s"}.</p>`
       }
-
       <h2 style="margin:0 0 12px;font-size:14px;font-weight:600;color:#a3a3a3;text-transform:uppercase;letter-spacing:0.05em">Deployed accounts (${connections.length} total)</h2>
       <table style="width:100%;border-collapse:collapse;border:1px solid #262626;border-radius:8px;overflow:hidden">
         <thead>
@@ -185,4 +231,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   return res.status(200).json({ swept: totalOrphaned, deployedTotal: connections.length });
+}
+
+// ── Dispatcher ────────────────────────────────────────────────────────────────
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (!authorized(req)) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const supabase = makeSupabase();
+  const { job } = req.query;
+
+  if (job === "downgrade-enforce") return handleDowngradeEnforce(supabase, res);
+  if (job === "orphan-detect")     return handleOrphanDetect(supabase, res);
+
+  return res.status(400).json({ error: "Unknown job. Use ?job=downgrade-enforce or ?job=orphan-detect" });
 }

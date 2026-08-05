@@ -3,7 +3,7 @@
     { "source": "/((?!api/|@|src|node_modules).*)", "destination": "/index.html" }
   ],
   "crons": [
-    { "path": "/api/cron/downgrade-enforce", "schedule": "0 0 * * *" },
-    { "path": "/api/cron/orphan-detect", "schedule": "0 6 * * *" }
+    { "path": "/api/cron?job=downgrade-enforce", "schedule": "0 0 * * *" },
+    { "path": "/api/cron?job=orphan-detect",     "schedule": "0 6 * * *" }
   ]
 }
