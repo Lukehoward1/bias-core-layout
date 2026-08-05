@@ -53,11 +53,21 @@ function assert(condition, message) {
   console.log(`  [ok] ${message}`);
 }
 
+// TARGET_URL: set in env to hit a deployed preview; defaults to localhost:3000
+const TARGET_URL = process.env.E2E_TARGET_URL || 'http://localhost:3000';
+
 async function httpPost(path, body, headers = {}) {
+  const url = new URL(path, TARGET_URL);
+  const https = require('https');
+  const isHttps = url.protocol === 'https:';
+  const transport = isHttps ? https : http;
   const bodyStr = JSON.stringify(body);
   return new Promise((resolve, reject) => {
-    const req = http.request({
-      hostname: 'localhost', port: 3000, path, method: 'POST',
+    const req = transport.request({
+      hostname: url.hostname,
+      port: url.port || (isHttps ? 443 : 80),
+      path: url.pathname + url.search,
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(bodyStr),
@@ -302,10 +312,10 @@ async function httpPost(path, body, headers = {}) {
     }).eq('id', TEST_USER_ID);
     console.log('  expired grace seeded');
 
-    console.log('  POST /api/cron/downgrade-enforce');
+    console.log('  POST /api/cron?job=downgrade-enforce');
     console.log('  (expect MetaApi retry errors for fake Account B UUID in server logs — non-fatal)');
     const cronRes3a = await httpPost(
-      '/api/cron/downgrade-enforce', {},
+      '/api/cron?job=downgrade-enforce', {},
       { Authorization: `Bearer ${env.CRON_SECRET}` },
     );
     assert(cronRes3a.status === 200,          `cron 3a: HTTP 200 (got ${cronRes3a.status})`);
@@ -346,7 +356,7 @@ async function httpPost(path, body, headers = {}) {
     }).eq('id', TEST_USER_ID);
 
     const cronRes3b = await httpPost(
-      '/api/cron/downgrade-enforce', {},
+      '/api/cron?job=downgrade-enforce', {},
       { Authorization: `Bearer ${env.CRON_SECRET}` },
     );
     assert(cronRes3b.status === 200,          `cron 3b: HTTP 200 (got ${cronRes3b.status})`);
