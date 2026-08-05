@@ -1,10 +1,19 @@
-// ── IMPORTANT: Add STRIPE_WEBHOOK_SECRET to Vercel env vars after setting up webhook in Stripe dashboard ──
-// ── Also add APP_URL=https://bias-core-layout.vercel.app to Vercel env vars ──
-
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { PRICE_IDS } from "../src/lib/stripe.js";
+import { undeployExcessBrokerConnections } from "./_lib/undeploy.js";
+import { sendDowngradeGraceEmail } from "./_lib/downgrade-email.js";
+
+function maxLinkedAccountsForTier(tier: string, status: string): number {
+  if (status !== "active" && status !== "trialing") return 0;
+  switch (tier) {
+    case "standard":        return 1;
+    case "pro":             return 3;
+    case "founding_member": return 1;
+    default:                return 0;
+  }
+}
 
 export const config = { api: { bodyParser: false } };
 
@@ -80,7 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const subscription = event.data.object as Stripe.Subscription & { current_period_end: number | null };
         const { data: rows } = await supabase
           .from("profiles")
-          .select("id, is_founding_member")
+          .select("id, email, is_founding_member")
           .eq("stripe_subscription_id", subscription.id)
           .limit(1);
 
@@ -100,15 +109,79 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             : null,
           updated_at: new Date().toISOString(),
         }).eq("id", row.id);
+
+        // Enforce account limits on active/trialing status changes only.
+        // past_due/unpaid: skip — Stripe's dunning handles those.
+        // deleted: handled by customer.subscription.deleted below.
+        if (subscription.status === "active" || subscription.status === "trialing") {
+          const newMax = maxLinkedAccountsForTier(tier, subscription.status);
+
+          const { count: currentCount } = await supabase
+            .from("linked_accounts")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", row.id);
+
+          const count = currentCount ?? 0;
+
+          if (newMax >= count) {
+            // Re-upgrade or count already within limit — clear any stale grace period
+            await supabase.from("profiles").update({
+              downgrade_grace_end_at: null,
+              downgrade_new_max: null,
+              downgrade_account_chosen: null,
+            }).eq("id", row.id);
+          } else {
+            // Downgrade: write 72-hour grace period instead of immediate undeploy
+            const graceEndAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
+            await supabase.from("profiles").update({
+              downgrade_grace_end_at: graceEndAt.toISOString(),
+              downgrade_new_max: newMax,
+              downgrade_account_chosen: null,
+            }).eq("id", row.id);
+
+            // Send email notification (fire-and-forget — don't block the 200)
+            if (row.email) {
+              sendDowngradeGraceEmail({
+                to: row.email,
+                graceEndAt,
+                accountCount: count,
+                newMax,
+              }).catch((err) =>
+                console.error("[webhook] failed to send downgrade grace email:", err.message),
+              );
+            }
+
+            console.log(`[webhook] downgrade grace period written for user ${row.id} (max=${newMax}, expires=${graceEndAt.toISOString()})`);
+          }
+        }
         break;
       }
 
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
+        const { data: profile, error: profileLookupError } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("stripe_subscription_id", subscription.id)
+          .limit(1)
+          .single();
+
+        if (profileLookupError) {
+          console.error("[webhook] failed to look up profile for subscription", subscription.id, profileLookupError.message);
+        }
+
         await supabase.from("profiles").update({
           subscription_status: "cancelled",
+          // Clear any pending grace period — subscription is gone, undeploy immediately
+          downgrade_grace_end_at: null,
+          downgrade_new_max: null,
+          downgrade_account_chosen: null,
           updated_at: new Date().toISOString(),
         }).eq("stripe_subscription_id", subscription.id);
+
+        if (profile?.id) {
+          await undeployExcessBrokerConnections(supabase, profile.id, 0);
+        }
         break;
       }
     }

@@ -9,6 +9,8 @@ interface Profile {
   trial_ends_at: string | null;
   current_period_end: string | null;
   stripe_customer_id: string | null;
+  downgrade_grace_end_at: string | null;
+  downgrade_new_max: number | null;
 }
 
 interface SubscriptionContextValue {
@@ -20,6 +22,8 @@ interface SubscriptionContextValue {
   trialEndsAt: string | null;
   currentPeriodEnd: string | null;
   stripeCustomerId: string | null;
+  downgradeGraceEndAt: string | null;
+  downgradeNewMax: number | null;
   isLoading: boolean;
   refetch: () => Promise<void>;
 }
@@ -42,7 +46,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     const { data } = await supabase
       .from("profiles")
       .select(
-        "subscription_status,subscription_tier,is_founding_member,trial_ends_at,current_period_end,stripe_customer_id",
+        "subscription_status,subscription_tier,is_founding_member,trial_ends_at,current_period_end,stripe_customer_id,downgrade_grace_end_at,downgrade_new_max",
       )
       .eq("id", user.id)
       .maybeSingle();
@@ -74,6 +78,8 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         trialEndsAt: profile?.trial_ends_at ?? null,
         currentPeriodEnd: profile?.current_period_end ?? null,
         stripeCustomerId: profile?.stripe_customer_id ?? null,
+        downgradeGraceEndAt: profile?.downgrade_grace_end_at ?? null,
+        downgradeNewMax: profile?.downgrade_new_max ?? null,
         isLoading,
         refetch: () => fetchProfile(false),
       }}
