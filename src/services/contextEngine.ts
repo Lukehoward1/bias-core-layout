@@ -3,7 +3,7 @@ import type { Asset } from "@/data/assets";
 import type { MarketQuote } from "@/services/marketData";
 import type { CalendarEvent } from "@/data/calendarEvents";
 import type { TraderStyle } from "@/context/TraderStyleProvider";
-import { getMultiTimeframeBias, getRealLevels } from "./candleData";
+import { getMultiTimeframeBias, getRealLevels, isBiasAvailable } from "./candleData";
 
 export type BiasState =
   | "Bullish Active"
@@ -12,7 +12,8 @@ export type BiasState =
   | "Bearish Weakening"
   | "Failure Detected"
   | "Flip Confirmed"
-  | "Neutral / Ranging";
+  | "Neutral / Ranging"
+  | "Bias Unavailable";
 
 export type StructureState = "Trending Up" | "Trending Down" | "Ranging" | "Structure Shifting" | "Consolidating";
 
@@ -726,6 +727,23 @@ function buildTimeframeContext(
 
 export async function buildMarketContext(input: ContextEngineInput): Promise<MarketContext> {
   const { asset, quote, upcomingRelevantEvents = [], traderStyle = "intraday" } = input;
+
+  // Gate: if no live candle data exists for this symbol, return an explicit unavailable
+  // state rather than letting hash-derived placeholder bias render as real analysis.
+  if (!isBiasAvailable(asset.symbol)) {
+    return {
+      symbol: asset.symbol,
+      biasState: "Bias Unavailable",
+      structureState: "Ranging",
+      biasConfidence: 0,
+      levels: [],
+      sessionContext: [],
+      overview: "",
+      timeframes: getStyleTimeframes(traderStyle),
+      timeframeContext: [],
+      highImpactSoon: false,
+    };
+  }
 
   const now = Date.now();
   const fourHours = 4 * 60 * 60 * 1000;

@@ -400,7 +400,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
   };
 
   const contextSnapshot = useMemo<ContextSnapshotItem[]>(() => {
-    if (!asset || !marketContext) return [];
+    if (!asset || !marketContext || marketContext.biasState === "Bias Unavailable") return [];
 
     const biasTf = marketContext.timeframes.bias[0] ?? "Higher timeframe";
     const structureTf = marketContext.timeframes.structure[0] ?? "Structure timeframe";
@@ -547,16 +547,22 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                     Market Context Snapshot
                   </h3>
 
-                  <div className="space-y-3">
-                    {contextSnapshot.map((item) => (
-                      <div key={item.label} className={`border-l ${getAccentClass(item.accent)} pl-3`}>
-                        <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground/70 leading-none mb-1">
-                          {item.label}
+                  {marketContext?.biasState === "Bias Unavailable" ? (
+                    <p className="text-sm text-muted-foreground">
+                      Bias analysis is not yet available for this instrument. Live data support coming soon.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {contextSnapshot.map((item) => (
+                        <div key={item.label} className={`border-l ${getAccentClass(item.accent)} pl-3`}>
+                          <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground/70 leading-none mb-1">
+                            {item.label}
+                          </div>
+                          <p className="text-sm font-medium text-foreground leading-snug">{item.text}</p>
                         </div>
-                        <p className="text-sm font-medium text-foreground leading-snug">{item.text}</p>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
 
                   {isNewsLoading && newsImpactPills.length === 0 && (
                     <div className="mt-5">
@@ -652,7 +658,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                   <div className="p-3 bg-muted/30 rounded-lg text-center">
                     <span className="text-xs text-muted-foreground block mb-1">Confidence</span>
                     <span className="text-sm font-semibold text-foreground">
-                      {marketContext?.biasConfidence ?? asset.biasConfidence}%
+                      {marketContext?.biasState === "Bias Unavailable" ? "—" : `${marketContext?.biasConfidence ?? asset.biasConfidence}%`}
                     </span>
                   </div>
 
@@ -681,7 +687,17 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                     <span className="font-medium text-foreground">{tfLabel}</span>
                   </div>
 
-                  {marketContext ? (
+                  {marketContext?.biasState === "Bias Unavailable" ? (
+                    <div className="flex flex-col items-center gap-3 py-6 text-center">
+                      <div className="relative w-72 h-36 flex items-center justify-center">
+                        <svg viewBox="0 0 100 50" className="w-full h-full absolute inset-0 opacity-10">
+                          <path d="M 10 45 A 40 40 0 0 1 90 45" fill="none" stroke="currentColor" strokeWidth="8" className="text-muted-foreground" />
+                        </svg>
+                      </div>
+                      <span className="text-sm text-muted-foreground">Bias analysis not yet available.</span>
+                      <span className="text-xs text-muted-foreground/60">Live data support coming soon.</span>
+                    </div>
+                  ) : marketContext ? (
                     <>
                       <div className="relative w-72 h-36">
                         <svg viewBox="0 0 100 50" className="w-full h-full">
@@ -878,7 +894,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
           </CardHeader>
 
           <CardContent>
-            {marketContext && (
+            {marketContext && marketContext.biasState !== "Bias Unavailable" && (
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="text-xs">
                   {marketContext.biasState}
@@ -894,7 +910,9 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
             )}
 
             <p className="text-muted-foreground leading-relaxed">
-              {marketContext?.overview ?? `${asset.symbol} context is being evaluated.`}
+              {marketContext?.biasState === "Bias Unavailable"
+                ? `${asset.symbol} is not yet supported by the live bias engine. Analysis will be available once live data is wired up for this instrument.`
+                : marketContext?.overview ?? `${asset.symbol} context is being evaluated.`}
             </p>
 
             {highImpactEventsNext4Hours.length > 0 ? (

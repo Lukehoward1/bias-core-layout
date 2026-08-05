@@ -345,10 +345,14 @@ export default function Markets() {
                         </div>
                       </div>
 
-                      <div className={`flex items-center gap-1 min-w-[120px] ${getBiasColor(getBiasDirection(context?.biasState))}`}>
-                        {getBiasIcon(getBiasDirection(context?.biasState))}
-                        <span className="text-sm">{context?.biasState ?? "—"}</span>
-                      </div>
+                      {context?.biasState === "Bias Unavailable" ? (
+                        <span className="text-sm text-muted-foreground/60 min-w-[120px]">Coming soon</span>
+                      ) : (
+                        <div className={`flex items-center gap-1 min-w-[120px] ${getBiasColor(getBiasDirection(context?.biasState))}`}>
+                          {getBiasIcon(getBiasDirection(context?.biasState))}
+                          <span className="text-sm">{context?.biasState ?? "—"}</span>
+                        </div>
+                      )}
 
                       <div className="hidden lg:flex items-center gap-2 flex-1 min-w-0">
                         {context?.structureState && (
@@ -445,10 +449,14 @@ export default function Markets() {
                         <p className="text-xs text-muted-foreground mt-1">{asset.displayName}</p>
                       </div>
 
-                      <div className={`flex items-center gap-1.5 ${getBiasColor(getBiasDirection(context?.biasState))}`}>
-                        {getBiasIcon(getBiasDirection(context?.biasState))}
-                        <span className="text-sm font-medium">{context?.biasState ?? "—"}</span>
-                      </div>
+                      {context?.biasState === "Bias Unavailable" ? (
+                        <span className="text-xs text-muted-foreground/60 font-medium">Coming soon</span>
+                      ) : (
+                        <div className={`flex items-center gap-1.5 ${getBiasColor(getBiasDirection(context?.biasState))}`}>
+                          {getBiasIcon(getBiasDirection(context?.biasState))}
+                          <span className="text-sm font-medium">{context?.biasState ?? "—"}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-end justify-between">
@@ -461,7 +469,7 @@ export default function Markets() {
                         </div>
                       </div>
 
-                      {context?.biasState && (
+                      {context?.biasState && context.biasState !== "Bias Unavailable" && (
                         <Badge variant="outline" className="text-[10px] mb-1">
                           {context.biasState}
                         </Badge>
@@ -471,18 +479,27 @@ export default function Markets() {
 
                   <CardContent className="space-y-3">
                     <div className="flex items-center justify-between gap-2 border-y border-border/60 py-2">
-                      <div className="min-w-0">
-                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Structure</div>
-                        <div className="text-xs font-medium text-foreground truncate">
-                          {context?.structureState ?? "—"}
+                      {context?.biasState === "Bias Unavailable" ? (
+                        <div className="min-w-0">
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Analysis</div>
+                          <div className="text-xs text-muted-foreground/60">Not yet available</div>
                         </div>
-                      </div>
+                      ) : (
+                        <>
+                          <div className="min-w-0">
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Structure</div>
+                            <div className="text-xs font-medium text-foreground truncate">
+                              {context?.structureState ?? "—"}
+                            </div>
+                          </div>
 
-                      {nearestLevel && (
-                        <div className="text-right min-w-0">
-                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Key area</div>
-                          <div className="text-xs font-medium text-foreground">{nearestLevel.price}</div>
-                        </div>
+                          {nearestLevel && (
+                            <div className="text-right min-w-0">
+                              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Key area</div>
+                              <div className="text-xs font-medium text-foreground">{nearestLevel.price}</div>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
 

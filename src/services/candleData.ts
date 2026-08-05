@@ -160,6 +160,10 @@ export const WHITELIST_SYMBOLS = [
 
 const CANDLE_API_WHITELIST = new Set(WHITELIST_SYMBOLS);
 
+export function isBiasAvailable(symbol: string): boolean {
+  return CANDLE_API_WHITELIST.has(normalizeSymbol(symbol));
+}
+
 // ── Fetch ────────────────────────────────────────────────────
 
 export async function fetchCandles(
