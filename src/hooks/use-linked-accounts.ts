@@ -61,6 +61,7 @@ interface UseLinkedAccountsReturn {
   // Actions
   linkAccount: (accountData: Omit<LinkedAccount, "id" | "lastUpdated">) => Promise<LinkAccountResult>;
   unlinkAccount: (accountId: string) => Promise<void>;
+  reloadAccounts: () => Promise<void>;
 
   refreshAccount: (accountId: string) => void;
   refreshAllAccounts: () => void;
@@ -71,9 +72,6 @@ interface UseLinkedAccountsReturn {
   setTradesForAccount: (accountId: string, trades: AccountTrade[]) => void;
   upsertTradesForAccount: (accountId: string, trades: AccountTrade[]) => void;
   clearTradesForAccount: (accountId: string) => void;
-
-  refreshAccountTrades: (accountId: string) => void;
-  refreshAllAccountTrades: () => void;
 }
 
 // ── Supabase row shape ────────────────────────────────────────────────────────
@@ -136,28 +134,12 @@ function upsertById(existing: AccountTrade[], incoming: AccountTrade[]): Account
   return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date));
 }
 
-function generateMockBrokerTrades(accountId: string): AccountTrade[] {
-  const seed = accountId.length;
-  const day = (n: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() - n);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
-  };
-  return [
-    { id: `broker-${accountId}-1`, date: day(1 + (seed % 3)), pair: "EURUSD", type: "Long", entry: 1.085, exit: 1.089, lots: 0.5, pnl: 150, status: "closed", notes: "", rating: 0, accountId, source: "broker" },
-    { id: `broker-${accountId}-2`, date: day(2 + (seed % 4)), pair: "XAUUSD", type: "Short", entry: 2040, exit: 2034, lots: 0.2, pnl: 180, status: "closed", notes: "", rating: 0, accountId, source: "broker" },
-  ];
-}
-
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 const DEMO_OWNER_ID = "bf56f6fc-99ab-4870-aba4-58fc18790011";
 
 export function useLinkedAccounts(): UseLinkedAccountsReturn {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
   const [primaryAccountId, setPrimaryAccountId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -206,14 +188,13 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
   const canLinkMore = canLinkMoreAccounts(plan, accountCount);
   const canLinkAccounts = limits.canLinkAccounts;
 
-  // Demo fallback: show DEMO_BROKER_ACCOUNT when no real rows exist,
-  // EXCEPT for the demo owner who always has a real linked_accounts row.
+  // Demo fallback: show DEMO_BROKER_ACCOUNT when no real rows exist.
   const effectiveAccounts = useMemo(() => {
-    if (accounts.length === 0 && user?.id !== DEMO_OWNER_ID) {
+    if (accounts.length === 0) {
       return [DEMO_BROKER_ACCOUNT];
     }
     return accounts;
-  }, [accounts, user?.id]);
+  }, [accounts]);
 
   const primaryAccount = useMemo(() => {
     return (
@@ -271,41 +252,30 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
 
   const unlinkAccount = useCallback(
     async (accountId: string) => {
-      if (!user) return;
+      if (!user || !session) return;
 
-      const { error } = await supabase
-        .from("linked_accounts")
-        .delete()
-        .eq("id", accountId)
-        .eq("user_id", user.id);
+      const response = await fetch("/api/broker-disconnect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ linkedAccountId: accountId }),
+      });
 
-      if (error) {
-        console.error("[useLinkedAccounts] unlinkAccount failed:", error.message);
-        return;
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? "Failed to disconnect account. Please try again.");
       }
 
-      // Also clear stored trades for this account (legacy localStorage system)
+      // Clear stored legacy trades for this account
       const map = readTradesMap();
       delete map[accountId];
       writeTradesMap(map);
 
-      const remaining = accounts.filter((a) => a.id !== accountId);
-      setAccounts(remaining);
-
-      // If we removed the primary, promote the next connected account
-      if (primaryAccountId === accountId) {
-        const next = remaining.find((a) => a.isConnected) ?? null;
-        if (next) {
-          await supabase
-            .from("linked_accounts")
-            .update({ is_primary: true })
-            .eq("id", next.id)
-            .eq("user_id", user.id);
-        }
-        setPrimaryAccountId(next?.id ?? null);
-      }
+      await loadAccounts();
     },
-    [user, accounts, primaryAccountId],
+    [user, session, loadAccounts],
   );
 
   // ── refreshAccount / refreshAllAccounts (stubs — no real broker sync yet) ──
@@ -399,33 +369,6 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
     writeTradesMap(map);
   }, []);
 
-  const refreshAccountTrades = useCallback(
-    (accountId: string) => {
-      setIsLoading(true);
-      setTimeout(() => {
-        const brokerTrades = generateMockBrokerTrades(accountId);
-        upsertTradesForAccount(accountId, brokerTrades);
-        setAccounts((prev) =>
-          prev.map((a) => (a.id === accountId ? { ...a, lastUpdated: new Date() } : a)),
-        );
-        setIsLoading(false);
-      }, 650);
-    },
-    [upsertTradesForAccount],
-  );
-
-  const refreshAllAccountTrades = useCallback(() => {
-    setIsLoading(true);
-    setTimeout(() => {
-      accounts.forEach((acc) => {
-        if (!acc.isConnected) return;
-        upsertTradesForAccount(acc.id, generateMockBrokerTrades(acc.id));
-      });
-      setAccounts((prev) => prev.map((a) => ({ ...a, lastUpdated: new Date() })));
-      setIsLoading(false);
-    }, 800);
-  }, [accounts, upsertTradesForAccount]);
-
   // ── Return ──────────────────────────────────────────────────────────────────
 
   return {
@@ -440,6 +383,7 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
 
     linkAccount,
     unlinkAccount,
+    reloadAccounts: loadAccounts,
     refreshAccount,
     refreshAllAccounts,
     setPrimaryAccount,
@@ -448,8 +392,6 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
     setTradesForAccount,
     upsertTradesForAccount,
     clearTradesForAccount,
-    refreshAccountTrades,
-    refreshAllAccountTrades,
   };
 }
 

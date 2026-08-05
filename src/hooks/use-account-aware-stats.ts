@@ -259,6 +259,21 @@ export function useAccountAwareStats(
       perAccount.set(account.id, buildEntry(account, effectiveTrades));
     }
 
+    // Defensive: if accounts is empty but trades exist (e.g. no linked accounts
+    // configured yet), synthesise a single entry so stats are never blank.
+    if (perAccount.size === 0 && orphanTrades.length > 0) {
+      const synthetic: LinkedAccount = {
+        id: "__orphaned__",
+        name: "My Trades",
+        broker: "",
+        balance: 0,
+        currency: "GBP",
+        isConnected: true,
+        lastUpdated: new Date(),
+      };
+      perAccount.set(synthetic.id, buildEntry(synthetic, orphanTrades));
+    }
+
     const currencies = new Set(accounts.map((a) => a.currency));
     const canCombine = accounts.length > 0 && currencies.size === 1;
 
