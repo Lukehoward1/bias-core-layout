@@ -138,39 +138,12 @@ function patchToRow(patch: Partial<Trade>): Record<string, unknown> {
   return row;
 }
 
-const SYNCED_TRADES_KEY_PREFIX = "journalSyncedTrades:v1:";
-
 const EVENT_NAME = "journalTradesUpdated";
 
-function safeParseJSON<T>(raw: string | null, fallback: T): T {
-  if (!raw) return fallback;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function readSyncedTradesForAccount(accountId: string): Trade[] {
-  const key = `${SYNCED_TRADES_KEY_PREFIX}${accountId}`;
-  const arr = safeParseJSON<Trade[]>(localStorage.getItem(key), []);
-  return Array.isArray(arr) ? arr : [];
-}
-
-function writeSyncedTradesForAccount(accountId: string, trades: Trade[]) {
-  const key = `${SYNCED_TRADES_KEY_PREFIX}${accountId}`;
-  localStorage.setItem(key, JSON.stringify(trades));
-}
-
-export function useJournalTrades(accountIds: string[] = []) {
+export function useJournalTrades(_accountIds: string[] = []) {
   const { user } = useAuth();
   const [manualTrades, setManualTrades] = useState<Trade[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [syncedTradesByAccount, setSyncedTradesByAccount] = useState<
-    Record<string, Trade[]>
-  >({});
-
-  const accountIdsKey = accountIds.join("|");
 
   useEffect(() => {
     let cancelled = false;
@@ -199,22 +172,13 @@ export function useJournalTrades(accountIds: string[] = []) {
     setIsLoaded(false);
     fetchManual();
 
-    // Synced trades remain in localStorage (no broker integration yet)
-    const loaded: Record<string, Trade[]> = {};
-    accountIds.forEach((id) => {
-      loaded[id] = readSyncedTradesForAccount(id);
-    });
-    setSyncedTradesByAccount(loaded);
-
-    // Reload when another hook instance mutates trades
     window.addEventListener(EVENT_NAME, fetchManual);
 
     return () => {
       cancelled = true;
       window.removeEventListener(EVENT_NAME, fetchManual);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, accountIdsKey]);
+  }, [user?.id]);
 
   // One-time seed: insert demo trades for the demo account if the table is empty
   useEffect(() => {
@@ -238,17 +202,13 @@ export function useJournalTrades(accountIds: string[] = []) {
     window.dispatchEvent(new Event(EVENT_NAME));
   }, []);
 
-  // isDemoData is kept for API compatibility; after seeding it is always false
   const isDemoData = false;
 
   const trades: Trade[] = useMemo(() => {
-    const syncedAll = Object.values(syncedTradesByAccount).flat();
-    const manual = manualTrades.map((t) => ({ ...t, source: "manual" as const }));
-    const synced = syncedAll.map((t) => ({ ...t, source: "synced" as const }));
-    const combined = [...manual, ...synced];
-    combined.sort((a, b) => b.date.localeCompare(a.date));
-    return combined;
-  }, [manualTrades, syncedTradesByAccount]);
+    const sorted = [...manualTrades];
+    sorted.sort((a, b) => b.date.localeCompare(a.date));
+    return sorted;
+  }, [manualTrades]);
 
   const addManualTrade = useCallback(
     async (trade: Trade) => {
@@ -347,34 +307,16 @@ export function useJournalTrades(accountIds: string[] = []) {
     [user, notify],
   );
 
-  const replaceSyncedTrades = useCallback(
-    (accountId: string, newTrades: Trade[]) => {
-      const normalized = newTrades.map((t) => ({
-        ...t,
-        accountId: t.accountId ?? accountId,
-        source: "synced" as const,
-      }));
-      setSyncedTradesByAccount((prev) => ({ ...prev, [accountId]: normalized }));
-      writeSyncedTradesForAccount(accountId, normalized);
-      notify();
-    },
-    [notify],
-  );
-
-  const clearSyncedTrades = useCallback(
-    (accountId: string) => {
-      setSyncedTradesByAccount((prev) => ({ ...prev, [accountId]: [] }));
-      writeSyncedTradesForAccount(accountId, []);
-      notify();
-    },
-    [notify],
-  );
+  // Deprecated stubs — broker-sync now writes directly to Supabase
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const replaceSyncedTrades = useCallback((_accountId: string, _newTrades: Trade[]) => {}, []);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const clearSyncedTrades = useCallback((_accountId: string) => {}, []);
 
   return {
     trades,
     isDemoData,
     manualTrades,
-    syncedTradesByAccount,
     addManualTrade,
     updateManualTrade,
     deleteManualTrade,
