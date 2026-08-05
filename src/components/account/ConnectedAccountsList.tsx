@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +47,14 @@ export function ConnectedAccountsList({ onConnectClick }: ConnectedAccountsListP
   } = useLinkedAccounts();
 
   const [activeAccountId, setActiveAccountId] = useState<string>(ALL_ACCOUNTS_VALUE);
-  const [showBrokerModal, setShowBrokerModal] = useState(false);
+  const [showBrokerModal, setShowBrokerModal] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem("connectBrokerFormDraft");
+      return raw ? JSON.parse(raw)?.wasOpen === true : false;
+    } catch {
+      return false;
+    }
+  });
 
   // Load active selection on mount + listen for changes (other tabs/components)
   useEffect(() => {
@@ -230,7 +238,7 @@ interface AccountCardProps {
   onSetPrimary: () => void;
   onSetActive: () => void;
   onRefresh: () => void;
-  onUnlink: () => void;
+  onUnlink: () => Promise<void>;
 }
 
 function AccountCard({
@@ -243,6 +251,19 @@ function AccountCard({
   onUnlink,
 }: AccountCardProps) {
   const [confirming, setConfirming] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  async function handleConfirmUnlink() {
+    setDisconnecting(true);
+    try {
+      await onUnlink();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to disconnect account. Please try again.";
+      toast.error(msg);
+      setDisconnecting(false);
+      setConfirming(false);
+    }
+  }
 
   return (
     <Card className={cn("bg-card border-border", isActive && "ring-1 ring-primary/50")}>
@@ -286,7 +307,12 @@ function AccountCard({
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            {confirming ? (
+            {disconnecting ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                <span>Disconnecting...</span>
+              </div>
+            ) : confirming ? (
               <>
                 <span className="text-sm text-destructive shrink-0">
                   Delete &ldquo;{account.name}&rdquo;?
@@ -295,7 +321,7 @@ function AccountCard({
                   variant="ghost"
                   size="sm"
                   className="h-7 px-2 text-xs text-destructive hover:text-destructive shrink-0"
-                  onClick={() => { onUnlink(); setConfirming(false); }}
+                  onClick={handleConfirmUnlink}
                 >
                   Yes, delete
                 </Button>
