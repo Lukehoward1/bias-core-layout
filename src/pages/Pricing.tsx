@@ -115,7 +115,7 @@ export default function Pricing() {
       <section className="text-center px-6 pt-12 pb-10 max-w-3xl mx-auto">
         <h1 className="text-4xl md:text-5xl font-bold text-foreground">Simple, clear pricing.</h1>
         <p className="mt-4 text-lg text-muted-foreground">
-          Start with a 7-day free trial. Card required — cancel before day 7 and you won't be charged.
+          Standard and Pro plans include a 7-day free trial. Card required — cancel before day 7 and you won't be charged.
         </p>
 
         {/* Monthly / Annual toggle */}
