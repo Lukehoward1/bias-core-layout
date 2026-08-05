@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import { Filter, ChevronDown, ChevronUp, CalendarDays, Sparkles, BarChart3 } from "lucide-react";
+import { Filter, ChevronDown, ChevronUp, CalendarDays, Sparkles, BarChart3, RefreshCw, Clock } from "lucide-react";
 
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
@@ -24,6 +24,8 @@ import {
   getEventDateLabel,
   getFilteredCalendarEvents,
   getNextKeyEvents,
+  isCalendarLoading,
+  isCalendarLiveDataAvailable,
   type CalendarDateRange,
   type CalendarSortMode,
 } from "@/services/calendarData";
@@ -48,6 +50,15 @@ function Calendar() {
   const [showAllEvents, setShowAllEvents] = useState(false);
 
   const eventRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
+
+  // Re-render when async live data arrives (calendarData.ts dispatches this event)
+  const [, forceUpdate] = useState(0);
+  useEffect(() => {
+    if (!isCalendarLoading()) return;
+    const handler = () => forceUpdate((n) => n + 1);
+    window.addEventListener("calendarDataLoaded", handler);
+    return () => window.removeEventListener("calendarDataLoaded", handler);
+  }, []);
 
   const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
 
@@ -169,6 +180,46 @@ function Calendar() {
       window.clearTimeout(clearHighlightTimer);
     };
   }, [searchParams, setSearchParams, openEvent]);
+
+  const calendarIsLoading = isCalendarLoading();
+  const calendarHasData = isCalendarLiveDataAvailable();
+
+  // Loading state — live data fetch still in-flight
+  if (calendarIsLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <AppHeader title="Calendar" />
+        <div className="max-w-7xl mx-auto flex flex-col items-center justify-center py-24 gap-4">
+          <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Loading calendar data…</p>
+        </div>
+      </div>
+    );
+  }
+
+  // No live data — FMP not yet active; never show synthetic fixture data to users
+  if (!calendarHasData) {
+    return (
+      <div className="p-6 space-y-6">
+        <AppHeader title="Calendar" />
+        <div className="max-w-7xl mx-auto">
+          <Card>
+            <CardContent className="py-20 flex flex-col items-center gap-4 text-center">
+              <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+                <Clock className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">Economic Calendar Coming Soon</h3>
+                <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                  Live economic calendar data is being set up. Check back shortly — this page will update automatically once the data feed is active.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">

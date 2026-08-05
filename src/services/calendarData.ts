@@ -11,21 +11,41 @@ import {
   type CalendarImpact,
 } from "@/data/calendarEvents";
 
-import { getLiveCalendarEvents } from "./calendarService";
+import { getLiveCalendarEvents, getCalendarFetchStatus } from "./calendarService";
 
 // Module-level live events, populated in the background on first import.
-// Synchronous callers get static data until the fetch resolves.
+// Returns [] until live data arrives — static fixture data is never shown to users.
 let _liveEvents: CalendarEvent[] | null = null;
+let _loadAttempted = false;
 
 getLiveCalendarEvents()
   .then((events) => {
-    if (events.length > 0) _liveEvents = events;
+    // Set _liveEvents whenever the fetch SUCCEEDED, even if the result is [].
+    // An empty array is a valid live response (e.g. quiet weekend, narrow date window).
+    // _liveEvents stays null only when the fetch failed (402, network error, etc.).
+    if (getCalendarFetchStatus() === true) {
+      _liveEvents = events;
+    }
   })
-  .catch(() => {});
+  .finally(() => {
+    _loadAttempted = true;
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("calendarDataLoaded"));
+    }
+  });
 
-// Returns live FMP events when available, otherwise the static fallback.
 function _getSource(): CalendarEvent[] {
-  return _liveEvents ?? calendarEvents;
+  return _liveEvents ?? [];
+}
+
+export function isCalendarLoading(): boolean {
+  return !_loadAttempted;
+}
+
+export function isCalendarLiveDataAvailable(): boolean {
+  // true when FMP responded successfully (even if it returned zero events).
+  // false when fetch failed (402, network) or hasn't completed yet.
+  return _liveEvents !== null;
 }
 
 export type CalendarDateRange = "today" | "week" | "month";

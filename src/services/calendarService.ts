@@ -20,12 +20,25 @@ interface FmpEconomicEvent {
 
 // ── Cache ─────────────────────────────────────────────────────
 
-const CACHE_TTL_MS = 30 * 60 * 1000;      // 30 minutes
-const FAILURE_COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
+const CACHE_TTL_MS = 30 * 60 * 1000;         // 30 minutes
+const HISTORY_CACHE_TTL_MS = 60 * 60 * 1000; // 60 minutes — history changes slowly
+const FAILURE_COOLDOWN_MS = 2 * 60 * 1000;   // 2 minutes
 
 let _cache: { data: CalendarEvent[]; expiresAt: number } | null = null;
 let _inFlightPromise: Promise<CalendarEvent[]> | null = null;
 let _failedAt: number | null = null;
+
+let _historyCache: { data: CalendarEvent[]; expiresAt: number } | null = null;
+let _historyInFlight: Promise<CalendarEvent[]> | null = null;
+
+// Tracks whether the last completed list-view fetch succeeded (true/false) or
+// hasn't completed yet (null). Used by calendarData.ts to distinguish a
+// successful empty result from a network/auth failure.
+let _lastFetchSucceeded: boolean | null = null;
+
+export function getCalendarFetchStatus(): boolean | null {
+  return _lastFetchSucceeded;
+}
 
 // ── Mapping helpers ───────────────────────────────────────────
 
@@ -98,6 +111,47 @@ function mapFmpEvent(raw: FmpEconomicEvent, index: number): CalendarEvent {
 
 // ── Public API ────────────────────────────────────────────────
 
+// Fetches ~12 months of past events for historical trend charts.
+// Cached for 60 minutes — results are shared across all event detail modals.
+// Filters to events with actual values must be done by the caller (FMP includes
+// future events in date-ranged queries even when the range includes today).
+export function getLiveCalendarHistoricalEvents(): Promise<CalendarEvent[]> {
+  if (_historyCache && Date.now() < _historyCache.expiresAt) {
+    return Promise.resolve(_historyCache.data);
+  }
+  if (_historyInFlight) return _historyInFlight;
+
+  const now = new Date();
+  const from = new Date(now);
+  from.setFullYear(from.getFullYear() - 1);
+  // Include through today — actual values on today's events may be populated
+  const to = new Date(now);
+
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  const url = `/api/economic-calendar?from=${fmt(from)}&to=${fmt(to)}`;
+
+  _historyInFlight = fetch(url)
+    .then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json() as Promise<unknown>;
+    })
+    .then((data) => {
+      if (!Array.isArray(data)) throw new Error("Unexpected FMP response — expected array");
+      const events = (data as FmpEconomicEvent[]).map(mapFmpEvent);
+      _historyCache = { data: events, expiresAt: Date.now() + HISTORY_CACHE_TTL_MS };
+      return events;
+    })
+    .catch((err) => {
+      console.error("[calendarService] Failed to fetch historical calendar events:", err);
+      return [] as CalendarEvent[];
+    })
+    .finally(() => {
+      _historyInFlight = null;
+    });
+
+  return _historyInFlight;
+}
+
 export function getLiveCalendarEvents(): Promise<CalendarEvent[]> {
   if (_cache && Date.now() < _cache.expiresAt) return Promise.resolve(_cache.data);
   if (_inFlightPromise) return _inFlightPromise;
@@ -122,11 +176,13 @@ export function getLiveCalendarEvents(): Promise<CalendarEvent[]> {
       const events = (data as FmpEconomicEvent[]).map(mapFmpEvent);
       _cache = { data: events, expiresAt: Date.now() + CACHE_TTL_MS };
       _failedAt = null;
+      _lastFetchSucceeded = true;
       return events;
     })
     .catch((err) => {
       console.error("[calendarService] Failed to fetch live calendar events:", err);
       _failedAt = Date.now();
+      _lastFetchSucceeded = false;
       return [] as CalendarEvent[];
     })
     .finally(() => {

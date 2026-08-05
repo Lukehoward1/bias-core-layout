@@ -9,7 +9,7 @@ import { useAssets } from "@/hooks/use-watchlist";
 import { useAlertsContext } from "@/contexts/AlertsContext";
 import type { CalendarEvent } from "@/data/calendarEvents";
 import { getEventDateTime, formatCalendarEventDateLabel } from "@/services/calendarData";
-import { getLiveCalendarEvents } from "@/services/calendarService";
+import { getLiveCalendarHistoricalEvents } from "@/services/calendarService";
 import { HistoricalTrendChart } from "./HistoricalTrendChart";
 
 import {
@@ -159,13 +159,19 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
   const { alerts, recurringSubscriptions, addAlert, scheduleAlert, addRecurringSubscription } = useAlertsContext();
 
   const [alertMode, setAlertMode] = useState<"once" | "event-series">("once");
-  const [liveEvents, setLiveEvents] = useState<CalendarEvent[]>([]);
+  const [historicalEvents, setHistoricalEvents] = useState<CalendarEvent[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
+  // Fetch 12-month history each time the modal opens for a new event.
+  // getLiveCalendarHistoricalEvents caches for 60 min, so repeated opens are cheap.
   useEffect(() => {
-    getLiveCalendarEvents()
-      .then((events) => setLiveEvents(events))
-      .catch(() => {});
-  }, []);
+    if (!isOpen || !event) return;
+    setIsHistoryLoading(true);
+    getLiveCalendarHistoricalEvents()
+      .then((events) => setHistoricalEvents(events))
+      .catch(() => setHistoricalEvents([]))
+      .finally(() => setIsHistoryLoading(false));
+  }, [isOpen, event?.event]);
 
   const safeEvent = useMemo<CalendarEvent>(
     () =>
@@ -190,7 +196,10 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
   const isReleased = safeEvent.actual !== "—" || (isValidEventDate && eventDateTime.getTime() <= Date.now());
 
   const chartData = useMemo(() => {
-    const filtered = liveEvents
+    // Filter to past releases of this specific event that have actual values.
+    // FMP includes future events in date-ranged queries, so we must filter by
+    // actual !== "—" to exclude upcoming/unresolved entries.
+    const filtered = historicalEvents
       .filter((e) => e.event === safeEvent.event && e.actual !== "—")
       .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -199,7 +208,7 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
       actual: parseEventValue(e.actual),
       forecast: parseEventValue(e.forecast) ?? undefined,
     }));
-  }, [liveEvents, safeEvent.event]);
+  }, [historicalEvents, safeEvent.event]);
 
   const interpretation = useMemo(
     () => getMarketInterpretation(safeEvent.event, safeEvent.currency),
@@ -631,7 +640,7 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
               </Card>
             </div>
 
-            <HistoricalTrendChart data={chartData} />
+            <HistoricalTrendChart data={chartData} isLoading={isHistoryLoading} />
 
             <Card className="bg-card border-border">
               <CardContent className="p-6">
