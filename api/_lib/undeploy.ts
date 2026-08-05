@@ -58,29 +58,34 @@ export async function undeployExcessBrokerConnections(
   const toUndeploy = sorted.slice(maxAllowed).filter((c) => c.deploy_state !== "UNDEPLOYED");
   if (!toUndeploy.length) return;
 
-  // @ts-ignore — tsconfig.api.json uses moduleResolution:node which can't resolve exports maps
-  const { default: MetaApi } = await import("metaapi.cloud-sdk/node");
-  const api = new (MetaApi as any)(process.env.METAAPI_TOKEN!);
+  try {
+    // @ts-ignore — tsconfig.api.json uses moduleResolution:node which can't resolve exports maps
+    const { default: MetaApi } = await import("metaapi.cloud-sdk/node");
+    const api = new (MetaApi as any)(process.env.METAAPI_TOKEN!);
 
-  for (const conn of toUndeploy) {
-    try {
-      await withRetry(async () => {
-        const account = await api.metatraderAccountApi.getAccount(conn.metaapi_account_id);
-        if (account.state !== "UNDEPLOYED") await account.undeploy();
-        await account.reload();
-      });
-      await supabase
-        .from("broker_connections")
-        .update({
-          deploy_state: "UNDEPLOYED",
-          connection_status: "disconnected",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", conn.id);
-      console.log(`[undeploy] undeployed connection ${conn.id} for user ${userId}`);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[undeploy] failed to undeploy ${conn.id} after 3 attempts:`, msg);
+    for (const conn of toUndeploy) {
+      try {
+        await withRetry(async () => {
+          const account = await api.metatraderAccountApi.getAccount(conn.metaapi_account_id);
+          if (account.state !== "UNDEPLOYED") await account.undeploy();
+          await account.reload();
+        });
+        await supabase
+          .from("broker_connections")
+          .update({
+            deploy_state: "UNDEPLOYED",
+            connection_status: "disconnected",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", conn.id);
+        console.log(`[undeploy] undeployed connection ${conn.id} for user ${userId}`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[undeploy] failed to undeploy ${conn.id} after 3 attempts:`, msg);
+      }
     }
+  } catch (initErr: unknown) {
+    const msg = initErr instanceof Error ? initErr.message : String(initErr);
+    console.error(`[undeploy] MetaApi init failed for user ${userId} — skipping undeploy, orphan-detect will catch:`, msg);
   }
 }
