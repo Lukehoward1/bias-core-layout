@@ -242,9 +242,21 @@ export function useAccountAwareStats(
   return useMemo(() => {
     const perAccount = new Map<string, AccountEntry>();
 
-    for (const account of accounts) {
+    // Trades with no accountId, or with an accountId that no longer exists in the
+    // accounts list (e.g. after migration 010 nulled legacy "demo-account" text IDs),
+    // are "orphaned". Assign them to the first/primary account so they are never
+    // silently dropped from stats and the equity curve.
+    const knownAccountIds = new Set(accounts.map((a) => a.id));
+    const orphanTrades = trades.filter(
+      (t) => !t.accountId || !knownAccountIds.has(t.accountId),
+    );
+
+    for (const [i, account] of accounts.entries()) {
       const accountTrades = trades.filter((t) => t.accountId === account.id);
-      perAccount.set(account.id, buildEntry(account, accountTrades));
+      const effectiveTrades = i === 0 && orphanTrades.length > 0
+        ? [...accountTrades, ...orphanTrades]
+        : accountTrades;
+      perAccount.set(account.id, buildEntry(account, effectiveTrades));
     }
 
     const currencies = new Set(accounts.map((a) => a.currency));
