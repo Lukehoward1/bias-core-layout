@@ -70,9 +70,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // ── 5. MetaApi undeploy + remove (broker accounts only) ───────────────────
 
   if (connection?.metaapi_account_id) {
-    // @ts-ignore — tsconfig.api.json uses moduleResolution:node which can't resolve exports maps; runtime resolves correctly
-    const { default: MetaApi } = await import("metaapi.cloud-sdk/node");
-    const api = new (MetaApi as any)(process.env.METAAPI_TOKEN!);
+    let api: any;
+    try {
+      // @ts-ignore — tsconfig.api.json uses moduleResolution:node which can't resolve exports maps; runtime resolves correctly
+      const { default: MetaApi } = await import("metaapi.cloud-sdk/node");
+      api = new (MetaApi as any)(process.env.METAAPI_TOKEN!);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[broker-disconnect] MetaApi SDK init failed for account ${connection.metaapi_account_id}:`, msg);
+      return res.status(500).json({ error: "Broker disconnection service unavailable. Please try again later." });
+    }
 
     try {
       await withRetry(async () => {

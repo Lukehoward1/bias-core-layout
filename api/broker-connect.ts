@@ -185,9 +185,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const accountName = `${platform.toUpperCase()} ${login}`;
 
-  // @ts-ignore — tsconfig.api.json uses moduleResolution:node which can't resolve exports maps; runtime resolves correctly
-  const { default: MetaApi } = await import("metaapi.cloud-sdk/node");
-  const api = new (MetaApi as any)(process.env.METAAPI_TOKEN!);
+  let api: any;
+  try {
+    // @ts-ignore — tsconfig.api.json uses moduleResolution:node which can't resolve exports maps; runtime resolves correctly
+    const { default: MetaApi } = await import("metaapi.cloud-sdk/node");
+    api = new (MetaApi as any)(process.env.METAAPI_TOKEN!);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[broker-connect] MetaApi SDK init failed:", msg);
+    return res.status(500).json({ error: "Broker connection service unavailable. Please try again later." });
+  }
 
   let metaApiAccount: any;
   try {
