@@ -60,8 +60,12 @@ export async function undeployExcessBrokerConnections(
 
   try {
     // @ts-ignore — tsconfig.api.json uses moduleResolution:node which can't resolve exports maps
-    const { default: MetaApi } = await import("metaapi.cloud-sdk/node");
-    const api = new (MetaApi as any)(process.env.METAAPI_TOKEN!);
+    const _mod = await import("metaapi.cloud-sdk/node");
+    // CJS/ESM interop: Vercel's ESM runtime wraps the CJS module.exports as .default,
+    // so the constructor is at .default.default. In compiled CJS output .default is the
+    // constructor directly. The fallback handles both.
+    const MetaApi = (_mod as any).default?.default ?? (_mod as any).default;
+    const api = new MetaApi(process.env.METAAPI_TOKEN!);
 
     for (const conn of toUndeploy) {
       try {

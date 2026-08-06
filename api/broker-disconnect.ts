@@ -73,8 +73,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let api: any;
     try {
       // @ts-ignore — tsconfig.api.json uses moduleResolution:node which can't resolve exports maps; runtime resolves correctly
-      const { default: MetaApi } = await import("metaapi.cloud-sdk/node");
-      api = new (MetaApi as any)(process.env.METAAPI_TOKEN!);
+      const _mod = await import("metaapi.cloud-sdk/node");
+      // CJS/ESM interop: Vercel's ESM runtime wraps the CJS module.exports as .default,
+      // so the constructor is at .default.default. In compiled CJS output .default is the
+      // constructor directly. The fallback handles both.
+      const MetaApi = (_mod as any).default?.default ?? (_mod as any).default;
+      api = new MetaApi(process.env.METAAPI_TOKEN!);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[broker-disconnect] MetaApi SDK init failed for account ${connection.metaapi_account_id}:`, msg);
