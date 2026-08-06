@@ -1047,8 +1047,8 @@ export default function Landing() {
               <h2 className="text-3xl md:text-4xl font-bold text-foreground">Become a Founding Member.</h2>
 
               <p className="text-muted-foreground max-w-md leading-relaxed">
-                Lock in 50% off Pro — forever. Start with a 7-day free trial, then pay half price for life.
-                Only available to the first 100 members. Start your 7-day free trial — cancel before day 7 and you won't be charged.
+                Lock in 50% off Pro — forever, starting today. Everything in Pro at half the regular price, for life.
+                Only available to the first 100 members.
               </p>
 
 
@@ -1060,7 +1060,7 @@ export default function Landing() {
                 Claim Your Spot
               </Button>
 
-              <p className="text-xs text-muted-foreground">Card required to start trial. Cancel before day 7 — you won't be charged a thing.</p>
+              <p className="text-xs text-muted-foreground">Annual payment · No trial · Renews at £299/year</p>
             </div>
           </AnimatedSection>
         </div>
