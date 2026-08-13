@@ -66,9 +66,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // returns, so we defer enableMetaStatsApi() to the first sync poll after deploy.
   if (!bc.metastats_enabled) {
     try {
-      // @ts-ignore
-      const { default: MetaApi } = await import("metaapi.cloud-sdk/node");
-      const api = new (MetaApi as any)(process.env.METAAPI_TOKEN!);
+      // @ts-ignore — tsconfig.api.json uses moduleResolution:node which can't resolve exports maps; runtime resolves correctly
+      const _mod = await import("metaapi.cloud-sdk/node");
+      // CJS/ESM interop: Vercel's ESM runtime wraps the CJS module.exports as .default,
+      // so the constructor is at .default.default. In compiled CJS output .default is the
+      // constructor directly. The fallback handles both.
+      const MetaApi = (_mod as any).default?.default ?? (_mod as any).default;
+      const api = new MetaApi(process.env.METAAPI_TOKEN!);
       const account = await api.metatraderAccountApi.getAccount(bc.metaapi_account_id);
       await account.enableMetaStatsApi();
       await supabase
@@ -99,8 +103,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let deals: any[] = [];
   try {
     // @ts-ignore — tsconfig.api.json uses moduleResolution:node which can't resolve exports maps; runtime resolves correctly
-    const { default: MetaStats } = await import("metaapi.cloud-metastats-sdk");
-    const metaStats = new (MetaStats as any)(process.env.METAAPI_TOKEN!);
+    const _metaStatsMod = await import("metaapi.cloud-metastats-sdk");
+    // CJS/ESM interop: same unwrap pattern as metaapi.cloud-sdk/node above.
+    const MetaStats = (_metaStatsMod as any).default?.default ?? (_metaStatsMod as any).default;
+    const metaStats = new MetaStats(process.env.METAAPI_TOKEN!);
     deals = await metaStats.getAccountTrades(bc.metaapi_account_id, startTime, endTime, false);
   } catch (err) {
     console.error(
