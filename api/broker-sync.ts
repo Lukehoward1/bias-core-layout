@@ -103,7 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let deals: any[] = [];
   try {
     // @ts-ignore — tsconfig.api.json uses moduleResolution:node which can't resolve exports maps; runtime resolves correctly
-    const _metaStatsMod = await import("metaapi.cloud-metastats-sdk");
+    const _metaStatsMod = await import("metaapi.cloud-metastats-sdk/node");
     // CJS/ESM interop: same unwrap pattern as metaapi.cloud-sdk/node above.
     const MetaStats = (_metaStatsMod as any).default?.default ?? (_metaStatsMod as any).default;
     const metaStats = new MetaStats(process.env.METAAPI_TOKEN!);
