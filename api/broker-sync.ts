@@ -108,6 +108,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const MetaStats = (_metaStatsMod as any).default?.default ?? (_metaStatsMod as any).default;
     const metaStats = new MetaStats(process.env.METAAPI_TOKEN!);
     deals = await metaStats.getAccountTrades(bc.metaapi_account_id, startTime, endTime, false);
+    console.log(
+      `[broker-sync] MetaStats raw deals: ${deals.length} | window: ${startTime} → ${endTime} | types: ${[...new Set(deals.map((d: any) => d.type))].join(", ") || "none"}`,
+    );
   } catch (err) {
     console.error(
       "[broker-sync] MetaStats fetch failed:",
