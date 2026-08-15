@@ -89,6 +89,64 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
+  // ── RPC balance/equity sync ─────────────────────────────────────────────────
+  // Runs BEFORE MetaStats so neither path can block the other — a MetaStats 502
+  // no longer silently skips balance sync.
+  // rpcConnection is hoisted outside the try so finally can always call close().
+  // Promise.race enforces a hard 15s ceiling independent of what SDK methods
+  // actually exist at runtime.
+  let rpcConnection: any;
+  try {
+    // @ts-ignore — tsconfig.api.json uses moduleResolution:node which can't resolve exports maps; runtime resolves correctly
+    const _rpcMod = await import("metaapi.cloud-sdk/node");
+    // CJS/ESM interop: same unwrap pattern as the imports above.
+    const MetaApi = (_rpcMod as any).default?.default ?? (_rpcMod as any).default;
+    const api = new MetaApi(process.env.METAAPI_TOKEN!);
+    const account = await api.metatraderAccountApi.getAccount(bc.metaapi_account_id);
+    rpcConnection = account.getRPCConnection();
+
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const rpcTimeout = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error("RPC balance sync timed out after 15s")), 15_000);
+    });
+
+    const info = await Promise.race([
+      (async () => {
+        await rpcConnection.connect();
+        // waitSynchronized is on the parent RpcMetaApiConnection, not the typed instance —
+        // optional-chain degrades gracefully if absent. The hard timeout above is the
+        // actual enforcement boundary regardless of what the SDK exposes.
+        await rpcConnection.waitSynchronized?.(15);
+        return rpcConnection.getAccountInformation();
+      })(),
+      rpcTimeout,
+    ]);
+    clearTimeout(timeoutId!);
+
+    await supabase
+      .from("linked_accounts")
+      .update({
+        balance: info.balance,
+        equity: info.equity,
+        currency: info.currency,
+        last_updated: new Date().toISOString(),
+      })
+      .eq("id", linkedAccountId)
+      .eq("user_id", user.id);
+    console.log(
+      `[broker-sync] balance=${info.balance} equity=${info.equity} currency=${info.currency}`,
+    );
+  } catch (err) {
+    console.error(
+      "[broker-sync] RPC balance/equity sync failed:",
+      err instanceof Error ? err.message : err,
+    );
+  } finally {
+    if (rpcConnection) {
+      try { await rpcConnection.close(); } catch {}
+    }
+  }
+
   const now = new Date();
   const startDate: Date = bc.last_synced_at
     ? new Date(bc.last_synced_at)
