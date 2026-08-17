@@ -75,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Verify account belongs to user and get connection details
   const { data: bc } = await supabase
     .from("broker_connections")
-    .select("id, metaapi_account_id, metastats_enabled, last_synced_at, last_deployed_at")
+    .select("id, metaapi_account_id, metastats_enabled, last_synced_at")
     .eq("account_id", linkedAccountId)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -173,10 +173,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const now = new Date();
+  // First sync (last_synced_at is null) always pulls the last 365 days of
+  // history — connect-time is not a useful floor because it excludes trades
+  // that closed before the account was linked (or re-linked after a reset).
   const startDate: Date = bc.last_synced_at
     ? new Date(bc.last_synced_at)
-    : bc.last_deployed_at
-    ? new Date(bc.last_deployed_at)
     : new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
 
   const startTime = toMetaStatsTime(startDate);
