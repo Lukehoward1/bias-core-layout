@@ -1177,7 +1177,7 @@ export default function Journal() {
             </div>
 
             {/* Top stats (active scope) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-5">
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">Total Trades</CardTitle>
@@ -1257,6 +1257,22 @@ export default function Journal() {
                     canCombine={kpiCanCombine}
                     activeAccountId={activeAccountId}
                     select={(s) => s.profitFactor}
+                    format={(v) => String(v)}
+                  />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Breakevens</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <AccountAwareStat
+                    perAccount={kpiPerAccount}
+                    combined={kpiCombined}
+                    canCombine={kpiCanCombine}
+                    activeAccountId={activeAccountId}
+                    select={(s) => `${s.breakevens} (${s.breakevenRate}%)`}
                     format={(v) => String(v)}
                   />
                 </CardContent>

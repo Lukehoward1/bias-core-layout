@@ -95,11 +95,16 @@ export function ReportPreview({ dateRange, trades }: ReportPreviewProps) {
   }, [trades, dateRange]);
 
   const metrics = useMemo(() => {
-    const wins = filtered.filter((t) => t.status === "win");
-    const losses = filtered.filter((t) => t.status === "loss");
+    // Derived from pnl sign (not the stored status string) so this always agrees
+    // with the main stats hook, and breakeven trades (pnl === 0) are tracked
+    // explicitly rather than silently falling out of the win/loss split.
+    const wins = filtered.filter((t) => t.pnl > 0);
+    const losses = filtered.filter((t) => t.pnl < 0);
+    const breakevens = filtered.filter((t) => t.pnl === 0).length;
 
     const totalTrades = filtered.length;
     const profitRate = totalTrades > 0 ? (wins.length / totalTrades) * 100 : 0;
+    const breakevenRate = totalTrades > 0 ? (breakevens / totalTrades) * 100 : 0;
 
     const posSum = wins.reduce((s, t) => s + t.pnl, 0);
     const negSum = Math.abs(losses.reduce((s, t) => s + t.pnl, 0));
@@ -125,9 +130,9 @@ export function ReportPreview({ dateRange, trades }: ReportPreviewProps) {
 
     let maxConsecWins = 0, maxConsecLosses = 0, curW = 0, curL = 0;
     for (const t of filtered) {
-      if (t.status === "win") {
+      if (t.pnl > 0) {
         curW++; maxConsecWins = Math.max(maxConsecWins, curW); curL = 0;
-      } else if (t.status === "loss") {
+      } else if (t.pnl < 0) {
         curL++; maxConsecLosses = Math.max(maxConsecLosses, curL); curW = 0;
       } else {
         curW = 0; curL = 0;
@@ -137,6 +142,8 @@ export function ReportPreview({ dateRange, trades }: ReportPreviewProps) {
     return {
       totalTrades,
       profitRate,
+      breakevens,
+      breakevenRate,
       profitFactor,
       expectancy,
       avgRR,
@@ -203,6 +210,10 @@ export function ReportPreview({ dateRange, trades }: ReportPreviewProps) {
           label="Max Consec. Losses"
           value={String(metrics.maxConsecLosses)}
           valueClass="text-destructive"
+        />
+        <StatCard
+          label="Breakevens"
+          value={`${metrics.breakevens} (${metrics.breakevenRate.toFixed(1)}%)`}
         />
       </div>
 

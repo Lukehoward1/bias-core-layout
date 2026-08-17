@@ -77,8 +77,12 @@ function DayStatsCard({ date, sym }: { date: string; sym: string }) {
   }
 
   const totalPnl = dayTrades.reduce((s, t) => s + t.pnl, 0);
-  const wins = dayTrades.filter((t) => t.status === "win").length;
-  const losses = dayTrades.filter((t) => t.status === "loss").length;
+  // Derived from pnl sign (not the stored status string) so this always agrees
+  // with the main stats hook, and breakeven trades (pnl === 0) are their own
+  // bucket rather than silently missing from the W/L breakdown.
+  const wins = dayTrades.filter((t) => t.pnl > 0).length;
+  const losses = dayTrades.filter((t) => t.pnl < 0).length;
+  const breakevens = dayTrades.filter((t) => t.pnl === 0).length;
   const winRate = dayTrades.length > 0 ? Math.round((wins / dayTrades.length) * 100) : 0;
   const pnlPositive = totalPnl >= 0;
 
@@ -93,8 +97,8 @@ function DayStatsCard({ date, sym }: { date: string; sym: string }) {
         <p className="text-lg font-bold text-foreground">{winRate}%</p>
       </div>
       <div className="rounded-lg border border-border bg-muted/30 p-3 text-center">
-        <p className="text-xs text-muted-foreground mb-1">W / L</p>
-        <p className="text-lg font-bold text-foreground">{wins} / {losses}</p>
+        <p className="text-xs text-muted-foreground mb-1">W / L / BE</p>
+        <p className="text-lg font-bold text-foreground">{wins} / {losses} / {breakevens}</p>
       </div>
       <div className={cn("rounded-lg border p-3 text-center", pnlPositive ? "border-success/30 bg-success/10" : "border-destructive/30 bg-destructive/10")}>
         <p className="text-xs text-muted-foreground mb-1">P&L</p>

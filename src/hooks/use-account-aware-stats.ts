@@ -30,6 +30,10 @@ export interface AccountStats {
   totalTrades: number;
   /** Integer 0–100. */
   winRate: number;
+  /** Count of trades closed at pnl === 0. Already included in totalTrades/equityCurve — surfaced separately so breakeven-heavy traders can see it. */
+  breakevens: number;
+  /** Integer 0–100. */
+  breakevenRate: number;
   totalPnl: number;
   weekPnl: number;
   monthPnl: number;
@@ -97,9 +101,11 @@ function computeStats(trades: Trade[]): AccountStats {
   const totalTrades = trades.length;
   const wins = trades.filter((t) => (t.pnl ?? 0) > 0);
   const losses = trades.filter((t) => (t.pnl ?? 0) < 0);
+  const breakevens = trades.filter((t) => (t.pnl ?? 0) === 0).length;
 
   const totalPnl = trades.reduce((s, t) => s + (t.pnl ?? 0), 0);
   const winRate = totalTrades > 0 ? Math.round((wins.length / totalTrades) * 100) : 0;
+  const breakevenRate = totalTrades > 0 ? Math.round((breakevens / totalTrades) * 100) : 0;
 
   const now = new Date();
   const weekStart = startOfWeek(now, { weekStartsOn: 1 });
@@ -166,7 +172,7 @@ function computeStats(trades: Trade[]): AccountStats {
   }
 
   return {
-    totalTrades, winRate, totalPnl, weekPnl, monthPnl,
+    totalTrades, winRate, breakevens, breakevenRate, totalPnl, weekPnl, monthPnl,
     avgRR, profitFactor, expectancy,
     maxConsecWins, maxConsecLosses,
     avgWinner, avgLoser,

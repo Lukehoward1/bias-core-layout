@@ -229,8 +229,7 @@ export function ReportBuilder({ showHeader = true }: ReportBuilderProps) {
                 )}
               </div>
             </div>
-          </div>
-        </div>
+    </div>
   );
 
   const savedConfigs = !isLoading && reports.length > 0 ? (
