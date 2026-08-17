@@ -6,14 +6,34 @@ function toMetaStatsTime(date: Date): string {
   return date.toISOString().replace("T", " ").slice(0, 23);
 }
 
-function mapDeal(deal: any, userId: string, linkedAccountId: string) {
+// A deal is classified breakeven when |pnl| is under this fraction of account
+// balance. MetaStats' own success flag is binary (won/lost) with no breakeven
+// concept, so we derive our own. Uses current balance for the whole batch —
+// an accepted approximation, not per-trade historical balance.
+const BREAKEVEN_THRESHOLD_PCT = 0.001;
+
+function mapDeal(
+  deal: any,
+  userId: string,
+  linkedAccountId: string,
+  balance: number | null,
+) {
   const closeStr: string = deal.closeTime ?? deal.openTime;
   const date = closeStr.slice(0, 10);
   const entryTime = (deal.openTime as string).slice(11, 16);
   const exitTime = deal.closeTime ? (deal.closeTime as string).slice(11, 16) : null;
   const type = deal.type === "DEAL_TYPE_BUY" ? "Long" : "Short";
-  const status =
-    deal.success === "won" ? "win" : deal.success === "lost" ? "loss" : "breakeven";
+  const pnl = deal.profit ?? null;
+
+  let status: "win" | "loss" | "breakeven";
+  if (balance !== null && balance > 0 && typeof pnl === "number") {
+    if (Math.abs(pnl) / balance < BREAKEVEN_THRESHOLD_PCT) status = "breakeven";
+    else if (pnl > 0) status = "win";
+    else status = "loss";
+  } else {
+    status =
+      deal.success === "won" ? "win" : deal.success === "lost" ? "loss" : "breakeven";
+  }
 
   return {
     user_id: userId,
@@ -23,7 +43,7 @@ function mapDeal(deal: any, userId: string, linkedAccountId: string) {
     entry: deal.openPrice ?? null,
     exit: deal.closePrice ?? null,
     lots: deal.volume ?? null,
-    pnl: deal.profit ?? null,
+    pnl,
     status,
     notes: deal.comment ?? null,
     account_id: linkedAccountId,
@@ -95,7 +115,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // rpcConnection is hoisted outside the try so finally can always call close().
   // Promise.race enforces a hard 15s ceiling independent of what SDK methods
   // actually exist at runtime.
+  // currentBalance is hoisted so mapDeal (below) can use it for pnl-based status
+  // classification. Stays null if the RPC fetch fails — mapDeal then falls back
+  // to MetaStats' won/lost flag.
   let rpcConnection: any;
+  let currentBalance: number | null = null;
   try {
     // @ts-ignore — tsconfig.api.json uses moduleResolution:node which can't resolve exports maps; runtime resolves correctly
     const _rpcMod = await import("metaapi.cloud-sdk/node");
@@ -122,6 +146,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       rpcTimeout,
     ]);
     clearTimeout(timeoutId!);
+    currentBalance = typeof info.balance === "number" ? info.balance : null;
 
     await supabase
       .from("linked_accounts")
@@ -180,7 +205,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Only import closed BUY/SELL entries (skip balance changes, credits, etc.)
   const rows = deals
     .filter((d) => d.type === "DEAL_TYPE_BUY" || d.type === "DEAL_TYPE_SELL")
-    .map((d) => mapDeal(d, user.id, linkedAccountId));
+    .map((d) => mapDeal(d, user.id, linkedAccountId, currentBalance));
 
   let synced = 0;
   if (rows.length > 0) {
