@@ -77,12 +77,9 @@ function DayStatsCard({ date, sym }: { date: string; sym: string }) {
   }
 
   const totalPnl = dayTrades.reduce((s, t) => s + t.pnl, 0);
-  // Derived from pnl sign (not the stored status string) so this always agrees
-  // with the main stats hook, and breakeven trades (pnl === 0) are their own
-  // bucket rather than silently missing from the W/L breakdown.
-  const wins = dayTrades.filter((t) => t.pnl > 0).length;
-  const losses = dayTrades.filter((t) => t.pnl < 0).length;
-  const breakevens = dayTrades.filter((t) => t.pnl === 0).length;
+  const wins = dayTrades.filter((t) => t.status === "win").length;
+  const losses = dayTrades.filter((t) => t.status === "loss").length;
+  const breakevens = dayTrades.filter((t) => t.status === "breakeven").length;
   const winRate = dayTrades.length > 0 ? Math.round((wins / dayTrades.length) * 100) : 0;
   const pnlPositive = totalPnl >= 0;
 

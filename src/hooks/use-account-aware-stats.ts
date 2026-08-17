@@ -30,7 +30,7 @@ export interface AccountStats {
   totalTrades: number;
   /** Integer 0–100. */
   winRate: number;
-  /** Count of trades closed at pnl === 0. Already included in totalTrades/equityCurve — surfaced separately so breakeven-heavy traders can see it. */
+  /** Count of trades tagged status === "breakeven". Already included in totalTrades/equityCurve — surfaced separately so breakeven-heavy traders can see it. */
   breakevens: number;
   /** Integer 0–100. */
   breakevenRate: number;
@@ -99,9 +99,9 @@ export interface UseAccountAwareStatsResult {
 
 function computeStats(trades: Trade[]): AccountStats {
   const totalTrades = trades.length;
-  const wins = trades.filter((t) => (t.pnl ?? 0) > 0);
-  const losses = trades.filter((t) => (t.pnl ?? 0) < 0);
-  const breakevens = trades.filter((t) => (t.pnl ?? 0) === 0).length;
+  const wins = trades.filter((t) => t.status === "win");
+  const losses = trades.filter((t) => t.status === "loss");
+  const breakevens = trades.filter((t) => t.status === "breakeven").length;
 
   const totalPnl = trades.reduce((s, t) => s + (t.pnl ?? 0), 0);
   const winRate = totalTrades > 0 ? Math.round((wins.length / totalTrades) * 100) : 0;
@@ -162,9 +162,9 @@ function computeStats(trades: Trade[]): AccountStats {
   const sorted = [...trades].sort((a, b) => a.date.localeCompare(b.date));
   let maxConsecWins = 0, maxConsecLosses = 0, curW = 0, curL = 0;
   for (const t of sorted) {
-    if ((t.pnl ?? 0) > 0) {
+    if (t.status === "win") {
       curW++; maxConsecWins = Math.max(maxConsecWins, curW); curL = 0;
-    } else if ((t.pnl ?? 0) < 0) {
+    } else if (t.status === "loss") {
       curL++; maxConsecLosses = Math.max(maxConsecLosses, curL); curW = 0;
     } else {
       curW = 0; curL = 0;

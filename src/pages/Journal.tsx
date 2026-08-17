@@ -2204,11 +2204,24 @@ export default function Journal() {
 
                     <div className="space-y-2">
                       <Label>Status</Label>
-                      <Input
+                      <Select
                         value={editingTrade.status}
-                        onChange={(e) => setEditingTrade((p) => (p ? { ...p, status: e.target.value } : p))}
+                        onValueChange={(v) =>
+                          setEditingTrade((p) =>
+                            p ? { ...p, status: v as "win" | "loss" | "breakeven" } : p,
+                          )
+                        }
                         disabled={isSyncedTrade(editingTrade)}
-                      />
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="win">Win</SelectItem>
+                          <SelectItem value="loss">Loss</SelectItem>
+                          <SelectItem value="breakeven">Breakeven</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div className="space-y-2">

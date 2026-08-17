@@ -65,9 +65,7 @@ function computeStats(trades: Trade[]): SegmentStats {
   const count = trades.length;
   if (count === 0) return { count: 0, profitRate: 0, avgR: null, profitFactor: null };
 
-  // Derived from pnl sign (not the stored status string) so this always agrees
-  // with the main stats hook (use-account-aware-stats.ts).
-  const wins = trades.filter((t) => (t.pnl ?? 0) > 0).length;
+  const wins = trades.filter((t) => t.status === "win").length;
   const profitRate = (wins / count) * 100;
 
   const rValues = trades
