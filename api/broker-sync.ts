@@ -11,7 +11,7 @@ function mapDeal(deal: any, userId: string, linkedAccountId: string) {
   const date = closeStr.slice(0, 10);
   const entryTime = (deal.openTime as string).slice(11, 16);
   const exitTime = deal.closeTime ? (deal.closeTime as string).slice(11, 16) : null;
-  const type = deal.type === "BUY" ? "Long" : "Short";
+  const type = deal.type === "DEAL_TYPE_BUY" ? "Long" : "Short";
   const status =
     deal.success === "won" ? "win" : deal.success === "lost" ? "loss" : "breakeven";
 
@@ -179,7 +179,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Only import closed BUY/SELL entries (skip balance changes, credits, etc.)
   const rows = deals
-    .filter((d) => d.type === "BUY" || d.type === "SELL")
+    .filter((d) => d.type === "DEAL_TYPE_BUY" || d.type === "DEAL_TYPE_SELL")
     .map((d) => mapDeal(d, user.id, linkedAccountId));
 
   let synced = 0;

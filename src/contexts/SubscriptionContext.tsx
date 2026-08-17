@@ -1,6 +1,7 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { type PlanLimits, getTierLimits } from "@/types/subscription";
 
 interface Profile {
   subscription_status: string | null;
@@ -24,8 +25,12 @@ interface SubscriptionContextValue {
   stripeCustomerId: string | null;
   downgradeGraceEndAt: string | null;
   downgradeNewMax: number | null;
+  limits: PlanLimits;
   isLoading: boolean;
   refetch: () => Promise<void>;
+  // Dev-only: override the active tier without touching the DB.
+  // Has no effect in production since the UI is gated by import.meta.env.DEV.
+  setDevTier: (tier: string | null) => void;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextValue | null>(null);
@@ -34,6 +39,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const { user, isLoading: authLoading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [devTierOverride, setDevTierOverride] = useState<string | null>(null);
 
   const fetchProfile = useCallback(async (showLoading = true) => {
     if (showLoading) setIsLoading(true);
@@ -58,20 +64,30 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     fetchProfile(true);
   }, [fetchProfile]);
 
-  const status = profile?.subscription_status ?? null;
-  const now = new Date();
+  const realStatus = profile?.subscription_status ?? null;
+  const realTier = profile?.subscription_tier ?? null;
 
-  const isActive = status === "active" || status === "trialing";
+  // Dev override: when set, treat the subscription as active with the chosen tier.
+  const effectiveTier = devTierOverride ?? realTier;
+  const effectiveStatus = devTierOverride ? "active" : realStatus;
+
+  const now = new Date();
+  const isActive = effectiveStatus === "active" || effectiveStatus === "trialing";
   const isTrial =
-    status === "trialing" &&
+    effectiveStatus === "trialing" &&
     !!profile?.trial_ends_at &&
     new Date(profile.trial_ends_at) > now;
+
+  const limits = useMemo(
+    () => getTierLimits(effectiveTier, effectiveStatus),
+    [effectiveTier, effectiveStatus],
+  );
 
   return (
     <SubscriptionContext.Provider
       value={{
-        subscriptionStatus: status,
-        subscriptionTier: profile?.subscription_tier ?? null,
+        subscriptionStatus: effectiveStatus,
+        subscriptionTier: effectiveTier,
         isFoundingMember: profile?.is_founding_member ?? false,
         isActive,
         isTrial,
@@ -80,8 +96,12 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         stripeCustomerId: profile?.stripe_customer_id ?? null,
         downgradeGraceEndAt: profile?.downgrade_grace_end_at ?? null,
         downgradeNewMax: profile?.downgrade_new_max ?? null,
+        limits,
         isLoading,
         refetch: () => fetchProfile(false),
+        setDevTier: (tier: string | null) => {
+          if (import.meta.env.DEV) setDevTierOverride(tier);
+        },
       }}
     >
       {children}

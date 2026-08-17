@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { undeployExcessBrokerConnections } from "./_lib/undeploy.js";
+import { maxLinkedAccountsForTier } from "./_lib/tier-limits.js";
 
 // ── Shared auth ────────────────────────────────────────────────────────────────
 
@@ -77,16 +78,6 @@ async function handleDowngradeEnforce(supabase: ReturnType<typeof makeSupabase>,
 // user's current plan limit (payment failure, manual admin action, etc.) and
 // undeployes them. Always emails admin with a full deployed-accounts summary.
 
-function maxAccountsForTier(tier: string | null, status: string | null): number {
-  if (status !== "active" && status !== "trialing") return 0;
-  switch (tier) {
-    case "standard":        return 1;
-    case "pro":             return 3;
-    case "founding_member": return 1;
-    default:                return 0;
-  }
-}
-
 interface DeployedUser {
   userId: string;
   email: string | null;
@@ -151,7 +142,7 @@ async function handleOrphanDetect(supabase: ReturnType<typeof makeSupabase>, res
     const profile = profileById.get(userId);
     const tier = profile?.subscription_tier ?? null;
     const status = profile?.subscription_status ?? null;
-    const maxAllowed = maxAccountsForTier(tier, status);
+    const maxAllowed = maxLinkedAccountsForTier(tier, status);
     const orphanCount = Math.max(0, deployedCount - maxAllowed);
 
     summary.push({ userId, email: emailById.get(userId) ?? null, tier, status, deployedCount, maxAllowed, orphanCount });

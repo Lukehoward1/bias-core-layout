@@ -25,7 +25,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
-import { useSubscription } from "@/hooks/use-subscription";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { LockedBadge } from "@/components/journal/FeatureGate";
 import { toast } from "sonner";

@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { useSubscription } from "./use-subscription";
-import { canLinkMoreAccounts, getRemainingAccountSlots } from "@/types/subscription";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { DEMO_BROKER_ACCOUNT } from "@/data/demoBrokerAccount";
 
 /**
@@ -143,7 +142,7 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
   const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
   const [primaryAccountId, setPrimaryAccountId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { plan, limits } = useSubscription();
+  const { limits } = useSubscription();
 
   // ── Load from Supabase on mount / user change ───────────────────────────────
 
@@ -184,8 +183,8 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
 
   const accountCount = accounts.length;
   const maxAccounts = limits.maxLinkedAccounts;
-  const remainingSlots = getRemainingAccountSlots(plan, accountCount);
-  const canLinkMore = canLinkMoreAccounts(plan, accountCount);
+  const remainingSlots = Math.max(0, limits.maxLinkedAccounts - accountCount);
+  const canLinkMore = accountCount < limits.maxLinkedAccounts && limits.canLinkAccounts;
   const canLinkAccounts = limits.canLinkAccounts;
 
   // Demo fallback: show DEMO_BROKER_ACCOUNT when no real rows exist.
@@ -213,7 +212,7 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
       if (!limits.canLinkAccounts) {
         return { success: false, message: "Account linking is not available on your current plan." };
       }
-      if (!canLinkMoreAccounts(plan, accounts.length)) {
+      if (accounts.length >= limits.maxLinkedAccounts) {
         return { success: false, message: "You've reached the account limit for your plan." };
       }
 
@@ -245,7 +244,7 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
 
       return { success: true, message: "Account linked successfully.", account: newAccount };
     },
-    [user, accounts.length, plan, limits.canLinkAccounts],
+    [user, accounts.length, limits.canLinkAccounts, limits.maxLinkedAccounts],
   );
 
   // ── unlinkAccount ───────────────────────────────────────────────────────────

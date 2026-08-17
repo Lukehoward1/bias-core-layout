@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 import { createCipheriv, randomBytes } from "crypto";
+import { maxLinkedAccountsForTier } from "./_lib/tier-limits.js";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -33,24 +34,6 @@ function encrypt(plaintext: string): string {
   const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   const authTag = cipher.getAuthTag();
   return `${iv.toString("hex")}:${authTag.toString("hex")}:${encrypted.toString("hex")}`;
-}
-
-// ── Tier limits ───────────────────────────────────────────────────────────────
-// Authoritative server-side account limit. Mirrors PLAN_LIMITS in
-// src/types/subscription.ts but uses the actual DB tier values (not the
-// localStorage-based frontend plan names).
-
-function maxLinkedAccountsForTier(
-  tier: string | null,
-  status: string | null,
-): number {
-  if (status !== "active" && status !== "trialing") return 0;
-  switch (tier) {
-    case "standard":        return 1;
-    case "pro":             return 3;
-    case "founding_member": return 1;
-    default:                return 0;
-  }
 }
 
 // ── MetaApi helpers ───────────────────────────────────────────────────────────

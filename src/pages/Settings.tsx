@@ -3,8 +3,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Link2, ArrowRight, Sparkles, ShieldOff, RefreshCw, Lock, KeyRound, SlidersHorizontal, User } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { useSubscription } from "@/hooks/use-subscription";
-import { useSubscription as useStripeSubscription } from "@/contexts/SubscriptionContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { createPortalSession } from "@/lib/stripe";
 import { CreditCard } from "lucide-react";
 import { useSessionLock } from "@/hooks/use-session-lock";
@@ -16,7 +15,6 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { SubscriptionPlan } from "@/types/subscription";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
@@ -41,7 +39,6 @@ const ALL_TIMEFRAMES: { value: BiasTimeframe; label: string }[] = [
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { plan, setPlan } = useSubscription();
   const {
     subscriptionStatus,
     subscriptionTier,
@@ -50,7 +47,8 @@ export default function Settings() {
     trialEndsAt,
     currentPeriodEnd,
     stripeCustomerId,
-  } = useStripeSubscription();
+    setDevTier,
+  } = useSubscription();
   const [portalLoading, setPortalLoading] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
   const { pinEnabled, setPinEnabled, pinSet, setPin, clearPin } = useSessionLock();
@@ -163,10 +161,11 @@ export default function Settings() {
     finally { setPortalLoading(false); }
   }, [stripeCustomerId, navigate]);
 
-  const planOptions: { value: SubscriptionPlan; label: string; color: string }[] = [
-    { value: "free", label: "Free", color: "bg-muted text-muted-foreground" },
+  const planOptions: { value: string | null; label: string; color: string }[] = [
+    { value: null, label: "None (Free)", color: "bg-muted text-muted-foreground" },
     { value: "standard", label: "Standard", color: "bg-primary/20 text-primary" },
-    { value: "premium", label: "Premium", color: "bg-accent text-accent-foreground" },
+    { value: "pro", label: "Pro", color: "bg-accent text-accent-foreground" },
+    { value: "founding_member", label: "Founding Member", color: "bg-warning/10 text-warning" },
   ];
 
   // ── Account Settings state ───────────────────────────────────────────────────
@@ -620,10 +619,10 @@ export default function Settings() {
                   {planOptions.map((option) => (
                     <Button
                       key={option.value}
-                      variant={plan === option.value ? "default" : "outline"}
+                      variant={subscriptionTier === option.value ? "default" : "outline"}
                       size="sm"
-                      className={plan === option.value ? option.color : ""}
-                      onClick={() => setPlan(option.value)}
+                      className={subscriptionTier === option.value ? option.color : ""}
+                      onClick={() => setDevTier(option.value)}
                     >
                       {option.label}
                     </Button>

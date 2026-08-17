@@ -4,16 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { PRICE_IDS } from "../src/lib/stripe.js";
 import { undeployExcessBrokerConnections } from "./_lib/undeploy.js";
 import { sendDowngradeGraceEmail } from "./_lib/downgrade-email.js";
-
-function maxLinkedAccountsForTier(tier: string, status: string): number {
-  if (status !== "active" && status !== "trialing") return 0;
-  switch (tier) {
-    case "standard":        return 1;
-    case "pro":             return 3;
-    case "founding_member": return 1;
-    default:                return 0;
-  }
-}
+import { maxLinkedAccountsForTier } from "./_lib/tier-limits.js";
 
 export const config = { api: { bodyParser: false } };
 
