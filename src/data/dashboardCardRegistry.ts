@@ -38,16 +38,6 @@ export const DASHBOARD_CARD_REGISTRY: DashboardCardDefinition[] = [
     dashboardEligible: true,
   },
   {
-    id: "active-trades",
-    title: "Active Trades",
-    description: "Current open positions",
-    section: "markets",
-    category: "metrics",
-    defaultRowType: "kpi",
-    allowedRowTypes: ["kpi"],
-    dashboardEligible: true,
-  },
-  {
     id: "next-session",
     title: "Next Session",
     description: "Upcoming trading session timer",

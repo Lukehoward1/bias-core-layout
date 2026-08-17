@@ -173,7 +173,7 @@ const migrateOldLayout = (): DashboardLayout | null => {
         const defaultLayout = getDefaultLayout();
 
         // ✅ Update KPI mapping to match new default KPI set
-        const kpiCards = ["todays-bias", "active-trades", "next-session", "rr-calculator"];
+        const kpiCards = ["todays-bias", "next-session", "rr-calculator"];
         const analysisCards = ["watchlist-overview", "session-timers", "risk-snapshot"];
         const overviewCards = ["upcoming-events", "performance-overview", "journal-summary", "calendar-events"];
 

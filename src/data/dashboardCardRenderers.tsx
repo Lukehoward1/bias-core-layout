@@ -729,22 +729,6 @@ function currencySymbol(code?: string): string {
    LIVE KPI CARDS
 ======================= */
 
-function ActiveTradesCard() {
-  const { viewTrades } = useTradingData();
-  const openCount = viewTrades.filter((t) => t.status === "open").length;
-  return (
-    <Card className="h-full">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">Active Trades</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-2xl font-bold text-foreground">{openCount}</p>
-        <p className="text-xs text-muted-foreground mt-1">open positions</p>
-      </CardContent>
-    </Card>
-  );
-}
-
 function NextSessionCard() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -831,7 +815,7 @@ function PerformanceOverviewCard() {
 function RiskSnapshotCard() {
   const { viewTrades, primaryAccount } = useTradingData();
 
-  const { dailyRisk, openExposurePct, drawdownPct } = useMemo(() => {
+  const { dailyRisk, drawdownPct } = useMemo(() => {
     const balance = primaryAccount?.balance ?? 100_000;
     const today = new Date().toLocaleDateString("sv"); // YYYY-MM-DD local
 
@@ -839,9 +823,6 @@ function RiskSnapshotCard() {
       .filter((t) => t.date === today && (t.pnl ?? 0) < 0)
       .reduce((s, t) => s + Math.abs(t.pnl ?? 0), 0);
     const dailyRisk = balance > 0 ? (todayLosses / balance) * 100 : 0;
-
-    const openCount = viewTrades.filter((t) => t.status === "open").length;
-    const openExposurePct = viewTrades.length > 0 ? (openCount / viewTrades.length) * 100 : 0;
 
     const sorted = [...viewTrades].sort((a, b) => a.date.localeCompare(b.date));
     let peak = balance;
@@ -852,7 +833,7 @@ function RiskSnapshotCard() {
     }
     const drawdownPct = peak > 0 ? Math.max(0, ((peak - running) / peak) * 100) : 0;
 
-    return { dailyRisk, openExposurePct, drawdownPct };
+    return { dailyRisk, drawdownPct };
   }, [viewTrades, primaryAccount]);
 
   const fmtPct = (v: number) => `${v.toFixed(1)}%`;
@@ -871,12 +852,6 @@ function RiskSnapshotCard() {
             <span className="text-sm text-foreground">Daily Risk Used</span>
             <span className={`text-sm font-medium ${dailyRisk === 0 ? "text-muted-foreground" : dailyRisk > 2 ? "text-destructive" : "text-warning"}`}>
               {dailyRisk === 0 ? "0%" : fmtPct(dailyRisk)}
-            </span>
-          </div>
-          <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-            <span className="text-sm text-foreground">Open Exposure</span>
-            <span className={`text-sm font-medium ${openExposurePct === 0 ? "text-muted-foreground" : "text-foreground"}`}>
-              {openExposurePct === 0 ? "0%" : fmtPct(openExposurePct)}
             </span>
           </div>
           <div className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
@@ -1090,7 +1065,6 @@ function LiveEquityCard({ slotType }: { slotType: string }) {
 export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.ReactNode> = {
   "todays-bias": () => <TodaysBiasDashboardCard />,
 
-  "active-trades": () => <ActiveTradesCard />,
   "next-session": () => <NextSessionCard />,
 
   "high-impact-events": () => <HighImpactEventsDashboardCard />,
