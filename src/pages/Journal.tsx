@@ -559,6 +559,7 @@ export default function Journal() {
     setup: "",
     confluence: [] as string[],
     tags: [] as string[],
+    statusOverride: "auto" as "auto" | "win" | "loss" | "breakeven",
   });
   const [pairIsManual, setPairIsManual] = useState(false);
 
@@ -580,6 +581,7 @@ export default function Journal() {
       setup: "",
       confluence: [],
       tags: [],
+      statusOverride: "auto",
     });
     setPairIsManual(false);
     setIsAddTradeOpen(true);
@@ -927,7 +929,10 @@ export default function Journal() {
       exit,
       lots,
       pnl,
-      status: pnl > 0 ? "win" : pnl < 0 ? "loss" : "breakeven",
+      status:
+        newTrade.statusOverride !== "auto"
+          ? newTrade.statusOverride
+          : pnl > 0 ? "win" : pnl < 0 ? "loss" : "breakeven",
       notes: newTrade.notes,
       rating: newTrade.rating,
       actualR,
@@ -959,6 +964,7 @@ export default function Journal() {
       setup: "",
       confluence: [],
       tags: [],
+      statusOverride: "auto",
     });
     setPairIsManual(false);
     setIsAddTradeOpen(false);
@@ -1893,6 +1899,30 @@ export default function Journal() {
                         onChange={(e) => setNewTrade({ ...newTrade, takeProfit: e.target.value })}
                       />
                     </div>
+                  </div>
+
+                  {/* Status override */}
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select
+                      value={newTrade.statusOverride}
+                      onValueChange={(v) =>
+                        setNewTrade({
+                          ...newTrade,
+                          statusOverride: v as "auto" | "win" | "loss" | "breakeven",
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Auto (based on P&amp;L)</SelectItem>
+                        <SelectItem value="win">Win</SelectItem>
+                        <SelectItem value="loss">Loss</SelectItem>
+                        <SelectItem value="breakeven">Breakeven</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* Date */}
