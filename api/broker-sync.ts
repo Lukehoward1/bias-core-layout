@@ -176,6 +176,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // First sync (last_synced_at is null) always pulls the last 365 days of
   // history — connect-time is not a useful floor because it excludes trades
   // that closed before the account was linked (or re-linked after a reset).
+  const isFirstSync = !bc.last_synced_at;
   const startDate: Date = bc.last_synced_at
     ? new Date(bc.last_synced_at)
     : new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
@@ -183,7 +184,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const startTime = toMetaStatsTime(startDate);
   const endTime = toMetaStatsTime(now);
 
-  // Fetch from MetaStats (updateHistory: false = reads cached data, not billable)
+  // updateHistory=true forces MetaStats to pull fresh history from the broker
+  // (billable). Do this once on the first sync so a brand-new account's empty
+  // cache gets backfilled; every subsequent sync uses false to read the cache
+  // MetaStats has been populating on its own.
   let deals: any[] = [];
   try {
     // @ts-ignore — tsconfig.api.json uses moduleResolution:node which can't resolve exports maps; runtime resolves correctly
@@ -191,9 +195,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // CJS/ESM interop: same unwrap pattern as metaapi.cloud-sdk/node above.
     const MetaStats = (_metaStatsMod as any).default?.default ?? (_metaStatsMod as any).default;
     const metaStats = new MetaStats(process.env.METAAPI_TOKEN!);
-    deals = await metaStats.getAccountTrades(bc.metaapi_account_id, startTime, endTime, false);
+    deals = await metaStats.getAccountTrades(bc.metaapi_account_id, startTime, endTime, isFirstSync);
     console.log(
-      `[broker-sync] MetaStats raw deals: ${deals.length} | window: ${startTime} → ${endTime} | types: ${[...new Set(deals.map((d: any) => d.type))].join(", ") || "none"}`,
+      `[broker-sync] MetaStats raw deals: ${deals.length} | window: ${startTime} → ${endTime} | updateHistory: ${isFirstSync} | types: ${[...new Set(deals.map((d: any) => d.type))].join(", ") || "none"}`,
     );
   } catch (err) {
     console.error(
