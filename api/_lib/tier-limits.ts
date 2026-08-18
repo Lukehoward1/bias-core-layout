@@ -5,7 +5,7 @@ export function maxLinkedAccountsForTier(
   tier: string | null,
   status: string | null,
 ): number {
-  if (status !== "active" && status !== "trialing") return 0;
+  if (status !== "active") return 0;
   switch (tier) {
     case "standard":        return 1;
     case "pro":             return 3;

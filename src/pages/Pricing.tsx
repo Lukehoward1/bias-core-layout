@@ -190,7 +190,7 @@ export default function Pricing() {
                   )}
                 </div>
 
-                <ul className="space-y-3 flex-1 mb-8">
+                <ul className="space-y-3 mb-4">
                   {plan.features.map((f) => (
                     <li key={f} className="flex items-start gap-3 text-sm text-muted-foreground">
                       <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
@@ -198,6 +198,14 @@ export default function Pricing() {
                     </li>
                   ))}
                 </ul>
+
+                {plan.trial && (
+                  <p className="text-xs text-muted-foreground mb-6">
+                    * Broker sync and automatic trade import activate once your trial converts to a paid subscription.
+                  </p>
+                )}
+
+                <div className="flex-1" />
 
                 <Button
                   className="w-full h-11"

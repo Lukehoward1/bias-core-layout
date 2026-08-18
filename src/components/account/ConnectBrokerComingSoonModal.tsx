@@ -17,10 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertCircle, Plug } from "lucide-react";
+import { AlertCircle, Plug, Lock } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 
 interface ConnectBrokerComingSoonModalProps {
   open: boolean;
@@ -57,6 +59,9 @@ export function ConnectBrokerComingSoonModal({
 }: ConnectBrokerComingSoonModalProps) {
   const { session } = useAuth();
   const { canLinkMore, accountCount, maxAccounts, reloadAccounts } = useLinkedAccounts();
+  const { subscriptionStatus } = useSubscription();
+  const navigate = useNavigate();
+  const isTrialing = subscriptionStatus === "trialing";
 
   const [platform, setPlatform] = useState<"mt4" | "mt5">("mt4");
   const [login, setLogin] = useState("");
@@ -148,97 +153,123 @@ export function ConnectBrokerComingSoonModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="platform">Platform</Label>
-            <Select
-              value={platform}
-              onValueChange={(v) => {
-                setPlatform(v as "mt4" | "mt5");
-                saveDraft({ platform: v, login, server });
-                clearApiError();
-              }}
-            >
-              <SelectTrigger id="platform">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="mt4">MetaTrader 4 (MT4)</SelectItem>
-                <SelectItem value="mt5">MetaTrader 5 (MT5)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="mt-login">MT Login</Label>
-            <Input
-              id="mt-login"
-              value={login}
-              onChange={(e) => { setLogin(e.target.value); saveDraft({ platform, login: e.target.value, server }); clearApiError(); }}
-              placeholder="e.g. 207605"
-              autoComplete="username"
-              disabled={isSubmitting}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="mt-password">Investor Password</Label>
-            <Input
-              id="mt-password"
-              type="password"
-              value={password}
-              onChange={(e) => { setPassword(e.target.value); clearApiError(); }}
-              placeholder="Your MT4/MT5 investor password"
-              autoComplete="current-password"
-              disabled={isSubmitting}
-            />
-            <p className="text-xs text-muted-foreground">
-              This is the read-only password, not your main trading password. In MT4/MT5: Tools → Options → Server → Change Investor Password.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="mt-server">Server</Label>
-            <Input
-              id="mt-server"
-              value={server}
-              onChange={(e) => { setServer(e.target.value); saveDraft({ platform, login, server: e.target.value }); clearApiError(); }}
-              placeholder="e.g. PepperstoneUK-Demo03"
-              disabled={isSubmitting}
-            />
-            <p className="text-xs text-muted-foreground">
-              Find this in your MT4/MT5 terminal under File → Open an Account.
-            </p>
-          </div>
-
-          {!canLinkMore && (
-            <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 border border-destructive/20">
-              <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-              <p className="text-sm text-destructive">
-                You've reached the account limit for your plan ({accountCount}/{maxAccounts}).
-              </p>
+        {isTrialing ? (
+          <>
+            <div className="py-6 flex flex-col items-center gap-4 text-center">
+              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                <Lock className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium text-foreground">Broker sync is available on paid plans.</p>
+                <p className="text-sm text-muted-foreground">
+                  Your free trial gives you full access to the journal and analytics. Broker sync and automatic trade import unlock once your trial converts to a paid subscription.
+                </p>
+              </div>
             </div>
-          )}
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => handleOpenChange(false)}>
+                Close
+              </Button>
+              <Button onClick={() => { handleOpenChange(false); navigate("/pricing"); }}>
+                View Plans
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="platform">Platform</Label>
+                <Select
+                  value={platform}
+                  onValueChange={(v) => {
+                    setPlatform(v as "mt4" | "mt5");
+                    saveDraft({ platform: v, login, server });
+                    clearApiError();
+                  }}
+                >
+                  <SelectTrigger id="platform">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mt4">MetaTrader 4 (MT4)</SelectItem>
+                    <SelectItem value="mt5">MetaTrader 5 (MT5)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-          {apiError && (
-            <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
-              {apiError}
-            </p>
-          )}
-        </div>
+              <div className="space-y-2">
+                <Label htmlFor="mt-login">MT Login</Label>
+                <Input
+                  id="mt-login"
+                  value={login}
+                  onChange={(e) => { setLogin(e.target.value); saveDraft({ platform, login: e.target.value, server }); clearApiError(); }}
+                  placeholder="e.g. 207605"
+                  autoComplete="username"
+                  disabled={isSubmitting}
+                />
+              </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button
-            variant="outline"
-            onClick={() => handleOpenChange(false)}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting || !canLinkMore}>
-            {isSubmitting ? "Connecting..." : "Connect Account"}
-          </Button>
-        </DialogFooter>
+              <div className="space-y-2">
+                <Label htmlFor="mt-password">Investor Password</Label>
+                <Input
+                  id="mt-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); clearApiError(); }}
+                  placeholder="Your MT4/MT5 investor password"
+                  autoComplete="current-password"
+                  disabled={isSubmitting}
+                />
+                <p className="text-xs text-muted-foreground">
+                  This is the read-only password, not your main trading password. In MT4/MT5: Tools → Options → Server → Change Investor Password.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="mt-server">Server</Label>
+                <Input
+                  id="mt-server"
+                  value={server}
+                  onChange={(e) => { setServer(e.target.value); saveDraft({ platform, login, server: e.target.value }); clearApiError(); }}
+                  placeholder="e.g. PepperstoneUK-Demo03"
+                  disabled={isSubmitting}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Find this in your MT4/MT5 terminal under File → Open an Account.
+                </p>
+              </div>
+
+              {!canLinkMore && (
+                <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 border border-destructive/20">
+                  <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                  <p className="text-sm text-destructive">
+                    You've reached the account limit for your plan ({accountCount}/{maxAccounts}).
+                  </p>
+                </div>
+              )}
+
+              {apiError && (
+                <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
+                  {apiError}
+                </p>
+              )}
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                onClick={() => handleOpenChange(false)}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSubmit} disabled={isSubmitting || !canLinkMore}>
+                {isSubmitting ? "Connecting..." : "Connect Account"}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
