@@ -153,3 +153,63 @@ Spacing System:
 *::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Opera */
 }
+
+/* Report printing — isolates whichever element has id="report-print-area"
+   (set by ReportPreview) and forces landscape, matching the tearsheet's wide
+   layout. `[data-pdf-exclude]` is reused here to hide the same controls
+   (pin buttons, lock badges, the Print button itself) that the PDF export
+   path already strips out of its capture. */
+@media print {
+  /* Browsers drop background colors/gradients by default when printing —
+     without this, the masthead's dark gradient (and every other bg-color
+     card) prints as plain white with near-invisible pale text on top.
+     Scoped to exclude SVG — applying this to the equity chart's <linearGradient>/
+     <stop> elements was flattening their stop-opacity fade into a solid block,
+     since this property isn't meant for SVG paint servers and some browsers
+     mishandle it there. HTML backgrounds still need the override; SVG fills
+     already print exactly as specified without it. */
+  *:not(svg, svg *) {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+  body * {
+    visibility: hidden !important;
+  }
+  #report-print-area,
+  #report-print-area * {
+    visibility: visible !important;
+  }
+  /* `position: absolute` (not `fixed`) is deliberate: fixed-position boxes
+     repeat on every printed page in Chrome's print engine, which is what was
+     causing the report's border/shadow/footer to redraw on a near-blank
+     page 2 whenever content overflowed a single page by even a small
+     amount. Absolute positioning still pins the report to the top of page 1
+     (there's no positioned ancestor left once the Dialog's own transform/
+     position are neutralized for print, so this resolves against the page
+     box). Only top/left are set (no `inset: 0`/bottom/right) so the box's
+     height stays intrinsic to its content instead of being pinned to a
+     single page — that's what lets genuinely long reports flow onto a real,
+     content-filled page 2 rather than either clipping or duplicating. */
+  #report-print-area {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+  }
+  #report-print-area [data-pdf-exclude] {
+    display: none !important;
+  }
+  /* Recharts keeps an empty tooltip box in the DOM at all times, hidden via
+     its own inline visibility:hidden until a hover event fires. The blanket
+     visibility:visible rule above was overriding that and revealing an empty
+     floating box on top of the charts — hide it explicitly, print has no
+     hover state anyway. */
+  .recharts-tooltip-wrapper {
+    display: none !important;
+  }
+  @page {
+    size: landscape;
+    margin: 8mm;
+  }
+}

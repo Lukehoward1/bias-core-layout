@@ -1,15 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { format, subDays } from "date-fns";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-} from "recharts";
-import { cn } from "@/lib/utils";
+import { ACTIVE_ACCOUNT_ALL } from "@/hooks/use-active-trading-account";
+import { OverviewPreset } from "./presets/OverviewPreset";
+import { PerformancePreset } from "./presets/PerformancePreset";
+import { SessionsPreset } from "./presets/SessionsPreset";
+import { AssetsPreset } from "./presets/AssetsPreset";
+import { SetupQualityPreset } from "./presets/SetupQualityPreset";
+import { PsychologyPreset } from "./presets/PsychologyPreset";
+import { RiskManagementPreset } from "./presets/RiskManagementPreset";
+import { TradeLogPreset } from "./presets/TradeLogPreset";
 
 interface Trade {
   id: string;
@@ -17,6 +16,17 @@ interface Trade {
   pnl: number;
   status: "win" | "loss" | "breakeven";
   actualR?: number | null;
+  pair?: string;
+  type?: "Long" | "Short";
+  accountId?: string;
+  entryTime?: string;
+  exitTime?: string;
+  notes?: string;
+  rating?: number;
+  stopLoss?: number;
+  entry?: number;
+  exit?: number;
+  lots?: number;
 }
 
 export interface ReportPreviewProps {
@@ -24,148 +34,124 @@ export interface ReportPreviewProps {
   selectedStats: string[];
   dateRange: { from: Date | undefined; to: Date | undefined };
   trades: Trade[];
+  /** Filter by account — ACTIVE_ACCOUNT_ALL (or omitted) means all accounts. */
+  accountId?: string;
+  /** Filter by pair — "__all__" (or omitted) means all pairs. */
+  pair?: string;
+  /** When true, opens the browser print dialog shortly after mount — used by the "Print" action. */
+  autoPrint?: boolean;
+  /**
+   * The selected account's current (live) balance — used to derive the
+   * opening/closing balance shown on the Trade Log report. Omit (or pass
+   * undefined) when no single reliable balance applies, e.g. "All Accounts"
+   * spanning mixed currencies.
+   */
+  accountBalance?: number;
 }
 
-function StatCard({
-  label,
-  value,
-  valueClass,
-}: {
-  label: string;
-  value: string;
-  valueClass?: string;
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-muted/50 p-3 space-y-1">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={cn("text-xl font-bold text-foreground", valueClass)}>{value}</p>
-    </div>
-  );
-}
+// "overview" and "performance" have real reports built so far — the rest of
+// the preset list mirrors the Reports tabs so the picker is honest about
+// what exists, with a "coming soon" placeholder until each is built out.
+const REPORT_TYPE_LABELS: Record<string, string> = {
+  overview: "Overview Report",
+  performance: "Performance Report",
+  sessions: "Sessions Report",
+  assets: "Assets Report",
+  setup: "Setup Quality Report",
+  psychology: "Psychology Report",
+  risk: "Risk Management Report",
+  tradelog: "Trade Log Report",
+};
 
-function ReportTooltip({
-  active,
-  payload,
-  chartMode,
-}: {
-  active?: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  payload?: any[];
-  chartMode: "pnl" | "r";
-}) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0].payload as {
-    fullDate: string;
-    cumPnl: number;
-    cumR: number;
-    tradePnl: number;
-    tradeR: number | null;
-  };
-  return (
-    <div className="bg-card border border-border rounded-lg p-2.5 text-xs shadow-sm">
-      <p className="font-medium text-foreground mb-1.5">{d.fullDate}</p>
-      <p className="text-muted-foreground">
-        Cumulative:{" "}
-        {chartMode === "pnl" ? `£${d.cumPnl.toLocaleString()}` : `${d.cumR.toFixed(2)}R`}
-      </p>
-      <p className="text-muted-foreground">
-        This trade:{" "}
-        {chartMode === "pnl"
-          ? `£${d.tradePnl.toFixed(2)}`
-          : d.tradeR != null
-            ? `${d.tradeR.toFixed(2)}R`
-            : "—"}
-      </p>
-    </div>
-  );
-}
+const BUILT_PRESETS = new Set([
+  "overview", "performance", "sessions", "assets", "setup", "psychology", "risk", "tradelog",
+]);
 
-export function ReportPreview({ dateRange, trades }: ReportPreviewProps) {
-  const [chartMode, setChartMode] = useState<"pnl" | "r">("pnl");
+const PRESET_COMPONENTS: Record<string, typeof OverviewPreset> = {
+  overview: OverviewPreset,
+  performance: PerformancePreset,
+  sessions: SessionsPreset,
+  assets: AssetsPreset,
+  setup: SetupQualityPreset,
+  psychology: PsychologyPreset,
+  risk: RiskManagementPreset,
+  tradelog: TradeLogPreset,
+};
 
-  const filtered = useMemo(() => {
+export function ReportPreview({
+  reportType,
+  dateRange,
+  trades,
+  accountId,
+  pair,
+  autoPrint = false,
+  accountBalance,
+}: ReportPreviewProps) {
+  // Date range as strings, shared by the trade filter below and the balance
+  // reconstruction further down.
+  const { fromStr, toStr } = useMemo(() => {
     const today = new Date();
     const from = dateRange.from ?? subDays(today, 30);
     const to = dateRange.to ?? today;
-    const fromStr = format(from, "yyyy-MM-dd");
-    const toStr = format(to, "yyyy-MM-dd");
-    return [...trades]
-      .filter((t) => t.date >= fromStr && t.date <= toStr)
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }, [trades, dateRange]);
+    return { fromStr: format(from, "yyyy-MM-dd"), toStr: format(to, "yyyy-MM-dd") };
+  }, [dateRange]);
 
-  const metrics = useMemo(() => {
-    const wins = filtered.filter((t) => t.status === "win");
-    const losses = filtered.filter((t) => t.status === "loss");
-    const breakevens = filtered.filter((t) => t.status === "breakeven").length;
+  // Account + pair filtered, but NOT date filtered — used to reconstruct the
+  // balance as of the range's end date from trades that happened afterward.
+  const accountPairFiltered = useMemo(
+    () =>
+      trades
+        .filter((t) => !accountId || accountId === ACTIVE_ACCOUNT_ALL || t.accountId === accountId)
+        .filter((t) => !pair || pair === "__all__" || t.pair === pair),
+    [trades, accountId, pair],
+  );
 
-    const totalTrades = filtered.length;
-    const profitRate = totalTrades > 0 ? (wins.length / totalTrades) * 100 : 0;
-    const breakevenRate = totalTrades > 0 ? (breakevens / totalTrades) * 100 : 0;
+  const filtered = useMemo(
+    () =>
+      accountPairFiltered
+        .filter((t) => t.date >= fromStr && t.date <= toStr)
+        .sort((a, b) => a.date.localeCompare(b.date)),
+    [accountPairFiltered, fromStr, toStr],
+  );
 
-    const posSum = wins.reduce((s, t) => s + t.pnl, 0);
-    const negSum = Math.abs(losses.reduce((s, t) => s + t.pnl, 0));
-    const profitFactor =
-      posSum === 0 ? "0.00" : negSum === 0 ? "∞" : (posSum / negSum).toFixed(2);
+  // Balance progression across the report period. The account's `balance`
+  // field is its CURRENT (live) value, not its value as of the report's end
+  // date — so we walk it backward: subtract the P&L of trades that happened
+  // after the range to get the closing balance, then subtract the period's
+  // own net P&L to get the opening balance. This assumes no deposits or
+  // withdrawals occurred, since trade history alone can't tell us about those.
+  const { openingBalance, closingBalance } = useMemo(() => {
+    if (accountBalance == null) return { openingBalance: null, closingBalance: null };
+    const pnlAfterRange = accountPairFiltered
+      .filter((t) => t.date > toStr)
+      .reduce((s, t) => s + t.pnl, 0);
+    const closing = accountBalance - pnlAfterRange;
+    const periodPnl = filtered.reduce((s, t) => s + t.pnl, 0);
+    const opening = closing - periodPnl;
+    return { openingBalance: opening, closingBalance: closing };
+  }, [accountBalance, accountPairFiltered, filtered, toStr]);
 
-    const avgWin = wins.length > 0 ? posSum / wins.length : 0;
-    const avgLoss = losses.length > 0 ? negSum / losses.length : 0;
-    const wr = profitRate / 100;
-    const expectancy = wr * avgWin - (1 - wr) * avgLoss;
+  const isBuilt = BUILT_PRESETS.has(reportType);
 
-    const winR = wins.map((t) => t.actualR).filter((r): r is number => r != null);
-    const lossRAbs = losses
-      .map((t) => t.actualR)
-      .filter((r): r is number => r != null)
-      .map(Math.abs);
-    const avgWinR = winR.length > 0 ? winR.reduce((s, r) => s + r, 0) / winR.length : 0;
-    const avgLossR =
-      lossRAbs.length > 0 ? lossRAbs.reduce((s, r) => s + r, 0) / lossRAbs.length : 1;
-    const avgRR = avgWinR / avgLossR;
+  // Print — triggered a beat after mount so layout/charts settle first.
+  // Skipped for presets that aren't built yet — nothing worth printing.
+  useEffect(() => {
+    if (!autoPrint || !isBuilt) return;
+    const t = setTimeout(() => window.print(), 250);
+    return () => clearTimeout(t);
+  }, [autoPrint, isBuilt]);
 
-    const netPnl = filtered.reduce((s, t) => s + t.pnl, 0);
+  const handlePrintClick = () => window.print();
 
-    let maxConsecWins = 0, maxConsecLosses = 0, curW = 0, curL = 0;
-    for (const t of filtered) {
-      if (t.status === "win") {
-        curW++; maxConsecWins = Math.max(maxConsecWins, curW); curL = 0;
-      } else if (t.status === "loss") {
-        curL++; maxConsecLosses = Math.max(maxConsecLosses, curL); curW = 0;
-      } else {
-        curW = 0; curL = 0;
-      }
-    }
-
-    return {
-      totalTrades,
-      profitRate,
-      breakevens,
-      breakevenRate,
-      profitFactor,
-      expectancy,
-      avgRR,
-      netPnl,
-      maxConsecWins,
-      maxConsecLosses,
-    };
-  }, [filtered]);
-
-  const chartData = useMemo(() => {
-    let cumPnl = 0;
-    let cumR = 0;
-    return filtered.map((t) => {
-      cumPnl += t.pnl;
-      cumR += t.actualR ?? 0;
-      return {
-        label: format(new Date(t.date + "T12:00:00"), "dd MMM"),
-        fullDate: t.date,
-        cumPnl: parseFloat(cumPnl.toFixed(2)),
-        cumR: parseFloat(cumR.toFixed(2)),
-        tradePnl: t.pnl,
-        tradeR: t.actualR ?? null,
-      };
-    });
-  }, [filtered]);
+  if (!isBuilt) {
+    return (
+      <div className="pt-6 mt-6 border-t border-border">
+        <p className="text-sm text-muted-foreground text-center py-8">
+          {REPORT_TYPE_LABELS[reportType] ?? "This report"} is coming soon.
+        </p>
+      </div>
+    );
+  }
 
   if (filtered.length < 10) {
     return (
@@ -177,107 +163,34 @@ export function ReportPreview({ dateRange, trades }: ReportPreviewProps) {
     );
   }
 
+  const now = new Date();
+  const periodStartLabel = format(new Date(fromStr + "T12:00:00"), "MMM d, yyyy");
+  const periodEndLabel = format(new Date(toStr + "T12:00:00"), "MMM d, yyyy");
+  const periodLabel = dateRange.from && dateRange.to
+    ? `${periodStartLabel} – ${periodEndLabel}`
+    : "Last 30 days";
+  const generatedAt = now.toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  const reportId = `SB-${(reportType || "overview").slice(0, 3).toUpperCase()}-${now.toISOString().slice(0, 10).replace(/-/g, "")}`;
+
+  const presetProps = {
+    trades: filtered,
+    reportTitle: REPORT_TYPE_LABELS[reportType] ?? "Overview Report",
+    periodLabel,
+    periodStartLabel,
+    periodEndLabel,
+    accountLabel: "All Accounts",
+    generatedAt,
+    reportId,
+    onPrint: handlePrintClick,
+    openingBalance,
+    closingBalance,
+  };
+
+  const PresetComponent = PRESET_COMPONENTS[reportType] ?? OverviewPreset;
+
   return (
-    <div className="pt-6 mt-6 border-t border-border space-y-4">
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-        Preview
-      </p>
-
-      <div className="grid grid-cols-4 gap-3">
-        <StatCard label="Total Trades" value={String(metrics.totalTrades)} />
-        <StatCard label="Profit Rate" value={`${metrics.profitRate.toFixed(1)}%`} />
-        <StatCard label="Profit Factor" value={metrics.profitFactor} />
-        <StatCard
-          label="Expectancy"
-          value={`${metrics.expectancy >= 0 ? "+" : ""}£${metrics.expectancy.toFixed(0)}/trade`}
-          valueClass={metrics.expectancy >= 0 ? "text-success" : "text-destructive"}
-        />
-        <StatCard label="Avg R:R" value={metrics.avgRR.toFixed(2)} />
-        <StatCard
-          label="Net P&L"
-          value={`${metrics.netPnl >= 0 ? "+" : ""}£${metrics.netPnl.toLocaleString()}`}
-          valueClass={metrics.netPnl >= 0 ? "text-success" : "text-destructive"}
-        />
-        <StatCard
-          label="Max Consec. Wins"
-          value={String(metrics.maxConsecWins)}
-          valueClass="text-success"
-        />
-        <StatCard
-          label="Max Consec. Losses"
-          value={String(metrics.maxConsecLosses)}
-          valueClass="text-destructive"
-        />
-        <StatCard
-          label="Breakevens"
-          value={`${metrics.breakevens} (${metrics.breakevenRate.toFixed(1)}%)`}
-        />
-      </div>
-
-      <div className="rounded-lg border border-border bg-muted/50 p-4">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-xs font-medium text-muted-foreground">Equity Curve</p>
-          <div className="flex items-center rounded-md border border-border bg-background p-0.5 gap-0.5">
-            {(["pnl", "r"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setChartMode(m)}
-                className={cn(
-                  "px-2.5 py-1 rounded-[4px] text-xs font-medium transition-colors leading-none",
-                  chartMode === m
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {m === "pnl" ? "£ P&L" : "R Multiple"}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="h-[220px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={chartData}
-              margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis
-                dataKey="label"
-                tick={{ fontSize: 10 }}
-                stroke="hsl(var(--muted-foreground))"
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 10 }}
-                stroke="hsl(var(--muted-foreground))"
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(v: number) =>
-                  chartMode === "pnl" ? `£${v}` : `${v}R`
-                }
-              />
-              <Tooltip
-                content={(props) => (
-                  <ReportTooltip
-                    active={props.active}
-                    payload={props.payload}
-                    chartMode={chartMode}
-                  />
-                )}
-              />
-              <Line
-                type="monotone"
-                dataKey={chartMode === "pnl" ? "cumPnl" : "cumR"}
-                stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 4 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+    <div className="pt-6 mt-6 border-t border-border">
+      <PresetComponent {...presetProps} />
     </div>
   );
 }

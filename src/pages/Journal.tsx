@@ -16,7 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Star,
-  Download,
+  Printer,
   Lock,
   Zap,
   Pencil,
@@ -624,6 +624,13 @@ export default function Journal() {
 
   const [reportAccountId, setReportAccountId] = useState<string>(ACTIVE_ACCOUNT_ALL);
   const [reportPair, setReportPair] = useState("__all__");
+
+  // Current balance for whichever account is selected in the Reports dialog
+  // (independent of the page's global active-account balance above) — used
+  // by the Trade Log report to show opening/closing balance for the period.
+  const reportAccountBalance = reportAccountId === ACTIVE_ACCOUNT_ALL
+    ? (allAccountsShareCurrency ? accounts.reduce((sum, a) => sum + (a.balance ?? 0), 0) : undefined)
+    : accounts.find(a => a.id === reportAccountId)?.balance;
   const [exportFormat, setExportFormat] = useState<ExportFormat>("pdf");
   const defaultSelectedSectionIds = useMemo(() => REPORT_SECTIONS.map((s) => s.id), []);
 
@@ -642,6 +649,7 @@ export default function Journal() {
   useEffect(() => { localStorage.setItem("rb_preview_visible", JSON.stringify(previewVisible)); }, [previewVisible]);
 
   const [previewKey, setPreviewKey] = useState(0);
+  const [printOnMount, setPrintOnMount] = useState(false);
 
   const [activeJournalTab, setActiveJournalTab] = useState<string>(() => {
     try { return localStorage.getItem("journal_active_tab") ?? "journal"; } catch { return "journal"; }
@@ -2416,26 +2424,33 @@ export default function Journal() {
           <TabsContent value="reports" className="space-y-6 mt-5">
             {/* Reports Dialog */}
             <Dialog open={isReportsDialogOpen} onOpenChange={(open) => { if (!open) resetReportBuilder(); }}>
-              <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+              <DialogContent
+                className={`${previewVisible ? "max-w-6xl" : "max-w-3xl"} max-h-[90vh] flex flex-col print:max-h-none print:overflow-visible print:!static print:!transform-none print:!inset-auto print:!m-0 print:!border-0 print:!shadow-none print:!bg-transparent print:!p-0`}
+              >
                 <DialogHeader>
                   <DialogTitle>Reports</DialogTitle>
                 </DialogHeader>
 
                 <div className="overflow-y-auto flex-1 space-y-6 pt-2 pb-1">
-                  {/* Step 1 — Report Type */}
+                  {/* Step 1 — Report Type: fixed presets, one per Reports tab.
+                      No "stats to include" step anymore — each preset is a
+                      designed, fixed layout rather than a pick-your-own-stats
+                      dashboard, so there's nothing to select there. */}
                   <div className="space-y-2">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       1 — Report Type
                     </p>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {(
                         [
-                          { id: "overview",   label: "Overview",       desc: "Key metrics at a glance" },
-                          { id: "comparison", label: "Comparison",     desc: "Compare across dimensions" },
-                          { id: "trend",      label: "Trend",          desc: "Performance over time" },
-                          { id: "deep-dive",  label: "Deep Dive",      desc: "In-depth on one dimension" },
-                          { id: "weekly",     label: "Weekly Review",  desc: "Structured weekly summary" },
-                          { id: "monthly",    label: "Monthly Review", desc: "Structured monthly summary" },
+                          { id: "overview",    label: "Overview",       desc: "Key metrics at a glance" },
+                          { id: "performance", label: "Performance",    desc: "Deeper performance breakdown" },
+                          { id: "sessions",    label: "Sessions",       desc: "Performance by session" },
+                          { id: "assets",      label: "Assets",         desc: "Performance by pair" },
+                          { id: "setup",       label: "Setup Quality",  desc: "Performance by setup" },
+                          { id: "psychology",  label: "Psychology",     desc: "Ratings & discipline" },
+                          { id: "risk",        label: "Risk Mgmt",      desc: "Drawdown & risk" },
+                          { id: "tradelog",    label: "Trade Log",      desc: "Full trade list" },
                         ] as const
                       ).map((rt) => (
                         <button
@@ -2461,54 +2476,10 @@ export default function Journal() {
                     </div>
                   </div>
 
-                  {/* Step 2 — Stats to include */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        2 — Stats to Include
-                      </p>
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          className="text-xs text-primary hover:underline"
-                          onClick={() => setSelectedSectionIds(REPORT_SECTIONS.map((s) => s.id))}
-                        >
-                          Select all
-                        </button>
-                        <button
-                          type="button"
-                          className="text-xs text-primary hover:underline"
-                          onClick={() => setSelectedSectionIds([])}
-                        >
-                          Clear
-                        </button>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {REPORT_SECTIONS.map((s) => {
-                        const checked = selectedSectionIds.includes(s.id);
-                        return (
-                          <label
-                            key={s.id}
-                            className="flex items-center gap-2.5 p-2.5 rounded-md border border-border bg-muted/20 hover:bg-muted/30 transition-colors cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => toggleSection(s.id)}
-                              className="h-3.5 w-3.5 shrink-0"
-                            />
-                            <span className="text-xs text-foreground">{s.title}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Step 3 — Date Range & Filters */}
+                  {/* Step 2 — Date Range & Filters */}
                   <div className="space-y-2">
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      3 — Date Range &amp; Filters
+                      2 — Date Range &amp; Filters
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {(
@@ -2592,31 +2563,37 @@ export default function Journal() {
                       selectedStats={selectedSectionIds}
                       dateRange={reportPreviewDateRange}
                       trades={viewTrades}
+                      accountId={reportAccountId}
+                      pair={reportPair}
+                      autoPrint={printOnMount}
+                      accountBalance={reportAccountBalance}
                     />
                   )}
                 </div>
 
-                <div className="border-t border-border pt-4 mt-2 shrink-0 flex items-center justify-end gap-2">
+                <div className="border-t border-border pt-4 mt-2 shrink-0 flex items-center justify-end gap-2" data-pdf-exclude>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                    setPreviewVisible(true);
-                    setPreviewKey((k) => k + 1);
-                  }}
+                      setPrintOnMount(false);
+                      setPreviewVisible(true);
+                      setPreviewKey((k) => k + 1);
+                    }}
                   >
-                    Preview Report
+                    Preview
                   </Button>
                   <Button
                     size="sm"
-                    disabled={selectedSectionIds.length === 0 || !canExportReports}
+                    disabled={!canExportReports}
                     onClick={() => {
-                      setExportFormat("pdf");
-                      handleExportSelected();
+                      setPrintOnMount(true);
+                      setPreviewVisible(true);
+                      setPreviewKey((k) => k + 1);
                     }}
                   >
-                    <Download className="h-3.5 w-3.5 mr-1.5" />
-                    Export PDF
+                    <Printer className="h-3.5 w-3.5 mr-1.5" />
+                    Print
                     {!canExportReports && <Lock className="h-3 w-3 ml-1.5" />}
                   </Button>
                 </div>
