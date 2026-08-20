@@ -30,7 +30,11 @@ interface Trade {
 }
 
 export interface ReportPreviewProps {
-  reportType: string;
+  /** One or more preset ids, in the order they should appear in the document.
+   * Each renders as its own full page (masthead through footer); a page break
+   * is forced before every preset after the first so a multi-select generates
+   * one combined, multi-page document rather than overlapping sections. */
+  reportTypes: string[];
   selectedStats: string[];
   dateRange: { from: Date | undefined; to: Date | undefined };
   trades: Trade[];
@@ -79,7 +83,7 @@ const PRESET_COMPONENTS: Record<string, typeof OverviewPreset> = {
 };
 
 export function ReportPreview({
-  reportType,
+  reportTypes,
   dateRange,
   trades,
   accountId,
@@ -131,23 +135,33 @@ export function ReportPreview({
     return { openingBalance: opening, closingBalance: closing };
   }, [accountBalance, accountPairFiltered, filtered, toStr]);
 
-  const isBuilt = BUILT_PRESETS.has(reportType);
+  const builtTypes = reportTypes.filter((t) => BUILT_PRESETS.has(t));
+  const hasSelection = builtTypes.length > 0;
 
   // Print — triggered a beat after mount so layout/charts settle first.
-  // Skipped for presets that aren't built yet — nothing worth printing.
   useEffect(() => {
-    if (!autoPrint || !isBuilt) return;
+    if (!autoPrint || !hasSelection) return;
     const t = setTimeout(() => window.print(), 250);
     return () => clearTimeout(t);
-  }, [autoPrint, isBuilt]);
+  }, [autoPrint, hasSelection]);
 
   const handlePrintClick = () => window.print();
 
-  if (!isBuilt) {
+  if (reportTypes.length === 0) {
     return (
       <div className="pt-6 mt-6 border-t border-border">
         <p className="text-sm text-muted-foreground text-center py-8">
-          {REPORT_TYPE_LABELS[reportType] ?? "This report"} is coming soon.
+          Select at least one report type above.
+        </p>
+      </div>
+    );
+  }
+
+  if (!hasSelection) {
+    return (
+      <div className="pt-6 mt-6 border-t border-border">
+        <p className="text-sm text-muted-foreground text-center py-8">
+          {REPORT_TYPE_LABELS[reportTypes[0]] ?? "This report"} is coming soon.
         </p>
       </div>
     );
@@ -170,11 +184,11 @@ export function ReportPreview({
     ? `${periodStartLabel} – ${periodEndLabel}`
     : "Last 30 days";
   const generatedAt = now.toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-  const reportId = `SB-${(reportType || "overview").slice(0, 3).toUpperCase()}-${now.toISOString().slice(0, 10).replace(/-/g, "")}`;
+  const reportIdSlug = builtTypes.length > 1 ? "MULTI" : builtTypes[0].slice(0, 3).toUpperCase();
+  const reportId = `SB-${reportIdSlug}-${now.toISOString().slice(0, 10).replace(/-/g, "")}`;
 
-  const presetProps = {
+  const sharedPresetProps = {
     trades: filtered,
-    reportTitle: REPORT_TYPE_LABELS[reportType] ?? "Overview Report",
     periodLabel,
     periodStartLabel,
     periodEndLabel,
@@ -186,11 +200,24 @@ export function ReportPreview({
     closingBalance,
   };
 
-  const PresetComponent = PRESET_COMPONENTS[reportType] ?? OverviewPreset;
-
   return (
     <div className="pt-6 mt-6 border-t border-border">
-      <PresetComponent {...presetProps} />
+      <div id="report-print-area">
+        {builtTypes.map((type, idx) => {
+          const PresetComponent = PRESET_COMPONENTS[type] ?? OverviewPreset;
+          return (
+            <div
+              key={type}
+              className={idx > 0 ? "mt-8 print:mt-0 print:break-before-page" : ""}
+            >
+              <PresetComponent
+                {...sharedPresetProps}
+                reportTitle={REPORT_TYPE_LABELS[type] ?? "Overview Report"}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

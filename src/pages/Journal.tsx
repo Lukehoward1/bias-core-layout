@@ -599,13 +599,30 @@ export default function Journal() {
   const [isReportsDialogOpen, setIsReportsDialogOpen] = useState(false);
   useEffect(() => { localStorage.setItem("rb_open", JSON.stringify(isReportsDialogOpen)); }, [isReportsDialogOpen]);
 
-  const [reportType, setReportType] = useState<string | null>(() => {
-    try { return localStorage.getItem("rb_type") ?? null; } catch { return null; }
+  // Multi-select — one or more preset types combine into a single generated
+  // document (each as its own page). Persisted as JSON; falls back to the
+  // old single-value "rb_type" localStorage key so existing users don't lose
+  // their last selection.
+  const [reportTypes, setReportTypes] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem("rb_types");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.every((v) => typeof v === "string")) return parsed;
+      }
+      const legacy = localStorage.getItem("rb_type");
+      return legacy ? [legacy] : ["overview"];
+    } catch {
+      return ["overview"];
+    }
   });
   useEffect(() => {
-    if (reportType != null) localStorage.setItem("rb_type", reportType);
-    else localStorage.removeItem("rb_type");
-  }, [reportType]);
+    localStorage.setItem("rb_types", JSON.stringify(reportTypes));
+  }, [reportTypes]);
+
+  const toggleReportType = (id: string) => {
+    setReportTypes((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]));
+  };
 
   const [reportDatePreset, setReportDatePreset] = useState<string>(() => {
     try { return localStorage.getItem("rb_date_preset") ?? "last-30"; } catch { return "last-30"; }
@@ -657,10 +674,10 @@ export default function Journal() {
   useEffect(() => { localStorage.setItem("journal_active_tab", activeJournalTab); }, [activeJournalTab]);
 
   const resetReportBuilder = () => {
-    ["rb_open", "rb_type", "rb_sections", "rb_date_preset", "rb_custom_from", "rb_custom_to", "rb_preview_visible"]
+    ["rb_open", "rb_type", "rb_types", "rb_sections", "rb_date_preset", "rb_custom_from", "rb_custom_to", "rb_preview_visible"]
       .forEach((k) => localStorage.removeItem(k));
     setIsReportsDialogOpen(false);
-    setReportType(null);
+    setReportTypes(["overview"]);
     setSelectedSectionIds(REPORT_SECTIONS.map((s) => s.id));
     setReportDatePreset("last-30");
     setCustomFrom("");
@@ -2437,9 +2454,16 @@ export default function Journal() {
                       designed, fixed layout rather than a pick-your-own-stats
                       dashboard, so there's nothing to select there. */}
                   <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      1 — Report Type
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        1 — Report Type
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {reportTypes.length === 0
+                          ? "Select one or more"
+                          : `${reportTypes.length} selected — combined into one document`}
+                      </p>
+                    </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       {(
                         [
@@ -2452,27 +2476,37 @@ export default function Journal() {
                           { id: "risk",        label: "Risk Mgmt",      desc: "Drawdown & risk" },
                           { id: "tradelog",    label: "Trade Log",      desc: "Full trade list" },
                         ] as const
-                      ).map((rt) => (
-                        <button
-                          key={rt.id}
-                          type="button"
-                          onClick={() => setReportType(rt.id)}
-                          className={`flex flex-col items-start px-3 py-2 rounded-md border text-left transition-colors ${
-                            reportType === rt.id
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "bg-muted/30 border-border hover:border-primary/50 hover:bg-muted/60"
-                          }`}
-                        >
-                          <span className="text-xs font-medium">{rt.label}</span>
-                          <span
-                            className={`text-[10px] mt-0.5 leading-tight ${
-                              reportType === rt.id ? "text-primary-foreground/70" : "text-muted-foreground"
+                      ).map((rt) => {
+                        const selected = reportTypes.includes(rt.id);
+                        const order = reportTypes.indexOf(rt.id);
+                        return (
+                          <button
+                            key={rt.id}
+                            type="button"
+                            onClick={() => toggleReportType(rt.id)}
+                            aria-pressed={selected}
+                            className={`relative flex flex-col items-start px-3 py-2 rounded-md border text-left transition-colors ${
+                              selected
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-muted/30 border-border hover:border-primary/50 hover:bg-muted/60"
                             }`}
                           >
-                            {rt.desc}
-                          </span>
-                        </button>
-                      ))}
+                            {selected && (
+                              <span className="absolute top-1.5 right-1.5 h-4 w-4 rounded-full bg-primary-foreground/20 text-[10px] font-semibold flex items-center justify-center">
+                                {order + 1}
+                              </span>
+                            )}
+                            <span className="text-xs font-medium pr-4">{rt.label}</span>
+                            <span
+                              className={`text-[10px] mt-0.5 leading-tight ${
+                                selected ? "text-primary-foreground/70" : "text-muted-foreground"
+                              }`}
+                            >
+                              {rt.desc}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -2559,7 +2593,7 @@ export default function Journal() {
                   {previewVisible && (
                     <ReportPreview
                       key={previewKey}
-                      reportType={reportType ?? "overview"}
+                      reportTypes={reportTypes}
                       selectedStats={selectedSectionIds}
                       dateRange={reportPreviewDateRange}
                       trades={viewTrades}
@@ -2575,6 +2609,7 @@ export default function Journal() {
                   <Button
                     variant="outline"
                     size="sm"
+                    disabled={reportTypes.length === 0}
                     onClick={() => {
                       setPrintOnMount(false);
                       setPreviewVisible(true);
@@ -2585,7 +2620,7 @@ export default function Journal() {
                   </Button>
                   <Button
                     size="sm"
-                    disabled={!canExportReports}
+                    disabled={!canExportReports || reportTypes.length === 0}
                     onClick={() => {
                       setPrintOnMount(true);
                       setPreviewVisible(true);

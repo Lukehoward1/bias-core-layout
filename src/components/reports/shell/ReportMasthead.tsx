@@ -1,8 +1,11 @@
 // src/components/reports/shell/ReportMasthead.tsx
 //
-// Fixed dark masthead — deliberately NOT theme-locked to the light document
-// tokens. It's a brand header (like a tearsheet's letterhead) so it stays a
-// constant near-black regardless of the report body's palette.
+// Light masthead that reads as part of the same document as the white report
+// body, rather than a contrasting dark banner — a thin brand-cyan accent line
+// along the bottom is what marks it as a header band. Renders inside
+// ReportThemeLock, so semantic classes (text-foreground, text-success, etc.)
+// resolve against the locked light-mode tokens and stay identical regardless
+// of the app's active light/dark theme.
 
 import type { ReactNode } from "react";
 import sbLogo from "@/assets/sb-logo.svg";
@@ -23,9 +26,9 @@ interface ReportMastheadProps {
 }
 
 const toneClass = (tone: HeroMetric["tone"]) => {
-  if (tone === "pos") return "text-emerald-400";
-  if (tone === "neg") return "text-red-400";
-  return "text-white";
+  if (tone === "pos") return "text-success";
+  if (tone === "neg") return "text-destructive";
+  return "text-foreground";
 };
 
 export function ReportMasthead({
@@ -37,27 +40,25 @@ export function ReportMasthead({
 }: ReportMastheadProps) {
   return (
     <div
-      className="rounded-t-2xl px-6 py-5 print:py-4"
-      style={{
-        background: "linear-gradient(135deg, #09090b 0%, #18181b 100%)",
-      }}
+      className="rounded-t-2xl px-6 py-5 print:py-4 bg-background border-b-2"
+      style={{ borderBottomColor: "#06b6d4" }}
     >
       <div className="flex flex-wrap items-center justify-between gap-4">
         {/* Wordmark + report title + period */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <img src={sbLogo} alt="StreamBias" className="h-8 w-auto" />
-            <span className="text-white font-bold text-lg tracking-tight">StreamBias</span>
+            <span className="text-foreground font-bold text-lg tracking-tight">StreamBias</span>
           </div>
-          <span className="text-zinc-700 hidden sm:inline">|</span>
-          <span className="text-zinc-200 font-semibold uppercase tracking-wide text-sm">
+          <span className="text-muted-foreground/40 hidden sm:inline">|</span>
+          <span className="text-foreground/80 font-semibold uppercase tracking-wide text-sm">
             {reportTitle}
           </span>
-          <span className="inline-flex items-center rounded-full bg-zinc-800/80 border border-zinc-700 px-2.5 py-0.5 text-xs font-medium text-zinc-300">
+          <span className="inline-flex items-center rounded-full bg-muted border border-border px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
             {periodLabel}
           </span>
           {accountLabel && (
-            <span className="text-xs text-zinc-500">{accountLabel}</span>
+            <span className="text-xs text-muted-foreground/70">{accountLabel}</span>
           )}
         </div>
 
@@ -67,9 +68,9 @@ export function ReportMasthead({
             {heroMetrics.map((m, i) => (
               <div
                 key={m.label}
-                className={i > 0 ? "pl-5 border-l border-zinc-800" : ""}
+                className={i > 0 ? "pl-5 border-l border-border" : ""}
               >
-                <div className="text-[10px] uppercase tracking-wide text-zinc-500">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                   {m.label}
                 </div>
                 <div className={`text-sm font-bold ${toneClass(m.tone)}`}>{m.value}</div>

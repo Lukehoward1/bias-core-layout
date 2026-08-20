@@ -5,6 +5,7 @@ import {
   ReportThemeLock,
   ReportShell,
   ReportMasthead,
+  ReportPrintButton,
   ReportKpiCard,
   ReportSectionCard,
   ReportDonut,
@@ -115,21 +116,13 @@ export function PerformancePreset({
   ];
 
   return (
-    <ReportThemeLock id="report-print-area">
+    <ReportThemeLock>
       <ReportShell>
         <ReportMasthead
           reportTitle={reportTitle}
           periodLabel={periodLabel}
           heroMetrics={heroMetrics}
-          actions={
-            <button
-              type="button"
-              onClick={onPrint}
-              className="text-xs font-medium px-3 py-1.5 rounded-md border border-zinc-700 bg-transparent text-zinc-200 hover:bg-zinc-800 hover:text-white transition-colors"
-            >
-              Print
-            </button>
-          }
+          actions={<ReportPrintButton onClick={onPrint} />}
         />
 
         <div className="p-6 space-y-6 print:p-3 print:space-y-2">
