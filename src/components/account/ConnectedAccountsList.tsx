@@ -3,7 +3,8 @@ import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Link2, Plug, Trash2, RefreshCw, Star, AlertCircle } from "lucide-react";
+import { Link2, Plug, Trash2, RefreshCw, Star, AlertCircle, Pencil, Check, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { useLinkedAccounts, type LinkedAccount } from "@/hooks/use-linked-accounts";
 import { ConnectBrokerComingSoonModal } from "@/components/account/ConnectBrokerComingSoonModal";
 import { cn } from "@/lib/utils";
@@ -44,6 +45,7 @@ export function ConnectedAccountsList({ onConnectClick }: ConnectedAccountsListP
     unlinkAccount,
     refreshAccount,
     setPrimaryAccount,
+    updateAccountBalance,
   } = useLinkedAccounts();
 
   const [activeAccountId, setActiveAccountId] = useState<string>(ALL_ACCOUNTS_VALUE);
@@ -222,6 +224,7 @@ export function ConnectedAccountsList({ onConnectClick }: ConnectedAccountsListP
             onSetActive={() => setActive(account.id)}
             onRefresh={() => refreshAccount(account.id)}
             onUnlink={() => unlinkAccount(account.id)}
+            onEditBalance={(newBalance) => updateAccountBalance(account.id, newBalance)}
           />
         ))}
       </div>
@@ -239,6 +242,7 @@ interface AccountCardProps {
   onSetActive: () => void;
   onRefresh: () => void;
   onUnlink: () => Promise<void>;
+  onEditBalance: (newBalance: number) => Promise<{ success: boolean; message?: string }>;
 }
 
 function AccountCard({
@@ -249,9 +253,35 @@ function AccountCard({
   onSetActive,
   onRefresh,
   onUnlink,
+  onEditBalance,
 }: AccountCardProps) {
   const [confirming, setConfirming] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [editingBalance, setEditingBalance] = useState(false);
+  const [balanceDraft, setBalanceDraft] = useState(() => String(account.balance));
+  const [savingBalance, setSavingBalance] = useState(false);
+
+  function startEditingBalance() {
+    setBalanceDraft(String(account.balance));
+    setEditingBalance(true);
+  }
+
+  async function handleSaveBalance() {
+    const parsed = parseFloat(balanceDraft);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      toast.error("Please enter a valid balance.");
+      return;
+    }
+    setSavingBalance(true);
+    const result = await onEditBalance(parsed);
+    setSavingBalance(false);
+    if (result.success) {
+      toast.success("Balance updated.");
+      setEditingBalance(false);
+    } else {
+      toast.error(result.message ?? "Failed to update balance. Please try again.");
+    }
+  }
 
   async function handleConfirmUnlink() {
     setDisconnecting(true);
@@ -299,10 +329,57 @@ function AccountCard({
 
               <p className="text-sm text-muted-foreground">{account.broker}</p>
 
-              <div className="flex items-center gap-3 mt-1">
-                <span className="text-lg font-semibold text-foreground">£{account.balance.toLocaleString()}</span>
-                <span className="text-xs text-muted-foreground">Updated {format(account.lastUpdated, "HH:mm")}</span>
-              </div>
+              {editingBalance ? (
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-sm text-muted-foreground">£</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={balanceDraft}
+                    onChange={(e) => setBalanceDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSaveBalance();
+                      if (e.key === "Escape") setEditingBalance(false);
+                    }}
+                    autoFocus
+                    disabled={savingBalance}
+                    className="h-7 w-32 text-sm"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-success hover:text-success"
+                    onClick={handleSaveBalance}
+                    disabled={savingBalance}
+                  >
+                    <Check className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setEditingBalance(false)}
+                    disabled={savingBalance}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-lg font-semibold text-foreground">£{account.balance.toLocaleString()}</span>
+                  {!account.hasBrokerConnection && (
+                    <button
+                      type="button"
+                      onClick={startEditingBalance}
+                      className="text-muted-foreground hover:text-foreground"
+                      title="Edit balance"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <span className="text-xs text-muted-foreground">Updated {format(account.lastUpdated, "HH:mm")}</span>
+                </div>
+              )}
             </div>
           </div>
 

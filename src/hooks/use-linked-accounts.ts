@@ -18,6 +18,7 @@ export interface LinkedAccount {
   currency: string;
   isConnected: boolean;
   lastUpdated: Date;
+  hasBrokerConnection?: boolean;
 }
 
 /**
@@ -65,6 +66,7 @@ interface UseLinkedAccountsReturn {
   refreshAccount: (accountId: string) => void;
   refreshAllAccounts: () => void;
   setPrimaryAccount: (accountId: string) => Promise<void>;
+  updateAccountBalance: (accountId: string, balance: number) => Promise<{ success: boolean; message?: string }>;
 
   // Legacy trades API (dead code — localStorage-based, kept for interface compatibility)
   getTradesForAccount: (accountId: string) => AccountTrade[];
@@ -88,7 +90,7 @@ interface LinkedAccountRow {
   created_at: string;
 }
 
-function rowToAccount(row: LinkedAccountRow): LinkedAccount {
+function rowToAccount(row: LinkedAccountRow, brokerConnectedIds?: Set<string>): LinkedAccount {
   return {
     id: row.id,
     name: row.name,
@@ -97,6 +99,7 @@ function rowToAccount(row: LinkedAccountRow): LinkedAccount {
     currency: row.currency,
     isConnected: row.is_connected,
     lastUpdated: new Date(row.last_updated),
+    hasBrokerConnection: brokerConnectedIds ? brokerConnectedIds.has(row.id) : false,
   };
 }
 
@@ -155,11 +158,17 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
     }
 
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from("linked_accounts")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: true });
+    const [{ data, error }, { data: bcs }] = await Promise.all([
+      supabase
+        .from("linked_accounts")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("broker_connections")
+        .select("account_id")
+        .eq("user_id", user.id),
+    ]);
 
     if (error) {
       console.error("[useLinkedAccounts] Failed to load accounts:", error.message);
@@ -167,7 +176,10 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
       setPrimaryAccountId(null);
     } else {
       const rows = (data ?? []) as LinkedAccountRow[];
-      setAccounts(rows.map(rowToAccount));
+      const brokerConnectedIds = new Set(
+        (bcs ?? []).map((bc: { account_id: string }) => bc.account_id).filter(Boolean),
+      );
+      setAccounts(rows.map((r) => rowToAccount(r, brokerConnectedIds)));
       const primary = rows.find((r) => r.is_primary);
       setPrimaryAccountId(primary?.id ?? null);
     }
@@ -238,7 +250,7 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
         return { success: false, message: "Failed to link account. Please try again." };
       }
 
-      const newAccount = rowToAccount(data as LinkedAccountRow);
+      const newAccount = rowToAccount(data as LinkedAccountRow, new Set());
       setAccounts((prev) => [...prev, newAccount]);
       if (isFirst) setPrimaryAccountId(newAccount.id);
 
@@ -341,6 +353,39 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
     [user, accounts],
   );
 
+  // ── updateAccountBalance ────────────────────────────────────────────────────
+  // Manual accounts have no broker sync to keep their balance current, and
+  // (until this) no way to correct it after creation either — this is the fix
+  // for that gap, e.g. when a manual account's balance drifts from reality or
+  // was mis-entered at creation.
+
+  const updateAccountBalance = useCallback(
+    async (accountId: string, balance: number): Promise<{ success: boolean; message?: string }> => {
+      if (!user) return { success: false, message: "Not authenticated." };
+      if (!Number.isFinite(balance) || balance < 0) {
+        return { success: false, message: "Please enter a valid balance." };
+      }
+
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from("linked_accounts")
+        .update({ balance, last_updated: now })
+        .eq("id", accountId)
+        .eq("user_id", user.id);
+
+      if (error) {
+        console.error("[useLinkedAccounts] updateAccountBalance failed:", error.message);
+        return { success: false, message: "Failed to update balance. Please try again." };
+      }
+
+      setAccounts((prev) =>
+        prev.map((a) => (a.id === accountId ? { ...a, balance, lastUpdated: new Date(now) } : a)),
+      );
+      return { success: true };
+    },
+    [user],
+  );
+
   // ── Legacy trades API (localStorage, dead code, kept for interface compat) ──
 
   const getTradesForAccount = useCallback((accountId: string): AccountTrade[] => {
@@ -386,6 +431,7 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
     refreshAccount,
     refreshAllAccounts,
     setPrimaryAccount,
+    updateAccountBalance,
 
     getTradesForAccount,
     setTradesForAccount,
