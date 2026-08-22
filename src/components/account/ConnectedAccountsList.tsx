@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link2, Plug, Trash2, RefreshCw, Star, AlertCircle, Pencil, Check, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useLinkedAccounts, type LinkedAccount } from "@/hooks/use-linked-accounts";
-import { ConnectBrokerComingSoonModal } from "@/components/account/ConnectBrokerComingSoonModal";
+import { ConnectBrokerModal } from "@/components/account/ConnectBrokerModal";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -131,7 +131,7 @@ export function ConnectedAccountsList({ onConnectClick }: ConnectedAccountsListP
           </div>
         </div>
 
-        <ConnectBrokerComingSoonModal open={showBrokerModal} onOpenChange={setShowBrokerModal} />
+        <ConnectBrokerModal open={showBrokerModal} onOpenChange={setShowBrokerModal} />
       </>
     );
   }
@@ -229,7 +229,7 @@ export function ConnectedAccountsList({ onConnectClick }: ConnectedAccountsListP
         ))}
       </div>
 
-      <ConnectBrokerComingSoonModal open={showBrokerModal} onOpenChange={setShowBrokerModal} />
+      <ConnectBrokerModal open={showBrokerModal} onOpenChange={setShowBrokerModal} />
     </div>
   );
 }

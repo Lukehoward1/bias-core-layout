@@ -305,7 +305,7 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
                 </div>
               ) : mode === "linked" && !isAccountLoading ? (
                 <p className="text-xs text-muted-foreground py-2">
-                  No account linked — broker connections are coming soon.
+                  No account linked — connect your MT4/MT5 account to sync your live balance.
                 </p>
               ) : (
                 <Input

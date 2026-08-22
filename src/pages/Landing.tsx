@@ -329,7 +329,7 @@ function QuickRiskMockup() {
           </span>
         </div>
 
-        <p className="text-[10px] text-muted-foreground">Sample data — broker sync coming soon</p>
+        <p className="text-[10px] text-muted-foreground">Sample data — connect your MT4/MT5 account to sync live</p>
 
         {/* Account Balance */}
         <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border">
@@ -921,8 +921,9 @@ export default function Landing() {
               A journal that analyses itself.
             </h2>
             <p className="text-muted-foreground leading-relaxed">
-              Log trades manually. StreamBias calculates profit rate, R:R, session performance
-              and emotional patterns — surfacing insights you'd never find manually. Broker sync coming soon.
+              Log trades manually or connect your MT4/MT5 account to sync them automatically.
+              StreamBias calculates profit rate, R:R, session performance and emotional patterns —
+              surfacing insights you'd never find manually.
             </p>
             <div className="flex flex-wrap gap-2 mt-1">
               <FeaturePill label="Auto P&L calculation" />
@@ -946,7 +947,7 @@ export default function Landing() {
               Set your rules once and trade within them every session.
             </p>
             <div className="flex flex-wrap gap-2 mt-1">
-              <FeaturePill label="Balance sync (coming soon)" />
+              <FeaturePill label="Live balance sync" />
               <FeaturePill label="Position calculator" />
               <FeaturePill label="Drawdown guard" />
             </div>

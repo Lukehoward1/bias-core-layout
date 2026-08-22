@@ -262,7 +262,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                     <div className="flex-1">
                       <p className="text-sm font-medium text-foreground">No account linked</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Broker connections are coming soon.
+                        Connect your MT4/MT5 account in Account Settings to sync your live balance.
                       </p>
                     </div>
                   </div>

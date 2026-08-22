@@ -24,7 +24,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 
-interface ConnectBrokerComingSoonModalProps {
+interface ConnectBrokerModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -53,10 +53,10 @@ function clearDraft() {
   } catch {}
 }
 
-export function ConnectBrokerComingSoonModal({
+export function ConnectBrokerModal({
   open,
   onOpenChange,
-}: ConnectBrokerComingSoonModalProps) {
+}: ConnectBrokerModalProps) {
   const { session } = useAuth();
   const { canLinkMore, accountCount, maxAccounts, reloadAccounts } = useLinkedAccounts();
   const { subscriptionStatus } = useSubscription();
