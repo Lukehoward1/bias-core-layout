@@ -25,8 +25,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: "API key not configured" });
   }
 
+  // NOTE: /api/v3/economic_calendar is FMP's legacy endpoint — officially
+  // deprecated and could be shut off without notice. The replacement is
+  // /stable/economic-calendar, but that requires a paid FMP plan (~$25/mo
+  // Starter tier). Revert to /stable/ and upgrade the plan before launch.
+  // See commit 4b165da for the prior migration and api/economic-calendar.ts
+  // git history for context.
   const url =
-    `https://financialmodelingprep.com/stable/economic-calendar` +
+    `https://financialmodelingprep.com/api/v3/economic_calendar` +
     `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&apikey=${API_KEY}`;
 
   try {
