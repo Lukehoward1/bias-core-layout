@@ -3,7 +3,23 @@
 // Caches for 30 minutes; falls back to empty array on any failure
 // so calendarData.ts can use static events instead.
 
-import type { CalendarEvent, CalendarImpact } from "@/data/calendarEvents";
+import { calendarEvents as staticCalendarEvents, type CalendarEvent, type CalendarImpact } from "@/data/calendarEvents";
+
+// ── Dev-only fixture toggle ───────────────────────────────────
+// When VITE_USE_CALENDAR_FIXTURES=true AND running a dev build, short-circuit
+// the FMP fetch and serve the static fixture set from data/calendarEvents.
+// Both conditions are Vite-baked at build time — `import.meta.env.DEV` is
+// literal `false` in production, so this whole branch tree-shakes out.
+const USE_FIXTURES =
+  import.meta.env.DEV && import.meta.env.VITE_USE_CALENDAR_FIXTURES === "true";
+let _fixturesNoticeLogged = false;
+function _logFixturesNotice() {
+  if (_fixturesNoticeLogged) return;
+  _fixturesNoticeLogged = true;
+  console.info(
+    "[calendarService] Serving fixture calendar data (VITE_USE_CALENDAR_FIXTURES=true, dev only).",
+  );
+}
 
 // ── FMP response shape ────────────────────────────────────────
 
@@ -116,6 +132,20 @@ function mapFmpEvent(raw: FmpEconomicEvent, index: number): CalendarEvent {
 // Filters to events with actual values must be done by the caller (FMP includes
 // future events in date-ranged queries even when the range includes today).
 export function getLiveCalendarHistoricalEvents(): Promise<CalendarEvent[]> {
+  if (USE_FIXTURES) {
+    _logFixturesNotice();
+    if (!_historyCache) {
+      const nowMs = Date.now();
+      const oneYearAgo = nowMs - 365 * 24 * 60 * 60 * 1000;
+      const past = staticCalendarEvents.filter((e) => {
+        const t = new Date(e.scheduledAt).getTime();
+        return !Number.isNaN(t) && t >= oneYearAgo && t <= nowMs;
+      });
+      _historyCache = { data: past, expiresAt: nowMs + HISTORY_CACHE_TTL_MS };
+    }
+    return Promise.resolve(_historyCache.data);
+  }
+
   if (_historyCache && Date.now() < _historyCache.expiresAt) {
     return Promise.resolve(_historyCache.data);
   }
@@ -153,6 +183,15 @@ export function getLiveCalendarHistoricalEvents(): Promise<CalendarEvent[]> {
 }
 
 export function getLiveCalendarEvents(): Promise<CalendarEvent[]> {
+  if (USE_FIXTURES) {
+    _logFixturesNotice();
+    if (!_cache) {
+      _cache = { data: staticCalendarEvents, expiresAt: Date.now() + CACHE_TTL_MS };
+      _lastFetchSucceeded = true;
+    }
+    return Promise.resolve(_cache.data);
+  }
+
   if (_cache && Date.now() < _cache.expiresAt) return Promise.resolve(_cache.data);
   if (_inFlightPromise) return _inFlightPromise;
   if (_failedAt && Date.now() - _failedAt < FAILURE_COOLDOWN_MS) return Promise.resolve([]);

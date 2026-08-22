@@ -293,10 +293,15 @@ function buildWeeklyEventSeries(template: CalendarEventTemplate, now: Date): Cal
 function buildMonthlyEventSeries(template: CalendarEventTemplate, now: Date): CalendarEvent[] {
   const nthWeek = template.monthlyWeek ?? 1;
   const weekday = template.monthlyWeekday ?? 5;
-  const startMonthBase = addMonths(now, -2);
+  // 12 months back → 7 months forward: gives the historical trend chart in
+  // EventDetailsModal a full year of prior instances per event key when
+  // running with fixtures (VITE_USE_CALENDAR_FIXTURES=true in local dev).
+  const MONTHS_BACK = 12;
+  const MONTHS_FORWARD = 7;
+  const startMonthBase = addMonths(now, -MONTHS_BACK);
   const events: CalendarEvent[] = [];
 
-  for (let monthOffset = 0; monthOffset < 9; monthOffset += 1) {
+  for (let monthOffset = 0; monthOffset < MONTHS_BACK + MONTHS_FORWARD; monthOffset += 1) {
     const monthDate = addMonths(startMonthBase, monthOffset);
     const eventDate = getNthWeekdayOfMonth(monthDate.getFullYear(), monthDate.getMonth(), nthWeek, weekday);
     const scheduled = createDateAtTime(eventDate, template.time);
