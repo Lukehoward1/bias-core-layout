@@ -973,7 +973,7 @@ export default function Landing() {
             </h2>
             <p className="text-muted-foreground leading-relaxed">
               An economic calendar that automatically filters high-impact events to the exact pairs you trade —
-              so you're never caught off guard by a rate decision, inflation print, or jobs report. Live data coming soon.
+              so you're never caught off guard by a rate decision, inflation print, or jobs report.
             </p>
             <div className="flex flex-wrap gap-2 mt-1">
               <FeaturePill label="Filtered by your pairs" />
