@@ -5,13 +5,16 @@
 
 import { calendarEvents as staticCalendarEvents, type CalendarEvent, type CalendarImpact } from "@/data/calendarEvents";
 
-// ── Dev-only fixture toggle ───────────────────────────────────
-// When VITE_USE_CALENDAR_FIXTURES=true AND running a dev build, short-circuit
-// the FMP fetch and serve the static fixture set from data/calendarEvents.
-// Both conditions are Vite-baked at build time — `import.meta.env.DEV` is
-// literal `false` in production, so this whole branch tree-shakes out.
-const USE_FIXTURES =
-  import.meta.env.DEV && import.meta.env.VITE_USE_CALENDAR_FIXTURES === "true";
+// ── Fixture toggle (dev + preview) ────────────────────────────
+// When VITE_USE_CALENDAR_FIXTURES=true, short-circuit the FMP fetch and serve
+// the static fixture set from data/calendarEvents. Vite bakes this value at
+// build time (Vercel Preview builds are technically "production" mode, so we
+// can't gate on import.meta.env.DEV here — that would exclude Preview too).
+// Safety comes from where the env var is scoped: dashboard has it set for
+// Preview only, and .env.local for local dev. Production builds have no such
+// env var, so the comparison evaluates to `undefined === "true"` (false) and
+// the whole fixture branch tree-shakes out of the production bundle.
+const USE_FIXTURES = import.meta.env.VITE_USE_CALENDAR_FIXTURES === "true";
 let _fixturesNoticeLogged = false;
 function _logFixturesNotice() {
   if (_fixturesNoticeLogged) return;
