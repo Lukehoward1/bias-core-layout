@@ -33,6 +33,8 @@ import RiskTools from "./pages/RiskTools";
 import Journal from "./pages/Journal";
 import Education from "./pages/Education";
 import Settings from "./pages/Settings";
+import ManageSubscription from "./pages/ManageSubscription";
+import CancelSubscription from "./pages/CancelSubscription";
 import Pricing from "./pages/Pricing";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
@@ -81,6 +83,8 @@ function AppRoutes() {
             <Route path="/journal" element={<Journal />} />
             <Route path="/education" element={<Education />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/settings/subscription" element={<ManageSubscription />} />
+            <Route path="/settings/cancel" element={<CancelSubscription />} />
             <Route path="/billing" element={<Navigate to="/settings" replace />} />
 
             {!backgroundLocation && <Route path="/markets/:symbol" element={<AssetDetailWithBoundary />} />}
