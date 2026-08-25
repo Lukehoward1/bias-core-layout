@@ -33,7 +33,6 @@ import RiskTools from "./pages/RiskTools";
 import Journal from "./pages/Journal";
 import Education from "./pages/Education";
 import Settings from "./pages/Settings";
-import Billing from "./pages/Billing";
 import Pricing from "./pages/Pricing";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
