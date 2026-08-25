@@ -40,9 +40,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // Release any pending schedule first so a queued Standard↔Pro switch
     // doesn't fire post-cancel.
-    const subscription = await stripe.subscriptions.retrieve(ctx.stripeSubscriptionId) as Stripe.Subscription & {
-      schedule: string | null;
-    };
+    const subscription = await stripe.subscriptions.retrieve(ctx.stripeSubscriptionId);
 
     if (subscription.schedule) {
       const scheduleId = typeof subscription.schedule === "string"
@@ -59,9 +57,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    const updated = await stripe.subscriptions.update(ctx.stripeSubscriptionId, {
+    // current_period_end isn't surfaced on the SDK's Subscription type in
+    // this version but is present in the raw API response — cast to read it.
+    const updated = (await stripe.subscriptions.update(ctx.stripeSubscriptionId, {
       cancel_at_period_end: true,
-    }) as Stripe.Subscription & { current_period_end: number | null };
+    })) as unknown as Stripe.Subscription & { current_period_end: number | null };
 
     // Record feedback via service-role client. tier_at_cancellation comes from
     // the profile (already known), cadence is derived from the current price.

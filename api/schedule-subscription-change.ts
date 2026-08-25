@@ -44,9 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
   try {
-    const subscription = await stripe.subscriptions.retrieve(ctx.stripeSubscriptionId) as Stripe.Subscription & {
-      schedule: string | null;
-    };
+    const subscription = await stripe.subscriptions.retrieve(ctx.stripeSubscriptionId);
 
     const currentPriceId = subscription.items?.data?.[0]?.price?.id ?? "";
     if (currentPriceId === targetPriceId) {

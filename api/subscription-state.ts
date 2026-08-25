@@ -80,9 +80,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
   try {
-    const subscription = await stripe.subscriptions.retrieve(profile.stripe_subscription_id) as Stripe.Subscription & {
+    // Cast via unknown: Stripe SDK's Subscription type doesn't surface
+    // current_period_end at the top level (it moved under items in newer API
+    // versions), but the raw API still returns it and we rely on it here.
+    // Leave `schedule` typed natively (string | SubscriptionSchedule | null)
+    // so the union works below.
+    const subscription = (await stripe.subscriptions.retrieve(profile.stripe_subscription_id)) as unknown as Stripe.Subscription & {
       current_period_end: number | null;
-      schedule: string | null;
     };
 
     const currentPriceId = subscription.items?.data?.[0]?.price?.id ?? "";

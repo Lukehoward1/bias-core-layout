@@ -15,9 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
   try {
-    const subscription = await stripe.subscriptions.retrieve(ctx.stripeSubscriptionId) as Stripe.Subscription & {
-      schedule: string | null;
-    };
+    const subscription = await stripe.subscriptions.retrieve(ctx.stripeSubscriptionId);
 
     if (!subscription.schedule) {
       return res.status(400).json({ error: "No scheduled change to cancel." });
