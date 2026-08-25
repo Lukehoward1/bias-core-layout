@@ -145,7 +145,7 @@ export function getAvailableCalendarCurrencies(): string[] {
 }
 
 export function filterCalendarEvents(events: CalendarEvent[], filters: CalendarFilters = {}): CalendarEvent[] {
-  const { dateRange = "today", impact = "all", currency = "all", sortMode = "impact" } = filters;
+  const { dateRange = "week", impact = "all", currency = "all", sortMode = "impact" } = filters;
 
   let next = [...events];
 

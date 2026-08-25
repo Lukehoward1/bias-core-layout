@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import { Filter, ChevronDown, ChevronUp, CalendarDays, Sparkles, BarChart3, RefreshCw, Clock } from "lucide-react";
+import { ChevronDown, ChevronUp, Sparkles, BarChart3, RefreshCw, Clock } from "lucide-react";
 
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
@@ -42,7 +42,7 @@ function Calendar() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
 
-  const [dateRange, setDateRange] = useState<CalendarDateRange>("today");
+  const [dateRange, setDateRange] = useState<CalendarDateRange>("week");
   const [impactFilter, setImpactFilter] = useState<ImpactFilter>("high");
   const [currencyFilter, setCurrencyFilter] = useState<CurrencyFilter>("all");
   const [sortMode, setSortMode] = useState<CalendarSortMode>("impact");
@@ -226,118 +226,106 @@ function Calendar() {
       <AppHeader title="Calendar" />
 
       <div className="max-w-7xl mx-auto space-y-6">
-        <Card>
-          <CardContent className="py-4 space-y-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-              <CalendarDays className="h-4 w-4 text-primary" />
-              Calendar Filters
-            </div>
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <Select value={dateRange} onValueChange={(value) => setDateRange(value as CalendarDateRange)}>
+              <SelectTrigger className="rounded-full h-8 px-4 text-xs w-auto">
+                <SelectValue placeholder="Date Range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="week">This Week</SelectItem>
+                <SelectItem value="month">This Month</SelectItem>
+              </SelectContent>
+            </Select>
 
-            <div className="flex flex-wrap gap-3">
-              <Select value={dateRange} onValueChange={(value) => setDateRange(value as CalendarDateRange)}>
-                <SelectTrigger className="w-[160px] h-9">
-                  <SelectValue placeholder="Date Range" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="week">This Week</SelectItem>
-                  <SelectItem value="month">This Month</SelectItem>
-                </SelectContent>
-              </Select>
+            <Select value={impactFilter} onValueChange={(value) => setImpactFilter(value as ImpactFilter)}>
+              <SelectTrigger className="rounded-full h-8 px-4 text-xs w-auto">
+                <SelectValue placeholder="Impact" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Impact</SelectItem>
+                <SelectItem value="high">High Impact</SelectItem>
+                <SelectItem value="medium">Medium Impact</SelectItem>
+                <SelectItem value="low">Low Impact</SelectItem>
+              </SelectContent>
+            </Select>
 
-              <Select value={impactFilter} onValueChange={(value) => setImpactFilter(value as ImpactFilter)}>
-                <SelectTrigger className="w-[160px] h-9">
-                  <SelectValue placeholder="Impact" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Impact</SelectItem>
-                  <SelectItem value="high">High Impact</SelectItem>
-                  <SelectItem value="medium">Medium Impact</SelectItem>
-                  <SelectItem value="low">Low Impact</SelectItem>
-                </SelectContent>
-              </Select>
+            <Select value={currencyFilter} onValueChange={(value) => setCurrencyFilter(value as CurrencyFilter)}>
+              <SelectTrigger className="rounded-full h-8 px-4 text-xs w-auto">
+                <SelectValue placeholder="Currency" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Currencies</SelectItem>
+                {availableCurrencies.map((currency) => (
+                  <SelectItem key={currency} value={currency}>
+                    {currency}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-              <Select value={currencyFilter} onValueChange={(value) => setCurrencyFilter(value as CurrencyFilter)}>
-                <SelectTrigger className="w-[160px] h-9">
-                  <SelectValue placeholder="Currency" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Currencies</SelectItem>
-                  {availableCurrencies.map((currency) => (
-                    <SelectItem key={currency} value={currency}>
-                      {currency}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <Select value={sortMode} onValueChange={(value) => setSortMode(value as CalendarSortMode)}>
+              <SelectTrigger className="rounded-full h-8 px-4 text-xs w-auto">
+                <SelectValue placeholder="Sort By" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="impact">Sort by Impact</SelectItem>
+                <SelectItem value="time">Sort by Time</SelectItem>
+              </SelectContent>
+            </Select>
 
-              <Select value={sortMode} onValueChange={(value) => setSortMode(value as CalendarSortMode)}>
-                <SelectTrigger className="w-[160px] h-9">
-                  <SelectValue placeholder="Sort By" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="impact">Sort by Impact</SelectItem>
-                  <SelectItem value="time">Sort by Time</SelectItem>
-                </SelectContent>
-              </Select>
+            <Select
+              value={String(visibleCount)}
+              onValueChange={(value) => {
+                setVisibleCount(Number(value) as VisibleCount);
+                if (value !== "999") {
+                  setShowAllEvents(false);
+                }
+              }}
+            >
+              <SelectTrigger className="rounded-full h-8 px-4 text-xs w-auto">
+                <SelectValue placeholder="Show" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="6">Show 6</SelectItem>
+                <SelectItem value="10">Show 10</SelectItem>
+                <SelectItem value="20">Show 20</SelectItem>
+                <SelectItem value="999">Show All</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-              <Select
-                value={String(visibleCount)}
-                onValueChange={(value) => {
-                  setVisibleCount(Number(value) as VisibleCount);
-                  if (value !== "999") {
-                    setShowAllEvents(false);
-                  }
-                }}
-              >
-                <SelectTrigger className="w-[120px] h-9">
-                  <SelectValue placeholder="Show" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="6">Show 6</SelectItem>
-                  <SelectItem value="10">Show 10</SelectItem>
-                  <SelectItem value="20">Show 20</SelectItem>
-                  <SelectItem value="999">Show All</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Button variant="outline" size="sm" className="h-9" disabled>
-                <Filter className="h-4 w-4 mr-2" />
-                Filters Active
-              </Button>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <div className="px-3 py-2 rounded-full border bg-muted/30 min-w-[108px]">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-semibold">{counts.total}</span>
-                  <span className="text-xs text-muted-foreground">Visible Events</span>
-                </div>
-              </div>
-
-              <div className="px-3 py-2 rounded-full border bg-muted/30 min-w-[108px]">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-semibold">{counts.high}</span>
-                  <span className="text-xs text-muted-foreground">High Impact</span>
-                </div>
-              </div>
-
-              <div className="px-3 py-2 rounded-full border bg-muted/30 min-w-[108px]">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-semibold">{counts.medium}</span>
-                  <span className="text-xs text-muted-foreground">Medium Impact</span>
-                </div>
-              </div>
-
-              <div className="px-3 py-2 rounded-full border bg-muted/30 min-w-[108px]">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-semibold">{counts.low}</span>
-                  <span className="text-xs text-muted-foreground">Low Impact</span>
-                </div>
+          <div className="flex flex-wrap gap-3">
+            <div className="px-3 py-2 rounded-full border bg-muted/30 min-w-[108px]">
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-semibold">{counts.total}</span>
+                <span className="text-xs text-muted-foreground">Visible Events</span>
               </div>
             </div>
-          </CardContent>
-        </Card>
+
+            <div className="px-3 py-2 rounded-full border bg-muted/30 min-w-[108px]">
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-semibold">{counts.high}</span>
+                <span className="text-xs text-muted-foreground">High Impact</span>
+              </div>
+            </div>
+
+            <div className="px-3 py-2 rounded-full border bg-muted/30 min-w-[108px]">
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-semibold">{counts.medium}</span>
+                <span className="text-xs text-muted-foreground">Medium Impact</span>
+              </div>
+            </div>
+
+            <div className="px-3 py-2 rounded-full border bg-muted/30 min-w-[108px]">
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-semibold">{counts.low}</span>
+                <span className="text-xs text-muted-foreground">Low Impact</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
