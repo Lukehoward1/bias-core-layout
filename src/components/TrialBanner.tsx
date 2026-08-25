@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { createPortalSession } from "@/lib/stripe";
 
 const DISMISS_KEY = "trial_banner_dismissed_v2";
 
 export function TrialBanner() {
+  const { session } = useAuth();
   const { isTrial, trialEndsAt, stripeCustomerId } = useSubscription();
   const [dismissed, setDismissed] = useState(
     () => localStorage.getItem(DISMISS_KEY) === "1",
@@ -27,9 +30,16 @@ export function TrialBanner() {
 
   async function handleManageTrial() {
     if (!stripeCustomerId) return;
+    if (!session?.access_token) {
+      toast.error("Session expired. Please sign in again.");
+      return;
+    }
     setPortalLoading(true);
     try {
-      await createPortalSession(stripeCustomerId);
+      await createPortalSession(session.access_token);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to open billing portal.";
+      toast.error(message);
     } finally {
       setPortalLoading(false);
     }
