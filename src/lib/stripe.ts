@@ -35,7 +35,10 @@ export async function createPortalSession(token: string): Promise<void> {
   if (data.url) window.location.href = data.url;
 }
 
-// ── Subscription management (dedicated endpoints, JWT-authed) ────────────────
+// ── Subscription management (single consolidated endpoint) ───────────────────
+// Backed by api/subscription.ts, which dispatches on method + body.action.
+// Consolidated into one function to stay under Vercel's Hobby-tier
+// serverless function count limit; the client-side surface is unchanged.
 
 export interface SubscriptionState {
   tier: "standard" | "pro" | "founding_member" | null;
@@ -53,14 +56,14 @@ export interface SubscriptionState {
   } | null;
 }
 
-async function jsonFetch<T>(url: string, token: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(url, {
-    ...init,
+async function subscriptionApi<T>(token: string, body?: Record<string, unknown>): Promise<T> {
+  const res = await fetch("/api/subscription", {
+    method: body ? "POST" : "GET",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
-      ...(init.headers ?? {}),
     },
+    body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json() as T & { error?: string };
   if (!res.ok || data.error) throw new Error(data.error ?? `Request failed (${res.status})`);
@@ -68,25 +71,22 @@ async function jsonFetch<T>(url: string, token: string, init: RequestInit = {}):
 }
 
 export function fetchSubscriptionState(token: string): Promise<SubscriptionState> {
-  return jsonFetch<SubscriptionState>("/api/subscription-state", token, { method: "GET" });
+  return subscriptionApi<SubscriptionState>(token);
 }
 
 export function scheduleSubscriptionChange(
   token: string,
   targetPriceId: string,
 ): Promise<{ scheduleId: string; effectiveAt: string }> {
-  return jsonFetch("/api/schedule-subscription-change", token, {
-    method: "POST",
-    body: JSON.stringify({ targetPriceId }),
-  });
+  return subscriptionApi(token, { action: "schedule_change", targetPriceId });
 }
 
 export function cancelScheduledChange(token: string): Promise<{ released: true }> {
-  return jsonFetch("/api/cancel-scheduled-change", token, { method: "POST" });
+  return subscriptionApi(token, { action: "cancel_scheduled" });
 }
 
 export function reactivateSubscription(token: string): Promise<{ reactivated: true; status: string }> {
-  return jsonFetch("/api/reactivate-subscription", token, { method: "POST" });
+  return subscriptionApi(token, { action: "reactivate" });
 }
 
 export function cancelSubscription(
@@ -94,8 +94,5 @@ export function cancelSubscription(
   reason: string,
   feedbackText?: string,
 ): Promise<{ cancelled: true; accessUntil: string | null }> {
-  return jsonFetch("/api/cancel-subscription", token, {
-    method: "POST",
-    body: JSON.stringify({ reason, feedback_text: feedbackText }),
-  });
+  return subscriptionApi(token, { action: "cancel", reason, feedback_text: feedbackText });
 }
