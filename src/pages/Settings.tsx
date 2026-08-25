@@ -154,12 +154,24 @@ export default function Settings() {
     if (!pinSet) setPinEnabled(false);
   };
 
+  const { user, session } = useAuth();
+
   const handleManageBilling = useCallback(async () => {
     if (!stripeCustomerId) { navigate("/pricing"); return; }
+    if (!session?.access_token) {
+      toast.error("Session expired. Please sign in again.");
+      return;
+    }
     setPortalLoading(true);
-    try { await createPortalSession(stripeCustomerId); }
-    finally { setPortalLoading(false); }
-  }, [stripeCustomerId, navigate]);
+    try {
+      await createPortalSession(session.access_token);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to open billing portal.";
+      toast.error(message);
+    } finally {
+      setPortalLoading(false);
+    }
+  }, [stripeCustomerId, session, navigate]);
 
   const planOptions: { value: string | null; label: string; color: string }[] = [
     { value: null, label: "None (Free)", color: "bg-muted text-muted-foreground" },
@@ -169,7 +181,6 @@ export default function Settings() {
   ];
 
   // ── Account Settings state ───────────────────────────────────────────────────
-  const { user } = useAuth();
   const [fullName, setFullName] = useState("");
   const [nameLoading, setNameLoading] = useState(false);
 
@@ -574,26 +585,37 @@ export default function Settings() {
                   )}
                 </div>
               </div>
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={portalLoading}
-                  onClick={handleManageBilling}
-                >
-                  {portalLoading ? "Loading…" : "Manage Subscription"}
+              {!subscriptionStatus || subscriptionStatus === "inactive" || subscriptionStatus === "cancelled" ? (
+                <Button size="sm" onClick={() => navigate("/pricing")}>
+                  Choose a Plan
                 </Button>
-                {subscriptionTier === "standard" && (
-                  <Button size="sm" onClick={() => navigate("/pricing")}>
-                    Upgrade to Pro
+              ) : (
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => navigate("/settings/subscription")}
+                  >
+                    Manage Subscription
                   </Button>
-                )}
-                {!subscriptionStatus || subscriptionStatus === "inactive" || subscriptionStatus === "cancelled" ? (
-                  <Button size="sm" onClick={() => navigate("/pricing")}>
-                    Choose a Plan
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={portalLoading}
+                    onClick={handleManageBilling}
+                  >
+                    {portalLoading ? "Loading…" : "Manage Billing"}
                   </Button>
-                ) : null}
-              </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={() => navigate("/settings/cancel")}
+                  >
+                    Cancel Subscription
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
