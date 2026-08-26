@@ -219,21 +219,24 @@ export default function ManageSubscription() {
               </div>
             )}
 
-            {/* Cancel-at-period-end banner */}
+            {/* Cancel-at-period-end banner — slim inline bar (mirrors pending-change banner above) */}
             {state.cancelAtPeriodEnd && (
-              <Card className="border-warning/40 bg-warning/5">
-                <CardContent className="pt-6 flex flex-wrap items-center justify-between gap-3">
-                  <div className="text-sm">
-                    <p className="font-medium text-foreground">Subscription set to cancel</p>
-                    <p className="text-muted-foreground">
-                      You'll keep access until {formatDate(state.currentPeriodEnd)}. Change your mind?
-                    </p>
-                  </div>
-                  <Button size="sm" disabled={actionLoading} onClick={handleReactivate}>
-                    Reactivate
-                  </Button>
-                </CardContent>
-              </Card>
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-warning/10 border border-warning/20 rounded-md px-4 py-2.5 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground">Subscription set to cancel</p>
+                  <p className="text-muted-foreground text-xs">
+                    You'll keep access until {formatDate(state.currentPeriodEnd)}. Change your mind?
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  className="h-7 px-3 text-xs shrink-0"
+                  disabled={actionLoading}
+                  onClick={handleReactivate}
+                >
+                  Reactivate
+                </Button>
+              </div>
             )}
 
             {/* Plan comparison */}
