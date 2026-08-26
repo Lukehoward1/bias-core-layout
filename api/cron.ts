@@ -224,6 +224,150 @@ async function handleOrphanDetect(supabase: ReturnType<typeof makeSupabase>, res
   return res.status(200).json({ swept: totalOrphaned, deployedTotal: connections.length });
 }
 
+// ── cancellation-digest ───────────────────────────────────────────────────────
+// Runs weekly (Fridays 08:00 UTC). Aggregates cancellation_feedback from the
+// last 7 days into a summary: reason breakdown (table) + full list of any
+// free-text feedback entries. Complements the real-time per-cancellation
+// alerts fired by api/subscription.ts:handleCancel.
+
+interface CancellationRow {
+  user_id: string;
+  tier_at_cancellation: string;
+  cadence_at_cancellation: string | null;
+  reason: string;
+  feedback_text: string | null;
+  created_at: string;
+}
+
+const REASON_LABELS: Record<string, string> = {
+  too_expensive:       "Too expensive",
+  not_using_enough:    "Not using it enough",
+  missing_feature:     "Missing a feature",
+  switched_competitor: "Switched to a competitor",
+  technical_issues:    "Technical issues",
+  other:               "Other",
+};
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+async function handleCancellationDigest(supabase: ReturnType<typeof makeSupabase>, res: VercelResponse) {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data: rows, error } = await supabase
+    .from("cancellation_feedback")
+    .select("user_id, tier_at_cancellation, cadence_at_cancellation, reason, feedback_text, created_at")
+    .gte("created_at", sevenDaysAgo)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("[cron/cancellation-digest] failed to query feedback:", error.message);
+    return res.status(500).json({ error: error.message });
+  }
+
+  const cancellations = (rows ?? []) as CancellationRow[];
+
+  // Map user_ids → emails, matching orphan-detect's listUsers pattern.
+  const { data: { users: authUsers }, error: authErr } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+  if (authErr) {
+    console.error("[cron/cancellation-digest] failed to list auth users:", authErr.message);
+  }
+  const emailById = new Map<string, string>();
+  for (const u of authUsers ?? []) {
+    if (u.email) emailById.set(u.id, u.email);
+  }
+
+  // Group + count by reason.
+  const countByReason = new Map<string, number>();
+  for (const c of cancellations) {
+    countByReason.set(c.reason, (countByReason.get(c.reason) ?? 0) + 1);
+  }
+  const reasonRows = [...countByReason.entries()].sort((a, b) => b[1] - a[1]);
+
+  const feedbackEntries = cancellations.filter((c) => c.feedback_text && c.feedback_text.trim().length > 0);
+
+  try {
+    const resend = new Resend(process.env.RESEND_API_KEY!);
+
+    const reasonTable = reasonRows
+      .map(
+        ([reason, count]) =>
+          `<tr style="border-bottom:1px solid #262626">
+            <td style="padding:8px 12px;font-size:12px;color:#e5e5e5">${escapeHtml(REASON_LABELS[reason] ?? reason)}</td>
+            <td style="padding:8px 12px;font-size:12px;color:#fafafa;text-align:right;font-weight:600">${count}</td>
+          </tr>`,
+      )
+      .join("");
+
+    const feedbackBlocks = feedbackEntries
+      .map(
+        (c) => `
+      <div style="margin:0 0 12px;padding:12px 16px;background:#0f0f0f;border:1px solid #262626;border-radius:6px">
+        <p style="margin:0 0 6px;font-size:11px;color:#525252">
+          ${escapeHtml(emailById.get(c.user_id) ?? "(unknown user)")} · ${escapeHtml(c.tier_at_cancellation)} · ${escapeHtml(REASON_LABELS[c.reason] ?? c.reason)} · ${new Date(c.created_at).toUTCString()}
+        </p>
+        <div style="font-size:13px;color:#e5e5e5;line-height:1.6;white-space:pre-wrap">${escapeHtml(c.feedback_text ?? "")}</div>
+      </div>`,
+      )
+      .join("");
+
+    const subject = cancellations.length === 0
+      ? "[BIAS] Weekly cancellations: none this week"
+      : `[BIAS] Weekly cancellations: ${cancellations.length} in the last 7 days`;
+
+    await resend.emails.send({
+      from: "BIAS Alerts <alerts@streambias.com>",
+      to: ADMIN_EMAIL,
+      subject,
+      html: `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#e5e5e5">
+  <div style="max-width:720px;margin:40px auto;padding:0 16px">
+    <div style="background:#141414;border:1px solid #262626;border-radius:12px;padding:32px">
+      <h1 style="margin:0 0 4px;font-size:18px;font-weight:600;color:#fafafa">Weekly cancellation digest</h1>
+      <p style="margin:0 0 24px;font-size:13px;color:#525252">${new Date().toUTCString()} · Last 7 days</p>
+      ${
+        cancellations.length === 0
+          ? `<p style="margin:0 0 24px;font-size:14px;color:#22c55e">✓ No cancellations in the last 7 days.</p>`
+          : `<p style="margin:0 0 16px;font-size:14px;color:#e5e5e5">${cancellations.length} cancellation${cancellations.length === 1 ? "" : "s"} recorded.</p>`
+      }
+      ${
+        reasonRows.length === 0
+          ? ""
+          : `<h2 style="margin:0 0 12px;font-size:14px;font-weight:600;color:#a3a3a3;text-transform:uppercase;letter-spacing:0.05em">Reason breakdown</h2>
+             <table style="width:100%;border-collapse:collapse;border:1px solid #262626;border-radius:8px;overflow:hidden;margin:0 0 24px">
+               <thead>
+                 <tr style="background:#1a1a1a">
+                   <th style="padding:8px 12px;font-size:11px;color:#737373;text-align:left;font-weight:500">Reason</th>
+                   <th style="padding:8px 12px;font-size:11px;color:#737373;text-align:right;font-weight:500">Count</th>
+                 </tr>
+               </thead>
+               <tbody>${reasonTable}</tbody>
+             </table>`
+      }
+      ${
+        feedbackEntries.length === 0
+          ? ""
+          : `<h2 style="margin:0 0 12px;font-size:14px;font-weight:600;color:#a3a3a3;text-transform:uppercase;letter-spacing:0.05em">Free-text feedback (${feedbackEntries.length})</h2>
+             ${feedbackBlocks}`
+      }
+    </div>
+  </div>
+</body>
+</html>
+      `.trim(),
+    });
+  } catch (emailErr) {
+    console.error("[cron/cancellation-digest] failed to send digest email:", emailErr instanceof Error ? emailErr.message : emailErr);
+  }
+
+  return res.status(200).json({ digested: cancellations.length });
+}
+
 // ── Dispatcher ────────────────────────────────────────────────────────────────
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -234,8 +378,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const supabase = makeSupabase();
   const { job } = req.query;
 
-  if (job === "downgrade-enforce") return handleDowngradeEnforce(supabase, res);
-  if (job === "orphan-detect")     return handleOrphanDetect(supabase, res);
+  if (job === "downgrade-enforce")   return handleDowngradeEnforce(supabase, res);
+  if (job === "orphan-detect")       return handleOrphanDetect(supabase, res);
+  if (job === "cancellation-digest") return handleCancellationDigest(supabase, res);
 
-  return res.status(400).json({ error: "Unknown job. Use ?job=downgrade-enforce or ?job=orphan-detect" });
+  return res.status(400).json({
+    error: "Unknown job. Use ?job=downgrade-enforce, ?job=orphan-detect, or ?job=cancellation-digest",
+  });
 }

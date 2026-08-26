@@ -20,6 +20,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import Stripe from "stripe";
 import { PRICE_IDS } from "../src/lib/stripe.js";
 import { requireSubscriber, blockFoundingMember, type CallerProfile } from "./_lib/subscription-auth.js";
+import { sendCancellationAlertEmail } from "./_lib/cancellation-alert-email.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -312,6 +313,25 @@ async function handleCancel(req: VercelRequest, res: VercelResponse, ctx: Caller
     // Log but don't fail — the cancel already succeeded.
     console.error("[api/subscription cancel] feedback insert failed:", insertErr.message);
   }
+
+  // Fire-and-forget admin alert: look up the user's email and email luke@.
+  // Must NOT block or delay the response — matches sendDowngradeGraceEmail
+  // usage pattern in webhook.ts (.catch on the promise, no await).
+  (async () => {
+    const { data } = await ctx.supabase.auth.admin.getUserById(ctx.userId);
+    await sendCancellationAlertEmail({
+      userEmail: data?.user?.email ?? null,
+      tier: ctx.subscriptionTier ?? "unknown",
+      cadence,
+      reason,
+      feedbackText,
+    });
+  })().catch((err) => {
+    console.error(
+      "[api/subscription cancel] failed to send admin alert:",
+      err instanceof Error ? err.message : err,
+    );
+  });
 
   return res.status(200).json({
     cancelled: true,
