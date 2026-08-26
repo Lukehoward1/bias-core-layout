@@ -72,9 +72,9 @@ export default function Terms() {
             <strong className="text-foreground">5.1 Plans.</strong> StreamBias is offered on a subscription basis with the following tiers, as described on our Pricing page:
           </p>
           <ul className="list-disc list-inside text-muted-foreground mb-3 space-y-1 pl-2">
-            <li><strong className="text-foreground">Standard</strong> — £19/month or £190/year</li>
-            <li><strong className="text-foreground">Pro</strong> — £29/month or £290/year</li>
-            <li><strong className="text-foreground">Founding Member</strong> — £197/year, available only to the first 100 members, locked at this price for the lifetime of the subscription as long as it remains continuously active</li>
+            <li><strong className="text-foreground">Standard</strong> — £29/month or £299/year</li>
+            <li><strong className="text-foreground">Pro</strong> — £45/month or £495/year</li>
+            <li><strong className="text-foreground">Founding Member</strong> — £299/year, available only to the first 100 members, locked at this price for the lifetime of the subscription as long as it remains continuously active</li>
           </ul>
           <p className="text-muted-foreground mb-3">
             <strong className="text-foreground">5.2 Free trial.</strong> Standard and Pro plans include a 7-day free trial. A valid payment card is required to start a trial. If you do not cancel before the end of the 7-day trial period, your card will be charged the applicable subscription fee and your subscription will continue on a recurring basis until cancelled.
