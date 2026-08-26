@@ -23,7 +23,11 @@ export async function sendDowngradeGraceEmail({
     timeZoneName: "short",
   });
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://app.hfx-capital.com";
+  // Hardcoded to the real production domain — matches create-checkout-session.ts.
+  // Previous NEXT_PUBLIC_APP_URL lookup was a leftover Next.js-style env name
+  // that was never set in this Vite project, so it always fell back to a
+  // wrong domain (app.hfx-capital.com) with a nonexistent path (/settings/accounts).
+  const appUrl = "https://streambias.com";
 
   await resend.emails.send({
     from: "BIAS <alerts@streambias.com>",
@@ -46,7 +50,7 @@ export async function sendDowngradeGraceEmail({
         If you don't choose by <strong style="color:#fafafa">${deadline}</strong>,
         we'll automatically keep your primary account and disconnect the rest.
       </p>
-      <a href="${appUrl}/settings/accounts"
+      <a href="${appUrl}/settings"
          style="display:inline-block;background:#ffffff;color:#0a0a0a;font-size:14px;font-weight:600;padding:10px 20px;border-radius:6px;text-decoration:none">
         Choose account
       </a>

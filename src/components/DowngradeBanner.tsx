@@ -1,10 +1,15 @@
 import { useState } from "react";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+
+// Dismiss key is scoped to the specific deadline. A new grace period (different
+// deadline value) generates a different key, so the banner reappears — but for
+// this deadline it stays hidden across reloads and navigation.
+const dismissKeyFor = (deadlineIso: string) => `downgrade_banner_dismissed_${deadlineIso}`;
 
 export function DowngradeBanner() {
   const { downgradeGraceEndAt, downgradeNewMax, refetch } = useSubscription();
@@ -12,11 +17,17 @@ export function DowngradeBanner() {
   const { session } = useAuth();
   const [chosenId, setChosenId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [dismissed, setDismissed] = useState(() => {
+    if (!downgradeGraceEndAt) return false;
+    try { return localStorage.getItem(dismissKeyFor(downgradeGraceEndAt)) === "1"; }
+    catch { return false; }
+  });
 
   if (!downgradeGraceEndAt) return null;
 
   const deadline = new Date(downgradeGraceEndAt);
   if (deadline < new Date()) return null;
+  if (dismissed) return null;
 
   const deadlineLabel = deadline.toLocaleDateString(undefined, {
     weekday: "short",
@@ -25,6 +36,14 @@ export function DowngradeBanner() {
     hour: "2-digit",
     minute: "2-digit",
   });
+
+  function handleDismiss() {
+    // Hide the banner for this specific grace period. Doesn't resolve anything —
+    // the deadline, auto-prune-to-primary, and reminder email all still apply.
+    // Users can still resolve via Settings → Connected Accounts → Set Primary.
+    try { localStorage.setItem(dismissKeyFor(downgradeGraceEndAt!), "1"); } catch { /* ignore quota errors */ }
+    setDismissed(true);
+  }
 
   async function handleConfirm() {
     if (!chosenId || !session) return;
@@ -56,7 +75,7 @@ export function DowngradeBanner() {
     <div className="bg-destructive/10 border-b border-destructive/30 px-4 py-3 text-sm">
       <div className="flex items-start gap-3 max-w-4xl">
         <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 pr-8">
           <p className="font-semibold text-foreground mb-1">
             Action required: choose which account to keep
           </p>
@@ -96,6 +115,16 @@ export function DowngradeBanner() {
             {submitting ? "Saving…" : "Confirm selection"}
           </Button>
         </div>
+
+        <button
+          type="button"
+          onClick={handleDismiss}
+          aria-label="Dismiss banner"
+          title="Dismiss — grace period still applies"
+          className="text-muted-foreground hover:text-foreground transition-colors shrink-0 mt-0.5"
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
     </div>
   );
