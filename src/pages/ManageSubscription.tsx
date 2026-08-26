@@ -196,28 +196,27 @@ export default function ManageSubscription() {
 
         {!loading && state && isSwitchable && (
           <>
-            {/* Pending scheduled change */}
+            {/* Pending scheduled change — slim inline bar (matches TrialBanner shape) */}
             {state.pendingChange && (
-              <Card className="border-primary/40 bg-primary/5">
-                <CardContent className="pt-6 flex flex-wrap items-center justify-between gap-3">
-                  <div className="text-sm">
-                    <p className="font-medium text-foreground">
-                      Scheduled: switching to <span className="capitalize">{state.pendingChange.newTier}</span>
-                    </p>
-                    <p className="text-muted-foreground">
-                      Takes effect on {formatDate(state.pendingChange.effectiveAt)}. No charge until then.
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={actionLoading}
-                    onClick={handleCancelPending}
-                  >
-                    Cancel scheduled change
-                  </Button>
-                </CardContent>
-              </Card>
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-primary/10 border border-primary/20 rounded-md px-4 py-2.5 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground">
+                    Scheduled: switching to <span className="capitalize">{state.pendingChange.newTier}</span>
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    Takes effect on {formatDate(state.pendingChange.effectiveAt)}. No charge until then.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-3 text-xs shrink-0"
+                  disabled={actionLoading}
+                  onClick={handleCancelPending}
+                >
+                  Cancel scheduled change
+                </Button>
+              </div>
             )}
 
             {/* Cancel-at-period-end banner */}

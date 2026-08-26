@@ -46,9 +46,9 @@ export async function sendDowngradeGraceEmail({
         but your new plan allows <strong style="color:#fafafa">${newMax}</strong>.
       </p>
       <p style="margin:0 0 24px;font-size:14px;color:#a3a3a3;line-height:1.6">
-        Please visit your account settings and choose which account to keep.
-        If you don't choose by <strong style="color:#fafafa">${deadline}</strong>,
-        we'll automatically keep your primary account and disconnect the rest.
+        Go to Settings → Connected Accounts and set your preferred account as Primary.
+        If you haven't chosen by <strong style="color:#fafafa">${deadline}</strong>,
+        we'll automatically keep whichever account is currently marked Primary and disconnect the rest.
       </p>
       <a href="${appUrl}/settings"
          style="display:inline-block;background:#ffffff;color:#0a0a0a;font-size:14px;font-weight:600;padding:10px 20px;border-radius:6px;text-decoration:none">

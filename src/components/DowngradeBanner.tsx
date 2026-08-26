@@ -80,9 +80,10 @@ export function DowngradeBanner() {
             Action required: choose which account to keep
           </p>
           <p className="text-muted-foreground mb-3">
-            Your plan now allows {downgradeNewMax ?? 1} broker account. Select which account to keep
-            by <span className="font-medium text-foreground">{deadlineLabel}</span> — after that
-            we'll automatically keep your primary account and disconnect the rest.
+            Your plan now allows {downgradeNewMax ?? 1} broker account. Choose one below, or set your
+            preferred account as Primary in Settings → Connected Accounts, by{" "}
+            <span className="font-medium text-foreground">{deadlineLabel}</span> — after that we'll
+            automatically keep whichever account is marked Primary and disconnect the rest.
           </p>
 
           {accounts.length > 0 && (
