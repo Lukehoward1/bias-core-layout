@@ -1,8 +1,11 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { undeployExcessBrokerConnections } from "./_lib/undeploy.js";
 import { maxLinkedAccountsForTier } from "./_lib/tier-limits.js";
+import { sendTrialEndingEmail } from "./_lib/trial-ending-email.js";
+import { sendWinbackEmail } from "./_lib/winback-email.js";
 
 // ── Shared auth ────────────────────────────────────────────────────────────────
 
@@ -368,6 +371,147 @@ async function handleCancellationDigest(supabase: ReturnType<typeof makeSupabase
   return res.status(200).json({ digested: cancellations.length });
 }
 
+// ── trial-ending-reminder ─────────────────────────────────────────────────────
+// Runs daily (09:00 UTC). Finds trialing profiles whose trial ends within the
+// next 24h and haven't yet been reminded. Fetches the underlying Stripe price
+// to compute a live "£X/month|year" amount label so the copy is accurate.
+// Marks each profile as reminded on success; per-user failures are logged but
+// don't abort the batch (matches handleDowngradeEnforce's style).
+
+async function handleTrialEndingReminder(supabase: ReturnType<typeof makeSupabase>, res: VercelResponse) {
+  const now = new Date();
+  const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+  const { data: profiles, error } = await supabase
+    .from("profiles")
+    .select("id, email, full_name, stripe_subscription_id, trial_ends_at")
+    .eq("subscription_status", "trialing")
+    .not("trial_ends_at", "is", null)
+    .gte("trial_ends_at", now.toISOString())
+    .lte("trial_ends_at", in24h.toISOString())
+    .is("trial_reminder_sent_at", null);
+
+  if (error) {
+    console.error("[cron/trial-ending-reminder] failed to query profiles:", error.message);
+    return res.status(500).json({ error: error.message });
+  }
+
+  if (!profiles?.length) {
+    return res.status(200).json({ sent: 0 });
+  }
+
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+  let sent = 0;
+
+  for (const profile of profiles) {
+    if (!profile.email) {
+      console.error(`[cron/trial-ending-reminder] user ${profile.id} has no email — skipping`);
+      continue;
+    }
+
+    // Best-effort price lookup: on any Stripe error, fall back to a generic
+    // amount label rather than skip the whole send — user still gets the
+    // reminder, just with less-specific copy.
+    let amountLabel = "your plan price";
+    try {
+      if (profile.stripe_subscription_id) {
+        const subscription = await stripe.subscriptions.retrieve(profile.stripe_subscription_id);
+        const price = subscription.items?.data?.[0]?.price;
+        if (price?.unit_amount != null && price.recurring?.interval) {
+          amountLabel = `£${(price.unit_amount / 100).toFixed(2)}/${price.recurring.interval}`;
+        }
+      }
+    } catch (priceErr) {
+      console.error(
+        `[cron/trial-ending-reminder] price lookup failed for user ${profile.id}:`,
+        priceErr instanceof Error ? priceErr.message : priceErr,
+      );
+    }
+
+    try {
+      await sendTrialEndingEmail({
+        to: profile.email,
+        fullName: profile.full_name ?? null,
+        trialEndsAt: profile.trial_ends_at ? new Date(profile.trial_ends_at) : null,
+        amountLabel,
+      });
+      await supabase
+        .from("profiles")
+        .update({ trial_reminder_sent_at: new Date().toISOString() })
+        .eq("id", profile.id);
+      sent++;
+      console.log(`[cron/trial-ending-reminder] sent to user ${profile.id}`);
+    } catch (sendErr) {
+      console.error(
+        `[cron/trial-ending-reminder] send failed for user ${profile.id}:`,
+        sendErr instanceof Error ? sendErr.message : sendErr,
+      );
+    }
+  }
+
+  return res.status(200).json({ sent });
+}
+
+// ── winback ──────────────────────────────────────────────────────────────────
+// Runs daily (10:00 UTC). Finds cancelled profiles whose cancellation lands
+// between 3 and 4 days ago (so each user hits exactly once) and haven't yet
+// been sent the winback. Marks each profile as sent on success; per-user
+// failures are logged but don't abort the batch.
+
+async function handleWinback(supabase: ReturnType<typeof makeSupabase>, res: VercelResponse) {
+  const now = Date.now();
+  const fourDaysAgo  = new Date(now - 4 * 24 * 60 * 60 * 1000);
+  const threeDaysAgo = new Date(now - 3 * 24 * 60 * 60 * 1000);
+
+  const { data: profiles, error } = await supabase
+    .from("profiles")
+    .select("id, email, full_name, cancelled_at")
+    .eq("subscription_status", "cancelled")
+    .not("cancelled_at", "is", null)
+    .gte("cancelled_at", fourDaysAgo.toISOString())
+    .lte("cancelled_at", threeDaysAgo.toISOString())
+    .is("winback_sent_at", null);
+
+  if (error) {
+    console.error("[cron/winback] failed to query profiles:", error.message);
+    return res.status(500).json({ error: error.message });
+  }
+
+  if (!profiles?.length) {
+    return res.status(200).json({ sent: 0 });
+  }
+
+  let sent = 0;
+
+  for (const profile of profiles) {
+    if (!profile.email) {
+      console.error(`[cron/winback] user ${profile.id} has no email — skipping`);
+      continue;
+    }
+
+    try {
+      await sendWinbackEmail({
+        to: profile.email,
+        fullName: profile.full_name ?? null,
+        cancelledAt: profile.cancelled_at ? new Date(profile.cancelled_at) : null,
+      });
+      await supabase
+        .from("profiles")
+        .update({ winback_sent_at: new Date().toISOString() })
+        .eq("id", profile.id);
+      sent++;
+      console.log(`[cron/winback] sent to user ${profile.id}`);
+    } catch (sendErr) {
+      console.error(
+        `[cron/winback] send failed for user ${profile.id}:`,
+        sendErr instanceof Error ? sendErr.message : sendErr,
+      );
+    }
+  }
+
+  return res.status(200).json({ sent });
+}
+
 // ── Dispatcher ────────────────────────────────────────────────────────────────
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -378,11 +522,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const supabase = makeSupabase();
   const { job } = req.query;
 
-  if (job === "downgrade-enforce")   return handleDowngradeEnforce(supabase, res);
-  if (job === "orphan-detect")       return handleOrphanDetect(supabase, res);
-  if (job === "cancellation-digest") return handleCancellationDigest(supabase, res);
+  if (job === "downgrade-enforce")     return handleDowngradeEnforce(supabase, res);
+  if (job === "orphan-detect")         return handleOrphanDetect(supabase, res);
+  if (job === "cancellation-digest")   return handleCancellationDigest(supabase, res);
+  if (job === "trial-ending-reminder") return handleTrialEndingReminder(supabase, res);
+  if (job === "winback")               return handleWinback(supabase, res);
 
   return res.status(400).json({
-    error: "Unknown job. Use ?job=downgrade-enforce, ?job=orphan-detect, or ?job=cancellation-digest",
+    error: "Unknown job. Use ?job=downgrade-enforce, ?job=orphan-detect, ?job=cancellation-digest, ?job=trial-ending-reminder, or ?job=winback",
   });
 }

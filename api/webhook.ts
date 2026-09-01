@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { PRICE_IDS } from "../src/lib/stripe.js";
 import { undeployExcessBrokerConnections } from "./_lib/undeploy.js";
 import { sendDowngradeGraceEmail } from "./_lib/downgrade-email.js";
+import { sendWelcomeEmail } from "./_lib/welcome-email.js";
 import { maxLinkedAccountsForTier } from "./_lib/tier-limits.js";
 
 export const config = { api: { bodyParser: false } };
@@ -73,6 +74,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           updated_at: new Date().toISOString(),
         }, { onConflict: "id" });
         if (upsertError) console.error("Profile upsert error:", JSON.stringify(upsertError));
+
+        // Fire-and-forget welcome email — trials only (Standard/Pro),
+        // deliberately excludes Founding Member which has no trial. IIFE so we
+        // can also write welcome_email_sent_at after a successful send, mirroring
+        // the trial_reminder_sent_at / winback_sent_at pattern in cron.ts.
+        // .catch preserves fire-and-forget semantics — never awaited.
+        if (subscription.status === "trialing" && session.customer_email) {
+          (async () => {
+            await sendWelcomeEmail({
+              to: session.customer_email!,
+              trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+            });
+            await supabase
+              .from("profiles")
+              .update({ welcome_email_sent_at: new Date().toISOString() })
+              .eq("id", userId);
+          })().catch((err) =>
+            console.error("[webhook] failed to send welcome email:", err instanceof Error ? err.message : err),
+          );
+        }
         break;
       }
 
@@ -163,6 +184,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         await supabase.from("profiles").update({
           subscription_status: "cancelled",
+          cancelled_at: new Date().toISOString(),
           // Clear any pending grace period — subscription is gone, undeploy immediately
           downgrade_grace_end_at: null,
           downgrade_new_max: null,
