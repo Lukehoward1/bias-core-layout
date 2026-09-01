@@ -58,7 +58,11 @@ export async function sendTrialEndingEmail({
         <p style="font-size:13px;color:#7a7a7a;line-height:1.6;margin:0 0 4px;">Nothing to do — access continues automatically on ${dateFragment} at ${amountFragment}.</p>
         <p style="font-size:13px;color:#7a7a7a;line-height:1.6;margin:0 0 26px;">Want to make changes first? <a href="${APP_URL}/settings" style="color:#0092ce;text-decoration:underline;">Manage your subscription</a>.</p>`;
 
-  await resend.emails.send({
+  // Resend SDK resolves with { data, error } on API-level failures instead of
+  // throwing — check the error field so real failures propagate to the
+  // caller's try/catch and trial_reminder_sent_at only gets written when the
+  // email actually sent.
+  const { error } = await resend.emails.send({
     from: "StreamBias <team@streambias.com>",
     to,
     subject: "No more manual entry, starting tomorrow",
@@ -72,4 +76,7 @@ export async function sendTrialEndingEmail({
       ctaHref: `${APP_URL}/dashboard`,
     }),
   });
+  if (error) {
+    throw new Error(`Resend error: ${error.message ?? JSON.stringify(error)}`);
+  }
 }

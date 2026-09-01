@@ -314,10 +314,11 @@ async function handleCancel(req: VercelRequest, res: VercelResponse, ctx: Caller
     console.error("[api/subscription cancel] feedback insert failed:", insertErr.message);
   }
 
-  // Fire-and-forget admin alert: look up the user's email and email luke@.
-  // Must NOT block or delay the response — matches sendDowngradeGraceEmail
-  // usage pattern in webhook.ts (.catch on the promise, no await).
-  (async () => {
+  // Awaited inline admin alert (NOT fire-and-forget) — same freeze-after-
+  // response risk we hit with the welcome email in webhook.ts. Own try/catch
+  // so a Resend failure never fails the user's actual cancellation, which
+  // must always return 200 regardless of whether the internal alert lands.
+  try {
     const { data } = await ctx.supabase.auth.admin.getUserById(ctx.userId);
     await sendCancellationAlertEmail({
       userEmail: data?.user?.email ?? null,
@@ -326,12 +327,12 @@ async function handleCancel(req: VercelRequest, res: VercelResponse, ctx: Caller
       reason,
       feedbackText,
     });
-  })().catch((err) => {
+  } catch (err) {
     console.error(
       "[api/subscription cancel] failed to send admin alert:",
       err instanceof Error ? err.message : err,
     );
-  });
+  }
 
   return res.status(200).json({
     cancelled: true,

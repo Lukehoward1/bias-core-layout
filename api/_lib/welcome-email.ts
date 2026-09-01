@@ -41,7 +41,11 @@ ${checklistItemHtml(
 )}
         <div style="height:26px;"></div>`;
 
-  await resend.emails.send({
+  // Resend SDK resolves with { data, error } on API-level failures instead of
+  // throwing (e.g. rate limit, unverified recipient, invalid HTML) — check the
+  // error field so real failures propagate to the caller's try/catch and
+  // welcome_email_sent_at only gets written when the email actually sent.
+  const { error } = await resend.emails.send({
     from: "StreamBias <team@streambias.com>",
     to,
     subject: "Your edge starts now",
@@ -54,4 +58,7 @@ ${checklistItemHtml(
       ctaHref: `${APP_URL}/dashboard`,
     }),
   });
+  if (error) {
+    throw new Error(`Resend error: ${error.message ?? JSON.stringify(error)}`);
+  }
 }

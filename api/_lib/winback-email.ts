@@ -43,7 +43,11 @@ export async function sendWinbackEmail({
 
         <p style="font-size:13px;color:#4a4a4a;line-height:1.6;margin:24px 0 26px;">Come back anytime — everything you built is exactly where you left it.</p>`;
 
-  await resend.emails.send({
+  // Resend SDK resolves with { data, error } on API-level failures instead of
+  // throwing — check the error field so real failures propagate to the
+  // caller's try/catch and winback_sent_at only gets written when the email
+  // actually sent.
+  const { error } = await resend.emails.send({
     from: "StreamBias <team@streambias.com>",
     to,
     subject: "Pick up right where you left off",
@@ -57,4 +61,7 @@ export async function sendWinbackEmail({
       ctaHref: `${APP_URL}/pricing`,
     }),
   });
+  if (error) {
+    throw new Error(`Resend error: ${error.message ?? JSON.stringify(error)}`);
+  }
 }

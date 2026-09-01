@@ -75,24 +75,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }, { onConflict: "id" });
         if (upsertError) console.error("Profile upsert error:", JSON.stringify(upsertError));
 
-        // Fire-and-forget welcome email — trials only (Standard/Pro),
-        // deliberately excludes Founding Member which has no trial. IIFE so we
-        // can also write welcome_email_sent_at after a successful send, mirroring
-        // the trial_reminder_sent_at / winback_sent_at pattern in cron.ts.
-        // .catch preserves fire-and-forget semantics — never awaited.
+        // Welcome email — trials only (Standard/Pro), excludes Founding Member
+        // (no trial). Awaited inline (NOT fire-and-forget) because Vercel
+        // freezes the function context after res.status(200), and the previous
+        // IIFE version silently orphaned the pending Resend fetch mid-flight —
+        // welcome_email_sent_at stayed null and no email landed.
+        //
+        // Wrapped in its own try/catch so a Resend failure doesn't propagate
+        // to the outer 500 handler — that would make Stripe retry the whole
+        // webhook and duplicate the profile upsert.
         if (subscription.status === "trialing" && session.customer_email) {
-          (async () => {
+          try {
             await sendWelcomeEmail({
-              to: session.customer_email!,
+              to: session.customer_email,
               trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
             });
             await supabase
               .from("profiles")
               .update({ welcome_email_sent_at: new Date().toISOString() })
               .eq("id", userId);
-          })().catch((err) =>
-            console.error("[webhook] failed to send welcome email:", err instanceof Error ? err.message : err),
-          );
+          } catch (err) {
+            console.error(
+              "[webhook] welcome email send failed:",
+              err instanceof Error ? err.message : err,
+            );
+          }
         }
         break;
       }
@@ -151,16 +158,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               downgrade_account_chosen: null,
             }).eq("id", row.id);
 
-            // Send email notification (fire-and-forget — don't block the 200)
+            // Awaited inline (NOT fire-and-forget) — same freeze-after-response
+            // risk we hit with the welcome email. Own try/catch so a Resend
+            // failure doesn't propagate to the outer 500 handler → Stripe
+            // webhook retry → duplicate downgrade-grace-period writes.
             if (row.email) {
-              sendDowngradeGraceEmail({
-                to: row.email,
-                graceEndAt,
-                accountCount: count,
-                newMax,
-              }).catch((err) =>
-                console.error("[webhook] failed to send downgrade grace email:", err.message),
-              );
+              try {
+                await sendDowngradeGraceEmail({
+                  to: row.email,
+                  graceEndAt,
+                  accountCount: count,
+                  newMax,
+                });
+              } catch (err) {
+                console.error(
+                  "[webhook] failed to send downgrade grace email:",
+                  err instanceof Error ? err.message : err,
+                );
+              }
             }
 
             console.log(`[webhook] downgrade grace period written for user ${row.id} (max=${newMax}, expires=${graceEndAt.toISOString()})`);
