@@ -46,15 +46,23 @@ function AppLayoutInner() {
         </main>
       </div>
 
-      {/* Onboarding — must be completed before using the app */}
-      <OnboardingModal />
-
       {/* Lock screen ALWAYS on top */}
       {isLocked && (
         <div className="fixed inset-0 z-[9999] pointer-events-auto">
           <LockScreen />
         </div>
       )}
+
+      {/* Onboarding — must be completed before using the app, but ONLY once
+          the user has unlocked. Rendering both simultaneously would silently
+          soft-lock a fresh signup: Radix Dialog calls `hideOthers` from the
+          aria-hidden package on every body-level sibling of its portal
+          (react-dialog/dist/index.mjs imports it directly), which applies
+          `inert` to LockScreen's own body-level portal host. LockScreen then
+          renders visually on top at z-9999 but can't receive a single click,
+          because Radix has turned its DOM subtree inert. Order matters here —
+          unlock first, then onboarding. */}
+      {!isLocked && <OnboardingModal />}
     </div>
   );
 }

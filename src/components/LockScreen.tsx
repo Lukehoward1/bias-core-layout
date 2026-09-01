@@ -150,7 +150,7 @@ function getRelevantCurrencies(symbols: string[]) {
 }
 
 export function LockScreen() {
-  const { isLocked, unlock, pinEnabled, pinSet } = useSessionLock();
+  const { isLocked, unlock } = useSessionLock();
   const { watchlistAssets } = useWatchlist();
 
   const [now, setNow] = useState(() => new Date());
@@ -289,19 +289,15 @@ export function LockScreen() {
             </div>
           </div>
 
-          <div className="pt-2 space-y-2">
-            <Button
-              onClick={() => unlock(undefined)}
-              className="px-10"
-              disabled={pinEnabled && pinSet}
-              title={pinEnabled && pinSet ? "PIN is enabled — PIN entry can be added next." : "Unlock"}
-            >
+          <div className="pt-2">
+            {/* Unlock is unconditional: PIN entry UI has never been built
+                (the toggle in Settings sets pinEnabled but there's nowhere
+                to enter a PIN), so gating Unlock on `pinEnabled && pinSet`
+                permanently soft-locked anyone who flipped that toggle.
+                Until PIN entry actually exists, this button just unlocks. */}
+            <Button onClick={() => unlock(undefined)} className="px-10">
               Unlock
             </Button>
-
-            {pinEnabled && pinSet && (
-              <div className="text-xs text-muted-foreground">PIN is enabled. PIN entry UI can be added here next.</div>
-            )}
           </div>
         </div>
 
