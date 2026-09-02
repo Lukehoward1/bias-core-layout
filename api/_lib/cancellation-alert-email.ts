@@ -36,7 +36,7 @@ export async function sendCancellationAlertEmail({
     ? `<div style="margin:0;padding:12px 16px;background:#0f0f0f;border:1px solid #262626;border-radius:6px;font-size:13px;color:#e5e5e5;line-height:1.6;white-space:pre-wrap">${escapeHtml(feedbackText)}</div>`
     : `<p style="margin:0;font-size:13px;color:#525252;font-style:italic">No feedback provided.</p>`;
 
-  await resend.emails.send({
+  const { error } = await resend.emails.send({
     from: "BIAS Alerts <alerts@streambias.com>",
     to: "luke@hfx-capital.com",
     subject: `[BIAS] Cancellation: ${reasonLabel}`,
@@ -79,6 +79,9 @@ export async function sendCancellationAlertEmail({
 </html>
     `.trim(),
   });
+  if (error) {
+    throw new Error(`Resend error: ${error.message ?? JSON.stringify(error)}`);
+  }
 }
 
 // Minimal HTML escape for values that could contain user-supplied text.

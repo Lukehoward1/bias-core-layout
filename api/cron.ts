@@ -182,7 +182,7 @@ async function handleOrphanDetect(supabase: ReturnType<typeof makeSupabase>, res
       ? `[BIAS] Orphan sweep: ${totalOrphaned} account${totalOrphaned === 1 ? "" : "s"} undeployed`
       : "[BIAS] Orphan sweep: all clear";
 
-    await resend.emails.send({
+    const { error: resendError } = await resend.emails.send({
       from: "BIAS Alerts <alerts@streambias.com>",
       to: ADMIN_EMAIL,
       subject,
@@ -220,6 +220,9 @@ async function handleOrphanDetect(supabase: ReturnType<typeof makeSupabase>, res
 </html>
       `.trim(),
     });
+    if (resendError) {
+      throw new Error(`Resend error: ${resendError.message ?? JSON.stringify(resendError)}`);
+    }
   } catch (emailErr) {
     console.error("[cron/orphan-detect] failed to send summary email:", emailErr instanceof Error ? emailErr.message : emailErr);
   }
@@ -320,7 +323,7 @@ async function handleCancellationDigest(supabase: ReturnType<typeof makeSupabase
       ? "[BIAS] Weekly cancellations: none this week"
       : `[BIAS] Weekly cancellations: ${cancellations.length} in the last 7 days`;
 
-    await resend.emails.send({
+    const { error: resendError } = await resend.emails.send({
       from: "BIAS Alerts <alerts@streambias.com>",
       to: ADMIN_EMAIL,
       subject,
@@ -364,6 +367,9 @@ async function handleCancellationDigest(supabase: ReturnType<typeof makeSupabase
 </html>
       `.trim(),
     });
+    if (resendError) {
+      throw new Error(`Resend error: ${resendError.message ?? JSON.stringify(resendError)}`);
+    }
   } catch (emailErr) {
     console.error("[cron/cancellation-digest] failed to send digest email:", emailErr instanceof Error ? emailErr.message : emailErr);
   }

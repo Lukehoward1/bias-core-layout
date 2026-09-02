@@ -29,7 +29,7 @@ export async function sendDowngradeGraceEmail({
   // wrong domain (app.hfx-capital.com) with a nonexistent path (/settings/accounts).
   const appUrl = "https://streambias.com";
 
-  await resend.emails.send({
+  const { error } = await resend.emails.send({
     from: "BIAS <alerts@streambias.com>",
     to,
     subject: "Action needed: choose which broker account to keep",
@@ -63,4 +63,7 @@ export async function sendDowngradeGraceEmail({
 </html>
     `.trim(),
   });
+  if (error) {
+    throw new Error(`Resend error: ${error.message ?? JSON.stringify(error)}`);
+  }
 }
