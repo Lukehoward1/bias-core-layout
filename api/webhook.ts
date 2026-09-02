@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import Stripe from "stripe";
+import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
 import { PRICE_IDS } from "../src/lib/stripe.js";
 import { undeployExcessBrokerConnections } from "./_lib/undeploy.js";
@@ -24,16 +25,56 @@ function tierFromPriceId(priceId: string): string {
   return "standard";
 }
 
+// Pull the bare address out of "Display Name <foo@bar.com>" or "foo@bar.com".
+function extractEmailAddress(from: string): string {
+  const m = from.match(/<([^>]+)>/);
+  return (m ? m[1] : from).trim().toLowerCase();
+}
+
+// Minimal HTML → plain-text fallback for when the inbound message has no
+// text/plain part. Not a general-purpose stripper — just good enough to keep
+// the forwarded email readable.
+function stripHtml(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
   const supabase = createClient(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
 
   const rawBody = await getRawBody(req);
+
+  // ── Branch: Resend inbound webhook (Svix-signed) ─────────────────────────
+  // This endpoint is shared with Stripe because we're at Vercel Hobby's
+  // 12-function ceiling. Resend's inbound webhooks are Svix-signed and carry
+  // svix-id / svix-timestamp / svix-signature headers; Stripe uses
+  // stripe-signature. Presence of svix-id is our branch discriminator —
+  // check it BEFORE the Stripe path so Resend POSTs don't get fed into
+  // stripe.webhooks.constructEvent and rejected.
+  if (req.headers["svix-id"]) {
+    return handleResendInbound(req, res, supabase, rawBody);
+  }
+
+  // ── Existing Stripe path (unchanged) ─────────────────────────────────────
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
   const sig = req.headers["stripe-signature"] as string;
 
   let event: Stripe.Event;
@@ -220,4 +261,118 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error("Webhook processing error:", message);
     return res.status(500).json({ error: message });
   }
+}
+
+// ── Resend inbound handler ──────────────────────────────────────────────────
+// Verifies the Svix signature, fetches the full inbound email, looks up the
+// sender in `profiles` for a priority tag, and forwards to FORWARD_TO with
+// the sender in Reply-To so a reply goes straight back to the customer.
+//
+// Return contract:
+//   400 → invalid signature (Resend won't retry a bad signature)
+//   200 → everything else (verified events, even unrecognized types or a
+//         failed forward — logged but not retried; Resend's exponential
+//         backoff isn't useful for forward-delivery issues on our side)
+
+async function handleResendInbound(
+  req: VercelRequest,
+  res: VercelResponse,
+  // The supabase client type comes from createClient(url, key) called without
+  // a Database generic — its inferred shape doesn't line up cleanly with
+  // ReturnType<typeof createClient> (the createClient overload defaults
+  // resolve differently in the two positions). `any` here matches how the
+  // existing Stripe-side profile queries in this file treat it — no runtime
+  // effect.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  rawBody: Buffer,
+): Promise<VercelResponse> {
+  // Hardcoded destination — intentionally swappable later when someone else
+  // takes over inbound customer email. Keeping it as a local const makes the
+  // swap obvious in one place.
+  const FORWARD_TO = "luke@hfx-capital.com";
+
+  const resend = new Resend(process.env.RESEND_API_KEY!);
+
+  // The SDK's verify() signature: { payload, webhookSecret, headers: { id,
+  // timestamp, signature } } — the SDK internally maps to webhook-* header
+  // names for the underlying svix library. Throws on invalid signature; catch
+  // and 400 (400 = don't retry a bad signature; 500 would trigger Resend's
+  // exponential backoff).
+  let event: { type: string; data: { email_id: string } };
+  try {
+    event = resend.webhooks.verify({
+      payload: rawBody.toString("utf8"),
+      webhookSecret: process.env.RESEND_WEBHOOK_SECRET!,
+      headers: {
+        id: req.headers["svix-id"] as string,
+        timestamp: req.headers["svix-timestamp"] as string,
+        signature: req.headers["svix-signature"] as string,
+      },
+    }) as { type: string; data: { email_id: string } };
+  } catch (err) {
+    console.error(
+      "[webhook/resend] signature verification failed:",
+      err instanceof Error ? err.message : err,
+    );
+    return res.status(400).json({ error: "Invalid Resend signature" });
+  }
+
+  if (event.type !== "email.received") {
+    console.log("[webhook/resend] ignoring event type:", event.type);
+    return res.status(200).json({ received: true });
+  }
+
+  // Fetch full message content (event payload is metadata-only).
+  const { data: email, error: fetchErr } = await resend.emails.receiving.get(event.data.email_id);
+  if (fetchErr || !email) {
+    console.error("[webhook/resend] failed to fetch inbound email:", JSON.stringify(fetchErr));
+    return res.status(200).json({ received: true });
+  }
+
+  const senderEmail = extractEmailAddress(email.from ?? "");
+  if (!senderEmail) {
+    console.error("[webhook/resend] could not extract sender address from:", email.from);
+    return res.status(200).json({ received: true });
+  }
+
+  // Priority tag lookup — best-effort. If the profile query fails or the
+  // sender isn't in profiles, we still forward without a tag.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_founding_member, subscription_tier, subscription_status")
+    .eq("email", senderEmail)
+    .maybeSingle();
+
+  let tag: string | null = null;
+  if (profile?.is_founding_member) {
+    tag = "[FOUNDING MEMBER — PRIORITY]";
+  } else if (
+    profile?.subscription_tier === "pro" &&
+    (profile?.subscription_status === "active" || profile?.subscription_status === "trialing")
+  ) {
+    tag = "[PRO — PRIORITY]";
+  }
+
+  const originalSubject = email.subject || "(no subject)";
+  const bodyText = email.text ?? (email.html ? stripHtml(email.html) : "(no readable body)");
+
+  const { error: sendErr } = await resend.emails.send({
+    from: "BIAS Inbound <alerts@streambias.com>",
+    to: FORWARD_TO,
+    replyTo: senderEmail,
+    subject: `${tag ? tag + " " : ""}Reply: ${originalSubject}`,
+    text: `From: ${email.from}\n\n${bodyText}`,
+  });
+
+  if (sendErr) {
+    // Log but still 200 — Resend retrying won't fix a downstream send failure
+    // on our side, and we don't want the inbound to endlessly reprocess.
+    console.error(
+      "[webhook/resend] failed to forward inbound email:",
+      typeof sendErr === "object" ? JSON.stringify(sendErr) : sendErr,
+    );
+  }
+
+  return res.status(200).json({ received: true });
 }
