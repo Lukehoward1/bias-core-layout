@@ -21,6 +21,7 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [trialSetup, setTrialSetup] = useState(false);
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -160,11 +161,27 @@ export default function Register() {
                 />
               </div>
 
+              <div className="flex items-start gap-2 pt-1">
+                <input
+                  id="agree-terms"
+                  type="checkbox"
+                  checked={agreedToTerms}
+                  onChange={(e) => setAgreedToTerms(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-primary"
+                />
+                <Label htmlFor="agree-terms" className="text-sm text-muted-foreground font-normal cursor-pointer leading-snug">
+                  I agree to the{" "}
+                  <Link to="/terms" className="text-primary hover:underline font-medium">Terms of Service</Link>
+                  {" "}and{" "}
+                  <Link to="/privacy" className="text-primary hover:underline font-medium">Privacy Policy</Link>
+                </Label>
+              </div>
+
               {error && (
                 <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{error}</p>
               )}
 
-              <Button type="submit" className="w-full" disabled={isLoading || trialSetup}>
+              <Button type="submit" className="w-full" disabled={isLoading || trialSetup || !agreedToTerms}>
                 {trialSetup ? "Setting up your trial…" : isLoading ? "Creating account…" : "Create Account"}
               </Button>
             </form>

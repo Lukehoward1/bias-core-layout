@@ -16,6 +16,12 @@ const NotFound = () => {
         <a href="/" className="text-primary underline hover:text-primary/90">
           Return to Home
         </a>
+        <p className="mt-4 text-sm text-muted-foreground">
+          Need help?{" "}
+          <a href="mailto:support@streambias.com" className="underline hover:text-foreground transition-colors">
+            support@streambias.com
+          </a>
+        </p>
       </div>
     </div>
   );

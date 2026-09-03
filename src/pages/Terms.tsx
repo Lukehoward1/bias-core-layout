@@ -24,12 +24,7 @@ export default function Terms() {
           <p className="text-muted-foreground mb-3">
             StreamBias is operated by Luke Howard, trading as StreamBias ("StreamBias," "we," "us," or "our"), of Howards Butchers, Lynn Road, Gayton, King's Lynn, PE32 1QJ.
           </p>
-          <p className="text-muted-foreground mb-3 font-semibold">
-            [PLACEHOLDER — UPDATE ON INCORPORATION]
-          </p>
-          <p className="text-muted-foreground mb-3 italic">
-            Once "StreamBias Limited" is incorporated, replace the paragraph above with: StreamBias is operated by StreamBias Limited, a company registered in England and Wales under company number [COMPANY NUMBER], with its registered office at [REGISTERED ADDRESS] ("StreamBias," "we," "us," or "our").
-          </p>
+          {/* Once "StreamBias Limited" is incorporated, replace the sole-trader paragraph above with: StreamBias is operated by StreamBias Limited, a company registered in England and Wales under company number [COMPANY NUMBER], with its registered office at [REGISTERED ADDRESS] ("StreamBias," "we," "us," or "our"). */}
           <p className="text-muted-foreground mb-3">Contact: support@streambias.com</p>
           <p className="text-muted-foreground">
             These Terms of Service ("Terms") govern your access to and use of the StreamBias website, dashboard, and related services (the "Service"). By creating an account or using the Service, you agree to these Terms. If you do not agree, do not use the Service.

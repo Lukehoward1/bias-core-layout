@@ -1123,6 +1123,7 @@ export default function Landing() {
             <button type="button" onClick={() => navigate("/privacy")}  className="text-xs text-muted-foreground hover:text-foreground transition-colors">Privacy Policy</button>
             <button type="button" onClick={() => navigate("/terms")}    className="text-xs text-muted-foreground hover:text-foreground transition-colors">Terms</button>
             <button type="button" onClick={resetConsentStatus}          className="text-xs text-muted-foreground hover:text-foreground transition-colors">Cookie Settings</button>
+            <a href="mailto:support@streambias.com" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Support</a>
           </div>
 
           <p className="text-xs text-muted-foreground">

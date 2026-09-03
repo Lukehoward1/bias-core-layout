@@ -715,6 +715,7 @@ export default function Settings() {
               <div className="border-t border-border" />
 
               {/* Change Password subsection */}
+
               <div className="space-y-4">
                 <p className="text-sm font-medium text-foreground">Change Password</p>
                 <div className="space-y-2">
@@ -757,6 +758,13 @@ export default function Settings() {
                   {passwordLoading ? "Updating…" : "Update Password"}
                 </Button>
               </div>
+
+              <p className="text-xs text-muted-foreground pt-1">
+                Need help?{" "}
+                <a href="mailto:support@streambias.com" className="hover:text-foreground transition-colors underline underline-offset-2">
+                  support@streambias.com
+                </a>
+              </p>
 
             </CardContent>
           </Card>

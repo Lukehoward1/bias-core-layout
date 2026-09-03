@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { DEMO_TRADES } from "@/data/demoTrades";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -164,6 +165,8 @@ export function useJournalTrades(_accountIds: string[] = []) {
       if (!cancelled) {
         if (!error && data) {
           setManualTrades((data as SupabaseTradeRow[]).map(fromRow));
+        } else if (error) {
+          toast.error("Couldn't load your trades — try refreshing the page.");
         }
         setIsLoaded(true);
       }
@@ -231,6 +234,7 @@ export function useJournalTrades(_accountIds: string[] = []) {
       } else if (error) {
         // Rollback on failure
         setManualTrades((prev) => prev.filter((t) => t.id !== trade.id));
+        toast.error("Couldn't save that trade — please try again.");
       }
       notify();
     },
@@ -250,6 +254,8 @@ export function useJournalTrades(_accountIds: string[] = []) {
           prev.map((t) => (t.id === tradeId ? { ...t, ...patch } : t)),
         );
         notify();
+      } else {
+        toast.error("Couldn't update that trade — please try again.");
       }
     },
     [user, notify],
@@ -266,6 +272,8 @@ export function useJournalTrades(_accountIds: string[] = []) {
       if (!error) {
         setManualTrades((prev) => prev.filter((t) => t.id !== tradeId));
         notify();
+      } else {
+        toast.error("Couldn't delete that trade — please try again.");
       }
     },
     [user, notify],
@@ -284,6 +292,8 @@ export function useJournalTrades(_accountIds: string[] = []) {
           prev.map((t) => (t.id === tradeId ? { ...t, notes } : t)),
         );
         notify();
+      } else {
+        toast.error("Couldn't save your notes — please try again.");
       }
     },
     [user, notify],
@@ -302,6 +312,8 @@ export function useJournalTrades(_accountIds: string[] = []) {
           prev.map((t) => (t.id === tradeId ? { ...t, rating } : t)),
         );
         notify();
+      } else {
+        toast.error("Couldn't save your rating — please try again.");
       }
     },
     [user, notify],
