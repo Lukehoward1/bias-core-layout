@@ -291,7 +291,7 @@ export default function Markets() {
               key={type}
               variant={selectedType === type ? "default" : "outline"}
               size="sm"
-              onClick={() => setSelectedType(type)}
+              onClick={() => { alert("click fired: " + type); setSelectedType(type); }}
               className={`rounded-full h-8 px-4 text-xs ${type === "Watchlist" ? "gap-1.5" : ""}`}
             >
               {type === "Watchlist" && <Star className="h-3.5 w-3.5" />}
