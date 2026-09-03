@@ -358,7 +358,7 @@ async function handleResendInbound(
   const bodyText = email.text ?? (email.html ? stripHtml(email.html) : "(no readable body)");
 
   const { error: sendErr } = await resend.emails.send({
-    from: "BIAS Inbound <alerts@streambias.com>",
+    from: "Customer Query <alerts@streambias.com>",
     to: FORWARD_TO,
     replyTo: senderEmail,
     subject: `${tag ? tag + " " : ""}Reply: ${originalSubject}`,
