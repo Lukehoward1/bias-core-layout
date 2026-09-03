@@ -381,13 +381,13 @@ export default function Dashboard() {
   const handleAddRow = (afterRowId?: string) => addRow("equal", afterRowId);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-6">
       <AppHeader title="Dashboard" />
 
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-3xl font-bold text-foreground">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
               {isNameLoading ? "Welcome" : `Welcome, ${fullName ?? "Trader"}`}
             </h1>
             {isEditMode && (
@@ -397,7 +397,7 @@ export default function Dashboard() {
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             <CombineAccountsToggle />
             <DashboardEditToolbar
               isEditMode={isEditMode}

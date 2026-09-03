@@ -36,7 +36,7 @@ export default function RiskTools() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-6">
       <AppHeader title="Risk Tools" />
 
       <div className="max-w-7xl mx-auto space-y-6">
