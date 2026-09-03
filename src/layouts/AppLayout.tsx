@@ -41,7 +41,7 @@ function AppLayoutInner() {
       <div className="flex-1 min-w-0 flex flex-col">
         <TrialBanner />
         <DowngradeBanner />
-        <main className="flex-1 overflow-y-auto min-w-0">
+        <main className="flex-1 overflow-y-auto min-w-0 touch-manipulation">
           <Outlet />
         </main>
       </div>
