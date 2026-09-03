@@ -12,13 +12,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  ChevronDown, User, LogOut, Sparkles, Lock,
+  ChevronDown, User, LogOut, Sparkles, Lock, Menu,
   TrendingUp, TrendingDown, Minus,
   BookOpen, Zap, FileText,
   LayoutDashboard, BarChart2, BookText, Shield, Calendar as CalendarIcon, Settings as SettingsIcon,
 } from "lucide-react";
 import { useSessionLock } from "@/hooks/use-session-lock";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAppSidebar } from "@/hooks/use-app-sidebar";
+import { Button } from "@/components/ui/button";
 import { WHITELIST_SYMBOLS } from "@/services/candleData";
 import { ASSET_BY_SYMBOL } from "@/data/asset-registry";
 import { articles, tips } from "@/data/educationContent";
@@ -289,6 +291,7 @@ interface AppHeaderProps {
 export function AppHeader({ title, rightContent }: AppHeaderProps) {
   const { lock } = useSessionLock();
   const { user, signOut } = useAuth();
+  const { setMobileOpen } = useAppSidebar();
   const navigate = useNavigate();
 
   const userEmail = user?.email ?? "";
@@ -309,7 +312,18 @@ export function AppHeader({ title, rightContent }: AppHeaderProps) {
     flex items-center justify-between px-6 gap-6 shrink-0
   "
     >
-      <h1 className="text-xl font-semibold text-foreground shrink-0">{title}</h1>
+      <div className="flex items-center gap-3 shrink-0">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden h-8 w-8"
+          onPointerDown={(e) => { e.preventDefault(); setMobileOpen(true); }}
+        >
+          <Menu className="h-5 w-5" />
+          <span className="sr-only">Open menu</span>
+        </Button>
+        <h1 className="text-xl font-semibold text-foreground">{title}</h1>
+      </div>
 
       {/* Global Smart Search */}
       <SmartSearch />

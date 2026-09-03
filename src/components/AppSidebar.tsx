@@ -239,7 +239,7 @@ export function AppSidebar() {
             fixed left-0 top-0 z-50 h-screen w-72
             bg-sidebar flex flex-col
             transform transition-transform duration-300 ease-in-out
-            ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
+            ${mobileOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"}
           `}
         >
           {sidebarContent}
