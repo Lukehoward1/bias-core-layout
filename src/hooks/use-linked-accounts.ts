@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -140,6 +141,11 @@ function upsertById(existing: AccountTrade[], incoming: AccountTrade[]): Account
 
 const DEMO_OWNER_ID = "bf56f6fc-99ab-4870-aba4-58fc18790011";
 
+// Fired after any mutation that changes linked_accounts row state so every
+// hook instance (Settings, ConnectedAccountsList, DowngradeBanner, etc.)
+// re-fetches instead of holding independent stale copies.
+const LINKED_ACCOUNTS_EVENT = "linkedAccountsUpdated";
+
 export function useLinkedAccounts(): UseLinkedAccountsReturn {
   const { user, session } = useAuth();
   const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
@@ -189,6 +195,9 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
 
   useEffect(() => {
     loadAccounts();
+    const handler = () => loadAccounts();
+    window.addEventListener(LINKED_ACCOUNTS_EVENT, handler);
+    return () => window.removeEventListener(LINKED_ACCOUNTS_EVENT, handler);
   }, [loadAccounts]);
 
   // ── Derived values ──────────────────────────────────────────────────────────
@@ -336,19 +345,45 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
       if (!account) return;
 
       // Step 1: clear all primaries for this user
-      await supabase
+      const { error: clearError } = await supabase
         .from("linked_accounts")
         .update({ is_primary: false })
         .eq("user_id", user.id);
 
-      // Step 2: set the new primary
-      await supabase
+      if (clearError) {
+        console.error("[useLinkedAccounts] setPrimaryAccount clear failed:", clearError.message);
+        toast.error("Couldn't update primary account — please try again.");
+        return;
+      }
+
+      // Step 2: set the new primary. .select() so we can verify the row actually
+      // flipped — RLS or a missing row would return `data: []` without an error.
+      const { data, error: setError } = await supabase
         .from("linked_accounts")
         .update({ is_primary: true })
         .eq("id", accountId)
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .select();
+
+      if (setError) {
+        console.error("[useLinkedAccounts] setPrimaryAccount set failed:", setError.message);
+        toast.error("Couldn't update primary account — please try again.");
+        // Step 1 already flipped everything to false; broadcast so sibling
+        // instances re-fetch the accurate (no-primary) state rather than
+        // holding onto the pre-clear snapshot.
+        window.dispatchEvent(new Event(LINKED_ACCOUNTS_EVENT));
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        console.error("[useLinkedAccounts] setPrimaryAccount: no rows updated");
+        toast.error("Couldn't update primary account — please try again.");
+        window.dispatchEvent(new Event(LINKED_ACCOUNTS_EVENT));
+        return;
+      }
 
       setPrimaryAccountId(accountId);
+      window.dispatchEvent(new Event(LINKED_ACCOUNTS_EVENT));
     },
     [user, accounts],
   );
