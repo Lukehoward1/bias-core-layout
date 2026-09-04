@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,25 +12,6 @@ import { format } from "date-fns";
 
 interface ConnectedAccountsListProps {
   onConnectClick: () => void;
-}
-
-/**
- * Active account selection:
- * - "__all__" means "All Accounts"
- * - otherwise it's a LinkedAccount.id
- */
-const ACTIVE_ACCOUNT_KEY = "activeTradingAccountId";
-const ACTIVE_ACCOUNT_EVENT = "activeTradingAccountChanged";
-const ALL_ACCOUNTS_VALUE = "__all__";
-
-function readActiveAccountId(): string {
-  const raw = localStorage.getItem(ACTIVE_ACCOUNT_KEY);
-  return raw && raw.trim().length > 0 ? raw : ALL_ACCOUNTS_VALUE;
-}
-
-function writeActiveAccountId(value: string) {
-  localStorage.setItem(ACTIVE_ACCOUNT_KEY, value);
-  window.dispatchEvent(new Event(ACTIVE_ACCOUNT_EVENT));
 }
 
 export function ConnectedAccountsList({ onConnectClick }: ConnectedAccountsListProps) {
@@ -48,7 +29,6 @@ export function ConnectedAccountsList({ onConnectClick }: ConnectedAccountsListP
     updateAccountBalance,
   } = useLinkedAccounts();
 
-  const [activeAccountId, setActiveAccountId] = useState<string>(ALL_ACCOUNTS_VALUE);
   const [showBrokerModal, setShowBrokerModal] = useState(() => {
     try {
       const raw = sessionStorage.getItem("connectBrokerFormDraft");
@@ -57,46 +37,6 @@ export function ConnectedAccountsList({ onConnectClick }: ConnectedAccountsListP
       return false;
     }
   });
-
-  // Load active selection on mount + listen for changes (other tabs/components)
-  useEffect(() => {
-    const syncFromStorage = () => setActiveAccountId(readActiveAccountId());
-
-    syncFromStorage();
-
-    const onStorage = (e: StorageEvent) => {
-      if (!e.key || e.key === ACTIVE_ACCOUNT_KEY) syncFromStorage();
-    };
-
-    window.addEventListener("storage", onStorage);
-    window.addEventListener(ACTIVE_ACCOUNT_EVENT, syncFromStorage);
-
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener(ACTIVE_ACCOUNT_EVENT, syncFromStorage);
-    };
-  }, []);
-
-  // If active account was deleted/disconnected, fall back safely
-  useEffect(() => {
-    if (activeAccountId === ALL_ACCOUNTS_VALUE) return;
-    const exists = accounts.some((a) => a.id === activeAccountId);
-    if (!exists) {
-      setActiveAccountId(ALL_ACCOUNTS_VALUE);
-      writeActiveAccountId(ALL_ACCOUNTS_VALUE);
-    }
-  }, [accounts, activeAccountId]);
-
-  const setActive = useCallback((id: string) => {
-    setActiveAccountId(id);
-    writeActiveAccountId(id);
-  }, []);
-
-  const activeLabel = useMemo(() => {
-    if (activeAccountId === ALL_ACCOUNTS_VALUE) return "All Accounts";
-    const match = accounts.find((a) => a.id === activeAccountId);
-    return match?.name ?? "Selected Account";
-  }, [activeAccountId, accounts]);
 
   if (isLoading) {
     return (
@@ -140,23 +80,9 @@ export function ConnectedAccountsList({ onConnectClick }: ConnectedAccountsListP
     <div className="space-y-4">
       {/* Account slots info */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-0.5">
-          <p className="text-sm text-muted-foreground">
-            {accountCount} of {maxAccounts} account slots used
-          </p>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Viewing:</span>
-            <Badge variant="outline" className="text-[10px]">
-              {activeLabel}
-            </Badge>
-            {activeAccountId !== ALL_ACCOUNTS_VALUE && primaryAccount?.id === activeAccountId && (
-              <Badge variant="secondary" className="text-[10px]">
-                <Star className="h-3 w-3 mr-1" />
-                Primary
-              </Badge>
-            )}
-          </div>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          {accountCount} of {maxAccounts} account slots used
+        </p>
 
         <div className="flex items-center gap-2 flex-wrap">
           <Button onClick={onConnectClick} disabled={!canLinkMore || !canLinkAccounts} size="sm" className="gap-2">
@@ -180,38 +106,6 @@ export function ConnectedAccountsList({ onConnectClick }: ConnectedAccountsListP
         </div>
       )}
 
-      {/* "All Accounts" selector row */}
-      <Card className={cn("bg-card border-border", activeAccountId === ALL_ACCOUNTS_VALUE && "ring-1 ring-primary/50")}>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center shrink-0", "bg-muted")}>
-                <Link2 className={cn("h-5 w-5", "text-muted-foreground")} />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-medium text-foreground truncate">All Accounts</h4>
-                  {activeAccountId === ALL_ACCOUNTS_VALUE && (
-                    <Badge variant="secondary" className="text-xs shrink-0">
-                      Viewing
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground">Show combined performance across all accounts</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1 shrink-0">
-              {activeAccountId !== ALL_ACCOUNTS_VALUE && (
-                <Button variant="ghost" size="sm" onClick={() => setActive(ALL_ACCOUNTS_VALUE)} className="text-xs">
-                  Set Active
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Connected accounts list */}
       <div className="space-y-3">
         {accounts.map((account) => (
@@ -219,9 +113,7 @@ export function ConnectedAccountsList({ onConnectClick }: ConnectedAccountsListP
             key={account.id}
             account={account}
             isPrimary={primaryAccount?.id === account.id}
-            isActive={activeAccountId === account.id}
             onSetPrimary={() => setPrimaryAccount(account.id)}
-            onSetActive={() => setActive(account.id)}
             onRefresh={() => refreshAccount(account.id)}
             onUnlink={() => unlinkAccount(account.id)}
             onEditBalance={(newBalance) => updateAccountBalance(account.id, newBalance)}
@@ -237,9 +129,7 @@ export function ConnectedAccountsList({ onConnectClick }: ConnectedAccountsListP
 interface AccountCardProps {
   account: LinkedAccount;
   isPrimary: boolean;
-  isActive: boolean;
   onSetPrimary: () => void;
-  onSetActive: () => void;
   onRefresh: () => void;
   onUnlink: () => Promise<void>;
   onEditBalance: (newBalance: number) => Promise<{ success: boolean; message?: string }>;
@@ -248,9 +138,7 @@ interface AccountCardProps {
 function AccountCard({
   account,
   isPrimary,
-  isActive,
   onSetPrimary,
-  onSetActive,
   onRefresh,
   onUnlink,
   onEditBalance,
@@ -296,7 +184,7 @@ function AccountCard({
   }
 
   return (
-    <Card className={cn("bg-card border-border", isActive && "ring-1 ring-primary/50")}>
+    <Card className="bg-card border-border">
       <CardContent className="p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div className="flex items-start gap-3 min-w-0 flex-1">
@@ -312,12 +200,6 @@ function AccountCard({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <h4 className="font-medium text-foreground truncate">{account.name}</h4>
-
-                {isActive && (
-                  <Badge variant="secondary" className="text-xs shrink-0">
-                    Viewing
-                  </Badge>
-                )}
 
                 {isPrimary && (
                   <Badge variant="secondary" className="text-xs shrink-0">
@@ -413,12 +295,6 @@ function AccountCard({
               </>
             ) : (
               <>
-                {!isActive && (
-                  <Button variant="ghost" size="sm" onClick={onSetActive} className="text-xs">
-                    Set Active
-                  </Button>
-                )}
-
                 {!isPrimary && (
                   <Button variant="ghost" size="sm" onClick={onSetPrimary} className="text-xs">
                     Set Primary
