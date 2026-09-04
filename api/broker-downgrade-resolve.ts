@@ -42,9 +42,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (!chosenAccount) return res.status(404).json({ error: "Account not found" });
 
-  // Promote chosen account to primary
-  await supabase.from("linked_accounts").update({ is_primary: false }).eq("user_id", user.id);
-  await supabase.from("linked_accounts").update({ is_primary: true }).eq("id", chosenLinkedAccountId);
+  // Promote chosen account to primary. Both writes must succeed before we
+  // clear the grace columns or run undeploy — otherwise the wrong account
+  // (or no account) could get undeployed while grace is marked resolved.
+  const { error: clearError } = await supabase
+    .from("linked_accounts")
+    .update({ is_primary: false })
+    .eq("user_id", user.id);
+
+  if (clearError) {
+    console.error(`[broker-downgrade-resolve] clear primaries failed for user ${user.id}:`, clearError.message);
+    return res.status(500).json({ error: "Failed to update primary account" });
+  }
+
+  const { data: promoted, error: setError } = await supabase
+    .from("linked_accounts")
+    .update({ is_primary: true })
+    .eq("id", chosenLinkedAccountId)
+    .eq("user_id", user.id)
+    .select();
+
+  if (setError) {
+    console.error(`[broker-downgrade-resolve] set primary failed for user ${user.id}:`, setError.message);
+    return res.status(500).json({ error: "Failed to update primary account" });
+  }
+
+  if (!promoted || promoted.length === 0) {
+    console.error(`[broker-downgrade-resolve] set primary updated 0 rows for user ${user.id} account ${chosenLinkedAccountId}`);
+    return res.status(500).json({ error: "Failed to update primary account" });
+  }
 
   // Clear grace columns
   await supabase.from("profiles").update({
