@@ -218,7 +218,7 @@ export function useLinkedAccounts(): UseLinkedAccountsReturn {
 
   const primaryAccount = useMemo(() => {
     return (
-      effectiveAccounts.find((a) => a.id === primaryAccountId && a.isConnected) ??
+      effectiveAccounts.find((a) => a.id === primaryAccountId) ??
       effectiveAccounts.find((a) => a.isConnected) ??
       null
     );
