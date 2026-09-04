@@ -72,15 +72,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: "Failed to update primary account" });
   }
 
-  // Clear grace columns
-  await supabase.from("profiles").update({
+  // Undeploy excess — primary is now set to the chosen account, so it's kept.
+  // Run this BEFORE clearing grace so that if it throws (defensively — it
+  // swallows its own errors internally, but the MetaApi import could fail
+  // in ways we don't cover), grace stays pending and the user's retry
+  // re-runs the whole flow. Primary flip and undeploy are both idempotent,
+  // so retries are safe. Partial per-connection undeploy failures are still
+  // handled asynchronously by the orphan-detect cron.
+  await undeployExcessBrokerConnections(supabase, user.id, profile.downgrade_new_max ?? 1);
+
+  // Clear grace columns last — this is the "resolve complete" marker. If it
+  // fails, don't mark resolved; user retries safely (all prior steps are
+  // idempotent).
+  const { error: graceError } = await supabase.from("profiles").update({
     downgrade_grace_end_at: null,
     downgrade_new_max: null,
     downgrade_account_chosen: null,
   }).eq("id", user.id);
 
-  // Undeploy excess — primary is now set to the chosen account, so it's kept
-  await undeployExcessBrokerConnections(supabase, user.id, profile.downgrade_new_max ?? 1);
+  if (graceError) {
+    console.error(`[broker-downgrade-resolve] clear grace columns failed for user ${user.id}:`, graceError.message);
+    return res.status(500).json({ error: "Failed to clear downgrade grace period" });
+  }
 
   console.log(`[broker-downgrade-resolve] user ${user.id} kept account ${chosenLinkedAccountId}`);
   return res.status(200).json({ success: true });
