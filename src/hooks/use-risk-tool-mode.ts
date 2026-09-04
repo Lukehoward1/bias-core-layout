@@ -59,7 +59,7 @@ export function useRiskToolMode(storageKey: string): RiskToolModeState {
     if (isLoading || connectedAccounts.length === 0) return;
     const isValid = selectedAccountId && connectedAccounts.some((a) => a.id === selectedAccountId);
     if (!isValid) {
-      const fallback = primaryAccount ?? connectedAccounts[0];
+      const fallback = (primaryAccount?.isConnected ? primaryAccount : null) ?? connectedAccounts[0];
       if (fallback) setSelectedAccountIdState(fallback.id);
     }
   }, [isLoading, connectedAccounts, selectedAccountId, primaryAccount]);
@@ -68,7 +68,7 @@ export function useRiskToolMode(storageKey: string): RiskToolModeState {
     if (connectedAccounts.length === 0) return null;
     return (
       connectedAccounts.find((a) => a.id === selectedAccountId) ??
-      primaryAccount ??
+      (primaryAccount?.isConnected ? primaryAccount : null) ??
       connectedAccounts[0] ??
       null
     );
