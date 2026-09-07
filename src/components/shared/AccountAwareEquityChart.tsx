@@ -290,6 +290,7 @@ export function AccountAwareEquityChart({
   const isAllAccounts = activeAccountId === ACTIVE_ACCOUNT_ALL;
   const rawId = useId();
   const baseGradId = `aeGrad${rawId.replace(/:/g, "")}`;
+  console.log("[combine chart]", combineMode, "isAllAccounts=", isAllAccounts, "perAccountSize=", perAccount.size, "curveType=", curveType, "ls=", localStorage.getItem("accountCombineMode:v1"));
 
   const pickCurve = (entry: AccountEntry) =>
     curveType === "absolute" ? entry.equityCurveAbsolute : entry.equityCurveRelative;
