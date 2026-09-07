@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -15,6 +16,7 @@ import {
   TrendingDown,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Star,
   Printer,
   Lock,
@@ -1905,6 +1907,25 @@ export default function Journal() {
                     </div>
                   </div>
 
+                  {/* Date */}
+                  <div className="space-y-2">
+                    <Label htmlFor="tradeDate">Date</Label>
+                    <Input
+                      id="tradeDate"
+                      type="date"
+                      value={newTrade.date}
+                      onChange={(e) => setNewTrade({ ...newTrade, date: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Progressive disclosure — everything below is collapsed by default */}
+                  <Collapsible>
+                    <CollapsibleTrigger className="group flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground pt-1">
+                      <span>Add more details</span>
+                      <ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-180" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-4 pt-4">
+
                   {/* Stop Loss / Take Profit */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -1953,17 +1974,6 @@ export default function Journal() {
                         <SelectItem value="breakeven">Breakeven</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-
-                  {/* Date */}
-                  <div className="space-y-2">
-                    <Label htmlFor="tradeDate">Date</Label>
-                    <Input
-                      id="tradeDate"
-                      type="date"
-                      value={newTrade.date}
-                      onChange={(e) => setNewTrade({ ...newTrade, date: e.target.value })}
-                    />
                   </div>
 
                   {/* Entry / Exit Time */}
@@ -2129,6 +2139,9 @@ export default function Journal() {
                     />
                   </div>
 
+                    </CollapsibleContent>
+                  </Collapsible>
+
                   </div>
                 </div>
 
@@ -2261,6 +2274,14 @@ export default function Journal() {
                         />
                       </div>
                     </div>
+
+                    {/* Progressive disclosure — everything below is collapsed by default */}
+                    <Collapsible>
+                      <CollapsibleTrigger className="group flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground pt-1">
+                        <span>Add more details</span>
+                        <ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-180" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="space-y-4 pt-4">
 
                     <div className="space-y-2">
                       <Label>Status</Label>
@@ -2401,6 +2422,9 @@ export default function Journal() {
                         />
                       </div>
                     </div>
+
+                      </CollapsibleContent>
+                    </Collapsible>
 
                   </div>
                   </div>

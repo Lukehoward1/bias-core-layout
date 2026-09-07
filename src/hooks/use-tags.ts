@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 
@@ -59,6 +60,9 @@ export function useTags() {
         setTags((prev) =>
           [...prev, fromRow(data as TagRow)].sort((a, b) => a.name.localeCompare(b.name)),
         );
+      } else if (error) {
+        console.error("[useTags] addTag failed:", error.message);
+        toast.error("Couldn't create that tag — please try again.");
       }
     },
     [user],
@@ -74,6 +78,9 @@ export function useTags() {
         .eq("user_id", user.id);
       if (!error) {
         setTags((prev) => prev.filter((t) => t.id !== id));
+      } else {
+        console.error("[useTags] deleteTag failed:", error.message);
+        toast.error("Couldn't delete that tag — please try again.");
       }
     },
     [user],
@@ -93,6 +100,9 @@ export function useTags() {
             .map((t) => (t.id === id ? { ...t, name } : t))
             .sort((a, b) => a.name.localeCompare(b.name)),
         );
+      } else {
+        console.error("[useTags] renameTag failed:", error.message);
+        toast.error("Couldn't rename that tag — please try again.");
       }
     },
     [user],
