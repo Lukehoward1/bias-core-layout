@@ -130,6 +130,18 @@ export function AccountAwareEquityChart({
   const pickCurve = (entry: AccountEntry) =>
     curveType === "absolute" ? entry.equityCurveAbsolute : entry.equityCurveRelative;
 
+  console.log("[combine chart]", {
+    curveType,
+    activeAccountId,
+    isAllAccounts,
+    combineMode,
+    primaryAccountId,
+    perAccountSize: perAccount.size,
+    perAccountKeys: [...perAccount.keys()],
+    nonEmptyKeys: [...perAccount.entries()].filter(([, e]) => pickCurve(e).length > 0).map(([id]) => id),
+    ls: localStorage.getItem("accountCombineMode:v1"),
+  });
+
   const renderSingle = (accountId: string | null) => {
     if (!accountId) return <p className="text-sm text-muted-foreground">No closed trades yet.</p>;
     const entry = perAccount.get(accountId);
