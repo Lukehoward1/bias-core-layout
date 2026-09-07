@@ -48,7 +48,18 @@ interface ReportsSessionsProps {
   };
   tradesByAccount?: AccountTrades[];
   combineMode?: boolean;
-  canCombine?: boolean;
+  /**
+   * Id of the primary account — used to resolve which single account's trades
+   * to show in single-mode when the Viewing dropdown is "All Accounts".
+   * Never blended across accounts.
+   */
+  primaryAccountId?: string | null;
+  activeAccountId?: string;
+  /**
+   * Trades to display in single-mode. Primary account's trades when All
+   * Accounts is selected, otherwise the selected account's trades.
+   */
+  singleModeTrades?: Trade[];
 }
 
 const SESSION_DEFS = [
@@ -82,10 +93,16 @@ function buildSessionStats(ts: Trade[]) {
   }).filter(s => s.trades > 0);
 }
 
-export function ReportsSessions({ trades, dateRangeLabel, pinStates, isLocked = false, sym = '£', tradesByAccount, combineMode, canCombine }: ReportsSessionsProps) {
+export function ReportsSessions({ trades: tradesProp, dateRangeLabel, pinStates, isLocked = false, sym = '£', tradesByAccount, combineMode, singleModeTrades }: ReportsSessionsProps) {
   const { exportToPdf } = usePdfExport();
 
-  const isMultiAccountMode = (tradesByAccount?.length ?? 0) > 1 && !(combineMode && canCombine);
+  // Shadow trades so single-mode session stats reflect primary/active account
+  // only when All Accounts is selected. Multi-mode uses tradesByAccount.
+  const trades = singleModeTrades ?? tradesProp;
+
+  // Combine ON  → per-account view (side by side, own scale)
+  // Combine OFF → single account (activeAccountId, or primary if All Accounts)
+  const isMultiAccountMode = !!combineMode && (tradesByAccount?.length ?? 0) > 1;
 
   const accountSymByName = Object.fromEntries(
     (tradesByAccount ?? []).map(({ account }) => [account.name, currencySymbol(account.currency)])

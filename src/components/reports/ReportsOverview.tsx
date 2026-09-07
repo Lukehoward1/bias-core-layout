@@ -42,6 +42,12 @@ interface ReportsOverviewProps {
   trades: Trade[];
   accounts: LinkedAccount[];
   activeAccountId: string;
+  /**
+   * Id of the primary account. Used to resolve which single account to show
+   * in KPI cards / charts / Best/Worst Day when the Viewing dropdown is
+   * "All Accounts" and the Combine toggle is OFF. Never blended across accounts.
+   */
+  primaryAccountId: string | null;
   dateRangeLabel: string;
   isLocked?: boolean;
   sym?: string;
@@ -58,7 +64,7 @@ interface ReportsOverviewProps {
   };
 }
 
-export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLabel, pinStates, isLocked = false, sym = '£' }: ReportsOverviewProps) {
+export function ReportsOverview({ trades, accounts, activeAccountId, primaryAccountId, dateRangeLabel, pinStates, isLocked = false, sym = '£' }: ReportsOverviewProps) {
   const { exportToPdf } = usePdfExport();
 
   // ── Inline stats kept only for the PDF export call ──────────────────────────
@@ -87,11 +93,10 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
   );
 
   // ── Per-account stats (full date range) — reused for all KPI cards ──────────
-  const {
-    perAccount: equityPerAccount,
-    combined: equityCombined,
-    canCombine: equityCanCombine,
-  } = useAccountAwareStats(trades as unknown as JournalTrade[], accounts);
+  const { perAccount: equityPerAccount } = useAccountAwareStats(
+    trades as unknown as JournalTrade[],
+    accounts,
+  );
   const resolvedActiveAccountId = activeAccountId ?? ACTIVE_ACCOUNT_ALL;
 
   // ── Rolling 30-day subset ──────────────────────────────────────────────────
@@ -101,11 +106,7 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
   const rolling30Trades = (trades as unknown as JournalTrade[]).filter(
     (t) => t.date >= rolling30DateStr,
   );
-  const {
-    perAccount: rolling30PerAccount,
-    combined: rolling30Combined,
-    canCombine: rolling30CanCombine,
-  } = useAccountAwareStats(rolling30Trades, accounts);
+  const { perAccount: rolling30PerAccount } = useAccountAwareStats(rolling30Trades, accounts);
 
   // ── Combine mode — read for Best/Worst Day three-mode logic ─────────────────
   const [combineMode] = useAccountCombineMode();
@@ -202,20 +203,21 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
     );
   }
 
+  // Combine ON  → per-account rows (never blended)
+  // Combine OFF → single day for the selected account (activeAccountId), or the
+  //               primary account when "All Accounts" is selected
   function BestDayContent() {
     if (!isAllAccounts) {
       const entry = equityPerAccount.get(resolvedActiveAccountId);
       return <SingleDay day={entry?.stats.bestDay ?? null} colorClass="text-success" />;
     }
-    if (combineMode && equityCanCombine && equityCombined) {
-      return <SingleDay day={equityCombined.stats.bestDay} colorClass="text-success" />;
-    }
-    return <MultiDayRows isBest={true} />;
+    if (combineMode) return <MultiDayRows isBest={true} />;
+    const entry = primaryAccountId ? equityPerAccount.get(primaryAccountId) : null;
+    return <SingleDay day={entry?.stats.bestDay ?? null} colorClass="text-success" />;
   }
 
   function WorstDayContent() {
-    if (!isAllAccounts) {
-      const entry = equityPerAccount.get(resolvedActiveAccountId);
+    const worstFor = (entry: import("@/hooks/use-account-aware-stats").AccountEntry | undefined) => {
       const day = entry?.stats.worstDay ?? null;
       return (
         <SingleDay
@@ -223,17 +225,10 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
           colorClass={day && day.pnl < 0 ? "text-destructive" : "text-success"}
         />
       );
-    }
-    if (combineMode && equityCanCombine && equityCombined) {
-      const day = equityCombined.stats.worstDay;
-      return (
-        <SingleDay
-          day={day}
-          colorClass={day && day.pnl < 0 ? "text-destructive" : "text-success"}
-        />
-      );
-    }
-    return <MultiDayRows isBest={false} />;
+    };
+    if (!isAllAccounts) return worstFor(equityPerAccount.get(resolvedActiveAccountId));
+    if (combineMode) return <MultiDayRows isBest={false} />;
+    return worstFor(primaryAccountId ? equityPerAccount.get(primaryAccountId) : undefined);
   }
 
   return (
@@ -265,8 +260,7 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
             <CardContent className="pt-0">
               <AccountAwareStat
                 perAccount={equityPerAccount}
-                combined={equityCombined}
-                canCombine={equityCanCombine}
+                primaryAccountId={primaryAccountId}
                 activeAccountId={resolvedActiveAccountId}
                 select={(s) => s.totalPnl}
                 format={(v) => {
@@ -299,8 +293,7 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
             <CardContent className="pt-0">
               <AccountAwareStat
                 perAccount={equityPerAccount}
-                combined={equityCombined}
-                canCombine={equityCanCombine}
+                primaryAccountId={primaryAccountId}
                 activeAccountId={resolvedActiveAccountId}
                 select={(s) => s.avgRR}
                 format={(v) => Number(v).toFixed(2)}
@@ -329,8 +322,7 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
             <CardContent className="pt-0">
               <AccountAwareStat
                 perAccount={equityPerAccount}
-                combined={equityCombined}
-                canCombine={equityCanCombine}
+                primaryAccountId={primaryAccountId}
                 activeAccountId={resolvedActiveAccountId}
                 select={(s) => s.winRate}
                 format={(v) => `${Number(v).toFixed(1)}%`}
@@ -359,8 +351,7 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
             <CardContent className="pt-0">
               <AccountAwareStat
                 perAccount={equityPerAccount}
-                combined={equityCombined}
-                canCombine={equityCanCombine}
+                primaryAccountId={primaryAccountId}
                 activeAccountId={resolvedActiveAccountId}
                 select={(s) => s.expectancy}
                 format={(v) => `${sym}${Number(v).toFixed(0)}/trade`}
@@ -384,8 +375,7 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
             <CardContent className="pt-0">
               <AccountAwareStat
                 perAccount={equityPerAccount}
-                combined={equityCombined}
-                canCombine={equityCanCombine}
+                primaryAccountId={primaryAccountId}
                 activeAccountId={resolvedActiveAccountId}
                 select={(s) => s.profitFactor}
                 format={(v) => String(v)}
@@ -405,8 +395,7 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
             <CardContent className="pt-0">
               <AccountAwareStat
                 perAccount={equityPerAccount}
-                combined={equityCombined}
-                canCombine={equityCanCombine}
+                primaryAccountId={primaryAccountId}
                 activeAccountId={resolvedActiveAccountId}
                 select={(s) => s.maxConsecWins}
                 format={(v) => String(v)}
@@ -427,8 +416,7 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
             <CardContent className="pt-0">
               <AccountAwareStat
                 perAccount={equityPerAccount}
-                combined={equityCombined}
-                canCombine={equityCanCombine}
+                primaryAccountId={primaryAccountId}
                 activeAccountId={resolvedActiveAccountId}
                 select={(s) => s.maxConsecLosses}
                 format={(v) => String(v)}
@@ -449,8 +437,7 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
             <CardContent className="pt-0">
               <AccountAwareStat
                 perAccount={equityPerAccount}
-                combined={equityCombined}
-                canCombine={equityCanCombine}
+                primaryAccountId={primaryAccountId}
                 activeAccountId={resolvedActiveAccountId}
                 select={(s) => s.avgWinner}
                 format={(v) => `${sym}${Number(v).toFixed(0)}`}
@@ -471,8 +458,7 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
             <CardContent className="pt-0">
               <AccountAwareStat
                 perAccount={equityPerAccount}
-                combined={equityCombined}
-                canCombine={equityCanCombine}
+                primaryAccountId={primaryAccountId}
                 activeAccountId={resolvedActiveAccountId}
                 select={(s) => s.avgLoser}
                 format={(v) => `${sym}${Number(v).toFixed(0)}`}
@@ -559,9 +545,8 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
           <CardContent>
             <AccountAwareEquityChart
               perAccount={equityPerAccount}
-              combined={equityCombined}
-              canCombine={equityCanCombine}
               activeAccountId={resolvedActiveAccountId}
+              primaryAccountId={primaryAccountId}
               chartHeight="h-64"
               curveType="relative"
             />
@@ -592,9 +577,8 @@ export function ReportsOverview({ trades, accounts, activeAccountId, dateRangeLa
           <CardContent>
             <AccountAwareEquityChart
               perAccount={rolling30PerAccount}
-              combined={rolling30Combined}
-              canCombine={rolling30CanCombine}
               activeAccountId={resolvedActiveAccountId}
+              primaryAccountId={primaryAccountId}
               chartHeight="h-48"
               curveType="relative"
             />

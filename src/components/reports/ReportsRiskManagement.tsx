@@ -53,7 +53,19 @@ interface ReportsRiskManagementProps {
   };
   tradesByAccount?: AccountTrades[];
   combineMode?: boolean;
-  canCombine?: boolean;
+  /**
+   * Id of the primary account — used to resolve which single account's trades
+   * to show in single-mode when the Viewing dropdown is "All Accounts". Never
+   * blended across accounts.
+   */
+  primaryAccountId?: string | null;
+  activeAccountId?: string;
+  /**
+   * Trades to display in single-mode. For a specific selected account this is
+   * that account's trades; for "All Accounts" it's the primary account's trades
+   * only. Never a cross-account blend.
+   */
+  singleModeTrades?: Trade[];
 }
 
 const RISK_BUCKET_THRESHOLDS = [50, 100, 150, 200];
@@ -91,10 +103,13 @@ function buildRiskStats(ts: Trade[], acctSym: string, balance: number | null | u
   return { risks, withRisk, avgRisk, maxRisk, maxLoss, totalLoss, losingTrades, threshold, excessiveTrades, riskBuckets, disciplineScore, coverage: withRisk.length };
 }
 
-export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLocked = false, sym = '£', accountBalance, tradesByAccount, combineMode, canCombine }: ReportsRiskManagementProps) {
+export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLocked = false, sym = '£', accountBalance, tradesByAccount, combineMode, singleModeTrades }: ReportsRiskManagementProps) {
   const { exportToPdf } = usePdfExport();
 
-  const isMultiAccountMode = (tradesByAccount?.length ?? 0) > 1 && !(combineMode && canCombine);
+  // Combine ON  → per-account view (side by side, own scale)
+  // Combine OFF → single account (activeAccountId, or primary if All Accounts)
+  const isMultiAccountMode = !!combineMode && (tradesByAccount?.length ?? 0) > 1;
+  const singleTrades = singleModeTrades ?? trades;
 
   const accountSymByName = Object.fromEntries(
     (tradesByAccount ?? []).map(({ account }) => [account.name, currencySymbol(account.currency)])
@@ -127,7 +142,7 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLoc
   };
 
   // Single-account stats
-  const single = buildRiskStats(trades, sym, accountBalance);
+  const single = buildRiskStats(singleTrades, sym, accountBalance);
 
   // Multi-account per-account stats
   const perAccountRisk = (tradesByAccount ?? []).map(({ account, trades: ts }) => {
@@ -234,9 +249,9 @@ export function ReportsRiskManagement({ trades, dateRangeLabel, pinStates, isLoc
                     <p className="text-xs text-muted-foreground mt-1">{single.losingTrades.length} losing trades</p>
                   </div>
                 </div>
-                {trades.length > 0 && (
+                {singleTrades.length > 0 && (
                   <p className="text-xs text-muted-foreground mt-3">
-                    Risk figures based on {single.coverage} of {trades.length} trades with a stop loss set.
+                    Risk figures based on {single.coverage} of {singleTrades.length} trades with a stop loss set.
                   </p>
                 )}
               </>

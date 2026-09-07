@@ -1,14 +1,15 @@
 // src/components/shared/AccountAwareStat.tsx
 //
-// Three-way KPI stat display — mirrors AccountAwareEquityChart's mode logic:
-//   1. Single account selected → one big number, same style as today
-//   2. All Accounts + combine OFF (or currencies differ) → per-account rows
-//      (coloured dot · account name · value), styled like the Risk Snapshot card
-//   3. All Accounts + combine ON + canCombine → single combined figure
+// Three-way KPI stat display driven by the Viewing dropdown + Combine toggle:
+//   1. Specific account selected           → one big number for that account.
+//   2. All Accounts + combine toggle ON    → per-account stacked rows, each in
+//                                            its own colour/scale. Never blended.
+//   3. All Accounts + combine toggle OFF   → one big number for the primary
+//                                            account only. Never a cross-
+//                                            account blend.
 //
 // Does NOT render its own Combine toggle — the toggle is global state read
 // via useAccountCombineMode(), which is also driven by the equity chart toggle.
-// Showing a second toggle on every KPI card would be noisy and redundant.
 
 import {
   ACTIVE_ACCOUNT_ALL,
@@ -19,9 +20,13 @@ import type { AccountEntry, AccountStats } from "@/hooks/use-account-aware-stats
 
 export interface AccountAwareStatProps {
   perAccount: Map<string, AccountEntry>;
-  combined: AccountEntry | null;
-  canCombine: boolean;
   activeAccountId: string;
+  /**
+   * Id of the primary account, used to resolve which single account to show
+   * when the Viewing dropdown is "All Accounts" and the Combine toggle is OFF.
+   * Null when the user has no linked accounts.
+   */
+  primaryAccountId: string | null;
   /** Extract the value to display from a single account's stats. */
   select: (stats: AccountStats) => string | number;
   /** Convert the selected value to its display string. */
@@ -32,7 +37,7 @@ export interface AccountAwareStatProps {
   sizeClass?: string;
 }
 
-// ── Single big figure (single-account or combined) ────────────────────────────
+// ── Single big figure ─────────────────────────────────────────────────────────
 
 function BigFigure({
   value,
@@ -92,9 +97,8 @@ function AccountRows({
 
 export function AccountAwareStat({
   perAccount,
-  combined,
-  canCombine,
   activeAccountId,
+  primaryAccountId,
   select,
   format,
   colorClass,
@@ -103,9 +107,9 @@ export function AccountAwareStat({
   const [combineMode] = useAccountCombineMode();
   const isAllAccounts = activeAccountId === ACTIVE_ACCOUNT_ALL;
 
-  // ── Single account ──────────────────────────────────────────────────────────
-  if (!isAllAccounts) {
-    const entry = perAccount.get(activeAccountId);
+  const renderSingle = (accountId: string | null) => {
+    if (!accountId) return <div className="text-2xl font-bold text-muted-foreground">—</div>;
+    const entry = perAccount.get(accountId);
     if (!entry) return <div className="text-2xl font-bold text-muted-foreground">—</div>;
     const raw = select(entry.stats);
     return (
@@ -115,31 +119,27 @@ export function AccountAwareStat({
         sizeClass={sizeClass}
       />
     );
-  }
+  };
 
-  // ── All accounts: combined view ─────────────────────────────────────────────
-  if (combineMode && canCombine && combined) {
-    const raw = select(combined.stats);
+  // ── Specific account selected ──────────────────────────────────────────────
+  if (!isAllAccounts) return renderSingle(activeAccountId);
+
+  // ── All Accounts + combine ON: per-account rows ────────────────────────────
+  if (combineMode) {
+    const entries = [...perAccount.entries()];
+    if (entries.length === 0) {
+      return <div className="text-2xl font-bold text-muted-foreground">—</div>;
+    }
     return (
-      <BigFigure
-        value={format(raw)}
-        colorClass={colorClass?.(raw)}
-        sizeClass={sizeClass}
+      <AccountRows
+        entries={entries}
+        select={select}
+        format={format}
+        colorClass={colorClass}
       />
     );
   }
 
-  // ── All accounts: per-account rows ─────────────────────────────────────────
-  const entries = [...perAccount.entries()];
-  if (entries.length === 0) {
-    return <div className="text-2xl font-bold text-muted-foreground">—</div>;
-  }
-  return (
-    <AccountRows
-      entries={entries}
-      select={select}
-      format={format}
-      colorClass={colorClass}
-    />
-  );
+  // ── All Accounts + combine OFF: single figure for primary account ──────────
+  return renderSingle(primaryAccountId);
 }

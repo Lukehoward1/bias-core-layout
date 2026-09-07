@@ -871,7 +871,7 @@ function ReportsKpiLiveCard({ metric }: { metric: "pnl" | "rr" | "winrate" | "ex
   const { primaryAccount } = useLinkedAccounts();
   const sym = currencySymbol(primaryAccount?.currency);
 
-  const { perAccount, combined, canCombine } = useAccountAwareStats(viewTrades, accounts);
+  const { perAccount } = useAccountAwareStats(viewTrades, accounts);
 
   type MetricConfig = {
     title: string;
@@ -923,8 +923,7 @@ function ReportsKpiLiveCard({ metric }: { metric: "pnl" | "rr" | "winrate" | "ex
       <CardContent>
         <AccountAwareStat
           perAccount={perAccount}
-          combined={combined}
-          canCombine={canCombine}
+          primaryAccountId={primaryAccount?.id ?? null}
           activeAccountId={activeAccountId}
           select={select}
           format={format}
@@ -942,7 +941,7 @@ function BestWorstDayCard({ type }: { type: "best" | "worst" }) {
   const [combineMode] = useAccountCombineMode();
   const isAllAccounts = activeAccountId === ACTIVE_ACCOUNT_ALL;
 
-  const { perAccount, combined, canCombine } = useAccountAwareStats(viewTrades, accounts);
+  const { perAccount } = useAccountAwareStats(viewTrades, accounts);
 
   const isBest = type === "best";
   const cardClass = isBest ? "h-full bg-success/5 border-success/20" : "h-full bg-destructive/5 border-destructive/20";
@@ -1009,15 +1008,19 @@ function BestWorstDayCard({ type }: { type: "best" | "worst" }) {
   }
 
   // ── Resolve content ─────────────────────────────────────────────────────────
+  // Combine ON  → per-account rows (never blended)
+  // Combine OFF → single day for the selected account, or the primary account
+  //               when "All Accounts" is selected
 
   let content: React.ReactNode;
   if (!isAllAccounts) {
     const entry = perAccount.get(activeAccountId);
     content = <SingleDay day={entry ? pickDay(entry) : null} />;
-  } else if (combineMode && canCombine && combined) {
-    content = <SingleDay day={pickDay(combined)} />;
-  } else {
+  } else if (combineMode) {
     content = <MultiDayRows />;
+  } else {
+    const entry = primaryAccount ? perAccount.get(primaryAccount.id) : null;
+    content = <SingleDay day={entry ? pickDay(entry) : null} />;
   }
 
   return (
@@ -1034,10 +1037,10 @@ function BestWorstDayCard({ type }: { type: "best" | "worst" }) {
 }
 
 function LiveEquityCard({ slotType }: { slotType: string }) {
-  const { viewTrades, accounts, activeAccountId } = useTradingData();
+  const { viewTrades, accounts, activeAccountId, primaryAccount } = useTradingData();
   const chartHeight = slotType === "hero" ? "h-64" : "h-40";
 
-  const { perAccount, canCombine, combined } = useAccountAwareStats(viewTrades, accounts);
+  const { perAccount } = useAccountAwareStats(viewTrades, accounts);
 
   return (
     <Card className="h-full">
@@ -1047,9 +1050,8 @@ function LiveEquityCard({ slotType }: { slotType: string }) {
       <CardContent>
         <AccountAwareEquityChart
           perAccount={perAccount}
-          combined={combined}
-          canCombine={canCombine}
           activeAccountId={activeAccountId}
+          primaryAccountId={primaryAccount?.id ?? null}
           chartHeight={chartHeight}
           curveType="absolute"
         />

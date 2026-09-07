@@ -194,13 +194,14 @@ interface EquityCurveCardProps {
   trades: JournalTrade[];
   accounts: LinkedAccount[];
   activeAccountId: string;
+  primaryAccountId: string | null;
   isAdded: boolean;
   onAdd: () => void;
   onRemove: () => void;
 }
 
-function EquityCurveCard({ trades, accounts, activeAccountId, isAdded, onAdd, onRemove }: EquityCurveCardProps) {
-  const { perAccount, combined, canCombine } = useAccountAwareStats(trades, accounts);
+function EquityCurveCard({ trades, accounts, activeAccountId, primaryAccountId, isAdded, onAdd, onRemove }: EquityCurveCardProps) {
+  const { perAccount } = useAccountAwareStats(trades, accounts);
 
   return (
     <Card>
@@ -218,9 +219,8 @@ function EquityCurveCard({ trades, accounts, activeAccountId, isAdded, onAdd, on
       <CardContent>
         <AccountAwareEquityChart
           perAccount={perAccount}
-          combined={combined}
-          canCombine={canCombine}
           activeAccountId={activeAccountId}
+          primaryAccountId={primaryAccountId}
           chartHeight="h-56"
           curveType="relative"
         />
@@ -250,11 +250,15 @@ export default function Journal() {
   // ✅ Active account scope + canonical journal actions
   const { activeAccountId, setActiveAccountId, activeAccountLabel, accounts, primaryAccount, viewTrades, journal } = useTradingData();
 
-  const allAccountsShareCurrency = accounts.length > 0 && accounts.every(a => a.currency === accounts[0].currency);
-
-  const accountBalance = activeAccountId === ACTIVE_ACCOUNT_ALL
-    ? (allAccountsShareCurrency ? accounts.reduce((sum, a) => sum + (a.balance ?? 0), 0) : undefined)
-    : accounts.find(a => a.id === activeAccountId)?.balance;
+  // In "single mode" (specific account selected, or All Accounts + combine OFF),
+  // reports show one account's data. When All Accounts is selected, that's the
+  // primary account — never a cross-account blend, since currencies and balance
+  // scales differ. Reports use this balance for the 2% risk threshold etc.
+  const singleModeAccount =
+    activeAccountId === ACTIVE_ACCOUNT_ALL
+      ? primaryAccount
+      : accounts.find(a => a.id === activeAccountId);
+  const accountBalance = singleModeAccount?.balance;
 
   const [combineMode] = useAccountCombineMode();
 
@@ -297,8 +301,7 @@ export default function Journal() {
         .filter((t) => filterTags.length === 0 || filterTags.some((tag) => (t.tags ?? []).includes(tag))),
     [viewTrades, filterSetup, filterTags],
   );
-  const { perAccount: kpiPerAccount, combined: kpiCombined, canCombine: kpiCanCombine } =
-    useAccountAwareStats(kpiTrades, accounts);
+  const { perAccount: kpiPerAccount } = useAccountAwareStats(kpiTrades, accounts);
 
   const availableSetups = useMemo(() => {
     const fromStrategies = strategies.map((s) => s.name);
@@ -469,9 +472,14 @@ export default function Journal() {
     [filteredTrades, accounts],
   );
 
-  const canCombine =
-    tradesByAccount.length > 0 &&
-    new Set(tradesByAccount.map(({ account }) => account.currency)).size === 1;
+  // Trades to display when a report is in single-account mode: the selected
+  // account's trades when a specific account is chosen, otherwise the primary
+  // account's trades when "All Accounts" is selected. Never blended.
+  const singleModeTrades = useMemo(() => {
+    if (activeAccountId !== ACTIVE_ACCOUNT_ALL) return filteredTrades;
+    if (!primaryAccount) return [];
+    return filteredTrades.filter(t => t.accountId === primaryAccount.id);
+  }, [filteredTrades, activeAccountId, primaryAccount]);
 
   // ✅ Top cards use viewTrades scoped by account + optional setup/tag filters
   const topStats = useMemo(() => {
@@ -645,8 +653,10 @@ export default function Journal() {
   // Current balance for whichever account is selected in the Reports dialog
   // (independent of the page's global active-account balance above) — used
   // by the Trade Log report to show opening/closing balance for the period.
+  // Sum across accounts only when all share a currency; otherwise undefined.
+  const reportAccountsShareCurrency = accounts.length > 0 && accounts.every(a => a.currency === accounts[0].currency);
   const reportAccountBalance = reportAccountId === ACTIVE_ACCOUNT_ALL
-    ? (allAccountsShareCurrency ? accounts.reduce((sum, a) => sum + (a.balance ?? 0), 0) : undefined)
+    ? (reportAccountsShareCurrency ? accounts.reduce((sum, a) => sum + (a.balance ?? 0), 0) : undefined)
     : accounts.find(a => a.id === reportAccountId)?.balance;
   const [exportFormat, setExportFormat] = useState<ExportFormat>("pdf");
   const defaultSelectedSectionIds = useMemo(() => REPORT_SECTIONS.map((s) => s.id), []);
@@ -1216,8 +1226,7 @@ export default function Journal() {
                 <CardContent>
                   <AccountAwareStat
                     perAccount={kpiPerAccount}
-                    combined={kpiCombined}
-                    canCombine={kpiCanCombine}
+                    primaryAccountId={primaryAccount?.id ?? null}
                     activeAccountId={activeAccountId}
                     select={(s) => s.totalTrades}
                     format={(v) => String(v)}
@@ -1232,8 +1241,7 @@ export default function Journal() {
                 <CardContent>
                   <AccountAwareStat
                     perAccount={kpiPerAccount}
-                    combined={kpiCombined}
-                    canCombine={kpiCanCombine}
+                    primaryAccountId={primaryAccount?.id ?? null}
                     activeAccountId={activeAccountId}
                     select={(s) => s.winRate}
                     format={(v) => `${v}%`}
@@ -1248,8 +1256,7 @@ export default function Journal() {
                 <CardContent>
                   <AccountAwareStat
                     perAccount={kpiPerAccount}
-                    combined={kpiCombined}
-                    canCombine={kpiCanCombine}
+                    primaryAccountId={primaryAccount?.id ?? null}
                     activeAccountId={activeAccountId}
                     select={(s) => s.totalPnl}
                     format={(v) => {
@@ -1268,8 +1275,7 @@ export default function Journal() {
                 <CardContent>
                   <AccountAwareStat
                     perAccount={kpiPerAccount}
-                    combined={kpiCombined}
-                    canCombine={kpiCanCombine}
+                    primaryAccountId={primaryAccount?.id ?? null}
                     activeAccountId={activeAccountId}
                     select={(s) => s.avgRR}
                     format={(v) => Number(v).toFixed(1)}
@@ -1284,8 +1290,7 @@ export default function Journal() {
                 <CardContent>
                   <AccountAwareStat
                     perAccount={kpiPerAccount}
-                    combined={kpiCombined}
-                    canCombine={kpiCanCombine}
+                    primaryAccountId={primaryAccount?.id ?? null}
                     activeAccountId={activeAccountId}
                     select={(s) => s.profitFactor}
                     format={(v) => String(v)}
@@ -1300,8 +1305,7 @@ export default function Journal() {
                 <CardContent>
                   <AccountAwareStat
                     perAccount={kpiPerAccount}
-                    combined={kpiCombined}
-                    canCombine={kpiCanCombine}
+                    primaryAccountId={primaryAccount?.id ?? null}
                     activeAccountId={activeAccountId}
                     select={(s) => `${s.breakevens} (${s.breakevenRate}%)`}
                     format={(v) => String(v)}
@@ -1315,6 +1319,7 @@ export default function Journal() {
               trades={viewTrades}
               accounts={accounts}
               activeAccountId={activeAccountId}
+              primaryAccountId={primaryAccount?.id ?? null}
               isAdded={isEquityCurveAdded}
               onAdd={handleAddEquityCurve}
               onRemove={handleRemoveEquityCurve}
@@ -2691,6 +2696,7 @@ export default function Journal() {
                   trades={filteredTrades}
                   accounts={accounts}
                   activeAccountId={activeAccountId}
+                  primaryAccountId={primaryAccount?.id ?? null}
                   dateRangeLabel={dateRangeLabel}
                   pinStates={overviewPinStates}
                   isLocked={!canAccessReports}
@@ -2706,7 +2712,9 @@ export default function Journal() {
                   sym={sym}
                   tradesByAccount={tradesByAccount}
                   combineMode={combineMode}
-                  canCombine={canCombine}
+                  primaryAccountId={primaryAccount?.id ?? null}
+                  activeAccountId={activeAccountId}
+                  singleModeTrades={singleModeTrades}
                 />
               </TabsContent>
               <TabsContent value="sessions" className="mt-5">
@@ -2718,7 +2726,9 @@ export default function Journal() {
                   sym={sym}
                   tradesByAccount={tradesByAccount}
                   combineMode={combineMode}
-                  canCombine={canCombine}
+                  primaryAccountId={primaryAccount?.id ?? null}
+                  activeAccountId={activeAccountId}
+                  singleModeTrades={singleModeTrades}
                 />
               </TabsContent>
               <TabsContent value="assets" className="mt-5">
@@ -2730,7 +2740,9 @@ export default function Journal() {
                   sym={sym}
                   tradesByAccount={tradesByAccount}
                   combineMode={combineMode}
-                  canCombine={canCombine}
+                  primaryAccountId={primaryAccount?.id ?? null}
+                  activeAccountId={activeAccountId}
+                  singleModeTrades={singleModeTrades}
                 />
               </TabsContent>
               <TabsContent value="setup" className="mt-5">
@@ -2742,7 +2754,9 @@ export default function Journal() {
                   sym={sym}
                   tradesByAccount={tradesByAccount}
                   combineMode={combineMode}
-                  canCombine={canCombine}
+                  primaryAccountId={primaryAccount?.id ?? null}
+                  activeAccountId={activeAccountId}
+                  singleModeTrades={singleModeTrades}
                 />
               </TabsContent>
               <TabsContent value="psychology" className="mt-5">
@@ -2754,7 +2768,9 @@ export default function Journal() {
                   sym={sym}
                   tradesByAccount={tradesByAccount}
                   combineMode={combineMode}
-                  canCombine={canCombine}
+                  primaryAccountId={primaryAccount?.id ?? null}
+                  activeAccountId={activeAccountId}
+                  singleModeTrades={singleModeTrades}
                 />
               </TabsContent>
               <TabsContent value="risk" className="mt-5">
@@ -2767,7 +2783,9 @@ export default function Journal() {
                   accountBalance={accountBalance}
                   tradesByAccount={tradesByAccount}
                   combineMode={combineMode}
-                  canCombine={canCombine}
+                  primaryAccountId={primaryAccount?.id ?? null}
+                  activeAccountId={activeAccountId}
+                  singleModeTrades={singleModeTrades}
                 />
               </TabsContent>
               <TabsContent value="tradelog" className="mt-5">

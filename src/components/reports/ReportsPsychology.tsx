@@ -48,7 +48,18 @@ interface ReportsPsychologyProps {
   };
   tradesByAccount?: AccountTrades[];
   combineMode?: boolean;
-  canCombine?: boolean;
+  /**
+   * Id of the primary account — used to resolve which single account's trades
+   * to show in single-mode when the Viewing dropdown is "All Accounts".
+   * Never blended across accounts.
+   */
+  primaryAccountId?: string | null;
+  activeAccountId?: string;
+  /**
+   * Trades to display in single-mode. Primary account's trades when All
+   * Accounts is selected, otherwise the selected account's trades.
+   */
+  singleModeTrades?: Trade[];
 }
 
 const POSITIVE_KEYWORDS = ['patient', 'perfect', 'confident', 'disciplined', 'calm', 'good setup', 'followed plan', 'great'];
@@ -80,10 +91,16 @@ function buildHoldTrades(ts: Trade[]) {
     });
 }
 
-export function ReportsPsychology({ trades, dateRangeLabel, pinStates, isLocked = false, sym = '£', tradesByAccount, combineMode, canCombine }: ReportsPsychologyProps) {
+export function ReportsPsychology({ trades: tradesProp, dateRangeLabel, pinStates, isLocked = false, sym = '£', tradesByAccount, combineMode, singleModeTrades }: ReportsPsychologyProps) {
   const { exportToPdf } = usePdfExport();
 
-  const isMultiAccountMode = (tradesByAccount?.length ?? 0) > 1 && !(combineMode && canCombine);
+  // Shadow trades so single-mode psychology stats reflect primary/active
+  // account only. Multi-mode uses tradesByAccount.
+  const trades = singleModeTrades ?? tradesProp;
+
+  // Combine ON  → per-account view (side by side, own scale)
+  // Combine OFF → single account (activeAccountId, or primary if All Accounts)
+  const isMultiAccountMode = !!combineMode && (tradesByAccount?.length ?? 0) > 1;
 
   const accountSymByName = Object.fromEntries(
     (tradesByAccount ?? []).map(({ account }) => [account.name, currencySymbol(account.currency)])

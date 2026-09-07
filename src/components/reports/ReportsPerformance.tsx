@@ -43,7 +43,19 @@ interface ReportsPerformanceProps {
   sym?: string;
   tradesByAccount?: AccountTrades[];
   combineMode?: boolean;
-  canCombine?: boolean;
+  /**
+   * Id of the primary account — used to resolve which single account's trades
+   * to show in single-mode when the Viewing dropdown is "All Accounts".
+   * Never blended across accounts.
+   */
+  primaryAccountId?: string | null;
+  activeAccountId?: string;
+  /**
+   * Trades to display in single-mode. For a specific selected account this is
+   * that account's trades; for "All Accounts" it's the primary account's
+   * trades only. Never a cross-account blend.
+   */
+  singleModeTrades?: Trade[];
   pinStates?: {
     byDay: PinState;
     distribution: PinState;
@@ -72,16 +84,21 @@ function computeTimedTrades(ts: Trade[]) {
 }
 
 export function ReportsPerformance({
-  trades,
+  trades: tradesProp,
   dateRangeLabel,
   pinStates,
   isLocked = false,
   sym = '£',
   tradesByAccount,
   combineMode = false,
-  canCombine = false,
+  singleModeTrades,
 }: ReportsPerformanceProps) {
   const { exportToPdf } = usePdfExport();
+
+  // Shadow trades: everything single-mode below (KPIs, day stats, distribution,
+  // hold-time, monthly heatmap, PDF export summary) works from the single-mode
+  // trades subset. Multi-mode branches still use tradesByAccount separately.
+  const trades = singleModeTrades ?? tradesProp;
 
   const totalPnl = trades.reduce((sum, t) => sum + t.pnl, 0);
   const winningTrades = trades.filter(t => t.pnl > 0);
@@ -143,7 +160,9 @@ export function ReportsPerformance({
     }, {} as Record<string, { month: string; pnl: number; trades: number }>)
   );
 
-  const isMultiAccountMode = (tradesByAccount?.length ?? 0) > 1 && !(combineMode && canCombine);
+  // Combine ON  → per-account view (side by side, own scale)
+  // Combine OFF → single account (activeAccountId, or primary if All Accounts)
+  const isMultiAccountMode = !!combineMode && (tradesByAccount?.length ?? 0) > 1;
 
   const accountSymByName = Object.fromEntries(
     (tradesByAccount ?? []).map(({ account }) => [account.name, currencySymbol(account.currency)])

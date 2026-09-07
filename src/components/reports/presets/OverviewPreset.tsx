@@ -189,9 +189,8 @@ export function OverviewPreset({
             <ReportSectionCard title="Equity Curve" subtitle="Cumulative P&L over the selected period" className="col-span-2">
               <AccountAwareEquityChart
                 perAccount={equityPerAccount}
-                combined={null}
-                canCombine={false}
                 activeAccountId="__preview__"
+                primaryAccountId={null}
                 chartHeight="h-64 print:h-44"
                 curveType="relative"
               />

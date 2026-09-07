@@ -44,7 +44,18 @@ interface ReportsAssetsProps {
   sym?: string;
   tradesByAccount?: AccountTrades[];
   combineMode?: boolean;
-  canCombine?: boolean;
+  /**
+   * Id of the primary account — used to resolve which single account's trades
+   * to show in single-mode when the Viewing dropdown is "All Accounts".
+   * Never blended across accounts.
+   */
+  primaryAccountId?: string | null;
+  activeAccountId?: string;
+  /**
+   * Trades to display in single-mode. Primary account's trades when All
+   * Accounts is selected, otherwise the selected account's trades.
+   */
+  singleModeTrades?: Trade[];
   pinStates?: {
     pnlChart: PinState;
     table: PinState;
@@ -71,16 +82,20 @@ function buildPairData(ts: Trade[]) {
 }
 
 export function ReportsAssets({
-  trades,
+  trades: tradesProp,
   dateRangeLabel,
   pinStates,
   isLocked = false,
   sym = '£',
   tradesByAccount,
   combineMode = false,
-  canCombine = false,
+  singleModeTrades,
 }: ReportsAssetsProps) {
   const { exportToPdf } = usePdfExport();
+
+  // Shadow trades so single-mode pair stats and PDF export reflect
+  // primary/active account only. Multi-mode uses tradesByAccount.
+  const trades = singleModeTrades ?? tradesProp;
 
   // Calculate summary stats for PDF export
   const totalPnl = trades.reduce((sum, t) => sum + t.pnl, 0);
@@ -107,7 +122,9 @@ export function ReportsAssets({
   const chartData = pairData.slice(0, 8).map(p => ({ pair: p.pair, pnl: p.pnl, winRate: p.winRate }));
 
   // Multi-account mode: all-accounts selected + combine off
-  const isMultiAccountMode = (tradesByAccount?.length ?? 0) > 1 && !(combineMode && canCombine);
+  // Combine ON  → per-account view (side by side, own scale)
+  // Combine OFF → single account (activeAccountId, or primary if All Accounts)
+  const isMultiAccountMode = !!combineMode && (tradesByAccount?.length ?? 0) > 1;
 
   // Per-account pair breakdowns
   const perAccountData = isMultiAccountMode
