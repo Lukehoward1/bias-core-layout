@@ -93,7 +93,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const userId = session.metadata?.userId;
         if (!userId || !session.subscription) break;
 
-        const subscription = await stripe.subscriptions.retrieve(session.subscription as string) as Stripe.Subscription & { current_period_end: number | null };
+        // Cast through unknown: newer stripe-node wraps the return in Response<Subscription>,
+        // which no longer overlaps directly with the intersection type. Runtime shape is
+        // Stripe.Subscription (Response is a thin wrapper); the surrounding code defensively
+        // handles nullish current_period_end on line 112.
+        const subscription = await stripe.subscriptions.retrieve(session.subscription as string) as unknown as Stripe.Subscription & { current_period_end: number | null };
         const isFoundingMember = session.metadata?.isFoundingMember === "true";
         const priceId = subscription.items?.data?.[0]?.price?.id ?? "";
         const tier = isFoundingMember ? "founding_member" : tierFromPriceId(priceId);
