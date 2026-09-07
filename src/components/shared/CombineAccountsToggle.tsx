@@ -4,7 +4,6 @@ import { useAccountCombineMode } from "@/hooks/use-active-trading-account";
 
 export function CombineAccountsToggle() {
   const [combineMode, setCombineMode] = useAccountCombineMode();
-  console.log("[combine toggle]", combineMode, "ls=", localStorage.getItem("accountCombineMode:v1"));
   return (
     <div className="flex items-center gap-2">
       <Label htmlFor="combine-accounts-toggle" className="text-xs text-muted-foreground cursor-pointer whitespace-nowrap">
