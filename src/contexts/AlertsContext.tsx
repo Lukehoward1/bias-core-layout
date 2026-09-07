@@ -509,7 +509,12 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
       const quote = quotes[symbol];
       const currentPrice = quote?.last;
 
-      if (!Number.isFinite(currentPrice)) {
+      // Skip on missing/malformed quotes, and on stale quotes (last-known
+      // value preserved after a failed poll). Firing on stale data would
+      // trigger alerts against numbers we already know are out of date.
+      // The stale flag clears on the next successful poll, so this only
+      // pauses for the cycle(s) where fresh data isn't available.
+      if (!Number.isFinite(currentPrice) || quote?.stale) {
         return alert;
       }
 

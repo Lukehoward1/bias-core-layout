@@ -537,9 +537,14 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                   </Button>
                 </div>
 
-                <div className="flex items-baseline gap-3 mb-6">
-                  <span className="text-3xl font-semibold text-foreground">{displayPrice}</span>
+                <div className="flex items-baseline gap-3 mb-6 flex-wrap">
+                  <span className={`text-3xl font-semibold ${quote?.stale ? "text-muted-foreground" : "text-foreground"}`}>{displayPrice}</span>
                   <span className={`text-lg font-medium ${getChangeColor()}`}>{getDisplayedChange()}</span>
+                  {quote?.stale && (
+                    <Badge variant="outline" className="text-xs text-muted-foreground border-muted-foreground/40 self-center">
+                      Stale
+                    </Badge>
+                  )}
                 </div>
 
                 <div>

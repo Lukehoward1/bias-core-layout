@@ -623,8 +623,15 @@ function DashboardWatchlistCard({
 
                   <div className="flex items-center gap-2 shrink-0">
                     <div className="text-right">
-                      <div className="text-sm font-medium text-foreground">
-                        {formatPriceNoCommas(quote?.last?.toString() ?? asset.latestPrice)}
+                      <div className="flex items-center justify-end gap-1.5">
+                        {quote?.stale && (
+                          <Badge variant="outline" className="text-[9px] text-muted-foreground border-muted-foreground/40 py-0 px-1.5">
+                            Stale
+                          </Badge>
+                        )}
+                        <div className={`text-sm font-medium ${quote?.stale ? "text-muted-foreground" : "text-foreground"}`}>
+                          {formatPriceNoCommas(quote?.last?.toString() ?? asset.latestPrice)}
+                        </div>
                       </div>
                       <div className={`text-xs ${getChangeColor(quote, asset.priceChange)}`}>
                         {getDisplayedChange(quote, asset.priceChange)}

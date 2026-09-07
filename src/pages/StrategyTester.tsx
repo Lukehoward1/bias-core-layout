@@ -1,3 +1,19 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// ⚠️  DO NOT ADD THIS PAGE TO THE ROUTER OR SIDEBAR.
+//
+// The backtest results this page renders come from use-strategy-sessions.ts,
+// which fabricates every metric (net profit, win rate, drawdown, trades)
+// with Math.random(). Nothing here runs a real backtest against real data.
+// The page's own internal buttons point to routes that don't exist
+// (/strategy/manual, /strategy/auto, /strategy/funding).
+//
+// Kept in-tree as a UI scaffold for a future feature. Before wiring it
+// into App.tsx or the sidebar: replace the fake generators in
+// use-strategy-sessions.ts with a real backtest engine AND build out the
+// linked-to strategy modes. Shipping this as-is would give users
+// authoritative-looking numbers with no grounding in real market data.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

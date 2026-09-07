@@ -1,3 +1,23 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// ⚠️  DO NOT WIRE THIS INTO ROUTING OR THE SIDEBAR.
+//
+// Every "backtest result" produced by this hook — net profit, win rate,
+// average R:R, drawdown, per-trade P&L, equity curve — is fabricated at
+// call time using Math.random(). Nothing here executes a real strategy
+// against real market data.
+//
+// The associated page (src/pages/StrategyTester.tsx) is currently
+// unreachable: not in App.tsx's router, not linked from the sidebar,
+// and its own internal buttons point to routes that don't exist.
+// Keep it that way. Linking this in would expose users to fake
+// performance figures they'd trust as real backtests.
+//
+// Before this can ship: replace generateMockMetrics / generateEquityCurve
+// / generateSampleTrades with a real backtest engine that consumes actual
+// historical candles (see MarketCandle in src/services/marketData.ts) and
+// runs deterministic strategy logic. Only then wire the page into routing.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { useState, useCallback } from 'react';
 import { StrategySession, SessionMetrics, EquityPoint, SessionTrade } from '@/types/strategySession';
 import { format } from 'date-fns';

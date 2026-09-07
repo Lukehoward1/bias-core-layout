@@ -80,9 +80,24 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
       if (syms.length === 0) return;
       try {
         const results = await getQuotes(syms);
-        const map: Record<string, MarketQuote> = {};
-        for (const q of results) map[q.symbol] = q;
-        setQuotes((prev) => ({ ...prev, ...map }));
+        setQuotes((prev) => {
+          const next: Record<string, MarketQuote> = { ...prev };
+          results.forEach((quote, i) => {
+            const sym = syms[i];
+            if (quote) {
+              // Fresh fetch — replace, clear any prior stale flag
+              next[sym] = quote;
+            } else {
+              // Fetch failed for this symbol. Preserve the last-known-good
+              // value with stale:true so the UI can mark it and alerts
+              // can skip it. No prior value → leave entry absent; display
+              // consumers already handle undefined via static seed data.
+              const prior = prev[sym];
+              if (prior) next[sym] = { ...prior, stale: true };
+            }
+          });
+          return next;
+        });
       } catch { /* fail silently */ }
     };
 

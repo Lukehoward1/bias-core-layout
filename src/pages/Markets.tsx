@@ -461,9 +461,16 @@ export default function Markets() {
 
                     <div className="flex items-end justify-between">
                       <div>
-                        <span className="text-2xl font-bold text-foreground">
-                          {formatPriceNoCommas(quote?.last?.toString() ?? asset.latestPrice)}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-2xl font-bold ${quote?.stale ? "text-muted-foreground" : "text-foreground"}`}>
+                            {formatPriceNoCommas(quote?.last?.toString() ?? asset.latestPrice)}
+                          </span>
+                          {quote?.stale && (
+                            <Badge variant="outline" className="text-[10px] text-muted-foreground border-muted-foreground/40">
+                              Stale
+                            </Badge>
+                          )}
+                        </div>
                         <div className={`text-sm font-medium ${getChangeColor(quote, asset.priceChange)}`}>
                           {getDisplayedChange(quote, asset.priceChange)}
                         </div>
