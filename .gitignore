@@ -26,3 +26,9 @@ dist-ssr
 .env.vercel
 insert-demo-trades.mjs
 .vercel
+
+# Non-code business/marketing artefacts — not part of the app, kept out of git history
+/non-code-assets/
+
+# Local Claude Code project settings — machine-specific, not shared config
+.claude/
