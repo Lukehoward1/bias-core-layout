@@ -189,7 +189,10 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
   const { isInWatchlist, toggleWatchlist } = useWatchlist();
   const { traderStyle } = useTraderStyle();
 
-  const asset = symbol ? getAssetBySymbol(symbol) : undefined;
+  // getAssetBySymbol returns a fresh {...base, biasMode, ...} object per call — memoize
+  // so `asset` is a stable reference across renders (else the [asset]-deps effect refires
+  // every render, thrashing buildMarketContext and downstream state).
+  const asset = useMemo(() => (symbol ? getAssetBySymbol(symbol) : undefined), [symbol, getAssetBySymbol, traderStyle]);
   const isWatchlisted = symbol ? isInWatchlist(symbol) : false;
 
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
@@ -649,7 +652,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
               </div>
 
               <div className="flex flex-col">
-                <div className="grid grid-cols-4 gap-3 mb-6">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
                   <div className="p-3 bg-muted/30 rounded-lg text-center">
                     <span className="text-xs text-muted-foreground block mb-1">Volume</span>
                     <span className="text-sm font-semibold text-foreground">{asset.volume}</span>

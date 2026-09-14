@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { getQuotes, normalizeSymbol, type MarketQuote } from "@/services/marketData";
 import { buildMarketContext, type MarketContext } from "@/services/contextEngine";
 import type { Asset } from "@/data/assets";
@@ -53,11 +53,11 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
       .catch(() => {});
   }, []);
 
-  const subscribeSymbols = (symbols: string[]) => {
+  const subscribeSymbols = useCallback((symbols: string[]) => {
     for (const s of symbols) {
       trackedSymbols.current.add(s.toUpperCase().replace(/[/ ]/g, ""));
     }
-  };
+  }, []);
 
   const subscribeContextSymbols = useCallback((assets: Asset[], style: TraderStyle) => {
     let dirty = false;
@@ -132,11 +132,12 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
     return () => { cancelled = true; };
   }, [contextTrigger, calendarSource]); // quotes intentionally omitted — read from latestQuotes ref
 
-  return (
-    <MarketDataContext.Provider value={{ quotes, subscribeSymbols, contextMap, subscribeContextSymbols }}>
-      {children}
-    </MarketDataContext.Provider>
+  const value = useMemo(
+    () => ({ quotes, subscribeSymbols, contextMap, subscribeContextSymbols }),
+    [quotes, subscribeSymbols, contextMap, subscribeContextSymbols],
   );
+
+  return <MarketDataContext.Provider value={value}>{children}</MarketDataContext.Provider>;
 }
 
 export function useMarketData(): MarketDataContextValue {

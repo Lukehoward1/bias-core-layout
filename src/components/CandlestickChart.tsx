@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { createChart, IChartApi, ISeriesApi, CandlestickData, Time, CandlestickSeries, LineSeries, AreaSeries, BarSeries, CrosshairMode, LineData } from 'lightweight-charts';
+import { createChart, IChartApi, ISeriesApi, CandlestickData, Time, CandlestickSeries, LineSeries, AreaSeries, BarSeries, CrosshairMode, LineData, MouseEventHandler } from 'lightweight-charts';
 import { OhlcDataPoint, formatPrice, formatTime } from '@/lib/mockOhlcData';
 import { ChartToolbar } from './ChartToolbar';
 import { ChartVerticalToolbar } from './ChartVerticalToolbar';
@@ -61,6 +61,7 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
     const chartRef = useRef<IChartApi | null>(null);
     const mainSeriesRef = useRef<ISeriesApi<'Candlestick'> | ISeriesApi<'Line'> | ISeriesApi<'Area'> | ISeriesApi<'Bar'> | null>(null);
     const maSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+    const crosshairHandlerRef = useRef<MouseEventHandler<Time> | null>(null);
     
     const [crosshairEnabled, setCrosshairEnabled] = useState(true);
     const [ohlcEnabled, setOhlcEnabled] = useState(false);
@@ -230,6 +231,10 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
 
       return () => {
         window.removeEventListener('resize', handleResize);
+        if (crosshairHandlerRef.current) {
+          try { chart.unsubscribeCrosshairMove(crosshairHandlerRef.current); } catch { /* chart already gone */ }
+          crosshairHandlerRef.current = null;
+        }
         chart.remove();
         chartRef.current = null;
         mainSeriesRef.current = null;
@@ -249,6 +254,12 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
       if (maSeriesRef.current) {
         chartRef.current.removeSeries(maSeriesRef.current);
         maSeriesRef.current = null;
+      }
+
+      // Drop any prior crosshair handler so we don't stack subscribers on re-runs.
+      if (crosshairHandlerRef.current) {
+        try { chartRef.current.unsubscribeCrosshairMove(crosshairHandlerRef.current); } catch { /* noop */ }
+        crosshairHandlerRef.current = null;
       }
 
       // Prepare data based on chart style
@@ -318,8 +329,9 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
         series.setData(candleData);
         mainSeriesRef.current = series;
 
-        // Subscribe to crosshair move for tooltip (only for candlestick types)
-        chartRef.current.subscribeCrosshairMove((param) => {
+        // Subscribe to crosshair move for tooltip (only for candlestick types).
+        // Stored on a ref so effect re-runs and unmount can unsubscribe the exact handler.
+        const crosshairHandler: MouseEventHandler<Time> = (param) => {
           if (!param.point || !param.time || !param.seriesData.size) {
             setTooltipData(null);
             return;
@@ -344,7 +356,9 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
             close: formatPrice(candleDataPoint.close, pair),
             isUp,
           });
-        });
+        };
+        chartRef.current.subscribeCrosshairMove(crosshairHandler);
+        crosshairHandlerRef.current = crosshairHandler;
       }
 
       // Add MA line if SMA or EMA is active
