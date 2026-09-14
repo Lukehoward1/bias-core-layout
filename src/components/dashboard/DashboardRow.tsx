@@ -23,6 +23,8 @@ interface DashboardRowProps {
   onDragEnd: () => void;
   onDragOverRow: (rowId: string) => void;
   onRemoveCard: (cardId: string) => void;
+  // Tap-based reorder fallback for touch devices — swaps two cards by id.
+  onMoveCard: (draggedCardId: string, targetCardId: string) => void;
   onChangeRowType: (rowId: string, type: RowType) => void;
   onMoveRow: (rowId: string, direction: "up" | "down") => void;
   onRemoveRow: (rowId: string) => void;
@@ -95,6 +97,7 @@ export function DashboardRow({
   onDragEnd,
   onDragOverRow,
   onRemoveCard,
+  onMoveCard,
   onChangeRowType,
   onMoveRow,
   onRemoveRow,
@@ -147,6 +150,9 @@ export function DashboardRow({
 
           if (!content) return null;
 
+          const prevCard = row.cards[cardIndex - 1];
+          const nextCard = row.cards[cardIndex + 1];
+
           return (
             <DraggableDashboardCard
               key={cardEntry.id}
@@ -159,6 +165,8 @@ export function DashboardRow({
               isDragging={draggingCardId === cardEntry.id}
               isDragOver={dragOverCardId === cardEntry.id}
               className={slotClass}
+              onMoveLeft={prevCard ? () => onMoveCard(cardEntry.id, prevCard.id) : undefined}
+              onMoveRight={nextCard ? () => onMoveCard(cardEntry.id, nextCard.id) : undefined}
             >
               {content}
             </DraggableDashboardCard>

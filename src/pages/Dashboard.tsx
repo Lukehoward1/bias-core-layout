@@ -424,6 +424,7 @@ export default function Dashboard() {
             onDragEnd={handleDragEnd}
             onDragOverRow={handleDragOverRow}
             onRemoveCard={removeCard}
+            onMoveCard={moveCard}
             onChangeRowType={changeRowType}
             onMoveRow={moveRow}
             onRemoveRow={removeRow}
