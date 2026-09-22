@@ -44,14 +44,35 @@ export default function Login() {
     return null;
   }
 
+  function friendlySignInError(raw: string): string {
+    const lower = raw.toLowerCase();
+    if (lower.includes("missing email") || lower.includes("missing phone")) {
+      return "Please enter your email and password.";
+    }
+    if (lower.includes("invalid login credentials")) {
+      return "Email or password is incorrect.";
+    }
+    if (lower.includes("email not confirmed")) {
+      return "Please confirm your email before signing in — check your inbox.";
+    }
+    return raw;
+  }
+
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
     setSignInError(null);
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      setSignInError("Please enter your email and password.");
+      return;
+    }
+
     setSignInLoading(true);
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password });
     if (error) {
       setSignInLoading(false);
-      setSignInError(error.message);
+      setSignInError(friendlySignInError(error.message));
       return;
     }
     const user = data.user;
