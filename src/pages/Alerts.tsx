@@ -26,6 +26,7 @@ import { AlertsSoundToggle } from "@/components/alerts/AlertsSoundToggle";
 import { CreatePriceAlertModal } from "@/components/alerts/CreatePriceAlertModal";
 import { useAlertsContext } from "@/contexts/AlertsContext";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
+import { useTapHandler } from "@/hooks/use-tap-handler";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { toast } from "sonner";
@@ -345,6 +346,7 @@ type MyAlertsRow =
     };
 
 export default function Alerts() {
+  const tap = useTapHandler();
   const [activeTab, setActiveTab] = useState("overview");
   const [showCreatePriceAlert, setShowCreatePriceAlert] = useState(false);
   const [editingPriceAlert, setEditingPriceAlert] = useState<PriceAlert | null>(null);
@@ -714,12 +716,12 @@ export default function Alerts() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
             <div className="overflow-x-auto">
               <TabsList className="h-9">
-                <TabsTrigger value="overview" className="text-sm gap-2">
+                <TabsTrigger value="overview" className="text-sm gap-2" {...tap(() => setActiveTab("overview"))}>
                   <Bell className="h-4 w-4" />
                   Overview
                 </TabsTrigger>
 
-                <TabsTrigger value="price-alerts" className="text-sm gap-2">
+                <TabsTrigger value="price-alerts" className="text-sm gap-2" {...tap(() => setActiveTab("price-alerts"))}>
                   <Target className="h-4 w-4" />
                   Price Alerts
                   {activePriceAlertsCount > 0 && (
@@ -729,7 +731,7 @@ export default function Alerts() {
                   )}
                 </TabsTrigger>
 
-                <TabsTrigger value="inbox" className="text-sm gap-2">
+                <TabsTrigger value="inbox" className="text-sm gap-2" {...tap(() => setActiveTab("inbox"))}>
                   <Inbox className="h-4 w-4" />
                   Inbox
                   {unreadCount > 0 && (
@@ -739,7 +741,7 @@ export default function Alerts() {
                   )}
                 </TabsTrigger>
 
-                <TabsTrigger value="preferences" className="text-sm gap-2">
+                <TabsTrigger value="preferences" className="text-sm gap-2" {...tap(() => setActiveTab("preferences"))}>
                   <Settings className="h-4 w-4" />
                   Preferences
                 </TabsTrigger>

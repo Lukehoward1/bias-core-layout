@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { CourseDetailModal } from "@/components/education/CourseDetailModal";
 import { CertificateModal } from "@/components/education/CertificateModal";
 import { EducationContentModal } from "@/components/education/EducationContentModal";
+import { useTapHandler } from "@/hooks/use-tap-handler";
 import { useEducationProgress } from "@/hooks/use-education-progress";
 import { generateCertificatePdf } from "@/lib/generateCertificatePdf";
 import { toast } from "@/hooks/use-toast";
@@ -199,6 +200,7 @@ const demoCertificates: Certificate[] = [
 ];
 
 export default function Education() {
+  const tap = useTapHandler();
   const [searchParams] = useSearchParams();
   const showTips = searchParams.get("view") === "tips";
 
@@ -311,20 +313,22 @@ export default function Education() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {tips.map((tip) => (
+              {tips.map((tip) => {
+                const openTip = () =>
+                  setSelectedContent({
+                    title: tip.title,
+                    type: "tip",
+                    level: "Beginner",
+                    readTime: calculateReadTime(tip.content),
+                    tags: tip.tags,
+                    content: tip.content,
+                  });
+                return (
                 <Card
                   key={tip.id}
-                  className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group flex flex-col"
-                  onClick={() =>
-                    setSelectedContent({
-                      title: tip.title,
-                      type: "tip",
-                      level: "Beginner",
-                      readTime: calculateReadTime(tip.content),
-                      tags: tip.tags,
-                      content: tip.content,
-                    })
-                  }
+                  className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group flex flex-col select-none [-webkit-touch-callout:none]"
+                  onClick={openTip}
+                  {...tap(openTip)}
                 >
                   <CardContent className="p-4 flex flex-col flex-1">
                     <h3 className="font-medium text-foreground group-hover:text-primary transition-colors mb-1 text-sm sm:text-base">
@@ -347,7 +351,8 @@ export default function Education() {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -397,20 +402,22 @@ export default function Education() {
               <p className="text-sm text-muted-foreground col-span-2 py-8 text-center">
                 No guides in this category yet.
               </p>
-            ) : sortedFilteredArticles.map((article) => (
+            ) : sortedFilteredArticles.map((article) => {
+              const openArticle = () =>
+                setSelectedContent({
+                  title: article.title,
+                  type: "article",
+                  level: article.level,
+                  readTime: calculateReadTime(article.content),
+                  tags: article.tags,
+                  content: article.content,
+                });
+              return (
               <Card
                 key={article.id}
-                className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group flex flex-col"
-                onClick={() =>
-                  setSelectedContent({
-                    title: article.title,
-                    type: "article",
-                    level: article.level,
-                    readTime: calculateReadTime(article.content),
-                    tags: article.tags,
-                    content: article.content,
-                  })
-                }
+                className="bg-card border-border hover:border-primary/50 transition-colors cursor-pointer group flex flex-col select-none [-webkit-touch-callout:none]"
+                onClick={openArticle}
+                {...tap(openArticle)}
               >
                 <CardContent className="p-4 flex flex-col flex-1">
                   <h3 className="font-medium text-foreground group-hover:text-primary transition-colors mb-1 text-sm sm:text-base">
@@ -446,7 +453,8 @@ export default function Education() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calculator, DollarSign, TrendingUp, LinkIcon, RefreshCw, ArrowRight } from "lucide-react";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
+import { useTapHandler } from "@/hooks/use-tap-handler";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 import { useRiskToolMode } from "@/hooks/use-risk-tool-mode";
 import { RiskToolModeToggle } from "@/components/risk/RiskToolModeToggle";
@@ -84,6 +85,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
   const [customRiskInput, setCustomRiskInput] = useState<string>("");
   const [isCustomRisk, setIsCustomRisk] = useState<boolean>(false);
 
+  const tap = useTapHandler();
   const [assetCategory, setAssetCategory] = useState<"FX" | "Futures">("FX");
   const [selectedInstrument, setSelectedInstrument] = useState<string>("EURUSD");
 
@@ -288,6 +290,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                   <button
                     key={preset}
                     onClick={() => handleRiskPresetChange(preset)}
+                    {...tap(() => handleRiskPresetChange(preset))}
                     className={cn(
                       "py-2 px-3 text-sm font-medium rounded-md border transition-all",
                       !isCustomRisk && riskPercent === preset
@@ -335,6 +338,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => setAssetCategory("FX")}
+                  {...tap(() => setAssetCategory("FX"))}
                   className={cn(
                     "py-2 px-4 text-sm font-medium rounded-md border transition-all",
                     assetCategory === "FX"
@@ -346,6 +350,7 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                 </button>
                 <button
                   onClick={() => setAssetCategory("Futures")}
+                  {...tap(() => setAssetCategory("Futures"))}
                   className={cn(
                     "py-2 px-4 text-sm font-medium rounded-md border transition-all",
                     assetCategory === "Futures"

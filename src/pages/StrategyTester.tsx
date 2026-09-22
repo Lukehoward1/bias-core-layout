@@ -19,6 +19,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useTapHandler } from "@/hooks/use-tap-handler";
 
 // Unified teal accent color matching StreamBias theme
 const ICON_COLOR = "#2EC4B6";
@@ -70,6 +71,7 @@ const ShieldIcon = () => (
 
 export default function StrategyTester() {
   const navigate = useNavigate();
+  const tap = useTapHandler();
 
   return (
     <div className="p-6 space-y-6">
@@ -85,9 +87,10 @@ export default function StrategyTester() {
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Manual Backtesting */}
         <Card
-          className="bg-card border-border hover:border-primary/50 transition-all duration-300 cursor-pointer group animate-fade-in"
+          className="bg-card border-border hover:border-primary/50 transition-all duration-300 cursor-pointer group animate-fade-in select-none [-webkit-touch-callout:none]"
           style={{ animationDelay: "0.1s" }}
           onClick={() => navigate("/strategy/manual")}
+          {...tap(() => navigate("/strategy/manual"))}
         >
           <CardContent className="p-8 flex flex-col items-center text-center">
             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 group-hover:scale-105 group-hover:shadow-[0_0_20px_rgba(46,196,182,0.15)] transition-all duration-300">
@@ -106,9 +109,10 @@ export default function StrategyTester() {
 
         {/* Automated Strategy Lab */}
         <Card
-          className="bg-card border-border hover:border-primary/50 transition-all duration-300 cursor-pointer group animate-fade-in"
+          className="bg-card border-border hover:border-primary/50 transition-all duration-300 cursor-pointer group animate-fade-in select-none [-webkit-touch-callout:none]"
           style={{ animationDelay: "0.2s" }}
           onClick={() => navigate("/strategy/auto")}
+          {...tap(() => navigate("/strategy/auto"))}
         >
           <CardContent className="p-8 flex flex-col items-center text-center">
             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 group-hover:scale-105 group-hover:shadow-[0_0_20px_rgba(46,196,182,0.15)] transition-all duration-300">
@@ -127,9 +131,10 @@ export default function StrategyTester() {
 
         {/* Funding Challenge Simulator */}
         <Card
-          className="bg-card border-border hover:border-primary/50 transition-all duration-300 cursor-pointer group animate-fade-in"
+          className="bg-card border-border hover:border-primary/50 transition-all duration-300 cursor-pointer group animate-fade-in select-none [-webkit-touch-callout:none]"
           style={{ animationDelay: "0.3s" }}
           onClick={() => navigate("/strategy/funding")}
+          {...tap(() => navigate("/strategy/funding"))}
         >
           <CardContent className="p-8 flex flex-col items-center text-center">
             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 group-hover:scale-105 group-hover:shadow-[0_0_20px_rgba(46,196,182,0.15)] transition-all duration-300">

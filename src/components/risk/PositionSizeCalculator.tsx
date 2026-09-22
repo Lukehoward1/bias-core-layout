@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Ruler, Lock } from "lucide-react";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
+import { useTapHandler } from "@/hooks/use-tap-handler";
 import { getFXInstruments, getFuturesInstruments, getInstrumentBySymbol } from "@/data/tradingInstruments";
 import { useMarketQuote } from "@/hooks/use-market-quotes";
 import { useRiskToolMode } from "@/hooks/use-risk-tool-mode";
@@ -68,6 +69,7 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
   const { homeCurrency } = useHomeCurrency();
   const sym = currencySymbol(homeCurrency);
 
+  const tap = useTapHandler();
   const [assetCategory, setAssetCategory] = useState<"FX" | "Futures">("FX");
   const [instrument, setInstrument] = useState<string>("EURUSD");
 
@@ -238,6 +240,7 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => setAssetCategory("FX")}
+                  {...tap(() => setAssetCategory("FX"))}
                   className={`py-2 px-4 text-sm font-medium rounded-md border transition-all ${
                     assetCategory === "FX"
                       ? "bg-primary text-primary-foreground border-primary"
@@ -248,6 +251,7 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
                 </button>
                 <button
                   onClick={() => setAssetCategory("Futures")}
+                  {...tap(() => setAssetCategory("Futures"))}
                   className={`py-2 px-4 text-sm font-medium rounded-md border transition-all ${
                     assetCategory === "Futures"
                       ? "bg-primary text-primary-foreground border-primary"

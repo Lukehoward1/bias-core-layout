@@ -26,6 +26,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useTapHandler } from '@/hooks/use-tap-handler';
 
 export interface SavedBacktest {
   id: string;
@@ -54,6 +55,7 @@ export function SavedBacktestsDropdown({
   onLoad,
   onCompare,
 }: SavedBacktestsDropdownProps) {
+  const tap = useTapHandler();
   const [loadModalOpen, setLoadModalOpen] = useState(false);
   const [compareModalOpen, setCompareModalOpen] = useState(false);
   const [selectedForCompare, setSelectedForCompare] = useState<string[]>([]);
@@ -136,7 +138,11 @@ export function SavedBacktestsDropdown({
                       onLoad(backtest.id);
                       setLoadModalOpen(false);
                     }}
-                    className="p-3 rounded-lg border border-border hover:bg-muted/50 cursor-pointer transition-colors"
+                    {...tap(() => {
+                      onLoad(backtest.id);
+                      setLoadModalOpen(false);
+                    })}
+                    className="p-3 rounded-lg border border-border hover:bg-muted/50 cursor-pointer transition-colors select-none [-webkit-touch-callout:none]"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium text-sm">{backtest.strategyName}</span>

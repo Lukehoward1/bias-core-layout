@@ -27,6 +27,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
+import { useTapHandler } from "@/hooks/use-tap-handler";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { LockedBadge } from "@/components/journal/FeatureGate";
@@ -236,6 +237,8 @@ function EquityCurveCard({ trades, accounts, activeAccountId, primaryAccountId, 
 ======================= */
 
 export default function Journal() {
+  const tap = useTapHandler();
+  const [reportsTab, setReportsTab] = useState<string>("overview");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [showWeekends, setShowWeekends] = useState<boolean>(() => {
     try { return JSON.parse(localStorage.getItem("cal_show_weekends") ?? "false"); }
@@ -1093,13 +1096,13 @@ export default function Journal() {
       <div className="max-w-7xl mx-auto space-y-6">
         <Tabs value={activeJournalTab} onValueChange={setActiveJournalTab} className="w-full">
           <TabsList className="grid w-full max-w-sm grid-cols-3">
-            <TabsTrigger value="journal" className="text-sm">
+            <TabsTrigger value="journal" className="text-sm" {...tap(() => setActiveJournalTab("journal"))}>
               Journal
             </TabsTrigger>
-            <TabsTrigger value="planner" className="text-sm">
+            <TabsTrigger value="planner" className="text-sm" {...tap(() => setActiveJournalTab("planner"))}>
               Planner
             </TabsTrigger>
-            <TabsTrigger value="reports" className="text-sm">
+            <TabsTrigger value="reports" className="text-sm" {...tap(() => setActiveJournalTab("reports"))}>
               Analytics
             </TabsTrigger>
           </TabsList>
@@ -1454,11 +1457,13 @@ export default function Journal() {
                                 <div
                                   key={dIdx}
                                   onClick={() => isCurrentMonth && handleDayClick(date)}
+                                  {...tap(() => { if (isCurrentMonth) handleDayClick(date); })}
                                   className={`
                                     min-h-[80px] p-2 rounded-lg border border-border/50 flex flex-col
                                     ${bgClass}
                                     ${!isCurrentMonth ? "opacity-30" : "cursor-pointer"}
                                     transition-colors
+                                    select-none [-webkit-touch-callout:none]
                                   `}
                                 >
                                   <span className={`text-xs ${isCurrentMonth ? "text-foreground" : "text-muted-foreground"}`}>
@@ -1704,6 +1709,7 @@ export default function Journal() {
                                   <button
                                     type="button"
                                     onClick={() => handleNoteClick(trade.id, trade.notes || "")}
+                                    {...tap(() => handleNoteClick(trade.id, trade.notes || ""))}
                                     className="text-xs text-left hover:text-foreground transition-colors max-w-[120px] truncate"
                                   >
                                     {trade.notes || <span className="text-muted-foreground/60 italic">Add note…</span>}
@@ -2664,31 +2670,31 @@ export default function Journal() {
               </DialogContent>
             </Dialog>
 
-            <Tabs defaultValue="overview" className="w-full">
+            <Tabs value={reportsTab} onValueChange={setReportsTab} className="w-full">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
                 <TabsList className="grid w-full lg:w-auto grid-cols-4 lg:grid-cols-8 h-auto gap-1 p-1">
-                  <TabsTrigger value="overview" className="text-xs px-2 py-1.5">
+                  <TabsTrigger value="overview" className="text-xs px-2 py-1.5" {...tap(() => setReportsTab("overview"))}>
                     Overview
                   </TabsTrigger>
-                  <TabsTrigger value="performance" className="text-xs px-2 py-1.5">
+                  <TabsTrigger value="performance" className="text-xs px-2 py-1.5" {...tap(() => setReportsTab("performance"))}>
                     Performance
                   </TabsTrigger>
-                  <TabsTrigger value="sessions" className="text-xs px-2 py-1.5">
+                  <TabsTrigger value="sessions" className="text-xs px-2 py-1.5" {...tap(() => setReportsTab("sessions"))}>
                     Sessions
                   </TabsTrigger>
-                  <TabsTrigger value="assets" className="text-xs px-2 py-1.5">
+                  <TabsTrigger value="assets" className="text-xs px-2 py-1.5" {...tap(() => setReportsTab("assets"))}>
                     Assets
                   </TabsTrigger>
-                  <TabsTrigger value="setup" className="text-xs px-2 py-1.5">
+                  <TabsTrigger value="setup" className="text-xs px-2 py-1.5" {...tap(() => setReportsTab("setup"))}>
                     Setup Quality
                   </TabsTrigger>
-                  <TabsTrigger value="psychology" className="text-xs px-2 py-1.5">
+                  <TabsTrigger value="psychology" className="text-xs px-2 py-1.5" {...tap(() => setReportsTab("psychology"))}>
                     Psychology
                   </TabsTrigger>
-                  <TabsTrigger value="risk" className="text-xs px-2 py-1.5">
+                  <TabsTrigger value="risk" className="text-xs px-2 py-1.5" {...tap(() => setReportsTab("risk"))}>
                     Risk Mgmt
                   </TabsTrigger>
-                  <TabsTrigger value="tradelog" className="text-xs px-2 py-1.5">
+                  <TabsTrigger value="tradelog" className="text-xs px-2 py-1.5" {...tap(() => setReportsTab("tradelog"))}>
                     Trade Log
                   </TabsTrigger>
                 </TabsList>

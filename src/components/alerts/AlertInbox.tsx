@@ -24,6 +24,7 @@ import {
 
 import type { AlertItem, AlertType } from "@/types/alerts";
 import { cn } from "@/lib/utils";
+import { useTapHandler } from "@/hooks/use-tap-handler";
 
 interface AlertInboxProps {
   alerts: AlertItem[];
@@ -46,6 +47,7 @@ export function AlertInbox({
 }: AlertInboxProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const tap = useTapHandler();
   const [filter, setFilter] = useState<"all" | "unread">("all");
 
   const unreadCount = useMemo(() => alerts.filter((alert) => !alert.read).length, [alerts]);
@@ -253,10 +255,10 @@ export function AlertInbox({
       <CardContent>
         <Tabs value={filter} onValueChange={(value) => setFilter(value as "all" | "unread")}>
           <TabsList className="h-8 mb-3">
-            <TabsTrigger value="all" className="text-xs">
+            <TabsTrigger value="all" className="text-xs" {...tap(() => setFilter("all"))}>
               All ({alerts.length})
             </TabsTrigger>
-            <TabsTrigger value="unread" className="text-xs">
+            <TabsTrigger value="unread" className="text-xs" {...tap(() => setFilter("unread"))}>
               Unread ({unreadCount})
             </TabsTrigger>
           </TabsList>

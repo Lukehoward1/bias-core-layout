@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Lightbulb, Zap } from "lucide-react";
+import { useTapHandler } from "@/hooks/use-tap-handler";
 
 interface TipCardProps {
   title: string;
@@ -11,6 +12,7 @@ interface TipCardProps {
 }
 
 export function TipCard({ title, content, category, level, onClick }: TipCardProps) {
+  const tap = useTapHandler();
   const getLevelColor = (level: string) => {
     switch (level) {
       case 'Beginner': return 'bg-success/20 text-success border-success/30';
@@ -31,9 +33,10 @@ export function TipCard({ title, content, category, level, onClick }: TipCardPro
   };
 
   return (
-    <Card 
-      className="group cursor-pointer hover:border-warning/50 transition-all duration-200 hover:shadow-lg hover:shadow-warning/5 bg-gradient-to-br from-card to-warning/5"
+    <Card
+      className="group cursor-pointer hover:border-warning/50 transition-all duration-200 hover:shadow-lg hover:shadow-warning/5 bg-gradient-to-br from-card to-warning/5 select-none [-webkit-touch-callout:none]"
       onClick={onClick}
+      {...tap(onClick)}
     >
       <CardContent className="p-4">
         <div className="flex items-start gap-3">

@@ -26,6 +26,7 @@ import {
 import { StrategySession } from "@/types/strategySession";
 import { SessionComparison } from "./SessionComparison";
 import { MiniEquityCurve } from "./MiniEquityCurve";
+import { useTapHandler } from "@/hooks/use-tap-handler";
 
 interface SessionsPanelProps {
   sessions: StrategySession[];
@@ -48,6 +49,7 @@ export function SessionsPanel({
   onUpdateNotes,
   getSelectedSessions,
 }: SessionsPanelProps) {
+  const tap = useTapHandler();
   const [isOpen, setIsOpen] = useState(false);
   const [viewingSession, setViewingSession] = useState<StrategySession | null>(null);
   const [isComparing, setIsComparing] = useState(false);
@@ -270,8 +272,9 @@ export function SessionsPanel({
                         className="shrink-0"
                       />
                       <div
-                        className="flex-1 min-w-0 cursor-pointer"
+                        className="flex-1 min-w-0 cursor-pointer select-none [-webkit-touch-callout:none]"
                         onClick={() => setViewingSession(session)}
+                        {...tap(() => setViewingSession(session))}
                       >
                         <div className="font-medium text-sm truncate">{session.name}</div>
                         <div className="flex items-center gap-2 mt-1">

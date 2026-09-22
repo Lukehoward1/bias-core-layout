@@ -23,6 +23,7 @@ import { setPrioritySymbol } from "@/services/candleData";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
 import { CandlestickChart, type CandlestickChartRef } from "@/components/CandlestickChart";
 import { fetchRealOhlcData, type OhlcDataPoint } from "@/lib/mockOhlcData";
+import { useTapHandler } from "@/hooks/use-tap-handler";
 
 // Returns the currencies relevant to a symbol for FMP calendar filtering.
 // FX pairs split naturally; indices and metals map to their primary currency.
@@ -188,6 +189,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
   const { getAssetBySymbol } = useAssets();
   const { isInWatchlist, toggleWatchlist } = useWatchlist();
   const { traderStyle } = useTraderStyle();
+  const tap = useTapHandler();
 
   // getAssetBySymbol returns a fresh {...base, biasMode, ...} object per call — memoize
   // so `asset` is a stable reference across renders (else the [asset]-deps effect refires
@@ -516,7 +518,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
         </div>
 
         {onRequestClose && (
-          <Button variant="outline" size="sm" onClick={onRequestClose} className="gap-2">
+          <Button variant="outline" size="sm" onClick={onRequestClose} {...tap(onRequestClose)} className="gap-2">
             <X className="h-4 w-4" />
             Close
           </Button>
@@ -1141,6 +1143,7 @@ export default function AssetDetail() {
   const { symbol } = useParams<{ symbol: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const tap = useTapHandler();
 
   const closeOverlay = useCallback(() => {
     const from = (location.state as { from?: string } | null)?.from;
@@ -1155,14 +1158,22 @@ export default function AssetDetail() {
 
   if (!symbol) return null;
 
+  const overlayTap = tap(() => closeOverlay());
+
   return (
     <div
-      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm p-4 md:p-8 overflow-y-auto"
-      onClick={closeOverlay}
+      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm p-4 md:p-8 overflow-y-auto select-none [-webkit-touch-callout:none] touch-manipulation [&_*]:touch-manipulation"
+      onClick={(e) => { if (e.target === e.currentTarget) closeOverlay(); }}
+      onPointerDown={(e) => { if (e.target === e.currentTarget) overlayTap.onPointerDown(e); }}
+      onPointerMove={overlayTap.onPointerMove}
+      onPointerUp={(e) => { if (e.target === e.currentTarget) overlayTap.onPointerUp(e); else overlayTap.onPointerCancel(); }}
+      onPointerCancel={overlayTap.onPointerCancel}
     >
       <div
         className="mx-auto max-w-6xl rounded-xl border border-border bg-background shadow-2xl overflow-hidden"
         onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
+        onPointerUp={(event) => event.stopPropagation()}
       >
         <AssetDetailContent symbol={symbol} onRequestClose={closeOverlay} />
       </div>

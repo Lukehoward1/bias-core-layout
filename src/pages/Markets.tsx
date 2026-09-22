@@ -13,6 +13,7 @@ import { TrendingUp, TrendingDown, Minus, Calendar, Star, ChevronRight, Activity
 import { useWatchlist, useAssets } from "@/hooks/use-watchlist";
 import { useMarketQuotes } from "@/hooks/use-market-quotes";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
+import { useTapHandler } from "@/hooks/use-tap-handler";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { toast } from "sonner";
 
@@ -113,6 +114,7 @@ export default function Markets() {
   const { watchlist, toggleWatchlist, isInWatchlist, watchlistAssets } = useWatchlist();
   const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
   const { traderStyle } = useTraderStyle();
+  const tap = useTapHandler();
 
   const watchlistOverviewCardId = "watchlist-overview";
   const isWatchlistOverviewAdded = isCardOnDashboard(watchlistOverviewCardId);
@@ -329,7 +331,8 @@ export default function Markets() {
                     <div
                       key={asset.symbol}
                       onClick={() => openAssetDetail(asset.symbol)}
-                      className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/40 cursor-pointer transition-colors group"
+                      {...tap(() => openAssetDetail(asset.symbol))}
+                      className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/40 cursor-pointer transition-colors group select-none [-webkit-touch-callout:none]"
                     >
                       <div className="min-w-[90px]">
                         <div className="font-semibold text-foreground">{asset.symbol}</div>
@@ -425,7 +428,8 @@ export default function Markets() {
                 <Card
                   key={asset.symbol}
                   onClick={() => openAssetDetail(asset.symbol)}
-                  className="hover:shadow-lg transition-shadow cursor-pointer group relative"
+                  {...tap(() => openAssetDetail(asset.symbol))}
+                  className="hover:shadow-lg transition-shadow cursor-pointer group relative select-none [-webkit-touch-callout:none]"
                 >
                   <Button
                     variant="ghost"

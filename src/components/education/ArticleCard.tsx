@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock, BookOpen, ArrowRight } from "lucide-react";
+import { useTapHandler } from "@/hooks/use-tap-handler";
 
 interface ArticleCardProps {
   title: string;
@@ -12,6 +13,7 @@ interface ArticleCardProps {
 }
 
 export function ArticleCard({ title, preview, readTime, level, tags, onClick }: ArticleCardProps) {
+  const tap = useTapHandler();
   const getLevelColor = (level: string) => {
     switch (level) {
       case 'Beginner': return 'bg-success/20 text-success border-success/30';
@@ -22,9 +24,10 @@ export function ArticleCard({ title, preview, readTime, level, tags, onClick }: 
   };
 
   return (
-    <Card 
-      className="group cursor-pointer hover:border-primary/50 transition-all duration-200 hover:shadow-lg hover:shadow-primary/5"
+    <Card
+      className="group cursor-pointer hover:border-primary/50 transition-all duration-200 hover:shadow-lg hover:shadow-primary/5 select-none [-webkit-touch-callout:none]"
       onClick={onClick}
+      {...tap(onClick)}
     >
       <CardContent className="p-5">
         <div className="flex items-center gap-2 mb-3">

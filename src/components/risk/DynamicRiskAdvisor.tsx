@@ -17,6 +17,7 @@ import { RiskToolModeToggle } from "@/components/risk/RiskToolModeToggle";
 import { useJournalTrades } from "@/hooks/use-journal-trades";
 import { cn } from "@/lib/utils";
 import type { Trade } from "@/hooks/use-journal-trades";
+import { useTapHandler } from "@/hooks/use-tap-handler";
 
 const RISK_STORAGE_KEY = "globalRiskPreset";
 const MIN_TRADES = 20;
@@ -259,6 +260,8 @@ export function DynamicRiskAdvisor({
     return trades;
   }, [trades, isEffectivelyLinked, selectedAccount]);
 
+  const tap = useTapHandler();
+  const [advisorTab, setAdvisorTab] = useState<string>("sessions");
   const [baseRisk, setBaseRisk] = useState<number>(1);
 
   useEffect(() => {
@@ -418,15 +421,15 @@ export function DynamicRiskAdvisor({
             </div>
           </div>
         ) : (
-          <Tabs defaultValue="sessions">
+          <Tabs value={advisorTab} onValueChange={setAdvisorTab}>
             <TabsList className="h-8 gap-1 mb-4">
-              <TabsTrigger value="sessions" className="text-xs px-3 h-6">
+              <TabsTrigger value="sessions" className="text-xs px-3 h-6" {...tap(() => setAdvisorTab("sessions"))}>
                 Sessions
               </TabsTrigger>
-              <TabsTrigger value="setups" className="text-xs px-3 h-6">
+              <TabsTrigger value="setups" className="text-xs px-3 h-6" {...tap(() => setAdvisorTab("setups"))}>
                 Setups
               </TabsTrigger>
-              <TabsTrigger value="days" className="text-xs px-3 h-6">
+              <TabsTrigger value="days" className="text-xs px-3 h-6" {...tap(() => setAdvisorTab("days"))}>
                 Days
               </TabsTrigger>
             </TabsList>

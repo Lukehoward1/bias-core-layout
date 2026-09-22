@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Star, TrendingUp, TrendingDown, Minus, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
+import { useTapHandler } from "@/hooks/use-tap-handler";
 import { DashboardEditToolbar } from "@/components/dashboard/DashboardEditToolbar";
 import { DashboardRow } from "@/components/dashboard/DashboardRow";
 import { CombineAccountsToggle } from "@/components/shared/CombineAccountsToggle";
@@ -174,6 +175,7 @@ const getStateDotClass = (state: TimeframeState) => {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const tap = useTapHandler();
   const [fullName, setFullName] = useState<string | null>(null);
   const [isNameLoading, setIsNameLoading] = useState(true);
 
@@ -349,11 +351,15 @@ export default function Dashboard() {
 
       return (
         <div
-          className={cn("h-full", !isEditMode && "cursor-pointer")}
+          className={cn("h-full select-none [-webkit-touch-callout:none]", !isEditMode && "cursor-pointer")}
           onClick={() => {
             if (isEditMode) return;
             openSessionModal(active);
           }}
+          {...tap(() => {
+            if (isEditMode) return;
+            openSessionModal(active);
+          })}
           role="button"
           tabIndex={0}
           onKeyDown={(e) => {

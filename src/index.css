@@ -130,6 +130,56 @@ Spacing System:
   body {
     @apply bg-background text-foreground;
   }
+
+  /* iOS Safari's press-and-hold text-selection gesture intercepts taps on any
+     text-containing element, breaking clicks on cards, tabs, and — while a
+     selection is active — even nearby native <button>s. Suppress it app-wide
+     under #app-shell (AppLayout's authenticated shell) and re-enable
+     explicitly on form fields and .text-selectable content.
+
+     touch-action: manipulation disables double-tap-to-zoom, which otherwise
+     gates click synthesis by ~300ms and causes the "must double-tap to open"
+     regression that appeared after the last fix. It's safe app-wide: pan/
+     scroll on <main>'s overflow-y-auto still work normally.
+
+     AssetDetail's modal-route form is a body-level sibling of #app-shell
+     (App.tsx renders it outside AppLayout when backgroundLocation is set),
+     so its outer overlay div applies the same behavior inline. */
+  #app-shell {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* touch-action does NOT inherit (unlike user-select and -webkit-touch-callout),
+     so applying it only to #app-shell leaves every descendant computed to `auto`
+     — which reintroduces the ~300ms double-tap-to-zoom click delay on cards,
+     tabs, etc. Broadcast it to all descendants explicitly. Universal selector
+     inside a narrow ID scope is cheap. */
+  #app-shell,
+  #app-shell * {
+    touch-action: manipulation;
+  }
+
+  #app-shell input,
+  #app-shell textarea,
+  #app-shell [contenteditable="true"],
+  #app-shell [contenteditable=""] {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+  }
+}
+
+@layer utilities {
+  /* Opt-in: re-enable native text selection on content meant to be read
+     or copied rather than tapped. Not currently applied inside #app-shell —
+     kept available for future use if a long-form info panel is added. */
+  .text-selectable {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+  }
 }
 
 /* Utility class for hiding scrollbars in modals while maintaining scroll functionality */
