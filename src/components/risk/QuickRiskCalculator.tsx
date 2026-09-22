@@ -417,6 +417,14 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
                       type="checkbox"
                       checked={includeSpread}
                       onChange={(e) => setIncludeSpread(e.target.checked)}
+                      onClick={(e) => {
+                        // Synthetic (non-trusted) click doesn't trigger the
+                        // browser's native checkbox toggle / change event on
+                        // affected iOS Safari devices, so drive state from
+                        // click explicitly. On desktop this fires alongside
+                        // the native toggle+change but is idempotent.
+                        if (!e.isTrusted) setIncludeSpread((v) => !v);
+                      }}
                       className="h-4 w-4 accent-[hsl(var(--primary))]"
                     />
                     Include spread in stop distance

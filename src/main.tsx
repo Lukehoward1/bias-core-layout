@@ -4,6 +4,9 @@ import App from "./App";
 import "./index.css";
 
 import { MarketDataProvider } from "@/context/MarketDataProvider";
+import { installClickSynthesizer } from "@/lib/click-synthesizer";
+
+installClickSynthesizer();
 
 createRoot(document.getElementById("root")!).render(
   <BrowserRouter>

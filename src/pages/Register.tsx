@@ -167,6 +167,12 @@ export default function Register() {
                   type="checkbox"
                   checked={agreedToTerms}
                   onChange={(e) => setAgreedToTerms(e.target.checked)}
+                  onClick={(e) => {
+                    // Synthetic (non-trusted) click doesn't trigger the
+                    // browser's native toggle / change event on affected
+                    // iOS Safari devices — drive state from click directly.
+                    if (!e.isTrusted) setAgreedToTerms((v) => !v);
+                  }}
                   className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-primary"
                 />
                 <Label htmlFor="agree-terms" className="text-sm text-muted-foreground font-normal cursor-pointer leading-snug">
