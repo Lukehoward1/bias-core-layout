@@ -267,7 +267,7 @@ export default function Markets() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-6">
       <AppHeader title="Markets" />
 
       <div className="max-w-7xl mx-auto space-y-6">
@@ -349,11 +349,11 @@ export default function Markets() {
                       </div>
 
                       {context?.biasState === "Bias Unavailable" ? (
-                        <span className="text-sm text-muted-foreground/60 min-w-[120px]">Coming soon</span>
+                        <span className="text-sm text-muted-foreground/60 flex-1 min-w-0 truncate">Coming soon</span>
                       ) : (
-                        <div className={`flex items-center gap-1 min-w-[120px] ${getBiasColor(getBiasDirection(context?.biasState))}`}>
+                        <div className={`flex items-center gap-1 flex-1 min-w-0 ${getBiasColor(getBiasDirection(context?.biasState))}`}>
                           {getBiasIcon(getBiasDirection(context?.biasState))}
-                          <span className="text-sm">{context?.biasState ?? "—"}</span>
+                          <span className="text-sm truncate">{context?.biasState ?? "—"}</span>
                         </div>
                       )}
 
@@ -446,19 +446,19 @@ export default function Markets() {
                     />
                   </Button>
 
-                  <CardHeader className="pb-3 pr-12">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
+                  <CardHeader className="pb-3 pr-11">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="min-w-0">
                         <CardTitle className="text-xl leading-none">{asset.symbol}</CardTitle>
-                        <p className="text-xs text-muted-foreground mt-1">{asset.displayName}</p>
+                        <p className="text-xs text-muted-foreground mt-1 truncate">{asset.displayName}</p>
                       </div>
 
                       {context?.biasState === "Bias Unavailable" ? (
-                        <span className="text-xs text-muted-foreground/60 font-medium">Coming soon</span>
+                        <span className="text-xs text-muted-foreground/60 font-medium shrink-0">Coming soon</span>
                       ) : (
-                        <div className={`flex items-center gap-1.5 ${getBiasColor(getBiasDirection(context?.biasState))}`}>
+                        <div className={`flex items-center gap-1.5 min-w-0 ${getBiasColor(getBiasDirection(context?.biasState))}`}>
                           {getBiasIcon(getBiasDirection(context?.biasState))}
-                          <span className="text-sm font-medium">{context?.biasState ?? "—"}</span>
+                          <span className="text-sm font-medium truncate">{context?.biasState ?? "—"}</span>
                         </div>
                       )}
                     </div>

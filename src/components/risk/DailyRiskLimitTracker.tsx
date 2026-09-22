@@ -168,9 +168,9 @@ export function DailyRiskLimitTracker({ isAdded, onAdd, onRemove, compact = fals
   return (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <ShieldCheck className="h-5 w-5 text-primary" />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
+            <ShieldCheck className="h-5 w-5 text-primary shrink-0" />
             <CardTitle>Daily Risk Limit Tracker</CardTitle>
             <RiskToolModeToggle mode={mode} onChange={setMode} />
           </div>

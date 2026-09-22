@@ -173,8 +173,9 @@ export default function Settings() {
     }
   }, [stripeCustomerId, session, navigate]);
 
-  const planOptions: { value: string | null; label: string; color: string }[] = [
-    { value: null, label: "None (Free)", color: "bg-muted text-muted-foreground" },
+  // Dev-only tier switcher (gated by import.meta.env.DEV below). "None (Free)"
+  // was removed — StreamBias has no free tier in production.
+  const planOptions: { value: string; label: string; color: string }[] = [
     { value: "standard", label: "Standard", color: "bg-primary/20 text-primary" },
     { value: "pro", label: "Pro", color: "bg-accent text-accent-foreground" },
     { value: "founding_member", label: "Founding Member", color: "bg-warning/10 text-warning" },
@@ -635,9 +636,9 @@ export default function Settings() {
             </CardHeader>
 
             <CardContent>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-muted-foreground mr-2">Current plan:</span>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {planOptions.map((option) => (
                     <Button
                       key={option.value}

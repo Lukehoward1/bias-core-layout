@@ -154,9 +154,9 @@ export function MaxDrawdownGuard({ isAdded, onAdd, onRemove, compact = false }: 
   return (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Shield className="h-5 w-5 text-primary" />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
+            <Shield className="h-5 w-5 text-primary shrink-0" />
             <CardTitle>Max Drawdown Guard</CardTitle>
             <RiskToolModeToggle mode={mode} onChange={setMode} />
           </div>

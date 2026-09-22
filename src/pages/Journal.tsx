@@ -1,5 +1,5 @@
 // src/pages/Journal.tsx
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { useTapHandler } from "@/hooks/use-tap-handler";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { LockedBadge } from "@/components/journal/FeatureGate";
@@ -44,6 +45,8 @@ import {
   isSameMonth,
   addMonths,
   subMonths,
+  addWeeks,
+  subWeeks,
   isWithinInterval,
   parseISO,
 } from "date-fns";
@@ -236,10 +239,29 @@ function EquityCurveCard({ trades, accounts, activeAccountId, primaryAccountId, 
    PAGE
 ======================= */
 
+// Compact PnL formatter for narrow mobile day cells. Preserves the sign,
+// currency symbol, and 1-2 significant digits: +£1,900 → "+£1.9k",
+// +£12,345 → "+£12k", +£1,234,567 → "+£1.2m", small values stay whole.
+function formatPnLCompact(pnl: number, sym: string): string {
+  const sign = pnl > 0 ? "+" : pnl < 0 ? "-" : "";
+  const abs = Math.abs(pnl);
+  if (abs < 1000) return `${sign}${sym}${Math.round(abs)}`;
+  if (abs < 10_000) return `${sign}${sym}${(abs / 1000).toFixed(1)}k`;
+  if (abs < 1_000_000) return `${sign}${sym}${Math.round(abs / 1000)}k`;
+  return `${sign}${sym}${(abs / 1_000_000).toFixed(1)}m`;
+}
+
 export default function Journal() {
   const tap = useTapHandler();
+  const isMobile = useIsMobile();
   const [reportsTab, setReportsTab] = useState<string>("overview");
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  // Separate state for the mobile week-view pager, so switching viewport size
+  // doesn't lose the user's position. Initialised to the current real-life
+  // week (Monday-start) which is usually the most useful anchor.
+  const [mobileWeekStart, setMobileWeekStart] = useState(() =>
+    startOfWeek(new Date(), { weekStartsOn: 1 }),
+  );
   const [showWeekends, setShowWeekends] = useState<boolean>(() => {
     try { return JSON.parse(localStorage.getItem("cal_show_weekends") ?? "false"); }
     catch { return false; }
@@ -1223,101 +1245,203 @@ export default function Journal() {
             </div>
 
             {/* Top stats (active scope) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-5">
+            {isMobile ? (
               <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Trades</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <AccountAwareStat
-                    perAccount={kpiPerAccount}
-                    primaryAccountId={primaryAccount?.id ?? null}
-                    activeAccountId={activeAccountId}
-                    select={(s) => s.totalTrades}
-                    format={(v) => String(v)}
-                  />
+                <CardContent className="p-0">
+                  <div className="grid grid-cols-3">
+                    {(
+                      [
+                        {
+                          label: "Trades",
+                          stat: (
+                            <AccountAwareStat
+                              perAccount={kpiPerAccount}
+                              primaryAccountId={primaryAccount?.id ?? null}
+                              activeAccountId={activeAccountId}
+                              select={(s) => s.totalTrades}
+                              format={(v) => String(v)}
+                              sizeClass="text-xl font-bold whitespace-nowrap"
+                            />
+                          ),
+                        },
+                        {
+                          label: "Win Rate",
+                          stat: (
+                            <AccountAwareStat
+                              perAccount={kpiPerAccount}
+                              primaryAccountId={primaryAccount?.id ?? null}
+                              activeAccountId={activeAccountId}
+                              select={(s) => s.winRate}
+                              format={(v) => `${v}%`}
+                              sizeClass="text-xl font-bold whitespace-nowrap"
+                            />
+                          ),
+                        },
+                        {
+                          label: "Total P&L",
+                          stat: (
+                            <AccountAwareStat
+                              perAccount={kpiPerAccount}
+                              primaryAccountId={primaryAccount?.id ?? null}
+                              activeAccountId={activeAccountId}
+                              select={(s) => s.totalPnl}
+                              format={(v) => formatPnLCompact(Number(v), sym)}
+                              colorClass={(v) => (Number(v) >= 0 ? "text-success" : "text-destructive")}
+                              sizeClass="text-xl font-bold whitespace-nowrap"
+                            />
+                          ),
+                        },
+                        {
+                          label: "Avg R:R",
+                          stat: (
+                            <AccountAwareStat
+                              perAccount={kpiPerAccount}
+                              primaryAccountId={primaryAccount?.id ?? null}
+                              activeAccountId={activeAccountId}
+                              select={(s) => s.avgRR}
+                              format={(v) => Number(v).toFixed(1)}
+                              sizeClass="text-xl font-bold whitespace-nowrap"
+                            />
+                          ),
+                        },
+                        {
+                          label: "Prof. Factor",
+                          stat: (
+                            <AccountAwareStat
+                              perAccount={kpiPerAccount}
+                              primaryAccountId={primaryAccount?.id ?? null}
+                              activeAccountId={activeAccountId}
+                              select={(s) => s.profitFactor}
+                              format={(v) => String(v)}
+                              sizeClass="text-xl font-bold whitespace-nowrap"
+                            />
+                          ),
+                        },
+                        {
+                          label: "Breakevens",
+                          stat: (
+                            <AccountAwareStat
+                              perAccount={kpiPerAccount}
+                              primaryAccountId={primaryAccount?.id ?? null}
+                              activeAccountId={activeAccountId}
+                              select={(s) => `${s.breakevens} (${s.breakevenRate}%)`}
+                              format={(v) => String(v)}
+                              sizeClass="text-lg font-bold whitespace-nowrap"
+                            />
+                          ),
+                        },
+                      ] as { label: string; stat: React.ReactNode }[]
+                    ).map(({ label, stat }, i) => (
+                      <div
+                        key={i}
+                        className={`p-3 flex flex-col gap-1.5${i % 3 !== 2 ? " border-r border-border" : ""}${i < 3 ? " border-b border-border" : ""}`}
+                      >
+                        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground leading-none">
+                          {label}
+                        </span>
+                        {stat}
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-5">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Trades</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <AccountAwareStat
+                      perAccount={kpiPerAccount}
+                      primaryAccountId={primaryAccount?.id ?? null}
+                      activeAccountId={activeAccountId}
+                      select={(s) => s.totalTrades}
+                      format={(v) => String(v)}
+                    />
+                  </CardContent>
+                </Card>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Profit Rate</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <AccountAwareStat
-                    perAccount={kpiPerAccount}
-                    primaryAccountId={primaryAccount?.id ?? null}
-                    activeAccountId={activeAccountId}
-                    select={(s) => s.winRate}
-                    format={(v) => `${v}%`}
-                  />
-                </CardContent>
-              </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Profit Rate</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <AccountAwareStat
+                      perAccount={kpiPerAccount}
+                      primaryAccountId={primaryAccount?.id ?? null}
+                      activeAccountId={activeAccountId}
+                      select={(s) => s.winRate}
+                      format={(v) => `${v}%`}
+                    />
+                  </CardContent>
+                </Card>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Total P&amp;L</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <AccountAwareStat
-                    perAccount={kpiPerAccount}
-                    primaryAccountId={primaryAccount?.id ?? null}
-                    activeAccountId={activeAccountId}
-                    select={(s) => s.totalPnl}
-                    format={(v) => {
-                      const n = Number(v);
-                      return `${n >= 0 ? "+" : ""}${sym}${Number(Math.abs(n)).toLocaleString()}`;
-                    }}
-                    colorClass={(v) => (Number(v) >= 0 ? "text-success" : "text-destructive")}
-                  />
-                </CardContent>
-              </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Total P&amp;L</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <AccountAwareStat
+                      perAccount={kpiPerAccount}
+                      primaryAccountId={primaryAccount?.id ?? null}
+                      activeAccountId={activeAccountId}
+                      select={(s) => s.totalPnl}
+                      format={(v) => {
+                        const n = Number(v);
+                        return `${n >= 0 ? "+" : ""}${sym}${Number(Math.abs(n)).toLocaleString()}`;
+                      }}
+                      colorClass={(v) => (Number(v) >= 0 ? "text-success" : "text-destructive")}
+                    />
+                  </CardContent>
+                </Card>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Avg R:R</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <AccountAwareStat
-                    perAccount={kpiPerAccount}
-                    primaryAccountId={primaryAccount?.id ?? null}
-                    activeAccountId={activeAccountId}
-                    select={(s) => s.avgRR}
-                    format={(v) => Number(v).toFixed(1)}
-                  />
-                </CardContent>
-              </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Avg R:R</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <AccountAwareStat
+                      perAccount={kpiPerAccount}
+                      primaryAccountId={primaryAccount?.id ?? null}
+                      activeAccountId={activeAccountId}
+                      select={(s) => s.avgRR}
+                      format={(v) => Number(v).toFixed(1)}
+                    />
+                  </CardContent>
+                </Card>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Profit Factor</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <AccountAwareStat
-                    perAccount={kpiPerAccount}
-                    primaryAccountId={primaryAccount?.id ?? null}
-                    activeAccountId={activeAccountId}
-                    select={(s) => s.profitFactor}
-                    format={(v) => String(v)}
-                  />
-                </CardContent>
-              </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Profit Factor</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <AccountAwareStat
+                      perAccount={kpiPerAccount}
+                      primaryAccountId={primaryAccount?.id ?? null}
+                      activeAccountId={activeAccountId}
+                      select={(s) => s.profitFactor}
+                      format={(v) => String(v)}
+                    />
+                  </CardContent>
+                </Card>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Breakevens</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <AccountAwareStat
-                    perAccount={kpiPerAccount}
-                    primaryAccountId={primaryAccount?.id ?? null}
-                    activeAccountId={activeAccountId}
-                    select={(s) => `${s.breakevens} (${s.breakevenRate}%)`}
-                    format={(v) => String(v)}
-                  />
-                </CardContent>
-              </Card>
-            </div>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Breakevens</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <AccountAwareStat
+                      perAccount={kpiPerAccount}
+                      primaryAccountId={primaryAccount?.id ?? null}
+                      activeAccountId={activeAccountId}
+                      select={(s) => `${s.breakevens} (${s.breakevenRate}%)`}
+                      format={(v) => String(v)}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
             {/* ✅ Equity curve uses active scope */}
             <EquityCurveCard
@@ -1333,9 +1457,9 @@ export default function Journal() {
             {/* Daily Performance calendar (active scope) */}
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <CardTitle>Daily Performance</CardTitle>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     <label className="flex items-center gap-1.5 cursor-pointer select-none">
                       <span className="text-xs text-muted-foreground">Weekends</span>
                       <Switch
@@ -1349,25 +1473,40 @@ export default function Journal() {
                       onAdd={handleAddDailyPerformance}
                       onRemove={handleRemoveDailyPerformance}
                     />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="text-sm font-medium min-w-[120px] text-center">
-                      {format(currentMonth, "MMMM yyyy")}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => {
+                          if (isMobile) setMobileWeekStart(subWeeks(mobileWeekStart, 1));
+                          else setCurrentMonth(subMonths(currentMonth, 1));
+                        }}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="text-sm font-medium min-w-[110px] text-center">
+                        {isMobile
+                          ? (() => {
+                              const weekEnd = addDays(mobileWeekStart, 6);
+                              return isSameMonth(mobileWeekStart, weekEnd)
+                                ? `${format(mobileWeekStart, "MMM d")} – ${format(weekEnd, "d")}`
+                                : `${format(mobileWeekStart, "MMM d")} – ${format(weekEnd, "MMM d")}`;
+                            })()
+                          : format(currentMonth, "MMMM yyyy")}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => {
+                          if (isMobile) setMobileWeekStart(addWeeks(mobileWeekStart, 1));
+                          else setCurrentMonth(addMonths(currentMonth, 1));
+                        }}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardHeader>
@@ -1377,7 +1516,132 @@ export default function Journal() {
                     ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
                     : ["Mon", "Tue", "Wed", "Thu", "Fri"];
                   const numDayCols = dayNames.length;
-                  const gridTemplate = `repeat(${numDayCols}, 1fr) 0.5rem 0.8fr`;
+
+                  // Mobile: week-at-a-time view. A full month grid can't fit 5-7
+                  // day columns + a weekly-total column on a ~350px screen
+                  // without unreadable PnL truncation. Instead we page by week
+                  // (via the same prev/next arrows above, which are already
+                  // conditional on isMobile) and show the weekly summary as a
+                  // full-width strip below the day row rather than a squeezed
+                  // 7th column.
+                  if (isMobile) {
+                    const weekDays: Date[] = Array.from({ length: 7 }, (_, i) =>
+                      addDays(mobileWeekStart, i),
+                    );
+                    const visibleDays = showWeekends ? weekDays : weekDays.slice(0, 5);
+
+                    const weekSummary = visibleDays.reduce(
+                      (acc, d) => {
+                        const s = getDailySummary(d);
+                        return { pnl: acc.pnl + s.totalPnl, trades: acc.trades + s.tradeCount };
+                      },
+                      { pnl: 0, trades: 0 },
+                    );
+
+                    let stripBg = "bg-muted/20";
+                    let stripPnlClass = "text-muted-foreground";
+                    if (weekSummary.trades > 0) {
+                      if (weekSummary.pnl > 0) {
+                        stripBg = "bg-success/15";
+                        stripPnlClass = "text-success";
+                      } else if (weekSummary.pnl < 0) {
+                        stripBg = "bg-destructive/15";
+                        stripPnlClass = "text-destructive";
+                      }
+                    }
+
+                    const mobileGridTemplate = `repeat(${numDayCols}, minmax(0, 1fr))`;
+
+                    return (
+                      <>
+                        {/* Day-name header row */}
+                        <div
+                          className="grid gap-1.5 mb-1.5"
+                          style={{ gridTemplateColumns: mobileGridTemplate }}
+                        >
+                          {(showWeekends ? dayNames : dayNames.slice(0, 5)).map((dayName) => (
+                            <div
+                              key={dayName}
+                              className="text-center text-[11px] font-medium text-muted-foreground py-1"
+                            >
+                              {dayName}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Day cells row */}
+                        <div className="grid gap-1.5" style={{ gridTemplateColumns: mobileGridTemplate }}>
+                          {visibleDays.map((date, dIdx) => {
+                            const summary = getDailySummary(date);
+                            const hasTrades = summary.tradeCount > 0;
+                            let bgClass = "bg-muted/20";
+                            let pnlColorClass = "text-muted-foreground";
+                            if (hasTrades) {
+                              if (summary.totalPnl > 0) {
+                                bgClass = "bg-success/10";
+                                pnlColorClass = "text-success";
+                              } else if (summary.totalPnl < 0) {
+                                bgClass = "bg-destructive/10";
+                                pnlColorClass = "text-destructive";
+                              } else {
+                                bgClass = "bg-muted/30";
+                              }
+                            }
+                            return (
+                              <div
+                                key={dIdx}
+                                onClick={() => handleDayClick(date)}
+                                {...tap(() => handleDayClick(date))}
+                                className={`
+                                  min-h-[72px] p-1.5 rounded-lg border border-border/50 flex flex-col
+                                  min-w-0 overflow-hidden
+                                  ${bgClass}
+                                  cursor-pointer transition-colors
+                                  select-none [-webkit-touch-callout:none]
+                                `}
+                              >
+                                <span className="text-[11px] font-medium text-foreground leading-none mb-1">
+                                  {format(date, "d")}
+                                </span>
+                                {hasTrades && (
+                                  <>
+                                    <span className={`text-xs font-bold mt-auto leading-tight ${pnlColorClass}`}>
+                                      {formatPnLCompact(summary.totalPnl, sym)}
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground leading-none mt-0.5">
+                                      {summary.tradeCount}t
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Full-width weekly summary strip */}
+                        <div
+                          className={`mt-3 flex items-center justify-between px-3 py-2 rounded-md ${stripBg}`}
+                        >
+                          <span className="text-xs text-muted-foreground">This week</span>
+                          <div className="flex items-center gap-3">
+                            <span className={`text-sm font-semibold ${stripPnlClass}`}>
+                              {weekSummary.trades > 0 ? formatPnLCompact(weekSummary.pnl, sym) : "—"}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {weekSummary.trades} trade{weekSummary.trades !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  }
+
+                  // Desktop: full month grid with the week-total column intact.
+                  // minmax(0, 1fr) — cells share available width equally but
+                  // never expand past their share if content is wider. Prevents
+                  // long PnL strings ("+$12,345") from forcing the whole grid
+                  // wider than the card on mobile.
+                  const gridTemplate = `repeat(${numDayCols}, minmax(0, 1fr)) 0.5rem minmax(0, 0.8fr)`;
 
                   // Split calendarDays into weeks of 7 (Mon–Sun), then optionally drop Sat/Sun
                   const weeks: Date[][] = [];
@@ -1460,6 +1724,7 @@ export default function Journal() {
                                   {...tap(() => { if (isCurrentMonth) handleDayClick(date); })}
                                   className={`
                                     min-h-[80px] p-2 rounded-lg border border-border/50 flex flex-col
+                                    min-w-0 overflow-hidden
                                     ${bgClass}
                                     ${!isCurrentMonth ? "opacity-30" : "cursor-pointer"}
                                     transition-colors
@@ -2699,7 +2964,7 @@ export default function Journal() {
                   </TabsTrigger>
                 </TabsList>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                   <CombineAccountsToggle />
 
                   <Button

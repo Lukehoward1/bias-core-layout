@@ -714,39 +714,37 @@ export default function Alerts() {
       <div className="max-w-7xl mx-auto space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-            <div className="overflow-x-auto">
-              <TabsList className="h-9">
-                <TabsTrigger value="overview" className="text-sm gap-2" {...tap(() => setActiveTab("overview"))}>
-                  <Bell className="h-4 w-4" />
-                  Overview
-                </TabsTrigger>
+            <TabsList className="h-auto flex-wrap justify-start">
+              <TabsTrigger value="overview" className="text-sm gap-2" {...tap(() => setActiveTab("overview"))}>
+                <Bell className="h-4 w-4" />
+                Overview
+              </TabsTrigger>
 
-                <TabsTrigger value="price-alerts" className="text-sm gap-2" {...tap(() => setActiveTab("price-alerts"))}>
-                  <Target className="h-4 w-4" />
-                  Price Alerts
-                  {activePriceAlertsCount > 0 && (
-                    <Badge variant="secondary" className="text-[10px] h-5 px-1.5 ml-1">
-                      {activePriceAlertsCount}
-                    </Badge>
-                  )}
-                </TabsTrigger>
+              <TabsTrigger value="price-alerts" className="text-sm gap-2" {...tap(() => setActiveTab("price-alerts"))}>
+                <Target className="h-4 w-4" />
+                Price Alerts
+                {activePriceAlertsCount > 0 && (
+                  <Badge variant="secondary" className="text-[10px] h-5 px-1.5 ml-1">
+                    {activePriceAlertsCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
 
-                <TabsTrigger value="inbox" className="text-sm gap-2" {...tap(() => setActiveTab("inbox"))}>
-                  <Inbox className="h-4 w-4" />
-                  Inbox
-                  {unreadCount > 0 && (
-                    <Badge variant="destructive" className="text-[10px] h-5 px-1.5 ml-1">
-                      {unreadCount}
-                    </Badge>
-                  )}
-                </TabsTrigger>
+              <TabsTrigger value="inbox" className="text-sm gap-2" {...tap(() => setActiveTab("inbox"))}>
+                <Inbox className="h-4 w-4" />
+                Inbox
+                {unreadCount > 0 && (
+                  <Badge variant="destructive" className="text-[10px] h-5 px-1.5 ml-1">
+                    {unreadCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
 
-                <TabsTrigger value="preferences" className="text-sm gap-2" {...tap(() => setActiveTab("preferences"))}>
-                  <Settings className="h-4 w-4" />
-                  Preferences
-                </TabsTrigger>
-              </TabsList>
-            </div>
+              <TabsTrigger value="preferences" className="text-sm gap-2" {...tap(() => setActiveTab("preferences"))}>
+                <Settings className="h-4 w-4" />
+                Preferences
+              </TabsTrigger>
+            </TabsList>
 
             <AlertsSoundToggle />
           </div>

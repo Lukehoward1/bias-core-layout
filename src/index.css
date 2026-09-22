@@ -131,6 +131,20 @@ Spacing System:
     @apply bg-background text-foreground;
   }
 
+  /* Page-level horizontal scroll safety net. Nothing in the app should ever
+     cause the whole viewport to pan sideways on mobile — if a single row is
+     too wide, it should wrap or clip in place, not spill out and push the
+     page. Applied at html/body so it covers both authenticated app-shell
+     content and pre-auth pages (Landing, Login, etc.). Elements that need
+     intentional horizontal scrolling (chart canvases, chip scrollers) use
+     their own `overflow-x-auto` which creates a new scroll context and is
+     unaffected by this ancestor rule. */
+  html,
+  body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
   /* iOS Safari's press-and-hold text-selection gesture intercepts taps on any
      text-containing element, breaking clicks on cards, tabs, and — while a
      selection is active — even nearby native <button>s. Suppress it app-wide
