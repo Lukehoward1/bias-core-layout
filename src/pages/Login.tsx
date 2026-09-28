@@ -25,25 +25,6 @@ export default function Login() {
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetLoading, setResetLoading] = useState(false);
 
-  async function waitForProfile(userId: string, maxAttempts = 8, delayMs = 1500): Promise<string | null> {
-    for (let i = 0; i < maxAttempts; i++) {
-      const { data } = await supabase
-        .from("profiles")
-        .select("subscription_status")
-        .eq("id", userId)
-        .single();
-
-      if (data?.subscription_status === "active" || data?.subscription_status === "trialing") {
-        return data.subscription_status;
-      }
-
-      if (i < maxAttempts - 1) {
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-      }
-    }
-    return null;
-  }
-
   function friendlySignInError(raw: string): string {
     const lower = raw.toLowerCase();
     if (lower.includes("missing email") || lower.includes("missing phone")) {
@@ -75,10 +56,8 @@ export default function Login() {
       setSignInError(friendlySignInError(error.message));
       return;
     }
-    const user = data.user;
-    if (!user) { navigate("/pricing"); return; }
-    const status = await waitForProfile(user.id);
-    navigate(status ? "/dashboard" : "/pricing");
+    if (!data.user) { navigate("/pricing"); return; }
+    navigate("/dashboard");
   }
 
   async function handleForgot(e: React.FormEvent) {
