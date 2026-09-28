@@ -1,5 +1,6 @@
 // src/components/reports/ReportsTradeLog.tsx
 import { useState, useMemo, useEffect } from "react";
+import { format, parseISO } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,8 @@ import { PdfExportButton } from "./PdfExportButton";
 import { usePdfExport } from "@/hooks/use-pdf-export";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 import { ACTIVE_ACCOUNT_ALL } from "@/hooks/use-active-trading-account";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { shortAccountName } from "@/lib/account-colors";
 
 interface Trade {
   id: string;
@@ -57,6 +60,7 @@ const csvEscape = (v: unknown) => {
 export function ReportsTradeLog({ trades, dateRangeLabel, sym = '£', activeAccountId }: ReportsTradeLogProps) {
   const { exportToPdf } = usePdfExport();
   const { accounts, primaryAccount } = useLinkedAccounts();
+  const isMobile = useIsMobile();
 
   // Summary stats for PDF payload
   const totalPnl = trades.reduce((sum, t) => sum + t.pnl, 0);
@@ -341,100 +345,161 @@ export function ReportsTradeLog({ trades, dateRangeLabel, sym = '£', activeAcco
         <span className="text-destructive">-{sym}{loss.toLocaleString()} loss</span>
       </div>
 
-      {/* Trade Table */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Date</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Account</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Pair</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Type</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Entry</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Exit</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Lots</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">P&L</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Rating</th>
-                  <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground min-w-[150px]">Notes</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {filteredTrades.map((trade) => {
-                  const accName = trade.accountId ? accountNameById.get(trade.accountId) || "Account" : "Unknown";
-                  const isPrimary = !!primaryAccount?.id && trade.accountId === primaryAccount.id;
-
-                  return (
-                    <tr key={trade.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                      <td className="py-3 px-3 text-sm text-muted-foreground">{trade.date}</td>
-
-                      <td className="py-3 px-3">
-                        <Badge variant="secondary" className="text-xs">
-                          {accName}
-                          {isPrimary ? " (Primary)" : ""}
-                        </Badge>
-                      </td>
-
-                      <td className="py-3 px-3">
-                        <Badge variant="outline" className="text-xs">
-                          {trade.pair}
-                        </Badge>
-                      </td>
-
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-1.5">
-                          {trade.type === "Long" ? (
-                            <TrendingUp className="h-3.5 w-3.5 text-success" />
-                          ) : (
-                            <TrendingDown className="h-3.5 w-3.5 text-destructive" />
-                          )}
-                          <span className="text-sm text-foreground">{trade.type}</span>
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-3 text-sm text-foreground">{trade.entry}</td>
-                      <td className="py-3 px-3 text-sm text-foreground">{trade.exit}</td>
-                      <td className="py-3 px-3 text-sm text-foreground">{trade.lots}</td>
-
-                      <td className="py-3 px-3">
-                        <span className={`text-sm font-medium ${trade.pnl >= 0 ? "text-success" : "text-destructive"}`}>
-                          {trade.pnl >= 0 ? "+" : ""}{sym}{trade.pnl.toLocaleString()}
-                        </span>
-                      </td>
-
-                      <td className="py-3 px-3">
-                        {trade.rating ? (
-                          <div className="flex gap-0.5">
-                            {[...Array(trade.rating)].map((_, i) => (
-                              <Star key={i} className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </td>
-
-                      <td className="py-3 px-3">
-                        <span className="text-xs text-muted-foreground truncate max-w-[150px] block">
-                          {trade.notes || "—"}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-
-            {filteredTrades.length === 0 && (
+      {/* Trade list (mobile) / table (desktop) */}
+      {isMobile ? (
+        <Card>
+          <CardContent className="pt-4 pb-2 px-3">
+            {filteredTrades.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-sm text-muted-foreground">No trades match your filters</p>
               </div>
+            ) : (
+              <div className="space-y-2">
+                {filteredTrades.map((trade) => {
+                  const accName = trade.accountId ? accountNameById.get(trade.accountId) || "Account" : "Unknown";
+                  const isPrimary = !!primaryAccount?.id && trade.accountId === primaryAccount.id;
+                  const dateShort = format(parseISO(trade.date), "d MMM");
+
+                  return (
+                    <div
+                      key={trade.id}
+                      className="flex items-center justify-between px-3 py-3 rounded-lg border border-border bg-background"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-foreground">{trade.pair}</span>
+                          <div className="flex items-center gap-1">
+                            {trade.type === "Long" ? (
+                              <TrendingUp className="h-3.5 w-3.5 text-success" />
+                            ) : (
+                              <TrendingDown className="h-3.5 w-3.5 text-destructive" />
+                            )}
+                            <span className="text-xs text-muted-foreground">{trade.type}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-xs text-muted-foreground">{dateShort}</span>
+                          <span className="text-xs text-muted-foreground">·</span>
+                          <span className="text-xs text-muted-foreground truncate">
+                            {shortAccountName(accName)}{isPrimary ? " ★" : ""}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-0.5 ml-3 shrink-0">
+                        <span className={`text-sm font-semibold ${trade.pnl >= 0 ? "text-success" : "text-destructive"}`}>
+                          {trade.pnl >= 0 ? "+" : ""}{sym}{trade.pnl.toLocaleString()}
+                        </span>
+                        {trade.rating ? (
+                          <div className="flex gap-0.5">
+                            {[...Array(trade.rating)].map((_, i) => (
+                              <Star key={i} className="h-2.5 w-2.5 fill-yellow-400 text-yellow-400" />
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Date</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Account</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Pair</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Type</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Entry</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Exit</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Lots</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">P&L</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Rating</th>
+                    <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground min-w-[150px]">Notes</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredTrades.map((trade) => {
+                    const accName = trade.accountId ? accountNameById.get(trade.accountId) || "Account" : "Unknown";
+                    const isPrimary = !!primaryAccount?.id && trade.accountId === primaryAccount.id;
+
+                    return (
+                      <tr key={trade.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                        <td className="py-3 px-3 text-sm text-muted-foreground">{trade.date}</td>
+
+                        <td className="py-3 px-3">
+                          <Badge variant="secondary" className="text-xs">
+                            {accName}
+                            {isPrimary ? " (Primary)" : ""}
+                          </Badge>
+                        </td>
+
+                        <td className="py-3 px-3">
+                          <Badge variant="outline" className="text-xs">
+                            {trade.pair}
+                          </Badge>
+                        </td>
+
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-1.5">
+                            {trade.type === "Long" ? (
+                              <TrendingUp className="h-3.5 w-3.5 text-success" />
+                            ) : (
+                              <TrendingDown className="h-3.5 w-3.5 text-destructive" />
+                            )}
+                            <span className="text-sm text-foreground">{trade.type}</span>
+                          </div>
+                        </td>
+
+                        <td className="py-3 px-3 text-sm text-foreground">{trade.entry}</td>
+                        <td className="py-3 px-3 text-sm text-foreground">{trade.exit}</td>
+                        <td className="py-3 px-3 text-sm text-foreground">{trade.lots}</td>
+
+                        <td className="py-3 px-3">
+                          <span className={`text-sm font-medium ${trade.pnl >= 0 ? "text-success" : "text-destructive"}`}>
+                            {trade.pnl >= 0 ? "+" : ""}{sym}{trade.pnl.toLocaleString()}
+                          </span>
+                        </td>
+
+                        <td className="py-3 px-3">
+                          {trade.rating ? (
+                            <div className="flex gap-0.5">
+                              {[...Array(trade.rating)].map((_, i) => (
+                                <Star key={i} className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
+
+                        <td className="py-3 px-3">
+                          <span className="text-xs text-muted-foreground truncate max-w-[150px] block">
+                            {trade.notes || "—"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              {filteredTrades.length === 0 && (
+                <div className="text-center py-8">
+                  <p className="text-sm text-muted-foreground">No trades match your filters</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

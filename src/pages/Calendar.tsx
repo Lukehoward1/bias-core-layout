@@ -187,7 +187,7 @@ function Calendar() {
   // Loading state — live data fetch still in-flight
   if (calendarIsLoading) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         <AppHeader title="Calendar" />
         <div className="max-w-7xl mx-auto flex flex-col items-center justify-center py-24 gap-4">
           <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -200,7 +200,7 @@ function Calendar() {
   // No live data — FMP not yet active; never show synthetic fixture data to users
   if (!calendarHasData) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         <AppHeader title="Calendar" />
         <div className="max-w-7xl mx-auto">
           <Card>
