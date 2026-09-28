@@ -48,13 +48,17 @@ let installed = false;
 // action gated by a trusted event — we have to reproduce it manually because
 // dispatchEvent'd mouse events don't perform default actions. `tabindex="-1"`
 // is deliberately excluded: those are focusable-via-script-only, not by tap.
+// Intentionally narrow: only real text-entry elements that need an explicit
+// .focus() call so the keyboard appears and a cursor is visible. Radix
+// interactive controls (Select, Tabs, Dialog, DropdownMenu, etc.) work via
+// their own onClick handlers and must NOT be focused here — doing so causes
+// their focus-visible:ring styling to fire on every tap via .closest() climbing
+// up to a tabpanel/[tabindex=0] wrapper.
 const FOCUSABLE_SELECTOR =
   'input:not([type="hidden"]):not([disabled]), ' +
   'textarea:not([disabled]), ' +
-  'select:not([disabled]), ' +
   '[contenteditable="true"], ' +
-  '[contenteditable=""], ' +
-  '[tabindex]:not([tabindex="-1"])';
+  '[contenteditable=""]';
 
 function focusTappedElement(target: Element): void {
   // <label for="x"> — focus the associated control (native default action).

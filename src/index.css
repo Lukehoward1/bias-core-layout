@@ -173,6 +173,7 @@ Spacing System:
   #app-shell,
   #app-shell * {
     touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   #app-shell input,
@@ -182,6 +183,14 @@ Spacing System:
     -webkit-user-select: text;
     user-select: text;
     -webkit-touch-callout: default;
+  }
+
+  /* Suppress the native browser focus outline everywhere. Real
+     keyboard-accessible controls (buttons, inputs) still get a visible
+     focus style via Tailwind's focus-visible:ring-2 utility, which uses
+     box-shadow rather than outline, so this doesn't affect them. */
+  *:focus {
+    outline: none;
   }
 }
 
