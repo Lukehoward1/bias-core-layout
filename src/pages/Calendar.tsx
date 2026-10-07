@@ -14,6 +14,7 @@ import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 import type { CalendarEvent } from "@/data/calendarEvents";
 import {
@@ -34,6 +35,21 @@ type ImpactFilter = "all" | "high" | "medium" | "low";
 type CurrencyFilter = "all" | string;
 type VisibleCount = 6 | 10 | 20 | 999;
 
+const CALENDAR_FILTERS_KEY = "cal-filters-v1";
+type SavedCalendarFilters = {
+  dateRange?: CalendarDateRange;
+  impactFilter?: ImpactFilter;
+  currencyFilter?: CurrencyFilter;
+  sortMode?: CalendarSortMode;
+  visibleCount?: VisibleCount;
+};
+function readCalendarFilters(): SavedCalendarFilters | null {
+  try {
+    const raw = sessionStorage.getItem(CALENDAR_FILTERS_KEY);
+    return raw ? (JSON.parse(raw) as SavedCalendarFilters) : null;
+  } catch { return null; }
+}
+
 function Calendar() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -42,14 +58,18 @@ function Calendar() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [highlightedEventId, setHighlightedEventId] = useState<string | null>(null);
 
-  const [dateRange, setDateRange] = useState<CalendarDateRange>("today");
-  const [impactFilter, setImpactFilter] = useState<ImpactFilter>("high");
-  const [currencyFilter, setCurrencyFilter] = useState<CurrencyFilter>("all");
-  const [sortMode, setSortMode] = useState<CalendarSortMode>("impact");
-  const [visibleCount, setVisibleCount] = useState<VisibleCount>(10);
+  const savedFilters = useRef(readCalendarFilters()).current;
+  const [dateRange, setDateRange] = useState<CalendarDateRange>(savedFilters?.dateRange ?? "today");
+  const [impactFilter, setImpactFilter] = useState<ImpactFilter>(savedFilters?.impactFilter ?? "high");
+  const [currencyFilter, setCurrencyFilter] = useState<CurrencyFilter>(savedFilters?.currencyFilter ?? "all");
+  const [sortMode, setSortMode] = useState<CalendarSortMode>(savedFilters?.sortMode ?? "impact");
+  const [visibleCount, setVisibleCount] = useState<VisibleCount>(savedFilters?.visibleCount ?? 10);
   const [showAllEvents, setShowAllEvents] = useState(false);
 
-  const eventRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
+  const eventRefs = useRef<Map<string, HTMLElement>>(new Map());
+  // Set to true by openEvent when it writes the eventId to the URL, so the
+  // restore-on-load useEffect below doesn't re-open the already-open modal.
+  const skipNextEventRestore = useRef(false);
 
   // Re-render when async live data arrives (calendarData.ts dispatches this event)
   const [, forceUpdate] = useState(0);
@@ -59,6 +79,16 @@ function Calendar() {
     window.addEventListener("calendarDataLoaded", handler);
     return () => window.removeEventListener("calendarDataLoaded", handler);
   }, []);
+
+  // Persist filter selections to sessionStorage so they survive iOS Safari tab reloads.
+  // showAllEvents is intentionally excluded — it's transient (reset on each load).
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(CALENDAR_FILTERS_KEY, JSON.stringify({
+        dateRange, impactFilter, currencyFilter, sortMode, visibleCount,
+      }));
+    } catch { /* noop */ }
+  }, [dateRange, impactFilter, currencyFilter, sortMode, visibleCount]);
 
   const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
 
@@ -77,7 +107,7 @@ function Calendar() {
     toast.success("Unpinned from Dashboard");
   }, [removeCard]);
 
-  const setEventRef = useCallback((eventId: string, el: HTMLTableRowElement | null) => {
+  const setEventRef = useCallback((eventId: string, el: HTMLElement | null) => {
     if (el) {
       eventRefs.current.set(eventId, el);
       return;
@@ -91,17 +121,37 @@ function Calendar() {
 
     setIsModalOpen(false);
     setSelectedEvent(null);
+    // Clear any stale deep-link highlight immediately — once a modal is
+    // actively opened the visual indicator is no longer needed, and leaving
+    // it would cause it to stay stuck if the clearHighlightTimer was
+    // cancelled by a subsequent effect re-run.
+    setHighlightedEventId(null);
+
+    // Write the event id to the URL so a tab reload restores the modal.
+    // Set the skip flag first so the restore useEffect ignores this write.
+    skipNextEventRestore.current = true;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("eventId", event.id);
+      return next;
+    }, { replace: true });
 
     requestAnimationFrame(() => {
       setSelectedEvent(event);
       setIsModalOpen(true);
     });
-  }, []);
+  }, [setSearchParams]);
 
   const closeModal = useCallback(() => {
     setIsModalOpen(false);
     setSelectedEvent(null);
-  }, []);
+    setHighlightedEventId(null);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("eventId");
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   const getImpactVariant = (impact: CalendarEvent["impact"]) => {
     if (impact === "high") return "destructive";
@@ -149,10 +199,19 @@ function Calendar() {
   }, [filteredEvents, showAllEvents, visibleCount]);
 
   const counts = useMemo(() => getCalendarCounts(filteredEvents), [filteredEvents]);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
+    // Always consume the skip flag immediately so it can never go stale across
+    // effect runs where eventId is null (e.g. after closeModal clears the param).
+    const skip = skipNextEventRestore.current;
+    skipNextEventRestore.current = false;
+
     const eventId = searchParams.get("eventId");
     if (!eventId) return;
+
+    // openEvent writes this id itself when opening — don't re-enter.
+    if (skip) return;
 
     const match = getCalendarEventOrNullById(eventId);
     if (!match) return;
@@ -173,13 +232,16 @@ function Calendar() {
       setHighlightedEventId(null);
     }, 3000);
 
-    setSearchParams({}, { replace: true });
+    // Do NOT call setSearchParams here — doing so synchronously changes
+    // searchParams, which causes React to run this effect's cleanup
+    // (clearTimeout) before the 100ms timer fires, cancelling the modal open.
+    // openEvent() manages the eventId param itself when it runs.
 
     return () => {
       window.clearTimeout(openTimer);
       window.clearTimeout(clearHighlightTimer);
     };
-  }, [searchParams, setSearchParams, openEvent]);
+  }, [searchParams, openEvent]);
 
   const calendarIsLoading = isCalendarLoading();
   const calendarHasData = isCalendarLiveDataAvailable();
@@ -222,7 +284,7 @@ function Calendar() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-6">
       <AppHeader title="Calendar" />
 
       <div className="max-w-7xl mx-auto space-y-6">
@@ -233,9 +295,9 @@ function Calendar() {
               Calendar Filters
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-3">
               <Select value={dateRange} onValueChange={(value) => setDateRange(value as CalendarDateRange)}>
-                <SelectTrigger className="w-[160px] h-9">
+                <SelectTrigger className="h-9 w-full sm:w-[160px]">
                   <SelectValue placeholder="Date Range" />
                 </SelectTrigger>
                 <SelectContent>
@@ -246,7 +308,7 @@ function Calendar() {
               </Select>
 
               <Select value={impactFilter} onValueChange={(value) => setImpactFilter(value as ImpactFilter)}>
-                <SelectTrigger className="w-[160px] h-9">
+                <SelectTrigger className="h-9 w-full sm:w-[160px]">
                   <SelectValue placeholder="Impact" />
                 </SelectTrigger>
                 <SelectContent>
@@ -258,7 +320,7 @@ function Calendar() {
               </Select>
 
               <Select value={currencyFilter} onValueChange={(value) => setCurrencyFilter(value as CurrencyFilter)}>
-                <SelectTrigger className="w-[160px] h-9">
+                <SelectTrigger className="h-9 w-full sm:w-[160px]">
                   <SelectValue placeholder="Currency" />
                 </SelectTrigger>
                 <SelectContent>
@@ -272,7 +334,7 @@ function Calendar() {
               </Select>
 
               <Select value={sortMode} onValueChange={(value) => setSortMode(value as CalendarSortMode)}>
-                <SelectTrigger className="w-[160px] h-9">
+                <SelectTrigger className="h-9 w-full sm:w-[160px]">
                   <SelectValue placeholder="Sort By" />
                 </SelectTrigger>
                 <SelectContent>
@@ -290,7 +352,7 @@ function Calendar() {
                   }
                 }}
               >
-                <SelectTrigger className="w-[120px] h-9">
+                <SelectTrigger className="h-9 w-full sm:w-[120px]">
                   <SelectValue placeholder="Show" />
                 </SelectTrigger>
                 <SelectContent>
@@ -307,7 +369,7 @@ function Calendar() {
               </Button>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3">
               <div className="px-3 py-2 rounded-full border bg-muted/30 min-w-[108px]">
                 <div className="flex items-center gap-2">
                   <span className="text-lg font-semibold">{counts.total}</span>
@@ -349,7 +411,7 @@ function Calendar() {
             <AddToDashboardButton isAdded={isUpcomingEventsAdded} onAdd={handleAddCard} onRemove={handleRemoveCard} />
           </CardHeader>
 
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <CardContent className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
             {filteredKeyEvents.length === 0 ? (
               <div className="col-span-full text-center py-8 text-muted-foreground text-sm">
                 No key events match the selected filters.
@@ -361,7 +423,7 @@ function Calendar() {
                   type="button"
                   onClick={() => openEvent(event)}
                   className={cn(
-                    "text-left p-4 rounded-lg border bg-muted/50 hover:bg-muted/70 transition-colors",
+                    "text-left p-2.5 sm:p-4 rounded-lg border bg-muted/50 hover:bg-muted/70 transition-colors w-full",
                     highlightedEventId === event.id && "ring-2 ring-primary",
                   )}
                 >
@@ -383,109 +445,177 @@ function Calendar() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-primary" />
-              <CardTitle>Calendar</CardTitle>
-            </div>
-
-            {filteredEvents.length > visibleEvents.length && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAllEvents((prev) => !prev)}
-                className="shrink-0"
-              >
-                {showAllEvents ? (
-                  <>
-                    <ChevronUp className="h-4 w-4 mr-2" />
-                    Show Less
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown className="h-4 w-4 mr-2" />
-                    Show More
-                  </>
-                )}
-              </Button>
-            )}
-          </CardHeader>
-
-          <CardContent className="overflow-x-auto">
-            <table className="w-full min-w-[860px]">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Date</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Time</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Currency</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Event</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Previous</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Forecast</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Actual</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Impact</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {visibleEvents.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      No calendar events match the selected filters.
-                    </td>
-                  </tr>
-                ) : (
-                  visibleEvents.map((event) => (
-                    <tr
+        {isMobile ? (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-3 pb-2">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-primary" />
+                <CardTitle>Calendar</CardTitle>
+              </div>
+              {filteredEvents.length > visibleEvents.length && (
+                <Button variant="outline" size="sm" onClick={() => setShowAllEvents((prev) => !prev)} className="shrink-0">
+                  {showAllEvents ? (
+                    <><ChevronUp className="h-4 w-4 mr-1" />Less</>
+                  ) : (
+                    <><ChevronDown className="h-4 w-4 mr-1" />More</>
+                  )}
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="pt-0 px-3 pb-3">
+              {visibleEvents.length === 0 ? (
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  No calendar events match the selected filters.
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {visibleEvents.map((event) => (
+                    <button
                       key={event.id}
                       ref={(el) => setEventRef(event.id, el)}
+                      type="button"
                       onClick={() => openEvent(event)}
                       className={cn(
-                        "border-b border-border cursor-pointer hover:bg-muted/40 transition-colors",
-                        highlightedEventId === event.id && "bg-primary/10",
+                        "w-full text-left px-3 py-2.5 rounded-lg border border-border bg-background hover:bg-muted/40 transition-colors",
+                        highlightedEventId === event.id && "bg-primary/10 border-primary/30",
                       )}
                     >
-                      <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
-                        {getEventDateLabel(event)}
-                      </td>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={cn(
+                            "shrink-0 h-2 w-2 rounded-full",
+                            event.impact === "high" ? "bg-destructive" : event.impact === "medium" ? "bg-warning" : "bg-muted-foreground/40",
+                          )} />
+                          <Badge variant="outline" className="text-xs shrink-0 py-0 px-1.5">{event.currency}</Badge>
+                          <span className="text-sm font-medium text-foreground truncate">{event.event}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground shrink-0">{event.time}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 pl-4 text-xs text-muted-foreground flex-wrap">
+                        <span>{getEventDateLabel(event)}</span>
+                        {event.actual !== "—" && <span className="text-foreground font-medium">A: {event.actual}</span>}
+                        {event.forecast !== "—" && <span>F: {event.forecast}</span>}
+                        {event.previous !== "—" && <span>P: {event.previous}</span>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {filteredEvents.length > visibleEvents.length && !showAllEvents && visibleCount !== 999 && (
+                <div className="flex justify-center pt-3">
+                  <Button variant="outline" size="sm" onClick={() => setShowAllEvents(true)}>
+                    <ChevronDown className="h-4 w-4 mr-1" />
+                    Show all {filteredEvents.length}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-primary" />
+                <CardTitle>Calendar</CardTitle>
+              </div>
 
-                      <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.time}</td>
+              {filteredEvents.length > visibleEvents.length && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAllEvents((prev) => !prev)}
+                  className="shrink-0"
+                >
+                  {showAllEvents ? (
+                    <>
+                      <ChevronUp className="h-4 w-4 mr-2" />
+                      Show Less
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-4 w-4 mr-2" />
+                      Show More
+                    </>
+                  )}
+                </Button>
+              )}
+            </CardHeader>
 
-                      <td className="px-4 py-3">
-                        <Badge variant="outline" className="text-xs">
-                          {event.currency}
-                        </Badge>
-                      </td>
+            <CardContent className="overflow-x-auto">
+              <table className="w-full min-w-[860px]">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Date</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Time</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Currency</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Event</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Previous</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Forecast</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Actual</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Impact</th>
+                  </tr>
+                </thead>
 
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-sm text-foreground">{event.event}</div>
-                      </td>
-
-                      <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.previous}</td>
-                      <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.forecast}</td>
-                      <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.actual}</td>
-
-                      <td className="px-4 py-3">
-                        <Badge variant={getImpactVariant(event.impact)} className="text-xs">
-                          {event.impact.toUpperCase()}
-                        </Badge>
+                <tbody>
+                  {visibleEvents.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                        No calendar events match the selected filters.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    visibleEvents.map((event) => (
+                      <tr
+                        key={event.id}
+                        ref={(el) => setEventRef(event.id, el)}
+                        onClick={() => openEvent(event)}
+                        className={cn(
+                          "border-b border-border cursor-pointer hover:bg-muted/40 transition-colors",
+                          highlightedEventId === event.id && "bg-primary/10",
+                        )}
+                      >
+                        <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
+                          {getEventDateLabel(event)}
+                        </td>
 
-            {filteredEvents.length > visibleEvents.length && !showAllEvents && visibleCount !== 999 && (
-              <div className="flex justify-center pt-4">
-                <Button variant="outline" onClick={() => setShowAllEvents(true)}>
-                  <ChevronDown className="h-4 w-4 mr-2" />
-                  Show all {filteredEvents.length} events
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                        <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.time}</td>
+
+                        <td className="px-4 py-3">
+                          <Badge variant="outline" className="text-xs">
+                            {event.currency}
+                          </Badge>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-sm text-foreground">{event.event}</div>
+                        </td>
+
+                        <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.previous}</td>
+                        <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.forecast}</td>
+                        <td className="px-4 py-3 text-sm text-foreground whitespace-nowrap">{event.actual}</td>
+
+                        <td className="px-4 py-3">
+                          <Badge variant={getImpactVariant(event.impact)} className="text-xs">
+                            {event.impact.toUpperCase()}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+
+              {filteredEvents.length > visibleEvents.length && !showAllEvents && visibleCount !== 999 && (
+                <div className="flex justify-center pt-4">
+                  <Button variant="outline" onClick={() => setShowAllEvents(true)}>
+                    <ChevronDown className="h-4 w-4 mr-2" />
+                    Show all {filteredEvents.length} events
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <EventDetailsModal

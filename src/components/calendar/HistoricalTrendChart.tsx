@@ -63,7 +63,7 @@ function ChartBody({ data }: { data: ChartDataPoint[] }) {
   return (
     <>
       {/* Scrollable chart area */}
-      <div className="overflow-x-auto -mx-5 px-5">
+      <div className="overflow-x-auto -mx-5 pl-8 pr-5">
         <div className="min-w-[600px]">
           {/* Grid + bars */}
           <div className="relative h-48 border-l border-b border-border/50">

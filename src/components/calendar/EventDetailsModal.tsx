@@ -1,4 +1,5 @@
 import { useMemo, useCallback, useState, useEffect } from "react";
+import { useSwipeToDismiss } from "@/hooks/use-swipe-to-dismiss";
 import { useLocation, useNavigate } from "react-router-dom";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 
@@ -46,9 +47,10 @@ function parseEventValue(s: string | null | undefined): number | null {
 
 function formatPeriod(dateStr: string): string {
   const parts = dateStr.split("-");
+  const yy = (parts[0] ?? "").slice(-2);
   const mm = parseInt(parts[1] ?? "1", 10);
   const dd = parseInt(parts[2] ?? "1", 10);
-  return `${PERIOD_MONTHS[mm - 1] ?? ""} ${dd}`;
+  return `${PERIOD_MONTHS[mm - 1] ?? ""} ${dd} '${yy}`;
 }
 
 const getMarketInterpretation = (eventName: string, currency: string) => {
@@ -161,6 +163,9 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
   const [alertMode, setAlertMode] = useState<"once" | "event-series">("once");
   const [historicalEvents, setHistoricalEvents] = useState<CalendarEvent[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+
+  // Must be called unconditionally before the `if (!event)` early return.
+  const swipe = useSwipeToDismiss(onClose);
 
   // Fetch 12-month history each time the modal opens for a new event.
   // getLiveCalendarHistoricalEvents caches for 60 min, so repeated opens are cheap.
@@ -364,28 +369,24 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
         <DialogPrimitive.Portal>
           <DialogPrimitive.Overlay
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[10000]"
-            onPointerDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onClose();
-            }}
+            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
           />
           <DialogPrimitive.Content
             className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] max-w-sm bg-background border border-border rounded-lg z-[10001] p-0"
-            onPointerDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => { e.stopPropagation(); swipe.onPointerDown(e); }}
+            onPointerMove={swipe.onPointerMove}
+            onPointerUp={swipe.onPointerUp}
+            onPointerCancel={swipe.onPointerCancel}
+            onOpenAutoFocus={(e) => e.preventDefault()}
           >
             <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <DialogPrimitive.Title asChild>
                 <span className="text-sm font-medium text-muted-foreground">Calendar Event</span>
               </DialogPrimitive.Title>
-              <button
-                type="button"
-                onClick={onClose}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Close"
-              >
+              <Button variant="outline" size="sm" onClick={onClose} className="gap-2">
                 <X className="h-4 w-4" />
-              </button>
+                Close
+              </Button>
             </div>
             <DialogPrimitive.Description className="sr-only">
               This calendar event could not be found or is no longer available.
@@ -412,23 +413,23 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay
           className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[10000]"
-          onPointerDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onClose();
-          }}
+          onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
         />
 
         <DialogPrimitive.Content
           className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 max-w-6xl w-[96vw] max-h-[92vh] overflow-y-auto scrollbar-hidden bg-background border border-border p-0 rounded-lg z-[10001]"
-          onPointerDown={(e) => e.stopPropagation()}
+          onPointerDown={(e) => { e.stopPropagation(); swipe.onPointerDown(e); }}
+          onPointerMove={swipe.onPointerMove}
+          onPointerUp={swipe.onPointerUp}
+          onPointerCancel={swipe.onPointerCancel}
+          onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <DialogPrimitive.Description className="sr-only">
             Details, figures, and market interpretation for this economic calendar event.
           </DialogPrimitive.Description>
           <div className="sticky top-0 z-10 bg-background border-b border-border">
             {openedFromAlert && (
-              <div className="px-8 py-3 border-b border-primary/15 bg-primary/5">
+              <div className="px-4 sm:px-8 py-2 sm:py-3 border-b border-primary/15 bg-primary/5">
                 <div className="flex items-center gap-2 text-sm text-primary">
                   <Inbox className="h-4 w-4" />
                   <span className="font-medium">Opened from alert</span>
@@ -436,52 +437,68 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
               </div>
             )}
 
-            <div className="px-8 py-5">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <Badge variant="outline" className="text-sm font-bold px-3 py-1.5 bg-muted/50">
-                    {safeEvent.currency}
-                  </Badge>
+            <div className="px-4 sm:px-8 py-2 sm:py-4">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3">
+                <div className="flex flex-col gap-1 sm:gap-1.5">
+                  {/* Badges row — Close sits top-right on mobile */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline" className="text-sm font-bold px-3 py-1.5 bg-muted/50">
+                        {safeEvent.currency}
+                      </Badge>
 
-                  <Badge className={`text-xs font-semibold ${getImpactColor(safeEvent.impact)}`}>
-                    {safeEvent.impact.toUpperCase()} IMPACT
-                  </Badge>
+                      <Badge className={`text-xs font-semibold ${getImpactColor(safeEvent.impact)}`}>
+                        {safeEvent.impact.toUpperCase()} IMPACT
+                      </Badge>
+                    </div>
+
+                    <Button variant="outline" size="sm" onClick={onClose} className="gap-2 shrink-0 sm:hidden">
+                      <X className="h-4 w-4" />
+                      Close
+                    </Button>
+                  </div>
 
                   <DialogPrimitive.Title asChild>
-                    <h2 className="text-2xl font-bold text-foreground">{safeEvent.event}</h2>
+                    <h2 className="text-lg sm:text-2xl font-bold text-foreground">{safeEvent.event}</h2>
                   </DialogPrimitive.Title>
+
+                  <div className="flex items-center gap-1.5 text-foreground/70">
+                    <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    <span className="text-xs sm:text-sm font-medium">{formatCalendarEventDateLabel(safeEvent)}</span>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    <span>{formatCalendarEventDateLabel(safeEvent)}</span>
-                  </div>
+                {/* Watchlist/Alert buttons — flex-1 spreads them across the full row on mobile */}
+                <div className="flex gap-2 sm:shrink-0">
+                  <Button variant="outline" size="sm" className="gap-1.5 flex-1 sm:flex-none" onClick={handleAddToWatchlist}>
+                    <Star className="h-3.5 w-3.5" />
+                    Watchlist
+                  </Button>
 
-                  <div className="flex gap-2 shrink-0">
-                    <Button variant="outline" size="sm" className="gap-1.5" onClick={handleAddToWatchlist}>
-                      <Star className="h-3.5 w-3.5" />
-                      Watchlist
-                    </Button>
+                  <Button variant="outline" size="sm" className="gap-1.5 flex-1 sm:flex-none" onClick={handleSetAlert}>
+                    <Bell className="h-3.5 w-3.5" />
+                    {alertMode === "event-series"
+                      ? hasExistingRecurringAlert
+                        ? "Recurring Added"
+                        : "Set Recurring"
+                      : hasExistingOneTimeAlert
+                        ? "Alert Added"
+                        : "Set Alert"}
+                  </Button>
 
-                    <Button variant="outline" size="sm" className="gap-1.5" onClick={handleSetAlert}>
-                      <Bell className="h-3.5 w-3.5" />
-                      {alertMode === "event-series"
-                        ? hasExistingRecurringAlert
-                          ? "Recurring Added"
-                          : "Set Recurring"
-                        : hasExistingOneTimeAlert
-                          ? "Alert Added"
-                          : "Set Alert"}
-                    </Button>
-                  </div>
+                  <Button variant="outline" size="sm" onClick={onClose} className="gap-2 hidden sm:flex">
+                    <X className="h-4 w-4" />
+                    Close
+                  </Button>
                 </div>
               </div>
 
-              <div className="mt-4 flex items-center gap-2 flex-wrap">
+              {/* Toggle row — buttons flex-1 on mobile, description wraps to its own line */}
+              <div className="mt-2 sm:mt-3 flex gap-2 flex-wrap sm:flex-nowrap items-center">
                 <Button
                   variant={alertMode === "once" ? "default" : "outline"}
                   size="sm"
+                  className="flex-1 sm:flex-none"
                   onClick={() => setAlertMode("once")}
                 >
                   One-time alert
@@ -490,12 +507,13 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
                 <Button
                   variant={alertMode === "event-series" ? "default" : "outline"}
                   size="sm"
+                  className="flex-1 sm:flex-none"
                   onClick={() => setAlertMode("event-series")}
                 >
                   Recurring
                 </Button>
 
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground w-full sm:w-auto">
                   {alertMode === "event-series"
                     ? `This will alert you every time ${safeEvent.event} appears again.`
                     : "This will alert you for this event only."}
@@ -504,11 +522,70 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
             </div>
           </div>
 
-          <div className="px-8 py-6 space-y-6">
+          <div className="px-3 sm:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card className="bg-card border-border">
-                <CardContent className="p-6">
+                <CardContent className="p-3 sm:p-6 h-full flex flex-col">
                   <div className="flex items-center gap-2 mb-4">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
+                      Current Release Figures
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-3 sm:mb-4">
+                    <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
+                      <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Previous</div>
+                      <div className="text-xl sm:text-2xl font-bold text-foreground">{safeEvent.previous}</div>
+                    </div>
+
+                    <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
+                      <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Forecast</div>
+                      <div className="text-xl sm:text-2xl font-bold text-foreground">{safeEvent.forecast}</div>
+                    </div>
+
+                    <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
+                      <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Actual</div>
+                      <div
+                        className={`text-xl sm:text-2xl font-bold ${
+                          safeEvent.actual !== "—" ? "text-primary" : "text-muted-foreground"
+                        }`}
+                      >
+                        {safeEvent.actual}
+                      </div>
+                    </div>
+
+                    <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
+                      <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Deviation</div>
+                      <div className="text-xl sm:text-2xl font-bold text-muted-foreground">
+                        {safeEvent.actual !== "—" ? "—" : "Pending"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 pt-4 border-t border-border/50">
+                    <div className="flex items-center gap-2 mb-3">
+                      <MessageSquare className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-semibold text-foreground uppercase tracking-wide">
+                        Release Commentary
+                      </span>
+                    </div>
+
+                    {narrative ? (
+                      <p className="text-sm text-muted-foreground leading-relaxed">{narrative}</p>
+                    ) : (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-lg p-4 border border-border/50">
+                        <Clock className="h-4 w-4 flex-shrink-0" />
+                        <span>Awaiting release — commentary will appear after publication.</span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card border-border">
+                <CardContent className="p-3 sm:p-6">
+                  <div className="flex items-center gap-2 mb-3 sm:mb-4">
                     <BarChart3 className="h-4 w-4 text-primary" />
                     <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
                       Market Interpretation
@@ -580,70 +657,12 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
                 </CardContent>
               </Card>
 
-              <Card className="bg-card border-border">
-                <CardContent className="p-6 h-full flex flex-col">
-                  <div className="flex items-center gap-2 mb-4">
-                    <TrendingUp className="h-4 w-4 text-primary" />
-                    <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
-                      Current Release Figures
-                    </h3>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
-                      <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Previous</div>
-                      <div className="text-2xl font-bold text-foreground">{safeEvent.previous}</div>
-                    </div>
-
-                    <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
-                      <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Forecast</div>
-                      <div className="text-2xl font-bold text-foreground">{safeEvent.forecast}</div>
-                    </div>
-
-                    <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
-                      <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Actual</div>
-                      <div
-                        className={`text-2xl font-bold ${
-                          safeEvent.actual !== "—" ? "text-primary" : "text-muted-foreground"
-                        }`}
-                      >
-                        {safeEvent.actual}
-                      </div>
-                    </div>
-
-                    <div className="bg-muted/30 rounded-lg p-4 border border-border/50">
-                      <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Deviation</div>
-                      <div className="text-2xl font-bold text-muted-foreground">
-                        {safeEvent.actual !== "—" ? "—" : "Pending"}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex-1 pt-4 border-t border-border/50">
-                    <div className="flex items-center gap-2 mb-3">
-                      <MessageSquare className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-semibold text-foreground uppercase tracking-wide">
-                        Release Commentary
-                      </span>
-                    </div>
-
-                    {narrative ? (
-                      <p className="text-sm text-muted-foreground leading-relaxed">{narrative}</p>
-                    ) : (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-lg p-4 border border-border/50">
-                        <Clock className="h-4 w-4 flex-shrink-0" />
-                        <span>Awaiting release — commentary will appear after publication.</span>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
             </div>
 
             <HistoricalTrendChart data={chartData} isLoading={isHistoryLoading} />
 
             <Card className="bg-card border-border">
-              <CardContent className="p-6">
+              <CardContent className="p-3 sm:p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Lightbulb className="h-4 w-4 text-primary" />
                   <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">How to Interpret</h3>

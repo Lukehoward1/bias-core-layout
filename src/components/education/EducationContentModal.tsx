@@ -1,5 +1,6 @@
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useSwipeToDismiss } from "@/hooks/use-swipe-to-dismiss";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Clock, BookOpen, Bookmark, X } from "lucide-react";
@@ -83,6 +84,8 @@ function renderContent(text: string) {
 }
 
 export function EducationContentModal({ isOpen, onClose, content }: EducationContentModalProps) {
+  const swipe = useSwipeToDismiss(onClose);
+
   if (!content) return null;
 
   const getLevelColor = (level?: string) => {
@@ -96,7 +99,14 @@ export function EducationContentModal({ isOpen, onClose, content }: EducationCon
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl w-[95vw] max-h-[90vh] overflow-y-auto scrollbar-hidden p-0 gap-0">
+      <DialogContent
+        className="max-w-5xl w-[95vw] max-h-[90vh] overflow-y-auto scrollbar-hidden p-0 gap-0"
+        onPointerDown={swipe.onPointerDown}
+        onPointerMove={swipe.onPointerMove}
+        onPointerUp={swipe.onPointerUp}
+        onPointerCancel={swipe.onPointerCancel}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         {/* Header */}
         <div className="sticky top-0 z-10 bg-card border-b border-border px-8 py-6">
           <div className="flex items-start justify-between gap-4">

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { useSwipeToDismiss } from "@/hooks/use-swipe-to-dismiss";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -108,6 +109,8 @@ export function SessionDetailsModal({ isOpen, onClose, session }: SessionDetails
     [navigate, location, onClose],
   );
 
+  const swipe = useSwipeToDismiss(onClose);
+
   if (!session) return null;
 
   return (
@@ -125,6 +128,11 @@ export function SessionDetailsModal({ isOpen, onClose, session }: SessionDetails
         <DialogPrimitive.Content
           className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] max-w-2xl max-h-[88vh] overflow-y-auto bg-background border border-border rounded-xl p-0 z-[10001]"
           onClick={(e) => e.stopPropagation()}
+          onPointerDown={swipe.onPointerDown}
+          onPointerMove={swipe.onPointerMove}
+          onPointerUp={swipe.onPointerUp}
+          onPointerCancel={swipe.onPointerCancel}
+          onOpenAutoFocus={(e) => e.preventDefault()}
         >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-border">
