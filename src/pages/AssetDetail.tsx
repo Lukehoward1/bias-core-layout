@@ -24,6 +24,7 @@ import { useTraderStyle } from "@/context/TraderStyleProvider";
 import { CandlestickChart, type CandlestickChartRef } from "@/components/CandlestickChart";
 import { fetchRealOhlcData, type OhlcDataPoint } from "@/lib/mockOhlcData";
 import { useTapHandler } from "@/hooks/use-tap-handler";
+import { useSwipeToDismiss } from "@/hooks/use-swipe-to-dismiss";
 
 // Returns the currencies relevant to a symbol for FMP calendar filtering.
 // FX pairs split naturally; indices and metals map to their primary currency.
@@ -197,6 +198,9 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
   const asset = useMemo(() => (symbol ? getAssetBySymbol(symbol) : undefined), [symbol, getAssetBySymbol, traderStyle]);
   const isWatchlisted = symbol ? isInWatchlist(symbol) : false;
 
+  const handleSwipeDismiss = useCallback(() => { onRequestClose?.(); }, [onRequestClose]);
+  const swipe = useSwipeToDismiss(handleSwipeDismiss);
+
   const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<CalendarEvent | null>(null);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [showAllRelevantNews, setShowAllRelevantNews] = useState(false);
@@ -243,11 +247,12 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
   const upcomingRelevantCalendarEvents = useMemo(() => {
     const now = Date.now();
+    const sevenDaysFromNow = now + 7 * 24 * 60 * 60 * 1000;
 
     return relevantCalendarEvents
       .filter((event) => {
         const time = getEventDateTime(event).getTime();
-        return !Number.isNaN(time) && time >= now;
+        return !Number.isNaN(time) && time >= now && time <= sevenDaysFromNow;
       })
       .sort((a, b) => getEventDateTime(a).getTime() - getEventDateTime(b).getTime());
   }, [relevantCalendarEvents]);
@@ -285,7 +290,13 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
     // Supplement fromCalendar with additional FMP events matching this symbol's currencies,
     // deduplicating against what the relevance filter already returned.
     const symbolCurrencies = getSymbolCurrencies(symbol);
+    const now2 = Date.now();
+    const sevenDaysFromNow2 = now2 + 7 * 24 * 60 * 60 * 1000;
     const extras: NewsPill[] = liveNewsEvents
+      .filter((event) => {
+        const time = getEventDateTime(event).getTime();
+        return !Number.isNaN(time) && time >= now2 && time <= sevenDaysFromNow2;
+      })
       .filter((event) => symbolCurrencies.includes(event.currency))
       .filter((event) => {
         const key = `${event.event.toLowerCase()}|${event.time}`;
@@ -398,10 +409,10 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
     return "text-muted-foreground";
   };
 
-  const getBiasIcon = (bias: string) => {
-    if (bias === "Bullish") return <TrendingUp className="h-6 w-6" />;
-    if (bias === "Bearish") return <TrendingDown className="h-6 w-6" />;
-    return <Minus className="h-6 w-6" />;
+  const getBiasIcon = (bias: string, size = "h-6 w-6") => {
+    if (bias === "Bullish") return <TrendingUp className={size} />;
+    if (bias === "Bearish") return <TrendingDown className={size} />;
+    return <Minus className={size} />;
   };
 
   const contextSnapshot = useMemo<ContextSnapshotItem[]>(() => {
@@ -509,7 +520,13 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
   return (
     <>
-      <div className="sticky top-0 z-10 bg-background border-b border-border px-6 py-4 flex items-center justify-between">
+      <div
+        className="sticky top-0 z-10 bg-background border-b border-border px-4 sm:px-6 py-3 sm:py-4 hidden sm:flex items-center justify-between"
+        onPointerDown={swipe.onPointerDown}
+        onPointerMove={swipe.onPointerMove}
+        onPointerUp={swipe.onPointerUp}
+        onPointerCancel={swipe.onPointerCancel}
+      >
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-semibold text-foreground">{asset.symbol}</h2>
           <Badge variant="outline" className="text-xs">
@@ -525,26 +542,220 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
         )}
       </div>
 
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-3 sm:space-y-6">
         <Card className="overflow-hidden">
-          <CardContent className="p-8">
-            <div className="grid lg:grid-cols-2 gap-8">
-              <div className="flex flex-col">
-                <div className="flex items-center gap-3 mb-3">
-                  <h1 className="text-4xl font-bold text-foreground">{asset.symbol}</h1>
+          <CardContent className="p-4 sm:p-8">
+            {/* ── Mobile layout (sm:hidden) ───────────────────────────────────── */}
+            <div className="sm:hidden flex flex-col gap-3">
+              {/* Symbol + watchlist star + Close button */}
+              <div
+                className="flex items-start justify-between gap-3"
+                onPointerDown={swipe.onPointerDown}
+                onPointerMove={swipe.onPointerMove}
+                onPointerUp={swipe.onPointerUp}
+                onPointerCancel={swipe.onPointerCancel}
+              >
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold text-foreground">{asset.symbol}</h1>
+                  <Button variant="ghost" size="icon" onClick={() => toggleWatchlist(symbol)} className="h-8 w-8">
+                    <Star className={`h-5 w-5 ${isWatchlisted ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`} />
+                  </Button>
+                </div>
+                {onRequestClose && (
+                  <Button variant="outline" size="sm" onClick={onRequestClose} {...tap(onRequestClose)} className="gap-2">
+                    <X className="h-4 w-4" />
+                    Close
+                  </Button>
+                )}
+              </div>
 
-                  <Button variant="ghost" size="icon" onClick={() => toggleWatchlist(symbol)} className="h-10 w-10">
+              {/* Price */}
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className={`text-xl font-semibold ${quote?.stale ? "text-muted-foreground" : "text-foreground"}`}>{displayPrice}</span>
+                <span className={`text-sm font-medium ${getChangeColor()}`}>{getDisplayedChange()}</span>
+                {quote?.stale && (
+                  <Badge variant="outline" className="text-xs text-muted-foreground border-muted-foreground/40 self-center">
+                    Stale
+                  </Badge>
+                )}
+              </div>
+
+              {/* Compact bias gauge */}
+              {marketContext?.biasState === "Bias Unavailable" ? (
+                <span className="text-xs text-muted-foreground">Bias unavailable</span>
+              ) : marketContext ? (
+                <div className="flex items-center gap-3">
+                  <div className="relative w-32 h-16 shrink-0">
+                    <svg viewBox="0 0 100 50" className="w-full h-full">
+                      <path
+                        d="M 10 45 A 40 40 0 0 1 90 45"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="8"
+                        className="text-muted"
+                      />
+                      <path
+                        d="M 10 45 A 40 40 0 0 1 90 45"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="8"
+                        strokeDasharray={`${(marketContext.biasConfidence / 100) * 126} 126`}
+                        className={getBiasColor(getBiasDirection(marketContext.biasState))}
+                      />
+                      <line
+                        x1="50"
+                        y1="45"
+                        x2={50 + 35 * Math.cos((Math.PI * (180 - marketContext.biasConfidence * 1.8)) / 180)}
+                        y2={45 - 35 * Math.sin((Math.PI * (180 - marketContext.biasConfidence * 1.8)) / 180)}
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        className="text-foreground"
+                      />
+                      <circle cx="50" cy="45" r="5" fill="currentColor" className="text-foreground" />
+                    </svg>
+                  </div>
+                  <div className={`flex items-center gap-1.5 ${getBiasColor(getBiasDirection(marketContext.biasState))}`}>
+                    {getBiasIcon(getBiasDirection(marketContext.biasState), "h-5 w-5")}
+                    <span className="text-base font-bold leading-tight">{marketContext.biasState}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="relative w-32 h-16">
+                  <svg viewBox="0 0 100 50" className="w-full h-full absolute inset-0 opacity-20">
+                    <path d="M 10 45 A 40 40 0 0 1 90 45" fill="none" stroke="currentColor" strokeWidth="8" className="text-muted-foreground" />
+                  </svg>
+                </div>
+              )}
+
+              {/* Market Context Snapshot */}
+              <div>
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                  Market Context Snapshot
+                </h3>
+                {marketContext?.biasState === "Bias Unavailable" ? (
+                  <p className="text-sm text-muted-foreground">
+                    Bias analysis is not yet available for this instrument. Live data support coming soon.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {contextSnapshot.map((item) => (
+                      <div key={item.label} className={`border-l ${getAccentClass(item.accent)} pl-3`}>
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground/70 leading-none mb-1">
+                          {item.label}
+                        </div>
+                        <p className="text-sm font-medium text-foreground leading-snug">{item.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Stats grid */}
+              <div className="grid grid-cols-4 gap-2">
+                <div className="p-2 bg-muted/30 rounded-lg text-center">
+                  <span className="text-[10px] text-muted-foreground block mb-0.5">Volume</span>
+                  <span className="text-xs font-semibold text-foreground">{asset.volume}</span>
+                </div>
+                <div className="p-2 bg-muted/30 rounded-lg text-center">
+                  <span className="text-[10px] text-muted-foreground block mb-0.5">Spread</span>
+                  <span className="text-xs font-semibold text-foreground">{asset.spread}</span>
+                </div>
+                <div className="p-2 bg-muted/30 rounded-lg text-center">
+                  <span className="text-[10px] text-muted-foreground block mb-0.5">Confidence</span>
+                  <span className="text-xs font-semibold text-foreground">
+                    {marketContext?.biasState === "Bias Unavailable" ? "—" : `${marketContext?.biasConfidence ?? asset.biasConfidence}%`}
+                  </span>
+                </div>
+                <div className="p-2 bg-muted/30 rounded-lg text-center">
+                  <span className="text-[10px] text-muted-foreground block mb-0.5">Sentiment</span>
+                  <span className={`text-xs font-semibold ${asset.sentiment > 0 ? "text-success" : asset.sentiment < 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                    {asset.sentiment > 0 ? "+" : ""}{asset.sentiment}
+                  </span>
+                </div>
+              </div>
+
+              {/* News Impact */}
+              {isNewsLoading && newsImpactPills.length === 0 && (
+                <div>
+                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                    News Impact
+                  </h3>
+                  <div className="space-y-2">
+                    <div className="h-7 rounded-md bg-muted/30 animate-pulse" />
+                    <div className="h-7 rounded-md bg-muted/20 animate-pulse" />
+                  </div>
+                </div>
+              )}
+              {newsImpactPills.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      News Impact
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => { setShowAllRelevantNews((v) => !v); setNewsExpanded(false); }}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      {showAllRelevantNews ? "Show high impact only" : "Show all relevant"}
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {(newsExpanded ? newsImpactPills : newsImpactPills.slice(0, 3)).map((pill) => {
+                      const impactColors = {
+                        High: "bg-destructive text-destructive-foreground",
+                        Medium: "bg-warning text-warning-foreground",
+                        Low: "bg-success text-success-foreground",
+                      } as const;
+                      return (
+                        <button
+                          key={pill.key}
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); openCalendarOverlayFromNewsPill(pill); }}
+                          className="w-full flex items-center gap-2 text-left hover:bg-muted/30 rounded-md px-2 py-1.5 transition-colors group"
+                        >
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${impactColors[pill.impact]}`}>
+                            {pill.impact}
+                          </span>
+                          <span className="text-sm text-foreground group-hover:text-primary transition-colors">{pill.event}</span>
+                          <span className="text-sm text-muted-foreground">—</span>
+                          <span className="text-sm text-muted-foreground">{pill.time}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {newsImpactPills.length > 3 && (
+                    <button
+                      type="button"
+                      onClick={() => setNewsExpanded((v) => !v)}
+                      className="text-xs text-primary hover:underline mt-1"
+                    >
+                      {newsExpanded ? "Show less" : `+${newsImpactPills.length - 3} more · Show more`}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ── Desktop layout (hidden sm:block) ────────────────────────────── */}
+            <div className="hidden sm:block">
+            <div className="grid lg:grid-cols-2 gap-4 lg:gap-8">
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2 sm:gap-3 mb-1.5 sm:mb-3">
+                  <h1 className="text-2xl sm:text-4xl font-bold text-foreground">{asset.symbol}</h1>
+
+                  <Button variant="ghost" size="icon" onClick={() => toggleWatchlist(symbol)} className="h-8 w-8 sm:h-10 sm:w-10">
                     <Star
-                      className={`h-6 w-6 ${
+                      className={`h-5 w-5 sm:h-6 sm:w-6 ${
                         isWatchlisted ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
                       }`}
                     />
                   </Button>
                 </div>
 
-                <div className="flex items-baseline gap-3 mb-6 flex-wrap">
-                  <span className={`text-3xl font-semibold ${quote?.stale ? "text-muted-foreground" : "text-foreground"}`}>{displayPrice}</span>
-                  <span className={`text-lg font-medium ${getChangeColor()}`}>{getDisplayedChange()}</span>
+                <div className="flex items-baseline gap-2 sm:gap-3 mb-3 sm:mb-6 flex-wrap">
+                  <span className={`text-xl sm:text-3xl font-semibold ${quote?.stale ? "text-muted-foreground" : "text-foreground"}`}>{displayPrice}</span>
+                  <span className={`text-sm sm:text-lg font-medium ${getChangeColor()}`}>{getDisplayedChange()}</span>
                   {quote?.stale && (
                     <Badge variant="outline" className="text-xs text-muted-foreground border-muted-foreground/40 self-center">
                       Stale
@@ -553,7 +764,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                  <h3 className="text-xs sm:text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2 sm:mb-3">
                     Market Context Snapshot
                   </h3>
 
@@ -562,7 +773,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                       Bias analysis is not yet available for this instrument. Live data support coming soon.
                     </p>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2 sm:space-y-3">
                       {contextSnapshot.map((item) => (
                         <div key={item.label} className={`border-l ${getAccentClass(item.accent)} pl-3`}>
                           <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground/70 leading-none mb-1">
@@ -575,8 +786,8 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                   )}
 
                   {isNewsLoading && newsImpactPills.length === 0 && (
-                    <div className="mt-5">
-                      <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                    <div className="mt-3 sm:mt-5">
+                      <h3 className="text-xs sm:text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2 sm:mb-3">
                         News Impact
                       </h3>
                       <div className="space-y-2">
@@ -587,9 +798,9 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                   )}
 
                   {newsImpactPills.length > 0 && (
-                    <div className="mt-5">
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                    <div className="mt-3 sm:mt-5">
+                      <div className="flex items-center justify-between mb-2 sm:mb-3">
+                        <h3 className="text-xs sm:text-sm font-medium text-muted-foreground uppercase tracking-wide">
                           News Impact
                         </h3>
 
@@ -654,28 +865,28 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
               </div>
 
               <div className="flex flex-col">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                  <div className="p-3 bg-muted/30 rounded-lg text-center">
-                    <span className="text-xs text-muted-foreground block mb-1">Volume</span>
-                    <span className="text-sm font-semibold text-foreground">{asset.volume}</span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-3 sm:mb-6">
+                  <div className="p-2 sm:p-3 bg-muted/30 rounded-lg text-center">
+                    <span className="text-[10px] sm:text-xs text-muted-foreground block mb-0.5 sm:mb-1">Volume</span>
+                    <span className="text-xs sm:text-sm font-semibold text-foreground">{asset.volume}</span>
                   </div>
 
-                  <div className="p-3 bg-muted/30 rounded-lg text-center">
-                    <span className="text-xs text-muted-foreground block mb-1">Spread</span>
-                    <span className="text-sm font-semibold text-foreground">{asset.spread}</span>
+                  <div className="p-2 sm:p-3 bg-muted/30 rounded-lg text-center">
+                    <span className="text-[10px] sm:text-xs text-muted-foreground block mb-0.5 sm:mb-1">Spread</span>
+                    <span className="text-xs sm:text-sm font-semibold text-foreground">{asset.spread}</span>
                   </div>
 
-                  <div className="p-3 bg-muted/30 rounded-lg text-center">
-                    <span className="text-xs text-muted-foreground block mb-1">Confidence</span>
-                    <span className="text-sm font-semibold text-foreground">
+                  <div className="p-2 sm:p-3 bg-muted/30 rounded-lg text-center">
+                    <span className="text-[10px] sm:text-xs text-muted-foreground block mb-0.5 sm:mb-1">Confidence</span>
+                    <span className="text-xs sm:text-sm font-semibold text-foreground">
                       {marketContext?.biasState === "Bias Unavailable" ? "—" : `${marketContext?.biasConfidence ?? asset.biasConfidence}%`}
                     </span>
                   </div>
 
-                  <div className="p-3 bg-muted/30 rounded-lg text-center">
-                    <span className="text-xs text-muted-foreground block mb-1">Sentiment</span>
+                  <div className="p-2 sm:p-3 bg-muted/30 rounded-lg text-center">
+                    <span className="text-[10px] sm:text-xs text-muted-foreground block mb-0.5 sm:mb-1">Sentiment</span>
                     <span
-                      className={`text-sm font-semibold ${
+                      className={`text-xs sm:text-sm font-semibold ${
                         asset.sentiment > 0
                           ? "text-success"
                           : asset.sentiment < 0
@@ -689,7 +900,8 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                   </div>
                 </div>
 
-                <div className="flex-1 flex flex-col items-center justify-center pt-2">
+                {/* Desktop full gauge */}
+                <div className="flex flex-1 flex-col items-center justify-center pt-2">
                   <span className="text-sm text-muted-foreground uppercase tracking-wide mb-2">Current Bias</span>
 
                   <div className="text-xs text-muted-foreground mb-4">
@@ -757,14 +969,15 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                 </div>
               </div>
             </div>
+            </div>{/* end hidden sm:block desktop wrapper */}
 
             {marketContext && marketContext.timeframeContext.length > 0 && (
-              <div className="mt-8 pt-6 border-t border-border/60">
-                <h3 className="text-xs font-medium text-muted-foreground/70 uppercase tracking-[0.18em] mb-4">
+              <div className="mt-4 sm:mt-8 pt-4 sm:pt-6 border-t border-border/60">
+                <h3 className="text-xs font-medium text-muted-foreground/70 uppercase tracking-[0.18em] mb-2 sm:mb-4">
                   Timeframe Context
                 </h3>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mb-3 sm:mb-5">
                   {marketContext.timeframeContext.map((tf) => {
                     const dotClass =
                       tf.state === "bullish"
@@ -878,7 +1091,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
         <Card className="overflow-hidden">
           <CardContent className="p-0">
-            <div className="relative h-[420px]">
+            <div className="relative h-[260px] sm:h-[420px]">
               {isChartLoading && (
                 <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-sm">
                   <span className="text-sm text-muted-foreground">Loading chart…</span>
@@ -896,14 +1109,14 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-primary" />
+          <CardHeader className="pb-2 sm:pb-4 px-4 sm:px-6 pt-4 sm:pt-6">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               AI Market Overview
             </CardTitle>
           </CardHeader>
 
-          <CardContent>
+          <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
             {marketContext && marketContext.biasState !== "Bias Unavailable" && (
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="text-xs">
@@ -993,17 +1206,17 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
           </CardContent>
         </Card>
 
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid lg:grid-cols-3 gap-3 sm:gap-6">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
+            <CardHeader className="pb-2 px-4 sm:px-6 pt-4 sm:pt-6">
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
                 <Target className="h-4 w-4 text-primary" />
                 Key Levels
               </CardTitle>
             </CardHeader>
 
-            <CardContent>
-              <div className="space-y-3">
+            <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+              <div className="space-y-2 sm:space-y-3">
                 {(marketContext?.levels ?? []).length === 0 ? (
                   <p className="text-xs text-muted-foreground">No context-driven levels available.</p>
                 ) : (
@@ -1041,15 +1254,15 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
+            <CardHeader className="pb-2 px-4 sm:px-6 pt-4 sm:pt-6">
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
                 <Clock className="h-4 w-4 text-primary" />
                 Session Insights
               </CardTitle>
             </CardHeader>
 
-            <CardContent>
-              <div className="space-y-3">
+            <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+              <div className="space-y-2 sm:space-y-3">
                 {(marketContext?.sessionContext ?? []).map((session: SessionContextItem, index: number) => {
                   const variant =
                     session.emphasis === "elevated"
@@ -1076,15 +1289,15 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
+            <CardHeader className="pb-2 px-4 sm:px-6 pt-4 sm:pt-6">
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
                 <Zap className="h-4 w-4 text-primary" />
                 Upcoming News
               </CardTitle>
             </CardHeader>
 
-            <CardContent>
-              <div className="space-y-3">
+            <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+              <div className="space-y-2 sm:space-y-3">
                 {upcomingNewsItems.length === 0 ? (
                   <div className="p-3 bg-muted/30 rounded-lg">
                     <p className="text-sm text-muted-foreground">No relevant upcoming calendar events found.</p>
