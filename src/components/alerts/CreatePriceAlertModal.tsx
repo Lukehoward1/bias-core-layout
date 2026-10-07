@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +62,8 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
 
   const isEditMode = !!editingAlert;
 
+  const isSubmittingRef = useRef(false);
+
   const [asset, setAsset] = useState(defaultAsset || "");
   const [direction, setDirection] = useState<PriceAlertDirection>("above");
   const [triggerType, setTriggerType] = useState<PriceAlertTriggerType>("wick");
@@ -79,6 +81,8 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
 
   useEffect(() => {
     if (!open) return;
+
+    isSubmittingRef.current = false;
 
     if (editingAlert) {
       setAsset(editingAlert.asset || "");
@@ -98,6 +102,8 @@ export function CreatePriceAlertModal({ open, onOpenChange, defaultAsset, editin
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
 
     if (!asset || !price) {
       toast.error("Please fill in all required fields");

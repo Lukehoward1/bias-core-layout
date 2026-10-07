@@ -3,7 +3,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Clock, Bell, TrendingUp, AlertTriangle, Calendar, Moon } from "lucide-react";
+import { Clock, Bell, TrendingUp, AlertTriangle, Calendar, Moon, Volume2 } from "lucide-react";
 import type { AlertPreferences } from "@/types/alerts";
 
 interface AlertPreferencesPanelProps {
@@ -46,6 +46,27 @@ export function AlertPreferencesPanel({ preferences, onUpdate }: AlertPreference
 
   return (
     <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Volume2 className="h-4 w-4 text-primary" />
+            Notification Sound
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="soundEnabled" className="text-sm">
+              Alert Sound
+            </Label>
+            <Switch
+              id="soundEnabled"
+              checked={preferences.soundEnabled}
+              onCheckedChange={(value) => updatePref("soundEnabled", value)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">

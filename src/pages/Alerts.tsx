@@ -22,11 +22,11 @@ import { AlertPreferencesPanel } from "@/components/alerts/AlertPreferencesPanel
 import { AlertInbox } from "@/components/alerts/AlertInbox";
 import { ManualTimerPanel } from "@/components/alerts/ManualTimerPanel";
 import { PriceAlertsPanel } from "@/components/alerts/PriceAlertsPanel";
-import { AlertsSoundToggle } from "@/components/alerts/AlertsSoundToggle";
 import { CreatePriceAlertModal } from "@/components/alerts/CreatePriceAlertModal";
 import { useAlertsContext } from "@/contexts/AlertsContext";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { useTapHandler } from "@/hooks/use-tap-handler";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
 import { toast } from "sonner";
@@ -347,6 +347,7 @@ type MyAlertsRow =
 
 export default function Alerts() {
   const tap = useTapHandler();
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState("overview");
   const [showCreatePriceAlert, setShowCreatePriceAlert] = useState(false);
   const [editingPriceAlert, setEditingPriceAlert] = useState<PriceAlert | null>(null);
@@ -369,6 +370,7 @@ export default function Alerts() {
     updatePreferences,
     unreadCount,
     priceAlerts,
+    deletePriceAlert,
   } = useAlertsContext();
 
   const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
@@ -713,7 +715,7 @@ export default function Alerts() {
 
       <div className="max-w-7xl mx-auto space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+          <div className="mb-4">
             <TabsList className="h-auto flex-wrap justify-start">
               <TabsTrigger value="overview" className="text-sm gap-2" {...tap(() => setActiveTab("overview"))}>
                 <Bell className="h-4 w-4" />
@@ -745,8 +747,6 @@ export default function Alerts() {
                 Preferences
               </TabsTrigger>
             </TabsList>
-
-            <AlertsSoundToggle />
           </div>
 
           <TabsContent value="overview" className="mt-6">
@@ -772,11 +772,7 @@ export default function Alerts() {
                         <button
                           key={item.id}
                           type="button"
-                          onPointerDown={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            handleTopNewsClick(item);
-                          }}
+                          onClick={() => handleTopNewsClick(item)}
                           className="w-full text-left p-4 bg-muted/50 rounded-lg border border-border hover:bg-muted transition-colors"
                         >
                           <div className="flex items-start justify-between gap-3">
@@ -887,63 +883,43 @@ export default function Alerts() {
                 </CardHeader>
 
                 <CardContent>
-                  <div className="overflow-x-auto -mx-5">
-                    <table className="w-full table-fixed">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th className="w-[180px] text-left py-3 px-5 text-xs font-medium text-muted-foreground">
-                            Type
-                          </th>
-                          <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">What</th>
-                          <th className="w-[180px] text-left py-3 px-4 text-xs font-medium text-muted-foreground">
-                            When
-                          </th>
-                          <th className="w-[110px] text-left py-3 px-4 text-xs font-medium text-muted-foreground">
-                            Status
-                          </th>
-                          <th className="w-[150px] text-left py-3 px-5 text-xs font-medium text-muted-foreground">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-
-                      <tbody>
-                        {myAlertsAndTimersRows.map((row) => (
-                          <tr key={row.id} className="border-b border-border hover:bg-muted/50 transition-colors">
-                            <td className="py-3 px-5 align-top text-sm text-foreground">
-                              <div className="flex items-start gap-2 flex-wrap">
-                                <Badge variant="outline" className="text-xs whitespace-nowrap">
+                  {isMobile ? (
+                    /* ── Mobile card list ───────────────────────────────────── */
+                    <div className="space-y-3">
+                      {myAlertsAndTimersRows.length === 0 ? (
+                        <p className="py-8 text-center text-muted-foreground text-sm">
+                          No active alerts. Click "Add Alert" or schedule one from a calendar event.
+                        </p>
+                      ) : (
+                        myAlertsAndTimersRows.map((row) => (
+                          <div key={row.id} className="border border-border rounded-lg p-3 space-y-2">
+                            {/* Top: type + recurring badges + status */}
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <Badge variant="outline" className="text-xs">
                                   {row.typeLabel}
                                 </Badge>
-
                                 {row.kind !== "price" && row.isRecurring && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[10px] border-warning/40 text-warning whitespace-nowrap"
-                                  >
+                                  <Badge variant="outline" className="text-[10px] border-warning/40 text-warning">
                                     Recurring
                                   </Badge>
                                 )}
                               </div>
-                            </td>
-
-                            <td className="py-3 px-4 align-top text-sm text-foreground font-medium">
-                              <div className="break-words leading-5">{row.what}</div>
-                            </td>
-
-                            <td className="py-3 px-4 align-top text-sm text-muted-foreground">
-                              <span className="block whitespace-normal break-words leading-5">{row.when}</span>
-                            </td>
-
-                            <td className="py-3 px-4 align-top">
-                              <Badge variant={row.statusVariant} className="text-xs whitespace-nowrap">
+                              <Badge variant={row.statusVariant} className="text-xs">
                                 {row.statusLabel}
                               </Badge>
-                            </td>
+                            </div>
 
-                            <td className="py-3 px-5 align-top">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {row.kind === "price" ? (
+                            {/* What */}
+                            <p className="text-sm font-medium text-foreground leading-snug">{row.what}</p>
+
+                            {/* When */}
+                            <p className="text-xs text-muted-foreground">{row.when}</p>
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-2 pt-1">
+                              {row.kind === "price" ? (
+                                <>
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -952,78 +928,225 @@ export default function Alerts() {
                                   >
                                     Edit
                                   </Button>
-                                ) : row.kind === "recurring" ? (
-                                  <>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 px-2 text-xs"
-                                      onPointerDown={(event) => {
-                                        event.preventDefault();
-                                        event.stopPropagation();
-                                        openRecurringRow(row.recurringItem.eventId);
-                                      }}
-                                    >
-                                      View
-                                    </Button>
-
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
-                                      onPointerDown={(event) => {
-                                        event.preventDefault();
-                                        event.stopPropagation();
-                                        removeRecurringSubscription(row.recurringItem.id);
-                                      }}
-                                    >
-                                      Stop
-                                    </Button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 px-2 text-xs"
-                                      onPointerDown={(event) => {
-                                        event.preventDefault();
-                                        event.stopPropagation();
-                                        openAlertRow(row.alertItem);
-                                      }}
-                                    >
-                                      View
-                                    </Button>
-
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
-                                      onPointerDown={(event) => {
-                                        event.preventDefault();
-                                        event.stopPropagation();
-                                        deleteAlert(row.alertItem.id);
-                                      }}
-                                    >
-                                      {row.kind === "scheduled" ? "Cancel" : "Remove"}
-                                    </Button>
-                                  </>
-                                )}
-                              </div>
-                            </td>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                                    onClick={() => deletePriceAlert(row.priceAlert.id)}
+                                  >
+                                    Remove
+                                  </Button>
+                                </>
+                              ) : row.kind === "recurring" ? (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs"
+                                    onPointerDown={(event) => {
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      openRecurringRow(row.recurringItem.eventId);
+                                    }}
+                                  >
+                                    View
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                                    onPointerDown={(event) => {
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      removeRecurringSubscription(row.recurringItem.id);
+                                    }}
+                                  >
+                                    Stop
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs"
+                                    onPointerDown={(event) => {
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      openAlertRow(row.alertItem);
+                                    }}
+                                  >
+                                    View
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                                    onPointerDown={(event) => {
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      deleteAlert(row.alertItem.id);
+                                    }}
+                                  >
+                                    {row.kind === "scheduled" ? "Cancel" : "Remove"}
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  ) : (
+                    /* ── Desktop table (unchanged) ──────────────────────────── */
+                    <div className="overflow-x-auto -mx-5">
+                      <table className="w-full table-fixed">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="w-[180px] text-left py-3 px-5 text-xs font-medium text-muted-foreground">
+                              Type
+                            </th>
+                            <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground">What</th>
+                            <th className="w-[180px] text-left py-3 px-4 text-xs font-medium text-muted-foreground">
+                              When
+                            </th>
+                            <th className="w-[110px] text-left py-3 px-4 text-xs font-medium text-muted-foreground">
+                              Status
+                            </th>
+                            <th className="w-[150px] text-left py-3 px-5 text-xs font-medium text-muted-foreground">
+                              Actions
+                            </th>
                           </tr>
-                        ))}
+                        </thead>
 
-                        {myAlertsAndTimersRows.length === 0 && (
-                          <tr>
-                            <td colSpan={5} className="py-8 text-center text-muted-foreground text-sm">
-                              No active alerts. Click "Add Alert" or schedule one from a calendar event.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                        <tbody>
+                          {myAlertsAndTimersRows.map((row) => (
+                            <tr key={row.id} className="border-b border-border hover:bg-muted/50 transition-colors">
+                              <td className="py-3 px-5 align-top text-sm text-foreground">
+                                <div className="flex items-start gap-2 flex-wrap">
+                                  <Badge variant="outline" className="text-xs whitespace-nowrap">
+                                    {row.typeLabel}
+                                  </Badge>
+
+                                  {row.kind !== "price" && row.isRecurring && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] border-warning/40 text-warning whitespace-nowrap"
+                                    >
+                                      Recurring
+                                    </Badge>
+                                  )}
+                                </div>
+                              </td>
+
+                              <td className="py-3 px-4 align-top text-sm text-foreground font-medium">
+                                <div className="break-words leading-5">{row.what}</div>
+                              </td>
+
+                              <td className="py-3 px-4 align-top text-sm text-muted-foreground">
+                                <span className="block whitespace-normal break-words leading-5">{row.when}</span>
+                              </td>
+
+                              <td className="py-3 px-4 align-top">
+                                <Badge variant={row.statusVariant} className="text-xs whitespace-nowrap">
+                                  {row.statusLabel}
+                                </Badge>
+                              </td>
+
+                              <td className="py-3 px-5 align-top">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {row.kind === "price" ? (
+                                    <>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 px-2 text-xs"
+                                        onClick={() => openEditPriceAlert(row.priceAlert)}
+                                      >
+                                        Edit
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                                        onClick={() => deletePriceAlert(row.priceAlert.id)}
+                                      >
+                                        Remove
+                                      </Button>
+                                    </>
+                                  ) : row.kind === "recurring" ? (
+                                    <>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 px-2 text-xs"
+                                        onPointerDown={(event) => {
+                                          event.preventDefault();
+                                          event.stopPropagation();
+                                          openRecurringRow(row.recurringItem.eventId);
+                                        }}
+                                      >
+                                        View
+                                      </Button>
+
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                                        onPointerDown={(event) => {
+                                          event.preventDefault();
+                                          event.stopPropagation();
+                                          removeRecurringSubscription(row.recurringItem.id);
+                                        }}
+                                      >
+                                        Stop
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 px-2 text-xs"
+                                        onPointerDown={(event) => {
+                                          event.preventDefault();
+                                          event.stopPropagation();
+                                          openAlertRow(row.alertItem);
+                                        }}
+                                      >
+                                        View
+                                      </Button>
+
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                                        onPointerDown={(event) => {
+                                          event.preventDefault();
+                                          event.stopPropagation();
+                                          deleteAlert(row.alertItem.id);
+                                        }}
+                                      >
+                                        {row.kind === "scheduled" ? "Cancel" : "Remove"}
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+
+                          {myAlertsAndTimersRows.length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="py-8 text-center text-muted-foreground text-sm">
+                                No active alerts. Click "Add Alert" or schedule one from a calendar event.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
