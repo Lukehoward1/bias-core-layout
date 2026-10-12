@@ -176,7 +176,7 @@ export function ChartVerticalToolbar({ onZoomIn, onZoomOut, onReset, onClearDraw
   const [activeTool, setActiveTool] = useState<ToolId>('cursor');
 
   return (
-    <div className="w-full h-full flex flex-col items-center py-1.5 px-1 bg-background/95 backdrop-blur-sm border-l border-border/50">
+    <div className="w-full h-full flex flex-col items-center py-1.5 px-1 bg-background/95 backdrop-blur-sm border-l border-border/50 overflow-y-auto">
       <div className="flex flex-col gap-0.5">
         {/* Cursor / Selection */}
         <ToolGroup tools={cursorTools} activeTool={activeTool} onSelectTool={setActiveTool} />

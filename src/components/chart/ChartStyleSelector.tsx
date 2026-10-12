@@ -6,6 +6,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { CandlestickChart, LineChart, BarChart3, AreaChart } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export type ChartStyle = 'candlestick' | 'bars' | 'line' | 'area' | 'heikin-ashi' | 'hollow';
 
@@ -24,14 +25,15 @@ const chartStyles: { value: ChartStyle; label: string; icon: React.ReactNode }[]
 ];
 
 export function ChartStyleSelector({ value, onChange }: ChartStyleSelectorProps) {
+  const isMobile = useIsMobile();
   const currentStyle = chartStyles.find((s) => s.value === value);
 
   return (
     <Select value={value} onValueChange={(v) => onChange(v as ChartStyle)}>
-      <SelectTrigger className="w-[140px] h-7 text-xs bg-transparent border-border/50 hover:bg-muted">
+      <SelectTrigger className={`${isMobile ? 'w-9' : 'w-[140px]'} h-7 text-xs bg-transparent border-border/50 hover:bg-muted`}>
         <div className="flex items-center gap-1.5">
           {currentStyle?.icon}
-          <SelectValue />
+          {!isMobile && <SelectValue />}
         </div>
       </SelectTrigger>
       <SelectContent className="bg-card border-border">

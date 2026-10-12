@@ -1,16 +1,5 @@
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { 
-  Crosshair, 
-  MoreHorizontal,
-  Info,
-  Palette
-} from 'lucide-react';
+import { Crosshair, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IndicatorSelector } from './chart/IndicatorSelector';
 import { ChartStyleSelector, ChartStyle } from './chart/ChartStyleSelector';
@@ -43,11 +32,6 @@ const timeframes = [
   { value: 'h1', label: '1H' },
   { value: 'h4', label: '4H' },
   { value: 'd1', label: '1D' },
-];
-
-const moreTimeframes = [
-  { value: 'w1', label: '1W' },
-  { value: 'mn1', label: '1M' },
 ];
 
 const pairLabels: Record<string, string> = {
@@ -89,7 +73,7 @@ export function ChartToolbar({
   return (
     <div className="flex items-center justify-between px-3 py-2 h-11 bg-background/95 backdrop-blur-sm border-b border-border/50">
       {/* Left: Timeframe buttons + Chart Style */}
-      <div className="flex items-center gap-2">
+      <div className="overflow-x-auto min-w-0 flex items-center gap-2">
         <div className="flex items-center gap-0.5">
           {timeframes.map((tf) => (
             <Button
@@ -108,23 +92,6 @@ export function ChartToolbar({
             </Button>
           ))}
           
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-6 px-1.5 text-muted-foreground hover:text-foreground">
-                <MoreHorizontal className="h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="bg-card border-border">
-              {moreTimeframes.map((tf) => (
-                <DropdownMenuItem 
-                  key={tf.value}
-                  className="text-muted-foreground cursor-not-allowed opacity-50"
-                >
-                  {tf.label} <span className="ml-2 text-xs">(Coming Soon)</span>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
 
         <div className="h-4 w-px bg-border/50" />
@@ -146,7 +113,7 @@ export function ChartToolbar({
       </div>
 
       {/* Center: Symbol + Timeframe label */}
-      <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+      <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center gap-1.5">
         <span className="text-sm font-semibold text-foreground">
           {pairLabels[pair] || pair.toUpperCase()}
         </span>
@@ -157,7 +124,7 @@ export function ChartToolbar({
       </div>
 
       {/* Right: Icon controls */}
-      <div className="flex items-center gap-1">
+      <div className="overflow-x-auto min-w-0 flex items-center gap-1">
         {/* Replay Mode */}
         <ReplayModePanel />
 
@@ -205,24 +172,6 @@ export function ChartToolbar({
           OHLC
         </Button>
 
-        {/* Theme placeholder */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-              title="Chart Theme"
-            >
-              <Palette className="h-3.5 w-3.5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="bg-card border-border">
-            <DropdownMenuItem className="text-muted-foreground cursor-not-allowed opacity-50">
-              Custom Theme (Coming Soon)
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
     </div>
   );
