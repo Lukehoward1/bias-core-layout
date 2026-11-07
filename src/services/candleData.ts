@@ -7,10 +7,11 @@
 import { normalizeSymbol } from "./marketData";
 import type { MarketCandle } from "./marketData";
 import type { BiasState } from "./contextEngine";
-import type { TraderStyle } from "@/context/TraderStyleProvider";
 import type { TfCode } from "@/data/timeframes";
 import { TRADE_INSTRUMENTS } from "@/data/tradeInstruments";
 import { activeProvider } from "./activeProvider";
+import type { TraderTimeframes, TfRole } from "./traderTimeframes";
+import { ROLE_WEIGHT } from "./traderTimeframes";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -20,11 +21,18 @@ export interface TimeframeBias {
   reason: string;
 }
 
-export interface MultiTimeframeBias {
+export interface TriTimeframeBiasRole {
+  tf: TfCode;
+  direction: "bullish" | "bearish" | "neutral";
+  confidence: number;
+  reason: string;
+}
+
+export interface TriTimeframeBias {
   biasState: BiasState;
   confidence: number;
-  dailyBias: TimeframeBias;
-  fourHourBias: TimeframeBias;
+  timeframes: TraderTimeframes;
+  perRole: Record<TfRole, TriTimeframeBiasRole>;
 }
 
 // ── Cache ────────────────────────────────────────────────────
@@ -268,99 +276,111 @@ function analyzeBias(candles: MarketCandle[], interval: string): TimeframeBias {
   return NEUTRAL;
 }
 
-export async function getDailyBias(symbol: string): Promise<TimeframeBias> {
-  try {
-    const candles = await fetchCandles(symbol, "1day", 20);
-    return analyzeBias(candles, "1day");
-  } catch {
-    return { bias: "neutral", confidence: 0, reason: "Error fetching daily data" };
-  }
-}
+// ── Three-role timeframe bias ────────────────────────────────
 
-export async function get4HBias(symbol: string): Promise<TimeframeBias> {
-  try {
-    const candles = await fetchCandles(symbol, "4h", 20);
-    return analyzeBias(candles, "4h");
-  } catch {
-    return { bias: "neutral", confidence: 0, reason: "Error fetching 4H data" };
-  }
-}
+export async function getTriTimeframeBias(
+  symbol: string,
+  timeframes: TraderTimeframes,
+): Promise<TriTimeframeBias> {
+  const roles: TfRole[] = ["bias", "structure", "entry"];
 
-// ── Multi-timeframe combination ──────────────────────────────
+  const results = await Promise.all(
+    roles.map(async (role) => {
+      const tf = timeframes[role];
+      try {
+        const candles = await fetchCandles(symbol, tf, 20);
+        return analyzeBias(candles, tf);
+      } catch {
+        return { bias: "neutral" as const, confidence: 0, reason: "Error fetching data" };
+      }
+    }),
+  );
+
+  const [biasTfBias, structureTfBias, entryTfBias] = results;
+
+  const perRole: TriTimeframeBias["perRole"] = {
+    bias:      { tf: timeframes.bias,      direction: biasTfBias.bias,      confidence: biasTfBias.confidence,      reason: biasTfBias.reason },
+    structure: { tf: timeframes.structure, direction: structureTfBias.bias, confidence: structureTfBias.confidence, reason: structureTfBias.reason },
+    entry:     { tf: timeframes.entry,     direction: entryTfBias.bias,     confidence: entryTfBias.confidence,     reason: entryTfBias.reason },
+  };
+
+  // D = Σ(weight × sign(direction)) — ranges from -1.0 to +1.0
+  const sign = (b: TimeframeBias["bias"]) => (b === "bullish" ? 1 : b === "bearish" ? -1 : 0);
+  const D =
+    ROLE_WEIGHT.bias      * sign(biasTfBias.bias) +
+    ROLE_WEIGHT.structure * sign(structureTfBias.bias) +
+    ROLE_WEIGHT.entry     * sign(entryTfBias.bias);
+
+  let biasState: BiasState;
+  if (D >= 0.70)       biasState = "Bullish Active";
+  else if (D >= 0.30)  biasState = "Bullish Weakening";
+  else if (D <= -0.70) biasState = "Bearish Active";
+  else if (D <= -0.30) biasState = "Bearish Weakening";
+  else                 biasState = "Neutral / Ranging";
+
+  // confidence = Σ(weight × conf) × (0.6 + 0.4 × |D|) — penalises conflicting TFs
+  const weightedConf =
+    ROLE_WEIGHT.bias      * biasTfBias.confidence +
+    ROLE_WEIGHT.structure * structureTfBias.confidence +
+    ROLE_WEIGHT.entry     * entryTfBias.confidence;
+  const confidence = Math.round(weightedConf * (0.6 + 0.4 * Math.abs(D)));
+
+  return { biasState, confidence, timeframes, perRole };
+}
 
 // ── Real price levels from candle data ───────────────────────
 
 export interface RealLevels {
-  prevDayHigh: number;
-  prevDayLow: number;
-  recentSwingHigh: number;
-  recentSwingLow: number;
-  majorSwingHigh: number;
-  majorSwingLow: number;
-  fourHourSwingHigh: number;
-  fourHourSwingLow: number;
+  biasHigh: number;
+  biasLow: number;
+  recentBiasHigh: number;
+  recentBiasLow: number;
+  majorBiasHigh: number;
+  majorBiasLow: number;
+  structureHigh: number;
+  structureLow: number;
+  entryHigh: number;
+  entryLow: number;
+  biasTf: TfCode;
+  structureTf: TfCode;
+  entryTf: TfCode;
 }
 
-export async function getRealLevels(symbol: string, _style: TraderStyle): Promise<RealLevels | null> {
+export async function getRealLevels(symbol: string, timeframes: TraderTimeframes): Promise<RealLevels | null> {
   try {
-    const [dailyCandles, fourHourCandles] = await Promise.all([
-      fetchCandles(symbol, "1day", 20),
-      fetchCandles(symbol, "4h", 20),
+    // All three fetched at outputsize=20 so cache keys match getTriTimeframeBias (sym:tf:20).
+    const [biasCandles, structureCandles, entryCandles] = await Promise.all([
+      fetchCandles(symbol, timeframes.bias, 20),
+      fetchCandles(symbol, timeframes.structure, 20),
+      fetchCandles(symbol, timeframes.entry, 20),
     ]);
 
-    // Need at least 6 daily candles (index 0 = forming, 1..5 = 5 closed)
-    if (dailyCandles.length < 6 || fourHourCandles.length < 10) return null;
+    // Need at least 6 bias-TF candles (index 0 = forming, 1..5 = 5 closed)
+    if (biasCandles.length < 6 || structureCandles.length < 5 || entryCandles.length < 5) return null;
 
-    const prevDay = dailyCandles[1]; // last fully closed daily
-    const recentClosed = dailyCandles.slice(1, 6); // 5 closed daily candles
-    const majorClosed = dailyCandles.slice(1); // all closed from the 20 fetched
-    const fourHourSlice = fourHourCandles.slice(0, 10); // last 10 4H candles
+    const prevBias = biasCandles[1];
+    const recentBiasClosed = biasCandles.slice(1, 6);
+    const majorBiasClosed = biasCandles.slice(1);
+    const structureSlice = structureCandles.slice(0, 10);
+    const entrySlice = entryCandles.slice(0, 10);
 
     return {
-      prevDayHigh: prevDay.high,
-      prevDayLow: prevDay.low,
-      recentSwingHigh: Math.max(...recentClosed.map((c) => c.high)),
-      recentSwingLow: Math.min(...recentClosed.map((c) => c.low)),
-      majorSwingHigh: Math.max(...majorClosed.map((c) => c.high)),
-      majorSwingLow: Math.min(...majorClosed.map((c) => c.low)),
-      fourHourSwingHigh: Math.max(...fourHourSlice.map((c) => c.high)),
-      fourHourSwingLow: Math.min(...fourHourSlice.map((c) => c.low)),
+      biasHigh: prevBias.high,
+      biasLow: prevBias.low,
+      recentBiasHigh: Math.max(...recentBiasClosed.map((c) => c.high)),
+      recentBiasLow: Math.min(...recentBiasClosed.map((c) => c.low)),
+      majorBiasHigh: Math.max(...majorBiasClosed.map((c) => c.high)),
+      majorBiasLow: Math.min(...majorBiasClosed.map((c) => c.low)),
+      structureHigh: Math.max(...structureSlice.map((c) => c.high)),
+      structureLow: Math.min(...structureSlice.map((c) => c.low)),
+      entryHigh: Math.max(...entrySlice.map((c) => c.high)),
+      entryLow: Math.min(...entrySlice.map((c) => c.low)),
+      biasTf: timeframes.bias,
+      structureTf: timeframes.structure,
+      entryTf: timeframes.entry,
     };
   } catch {
     return null;
   }
 }
 
-export async function getMultiTimeframeBias(
-  symbol: string,
-  _style: TraderStyle,
-): Promise<MultiTimeframeBias> {
-  const [dailyBias, fourHourBias] = await Promise.all([getDailyBias(symbol), get4HBias(symbol)]);
-
-  let biasState: BiasState;
-  let confidence: number;
-
-  const d = dailyBias.bias;
-  const h = fourHourBias.bias;
-
-  if (d === "bullish" && h === "bullish") {
-    biasState = "Bullish Active";
-    confidence = Math.max(85, Math.round((dailyBias.confidence + fourHourBias.confidence) / 2));
-  } else if (d === "bearish" && h === "bearish") {
-    biasState = "Bearish Active";
-    confidence = Math.max(85, Math.round((dailyBias.confidence + fourHourBias.confidence) / 2));
-  } else if (d === "bullish" && h === "bearish") {
-    // Higher TF bullish but lower TF pulling back — weakening
-    biasState = "Bullish Weakening";
-    confidence = 50;
-  } else if (d === "bearish" && h === "bullish") {
-    // Higher TF bearish but lower TF bouncing — weakening
-    biasState = "Bearish Weakening";
-    confidence = 50;
-  } else {
-    biasState = "Neutral / Ranging";
-    confidence = Math.round((dailyBias.confidence + fourHourBias.confidence) / 2);
-  }
-
-  return { biasState, confidence, dailyBias, fourHourBias };
-}

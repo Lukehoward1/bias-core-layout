@@ -319,7 +319,7 @@ function useDashboardEventNavigation() {
 function TodaysBiasDashboardCard() {
   const { assets } = useAssets();
   const { watchlistAssets } = useWatchlist();
-  const { traderStyle } = useTraderStyle();
+  const { traderStyle, resolvedTimeframes } = useTraderStyle();
 
   const basisAssets = useMemo(() => {
     return (watchlistAssets.length > 0 ? watchlistAssets : assets).slice(0, 6);
@@ -331,8 +331,8 @@ function TodaysBiasDashboardCard() {
   const { contextMap, subscribeContextSymbols } = useMarketData();
 
   useEffect(() => {
-    subscribeContextSymbols(basisAssets, traderStyle);
-  }, [basisAssets, traderStyle, subscribeContextSymbols]);
+    subscribeContextSymbols(basisAssets, resolvedTimeframes);
+  }, [basisAssets, resolvedTimeframes, subscribeContextSymbols]);
 
   const bullishCount = basisAssets.filter((a) => contextMap[a.symbol]?.biasState.includes("Bullish")).length;
   const bearishCount = basisAssets.filter((a) => contextMap[a.symbol]?.biasState.includes("Bearish")).length;

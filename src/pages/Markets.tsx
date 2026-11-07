@@ -113,7 +113,7 @@ export default function Markets() {
   const { assets } = useAssets();
   const { watchlist, toggleWatchlist, isInWatchlist, watchlistAssets } = useWatchlist();
   const { isCardOnDashboard, addCard, removeCard } = useDashboardLayout();
-  const { traderStyle } = useTraderStyle();
+  const { traderStyle, resolvedTimeframes } = useTraderStyle();
   const tap = useTapHandler();
 
   const watchlistOverviewCardId = "watchlist-overview";
@@ -178,7 +178,7 @@ export default function Markets() {
       allAssets.map(async (asset) => {
         const quote = quotes[asset.symbol];
         const relevantEvents = activeCalendarEvents.filter((event) => isEventRelevantToSymbol(asset.symbol, event));
-        const ctx = await buildMarketContext({ asset, quote, upcomingRelevantEvents: relevantEvents, traderStyle });
+        const ctx = await buildMarketContext({ asset, quote, upcomingRelevantEvents: relevantEvents, resolvedTimeframes });
         return [asset.symbol, ctx] as const;
       }),
     )
@@ -189,7 +189,7 @@ export default function Markets() {
     return () => {
       cancelled = true;
     };
-  }, [watchlistAssets, filteredPairs, traderStyle, liveCalendarEvents]); // quotes intentionally omitted — new ref every render would cause infinite loop
+  }, [watchlistAssets, filteredPairs, resolvedTimeframes, liveCalendarEvents]); // quotes intentionally omitted — new ref every render would cause infinite loop
 
   // Derive Bullish/Bearish/Neutral from the candle-engine biasState string.
   // asset.biasDirection is now a neutral fallback only — the real value is in context.biasState.

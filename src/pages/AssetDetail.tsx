@@ -19,6 +19,7 @@ import type { CalendarEvent } from "@/data/calendarEvents";
 import { getAllCalendarEvents, getEventDateTime, formatCalendarEventDateLabel } from "@/services/calendarData";
 import { getLiveCalendarEvents } from "@/services/calendarService";
 import { buildMarketContext, type KeyLevel, type MarketContext, type SessionContextItem } from "@/services/contextEngine";
+import { TF_BY_CODE } from "@/data/timeframes";
 import { setPrioritySymbol } from "@/services/candleData";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
 import { CandlestickChart, type CandlestickChartRef } from "@/components/CandlestickChart";
@@ -190,7 +191,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
   const navigate = useNavigate();
   const { getAssetBySymbol } = useAssets();
   const { isInWatchlist, toggleWatchlist } = useWatchlist();
-  const { traderStyle } = useTraderStyle();
+  const { traderStyle, resolvedTimeframes } = useTraderStyle();
   const tap = useTapHandler();
 
   // getAssetBySymbol returns a fresh {...base, biasMode, ...} object per call — memoize
@@ -392,7 +393,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
       asset,
       quote,
       upcomingRelevantEvents: upcomingRelevantCalendarEvents,
-      traderStyle,
+      resolvedTimeframes,
     })
       .then((ctx) => {
         if (!cancelled) setMarketContext(ctx);
@@ -401,7 +402,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
     return () => {
       cancelled = true;
     };
-  }, [asset, quote, upcomingRelevantCalendarEvents, traderStyle]);
+  }, [asset, quote, upcomingRelevantCalendarEvents, resolvedTimeframes]);
 
   // Derive Bullish/Bearish/Neutral from the candle-engine biasState string.
   // asset.biasDirection is now a neutral fallback only — the real value is in marketContext.biasState.
@@ -427,8 +428,8 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
   const contextSnapshot = useMemo<ContextSnapshotItem[]>(() => {
     if (!asset || !marketContext || marketContext.biasState === "Bias Unavailable") return [];
 
-    const biasTf = marketContext.timeframes.bias[0] ?? "Higher timeframe";
-    const structureTf = marketContext.timeframes.structure[0] ?? "Structure timeframe";
+    const biasTf = TF_BY_CODE[marketContext.timeframes.bias].label;
+    const structureTf = TF_BY_CODE[marketContext.timeframes.structure].label;
     const biasDir = getBiasDirection(marketContext.biasState);
     const direction = getDirectionalWord(biasDir);
 
@@ -1152,8 +1153,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                   {marketContext.structureState}
                 </Badge>
                 <span className="text-xs text-muted-foreground">
-                  Bias TF: {marketContext.timeframes.bias.join(" / ")} • Structure TF:{" "}
-                  {marketContext.timeframes.structure.join(" / ")}
+                  Bias: {TF_BY_CODE[marketContext.timeframes.bias].label} · Structure: {TF_BY_CODE[marketContext.timeframes.structure].label} · Entry: {TF_BY_CODE[marketContext.timeframes.entry].label}
                 </span>
               </div>
             )}

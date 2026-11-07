@@ -53,7 +53,7 @@ const getStateDotClass = (state: TimeframeState) => {
 
 export function WatchlistOverviewCard({ isEditMode = false }: WatchlistOverviewCardProps) {
   const { watchlistAssets } = useWatchlist();
-  const { traderStyle } = useTraderStyle();
+  const { traderStyle, resolvedTimeframes } = useTraderStyle();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -78,8 +78,8 @@ export function WatchlistOverviewCard({ isEditMode = false }: WatchlistOverviewC
   const { contextMap, subscribeContextSymbols } = useMarketData();
 
   useEffect(() => {
-    subscribeContextSymbols(displayAssets, traderStyle);
-  }, [displayAssets, traderStyle, subscribeContextSymbols]);
+    subscribeContextSymbols(displayAssets, resolvedTimeframes);
+  }, [displayAssets, resolvedTimeframes, subscribeContextSymbols]);
 
   // Derive Bullish/Bearish/Neutral from the candle-engine biasState string.
   // asset.biasDirection is now a neutral fallback only — the real value is in context.biasState.

@@ -2,8 +2,11 @@
 import type { Asset } from "@/data/assets";
 import type { MarketQuote } from "@/services/marketData";
 import type { CalendarEvent } from "@/data/calendarEvents";
-import type { TraderStyle } from "@/context/TraderStyleProvider";
-import { getMultiTimeframeBias, getRealLevels, isBiasAvailable } from "./candleData";
+import type { TfCode } from "@/data/timeframes";
+import { TF_BY_CODE } from "@/data/timeframes";
+import type { TraderTimeframes, TfRole } from "./traderTimeframes";
+import { getTriTimeframeBias, getRealLevels, isBiasAvailable } from "./candleData";
+import type { TriTimeframeBiasRole } from "./candleData";
 
 export type BiasState =
   | "Bullish Active"
@@ -59,12 +62,6 @@ export interface SessionContextItem {
   emphasis: "info" | "watch" | "elevated";
 }
 
-export type StyleTimeframes = {
-  bias: [string, string];
-  structure: [string, string];
-  execution: [string, string];
-};
-
 export type TimeframeState = "bullish" | "weakening" | "bearish" | "liquidity" | "neutral";
 
 export interface TimeframeContextItem {
@@ -83,7 +80,8 @@ export interface MarketContext {
   levels: KeyLevel[];
   sessionContext: SessionContextItem[];
   overview: string;
-  timeframes: StyleTimeframes;
+  timeframes: TraderTimeframes;
+  perRole: Record<TfRole, TriTimeframeBiasRole>;
   timeframeContext: TimeframeContextItem[];
   highImpactSoon: boolean;
 }
@@ -92,19 +90,7 @@ export interface ContextEngineInput {
   asset: Asset;
   quote?: MarketQuote | null;
   upcomingRelevantEvents?: CalendarEvent[];
-  traderStyle?: TraderStyle;
-}
-
-export function getStyleTimeframes(style: TraderStyle = "intraday"): StyleTimeframes {
-  if (style === "scalper") {
-    return { bias: ["15m", "1H"], structure: ["5m", "15m"], execution: ["1m", "5m"] };
-  }
-
-  if (style === "swing") {
-    return { bias: ["Daily", "Weekly"], structure: ["4H", "Daily"], execution: ["1H", "4H"] };
-  }
-
-  return { bias: ["1H", "4H"], structure: ["15m", "1H"], execution: ["5m", "15m"] };
+  resolvedTimeframes: TraderTimeframes;
 }
 
 function toNumber(value: string | number | undefined | null): number {
@@ -245,7 +231,7 @@ async function buildLevels(
   asset: Asset,
   quote: MarketQuote | null | undefined,
   biasState: BiasState,
-  traderStyle: TraderStyle,
+  timeframes: TraderTimeframes,
 ): Promise<KeyLevel[]> {
   const ref = toNumber(asset.latestPrice) || toNumber(quote?.last);
   if (!Number.isFinite(ref) || ref <= 0) return [];
@@ -255,40 +241,39 @@ async function buildLevels(
   const isBearish = biasState.startsWith("Bearish");
   const isNeutral = biasState === "Neutral / Ranging";
 
+  const biasTfLabel = TF_BY_CODE[timeframes.bias].label;
+  const structureTfLabel = TF_BY_CODE[timeframes.structure].label;
+
   // Attempt to use real candle-derived levels
-  const real = isNeutral ? null : await getRealLevels(asset.symbol, traderStyle);
+  const real = isNeutral ? null : await getRealLevels(asset.symbol, timeframes);
 
   if (real) {
     const {
-      prevDayHigh,
-      prevDayLow,
-      recentSwingHigh,
-      recentSwingLow,
-      majorSwingHigh,
-      majorSwingLow,
-      fourHourSwingHigh,
-      fourHourSwingLow,
+      biasHigh,
+      biasLow,
+      recentBiasHigh,
+      recentBiasLow,
+      majorBiasHigh,
+      majorBiasLow,
+      structureHigh,
+      structureLow,
     } = real;
 
     // Nearest real level above/below current price for the directional target
-    const upsideCandidates = [prevDayHigh, recentSwingHigh, fourHourSwingHigh, majorSwingHigh].filter(
-      (l) => l > ref,
-    );
-    const downsideCandidates = [prevDayLow, recentSwingLow, fourHourSwingLow, majorSwingLow].filter(
-      (l) => l < ref,
-    );
-    const nearestAbove = upsideCandidates.length > 0 ? Math.min(...upsideCandidates) : majorSwingHigh;
-    const nearestBelow = downsideCandidates.length > 0 ? Math.max(...downsideCandidates) : majorSwingLow;
+    const upsideCandidates = [biasHigh, recentBiasHigh, structureHigh, majorBiasHigh].filter((l) => l > ref);
+    const downsideCandidates = [biasLow, recentBiasLow, structureLow, majorBiasLow].filter((l) => l < ref);
+    const nearestAbove = upsideCandidates.length > 0 ? Math.min(...upsideCandidates) : majorBiasHigh;
+    const nearestBelow = downsideCandidates.length > 0 ? Math.max(...downsideCandidates) : majorBiasLow;
 
     const levels: KeyLevel[] = [];
 
     levels.push(
       makeLevel({
         type: "Swing High",
-        price: prevDayHigh,
+        price: biasHigh,
         decimals,
         tags: ["Tested once", "Possible reaction zone"],
-        reason: "Previous day high — nearest overhead swing area where price may react.",
+        reason: `Prior ${biasTfLabel} high — nearest overhead swing area where price may react.`,
         alignedWithBias: isBearish,
         higherTimeframe: false,
       }),
@@ -297,10 +282,10 @@ async function buildLevels(
     levels.push(
       makeLevel({
         type: "Swing Low",
-        price: prevDayLow,
+        price: biasLow,
         decimals,
         tags: ["Tested once", "Possible reaction zone"],
-        reason: "Previous day low — nearest downside swing area acting as the closest demand reference.",
+        reason: `Prior ${biasTfLabel} low — nearest downside swing area acting as the closest demand reference.`,
         alignedWithBias: isBullish,
         higherTimeframe: false,
       }),
@@ -309,12 +294,12 @@ async function buildLevels(
     levels.push(
       makeLevel({
         type: "Strong Reaction Zone",
-        price: isBullish ? majorSwingLow : majorSwingHigh,
+        price: isBullish ? majorBiasLow : majorBiasHigh,
         decimals,
         tags: ["Strong reaction", "Untested"],
         reason: isBullish
-          ? "Major 20-day swing low — higher-timeframe demand reference useful as a pullback/invalidation area."
-          : "Major 20-day swing high — higher-timeframe supply reference useful as a bounce/invalidation area.",
+          ? `Major ${biasTfLabel} swing low — higher-timeframe demand reference useful as a pullback/invalidation area.`
+          : `Major ${biasTfLabel} swing high — higher-timeframe supply reference useful as a bounce/invalidation area.`,
         alignedWithBias: true,
         higherTimeframe: true,
       }),
@@ -337,12 +322,12 @@ async function buildLevels(
     levels.push(
       makeLevel({
         type: "Break and Retest Zone",
-        price: isBearish ? fourHourSwingHigh : fourHourSwingLow,
+        price: isBearish ? structureHigh : structureLow,
         decimals,
         tags: ["Retested", "Possible reaction zone"],
         reason: isBearish
-          ? "4H swing high above price — prior resistance that may act as a retest zone."
-          : "4H swing low below price — prior support that may act as a retest zone.",
+          ? `${structureTfLabel} swing high above price — prior resistance that may act as a retest zone.`
+          : `${structureTfLabel} swing low below price — prior support that may act as a retest zone.`,
         alignedWithBias: true,
         higherTimeframe: false,
       }),
@@ -351,12 +336,12 @@ async function buildLevels(
     levels.push(
       makeLevel({
         type: "Liquidity Sweep",
-        price: isBearish ? recentSwingLow : recentSwingHigh,
+        price: isBearish ? recentBiasLow : recentBiasHigh,
         decimals,
         tags: ["Liquidity swept", "Possible reaction zone"],
         reason: isBearish
-          ? "Recent 5-day swing low — downside liquidity area; reaction depends on acceptance or reclaim."
-          : "Recent 5-day swing high — upside liquidity area; reaction depends on acceptance or rejection.",
+          ? `Recent ${biasTfLabel} swing low — downside liquidity area; reaction depends on acceptance or reclaim.`
+          : `Recent ${biasTfLabel} swing high — upside liquidity area; reaction depends on acceptance or rejection.`,
         alignedWithBias: true,
         higherTimeframe: false,
       }),
@@ -552,22 +537,21 @@ function buildOverview(opts: {
   return `${biasText} ${structureText} ${levelText}${newsText}`;
 }
 
-function getDefaultTimeframesForStyle(style: TraderStyle): [string, string, string] {
-  if (style === "scalper") return ["1m", "5m", "15m"];
-  if (style === "swing") return ["1H", "4H", "Daily"];
-  return ["5m", "15m", "1H"];
-}
-
 function buildTimeframeContext(
   asset: Asset,
   biasState: BiasState,
   structureState: StructureState,
   quote: MarketQuote | null | undefined,
   highImpactSoon: boolean,
-  style: TraderStyle,
+  timeframes: TraderTimeframes,
   confidence: number,
 ): TimeframeContextItem[] {
-  const timeframes = getDefaultTimeframesForStyle(style);
+  // Ordered entry → structure → bias (ascending timeframe for display)
+  const tfLabels: [string, string, string] = [
+    TF_BY_CODE[timeframes.entry].label,
+    TF_BY_CODE[timeframes.structure].label,
+    TF_BY_CODE[timeframes.bias].label,
+  ];
   // Derive direction from candle-based biasState — asset.biasDirection is now a neutral fallback only
   const direction: "Bullish" | "Bearish" | "Neutral" = biasState.startsWith("Bullish")
     ? "Bullish"
@@ -580,7 +564,7 @@ function buildTimeframeContext(
   const failure = biasState === "Failure Detected";
   const neutral = biasState === "Neutral / Ranging";
 
-  return timeframes.map((timeframe, index) => {
+  return tfLabels.map((timeframe, index) => {
     if (index === 2) {
       if (neutral) {
         return {
@@ -726,7 +710,14 @@ function buildTimeframeContext(
 }
 
 export async function buildMarketContext(input: ContextEngineInput): Promise<MarketContext> {
-  const { asset, quote, upcomingRelevantEvents = [], traderStyle = "intraday" } = input;
+  const { asset, quote, upcomingRelevantEvents = [], resolvedTimeframes } = input;
+
+  const neutralRole: TriTimeframeBiasRole = { tf: resolvedTimeframes.bias, direction: "neutral", confidence: 0, reason: "Analysis unavailable" };
+  const unavailablePerRole: Record<TfRole, TriTimeframeBiasRole> = {
+    bias:      { ...neutralRole, tf: resolvedTimeframes.bias },
+    structure: { ...neutralRole, tf: resolvedTimeframes.structure },
+    entry:     { ...neutralRole, tf: resolvedTimeframes.entry },
+  };
 
   // Gate: if no live candle data exists for this symbol, return an explicit unavailable
   // state rather than letting hash-derived placeholder bias render as real analysis.
@@ -739,7 +730,8 @@ export async function buildMarketContext(input: ContextEngineInput): Promise<Mar
       levels: [],
       sessionContext: [],
       overview: "",
-      timeframes: getStyleTimeframes(traderStyle),
+      timeframes: resolvedTimeframes,
+      perRole: unavailablePerRole,
       timeframeContext: [],
       highImpactSoon: false,
     };
@@ -758,14 +750,16 @@ export async function buildMarketContext(input: ContextEngineInput): Promise<Mar
 
   let biasState: BiasState;
   let structureState: StructureState;
-  let biasConfidence = 50; // fallback — overridden by candle engine below
+  let biasConfidence = 50;
+  let perRole: Record<TfRole, TriTimeframeBiasRole> = unavailablePerRole;
   try {
-    const mtf = await getMultiTimeframeBias(asset.symbol, traderStyle);
-    biasConfidence = mtf.confidence;
-    if (mtf.biasState !== "Neutral / Ranging") {
-      biasState = mtf.biasState;
+    const tri = await getTriTimeframeBias(asset.symbol, resolvedTimeframes);
+    biasConfidence = tri.confidence;
+    perRole = tri.perRole;
+    if (tri.biasState !== "Neutral / Ranging") {
+      biasState = tri.biasState;
       structureState =
-        mtf.confidence > 75
+        tri.confidence > 75
           ? biasState.startsWith("Bullish")
             ? "Trending Up"
             : "Trending Down"
@@ -778,7 +772,7 @@ export async function buildMarketContext(input: ContextEngineInput): Promise<Mar
     biasState = deriveBiasState(asset, quote);
     structureState = deriveStructureState(asset, quote);
   }
-  const levels = await buildLevels(asset, quote, biasState, traderStyle);
+  const levels = await buildLevels(asset, quote, biasState, resolvedTimeframes);
   const sessionContext = deriveSessionContext(asset, biasState, highImpactSoon);
   const timeframeContext = buildTimeframeContext(
     asset,
@@ -786,7 +780,7 @@ export async function buildMarketContext(input: ContextEngineInput): Promise<Mar
     structureState,
     quote,
     highImpactSoon,
-    traderStyle,
+    resolvedTimeframes,
     biasConfidence,
   );
 
@@ -807,7 +801,8 @@ export async function buildMarketContext(input: ContextEngineInput): Promise<Mar
     levels,
     sessionContext,
     overview,
-    timeframes: getStyleTimeframes(traderStyle),
+    timeframes: resolvedTimeframes,
+    perRole,
     timeframeContext,
     highImpactSoon,
   };

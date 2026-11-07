@@ -492,7 +492,7 @@ function DashboardWatchlistCard({
   onOpenAsset: (symbol: string) => void;
 }) {
   const { watchlistAssets } = useWatchlist();
-  const { traderStyle } = useTraderStyle();
+  const { traderStyle, resolvedTimeframes } = useTraderStyle();
 
   const displayAssets = useMemo(() => watchlistAssets.slice(0, 5), [watchlistAssets]);
   const symbols = useMemo(() => displayAssets.map((asset) => asset.symbol), [displayAssets]);
@@ -526,8 +526,8 @@ function DashboardWatchlistCard({
   const { contextMap, subscribeContextSymbols } = useMarketData();
 
   useEffect(() => {
-    subscribeContextSymbols(displayAssets, traderStyle);
-  }, [displayAssets, traderStyle, subscribeContextSymbols]);
+    subscribeContextSymbols(displayAssets, resolvedTimeframes);
+  }, [displayAssets, resolvedTimeframes, subscribeContextSymbols]);
 
   const getChangeColor = (quote: MarketQuote | undefined, fallbackChange?: string) => {
     if (quote) {

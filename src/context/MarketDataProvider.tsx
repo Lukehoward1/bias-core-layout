@@ -5,13 +5,13 @@ import type { Asset } from "@/data/assets";
 import { calendarEvents as staticCalendarEvents, type CalendarEvent } from "@/data/calendarEvents";
 import { getLiveCalendarEvents } from "@/services/calendarService";
 import { getEventImpact } from "@/data/eventImpactRules";
-import type { TraderStyle } from "@/context/TraderStyleProvider";
+import { PRESETS, type TraderTimeframes } from "@/services/traderTimeframes";
 
 type MarketDataContextValue = {
   quotes: Record<string, MarketQuote>;
   subscribeSymbols: (symbols: string[]) => void;
   contextMap: Record<string, MarketContext>;
-  subscribeContextSymbols: (assets: Asset[], traderStyle: TraderStyle) => void;
+  subscribeContextSymbols: (assets: Asset[], resolvedTimeframes: TraderTimeframes) => void;
 };
 
 const MarketDataContext = createContext<MarketDataContextValue | null>(null);
@@ -42,7 +42,7 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
 
   const trackedSymbols = useRef<Set<string>>(new Set());
   const trackedContextAssets = useRef<Map<string, Asset>>(new Map());
-  const latestTraderStyle = useRef<TraderStyle>("intraday");
+  const latestResolvedTimeframes = useRef<TraderTimeframes>(PRESETS.intraday);
   const latestQuotes = useRef<Record<string, MarketQuote>>({});
 
   useEffect(() => { latestQuotes.current = quotes; }, [quotes]);
@@ -59,7 +59,7 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
     }
   }, []);
 
-  const subscribeContextSymbols = useCallback((assets: Asset[], style: TraderStyle) => {
+  const subscribeContextSymbols = useCallback((assets: Asset[], resolvedTimeframes: TraderTimeframes) => {
     let dirty = false;
     for (const a of assets) {
       if (!trackedContextAssets.current.has(a.symbol)) {
@@ -67,8 +67,13 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
         dirty = true;
       }
     }
-    if (style !== latestTraderStyle.current) {
-      latestTraderStyle.current = style;
+    const prev = latestResolvedTimeframes.current;
+    if (
+      resolvedTimeframes.bias !== prev.bias ||
+      resolvedTimeframes.structure !== prev.structure ||
+      resolvedTimeframes.entry !== prev.entry
+    ) {
+      latestResolvedTimeframes.current = resolvedTimeframes;
       dirty = true;
     }
     if (dirty) setContextTrigger((n) => n + 1);
@@ -121,7 +126,7 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
           asset,
           quote,
           upcomingRelevantEvents: relevant,
-          traderStyle: latestTraderStyle.current,
+          resolvedTimeframes: latestResolvedTimeframes.current,
         });
         return [asset.symbol, ctx] as const;
       }),
