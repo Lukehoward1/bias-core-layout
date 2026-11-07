@@ -23,6 +23,7 @@ import { setPrioritySymbol } from "@/services/candleData";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
 import { CandlestickChart, type CandlestickChartRef } from "@/components/CandlestickChart";
 import { fetchRealOhlcData, type OhlcDataPoint } from "@/lib/mockOhlcData";
+import { DataUnavailableState } from "@/components/chart/DataUnavailableState";
 import { useTapHandler } from "@/hooks/use-tap-handler";
 import { useSwipeToDismiss } from "@/hooks/use-swipe-to-dismiss";
 
@@ -352,6 +353,7 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
 
   const [selectedTimeframe, setSelectedTimeframe] = useState("h1");
   const [chartData, setChartData] = useState<OhlcDataPoint[]>([]);
+  const [chartLoadFailed, setChartLoadFailed] = useState(false);
   const [isChartLoading, setIsChartLoading] = useState(false);
   const chartRef = useRef<CandlestickChartRef>(null);
 
@@ -359,9 +361,16 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
     if (!symbol) return;
     let cancelled = false;
     setIsChartLoading(true);
+    setChartLoadFailed(false);
     fetchRealOhlcData(symbol, selectedTimeframe).then((data) => {
       if (!cancelled) {
-        setChartData(data);
+        if (data === null) {
+          setChartLoadFailed(true);
+          setChartData([]);
+        } else {
+          setChartData(data);
+          setChartLoadFailed(false);
+        }
         setIsChartLoading(false);
       }
     });
@@ -1097,13 +1106,30 @@ export function AssetDetailContent({ symbol, onRequestClose }: { symbol: string;
                   <span className="text-sm text-muted-foreground">Loading chart…</span>
                 </div>
               )}
-              <CandlestickChart
-                ref={chartRef}
-                data={chartData}
-                pair={symbol.toLowerCase()}
-                timeframe={selectedTimeframe}
-                onTimeframeChange={setSelectedTimeframe}
-              />
+              {chartLoadFailed ? (
+                <DataUnavailableState
+                  onRetry={() => {
+                    setChartLoadFailed(false);
+                    setIsChartLoading(true);
+                    fetchRealOhlcData(symbol, selectedTimeframe).then((data) => {
+                      if (data === null) {
+                        setChartLoadFailed(true);
+                      } else {
+                        setChartData(data);
+                      }
+                      setIsChartLoading(false);
+                    });
+                  }}
+                />
+              ) : (
+                <CandlestickChart
+                  ref={chartRef}
+                  data={chartData}
+                  pair={symbol.toLowerCase()}
+                  timeframe={selectedTimeframe}
+                  onTimeframeChange={setSelectedTimeframe}
+                />
+              )}
             </div>
           </CardContent>
         </Card>

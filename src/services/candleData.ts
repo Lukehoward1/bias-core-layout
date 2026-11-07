@@ -8,6 +8,9 @@ import { normalizeSymbol } from "./marketData";
 import type { MarketCandle } from "./marketData";
 import type { BiasState } from "./contextEngine";
 import type { TraderStyle } from "@/context/TraderStyleProvider";
+import type { TfCode } from "@/data/timeframes";
+import { TRADE_INSTRUMENTS } from "@/data/tradeInstruments";
+import { activeProvider } from "./activeProvider";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -151,12 +154,7 @@ function _enqueue<T>(fn: () => Promise<T>, priority: number): Promise<T> {
 // This keeps page-load requests within the free-tier limit (~8 req/min, 800/day).
 // Expand this set when upgrading to a paid API plan.
 
-export const WHITELIST_SYMBOLS = [
-  "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "AUDUSD", "USDCAD",
-  "NZDUSD", "EURGBP", "EURJPY", "GBPJPY",
-  "XAUUSD",
-  "NAS100", "US30", "GER40", "UK100",
-];
+export const WHITELIST_SYMBOLS = TRADE_INSTRUMENTS.map((i) => i.symbol);
 
 const CANDLE_API_WHITELIST = new Set(WHITELIST_SYMBOLS);
 
@@ -190,38 +188,11 @@ export async function fetchCandles(
     const cached2 = getCached(cacheKey);
     if (cached2) return cached2;
 
-    // Call our server-side proxy — API key never leaves the server.
-    const url =
-      `/api/timeseries` +
-      `?symbol=${encodeURIComponent(norm)}` +
-      `&interval=${interval}` +
-      `&outputsize=${outputsize}`;
+    const result = await activeProvider.fetchCandles(norm, interval as TfCode, outputsize);
+    if (result.kind !== "ok") return [];
 
-    let json: { status: string; values?: Record<string, string>[] };
-    try {
-      const res = await fetch(url);
-      if (!res.ok) return [];
-      json = await res.json();
-    } catch {
-      return [];
-    }
-
-    if (json.status === "error" || !Array.isArray(json.values)) return [];
-
-    // Twelve Data returns values newest-first — preserve that order.
-    const candles: MarketCandle[] = (json.values as Record<string, string>[]).map((v) => ({
-      symbol: norm,
-      timeframe: interval,
-      timestamp: new Date(v.datetime).getTime(),
-      open: parseFloat(v.open),
-      high: parseFloat(v.high),
-      low: parseFloat(v.low),
-      close: parseFloat(v.close),
-      volume: parseFloat(v.volume ?? "0"),
-    }));
-
-    setCache(cacheKey, candles, interval);
-    return candles;
+    setCache(cacheKey, result.data, interval);
+    return result.data;
   }, priority).finally(() => {
     _inFlight.delete(cacheKey);
   });

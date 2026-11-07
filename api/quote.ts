@@ -148,8 +148,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  // s-maxage tells Vercel's edge CDN to cache for 15s; stale-while-revalidate
-  // lets it serve the stale response for another 20s while it re-validates.
-  res.setHeader("Cache-Control", "s-maxage=15, stale-while-revalidate=20");
+  res.setHeader("Cache-Control", "s-maxage=10, stale-while-revalidate=60");
   return res.status(200).json(result);
 }

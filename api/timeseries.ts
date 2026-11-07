@@ -89,14 +89,16 @@ function getStale(key: string): Record<string, string>[] | null {
   return cache.get(key)?.values ?? null;
 }
 
-function setCache(key: string, values: Record<string, string>[], interval: string): void {
-  cache.set(key, { values, expiresAt: Date.now() + getNextCandleCloseMs(interval) });
+function setCache(key: string, values: Record<string, string>[], interval: string, ttlMs?: number): void {
+  cache.set(key, { values, expiresAt: Date.now() + (ttlMs ?? getNextCandleCloseMs(interval)) });
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const { symbol, interval, outputsize } = req.query;
+  const { symbol, interval, outputsize, forming } = req.query;
+  // forming=1 → short edge-cache TTL so use-live-candle sees fresh intra-candle data
+  const isForming = forming === '1';
 
   if (!symbol || typeof symbol !== "string") {
     return res.status(400).json({ error: "Missing required query param: symbol" });
@@ -107,13 +109,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const size = typeof outputsize === "string" ? Math.max(1, parseInt(outputsize, 10) || 10) : 10;
   const normSym = symbol.toUpperCase().replace(/[/ ]/g, "");
-  const cacheKey = `${normSym}:${interval}:${size}`;
+  // forming=1 uses a separate key with a 15 s TTL so intra-candle refetches bypass
+  // the closed-candle cache (which lives until next candle close, often tens of minutes).
+  const cacheKey = isForming ? `${normSym}:${interval}:${size}:forming` : `${normSym}:${interval}:${size}`;
 
   // Serve fresh cache immediately — no upstream call needed
   const fresh = getFresh(cacheKey);
   if (fresh) {
     const ttlRemaining = Math.max(60, Math.ceil((cache.get(cacheKey)!.expiresAt - Date.now()) / 1000));
-    res.setHeader("Cache-Control", `s-maxage=${ttlRemaining}, stale-while-revalidate=60`);
+    const cc = isForming ? 's-maxage=15, stale-while-revalidate=15' : `s-maxage=${ttlRemaining}, stale-while-revalidate=60`;
+    res.setHeader("Cache-Control", cc);
     return res.status(200).json({ status: "ok", values: fresh });
   }
 
@@ -121,7 +126,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Return stale if we have it; otherwise 503
     const stale = getStale(cacheKey);
     if (stale) {
-      res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=60");
+      const cc = isForming ? 's-maxage=15, stale-while-revalidate=15' : 's-maxage=30, stale-while-revalidate=60';
+      res.setHeader("Cache-Control", cc);
       return res.status(200).json({ status: "ok", values: stale });
     }
     return res.status(503).json({ error: "API key not configured" });
@@ -141,7 +147,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!upstream.ok) {
       const stale = getStale(cacheKey);
       if (stale) {
-        res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=60");
+        const cc = isForming ? 's-maxage=15, stale-while-revalidate=15' : 's-maxage=30, stale-while-revalidate=60';
+        res.setHeader("Cache-Control", cc);
         return res.status(200).json({ status: "ok", values: stale });
       }
       return res.status(upstream.status).json({ error: "Upstream error" });
@@ -152,23 +159,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (json.status === "error" || !Array.isArray(json.values)) {
       const stale = getStale(cacheKey);
       if (stale) {
-        res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=60");
+        const cc = isForming ? 's-maxage=15, stale-while-revalidate=15' : 's-maxage=30, stale-while-revalidate=60';
+        res.setHeader("Cache-Control", cc);
         return res.status(200).json({ status: "ok", values: stale });
       }
       return res.status(200).json({ status: "error", values: [] });
     }
 
-    setCache(cacheKey, json.values, interval);
+    setCache(cacheKey, json.values, interval, isForming ? 15_000 : undefined);
 
     const ttlMs = getNextCandleCloseMs(interval);
     const ttlSec = Math.ceil(ttlMs / 1000);
-    res.setHeader("Cache-Control", `s-maxage=${ttlSec}, stale-while-revalidate=60`);
+    const cc = isForming ? 's-maxage=15, stale-while-revalidate=15' : `s-maxage=${ttlSec}, stale-while-revalidate=60`;
+    res.setHeader("Cache-Control", cc);
     return res.status(200).json({ status: "ok", values: json.values });
   } catch {
     // Network/parse error — serve stale if available
     const stale = getStale(cacheKey);
     if (stale) {
-      res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=60");
+      const cc = isForming ? 's-maxage=15, stale-while-revalidate=15' : 's-maxage=30, stale-while-revalidate=60';
+      res.setHeader("Cache-Control", cc);
       return res.status(200).json({ status: "ok", values: stale });
     }
     return res.status(503).json({ error: "Failed to reach upstream" });
