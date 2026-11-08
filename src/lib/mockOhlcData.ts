@@ -7,6 +7,9 @@ export interface OhlcDataPoint {
   high: number;
   low: number;
   close: number;
+  /** Provider-reported volume when available. Twelve Data returns 0 for most FX;
+   * FMP returns tick-like values. Consumed by the §2.5 volume rule in the Trade panel. */
+  volume?: number;
 }
 
 // Maps ChartToolbar timeframe keys → TfCode values
@@ -41,6 +44,7 @@ export async function fetchRealOhlcData(
     high: c.high,
     low: c.low,
     close: c.close,
+    volume: c.volume,
   }));
 }
 

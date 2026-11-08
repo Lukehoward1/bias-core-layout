@@ -27,22 +27,11 @@ import { fetchRealOhlcData, type OhlcDataPoint } from "@/lib/mockOhlcData";
 import { DataUnavailableState } from "@/components/chart/DataUnavailableState";
 import { useTapHandler } from "@/hooks/use-tap-handler";
 import { useSwipeToDismiss } from "@/hooks/use-swipe-to-dismiss";
-
-// Returns the currencies relevant to a symbol for FMP calendar filtering.
-// FX pairs split naturally; indices and metals map to their primary currency.
-const INDEX_CCY: Record<string, string[]> = {
-  NAS100: ["USD"], US30: ["USD"], SPX500: ["USD"],
-  GER40: ["EUR"], UK100: ["GBP"],
-};
-
-function getSymbolCurrencies(symbol: string): string[] {
-  const norm = normalizeMarketSymbol(symbol);
-  if (isFxPairSymbol(norm)) return [norm.slice(0, 3), norm.slice(3, 6)];
-  if (INDEX_CCY[norm]) return INDEX_CCY[norm];
-  // Commodity pairs like XAUUSD: use the quote currency (last 3 chars)
-  if (norm.length >= 6) return [norm.slice(-3)];
-  return ["USD"];
-}
+import {
+  getSymbolCurrencies,
+  isFxPairSymbol,
+  normalizeMarketSymbol,
+} from "@/lib/symbolCurrencies";
 
 type NewsPill = {
   key: string;
@@ -57,9 +46,6 @@ type ContextSnapshotItem = {
   text: string;
   accent: "success" | "warning" | "destructive" | "primary" | "muted";
 };
-
-const normalizeMarketSymbol = (symbol: string) => symbol.toUpperCase().replace(/[^A-Z0-9]/g, "");
-const isFxPairSymbol = (symbol: string) => /^[A-Z]{6}$/.test(symbol);
 
 const getFxCurrencies = (symbol: string) => {
   const normalized = normalizeMarketSymbol(symbol);

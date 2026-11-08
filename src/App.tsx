@@ -41,6 +41,7 @@ import Privacy from "./pages/Privacy";
 import StartTrial from "./pages/StartTrial";
 import NotFound from "./pages/NotFound";
 import AssetDetail from "./pages/AssetDetail";
+import Trade from "./pages/Trade";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const queryClient = new QueryClient();
@@ -50,6 +51,15 @@ function AssetDetailWithBoundary() {
   return (
     <ErrorBoundary key={symbol} fallbackMessage="Failed to load asset">
       <AssetDetail />
+    </ErrorBoundary>
+  );
+}
+
+function TradeWithBoundary() {
+  const { symbol } = useParams<{ symbol: string }>();
+  return (
+    <ErrorBoundary key={symbol} fallbackMessage="Failed to load Trade screen">
+      <Trade />
     </ErrorBoundary>
   );
 }
@@ -76,6 +86,7 @@ function AppRoutes() {
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/trade" element={<Trade />} />
             <Route path="/markets" element={<Markets />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/alerts" element={<Alerts />} />
@@ -89,6 +100,7 @@ function AppRoutes() {
 
             {!backgroundLocation && <Route path="/markets/:symbol" element={<AssetDetailWithBoundary />} />}
             {!backgroundLocation && <Route path="/asset/:symbol" element={<AssetDetailWithBoundary />} />}
+            {!backgroundLocation && <Route path="/trade/:symbol" element={<TradeWithBoundary />} />}
           </Route>
         </Route>
 
@@ -99,6 +111,7 @@ function AppRoutes() {
         <Routes>
           <Route path="/markets/:symbol" element={<AssetDetailWithBoundary />} />
           <Route path="/asset/:symbol" element={<AssetDetailWithBoundary />} />
+          <Route path="/trade/:symbol" element={<TradeWithBoundary />} />
         </Routes>
       )}
     </>
