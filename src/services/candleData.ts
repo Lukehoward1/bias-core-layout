@@ -84,21 +84,38 @@ function getNextCandleCloseMs(interval: string): number {
   return 300_000; // 5-minute default for sub-hour intervals
 }
 
-interface CacheEntry {
-  data: MarketCandle[];
+export interface CacheEntry {
+  data: MarketCandle[]; // newest-first, length up to STANDARD_SIZE
   expiresAt: number;
+}
+
+/** One size per (sym, interval) so chart (150) and bias (20) share one upstream call. */
+export const STANDARD_SIZE = 150;
+
+/** Pure: cache lookup. Exported for tests. */
+export function pickCachedCandles(
+  entry: CacheEntry | undefined,
+  requested: number,
+  nowMs: number,
+): MarketCandle[] | null {
+  if (!entry) return null;
+  if (nowMs > entry.expiresAt) return null;
+  if (entry.data.length < requested) return null;
+  return entry.data.slice(0, requested);
+}
+
+/** Pure: cache-key builder. Exported for tests. */
+export function makeCacheKey(norm: string, interval: string): string {
+  return `${norm}:${interval}`;
 }
 
 const candleCache = new Map<string, CacheEntry>();
 
-function getCached(key: string): MarketCandle[] | null {
+function getCached(key: string, requested: number): MarketCandle[] | null {
   const entry = candleCache.get(key);
-  if (!entry) return null;
-  if (Date.now() > entry.expiresAt) {
-    candleCache.delete(key);
-    return null;
-  }
-  return entry.data;
+  const hit = pickCachedCandles(entry, requested, Date.now());
+  if (!hit && entry && Date.now() > entry.expiresAt) candleCache.delete(key);
+  return hit;
 }
 
 function setCache(key: string, data: MarketCandle[], interval: string): void {
@@ -106,10 +123,11 @@ function setCache(key: string, data: MarketCandle[], interval: string): void {
 }
 
 // ── Request queue ─────────────────────────────────────────────
-// Limits concurrent Twelve Data fetches to MAX_CONCURRENT.
-// Higher-priority tasks (currently-viewed asset) are inserted at the front.
+// Limits concurrent Twelve Data fetches to MAX_CONCURRENT. Lower = gentler on
+// the shared 8-req/min Basic key. Higher-priority tasks (currently-viewed
+// asset) are inserted at the front.
 
-const MAX_CONCURRENT = 6;
+const MAX_CONCURRENT = 2;
 let _active = 0;
 let _prioritySymbol: string | null = null;
 
@@ -122,6 +140,8 @@ interface QueueTask<T> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const _queue: QueueTask<any>[] = [];
+// In-flight promise resolves to the FULL upstream array (STANDARD_SIZE);
+// callers slice to their requested outputsize. One upstream call serves all.
 const _inFlight = new Map<string, Promise<MarketCandle[]>>();
 
 /** Call when the user navigates to an asset detail view so its fetches run first. */
@@ -172,6 +192,9 @@ export function isBiasAvailable(symbol: string): boolean {
 
 // ── Fetch ────────────────────────────────────────────────────
 
+/** Short back-off before retrying once on an empty/error response. */
+const RETRY_DELAY_MS = 1500;
+
 export async function fetchCandles(
   symbol: string,
   interval: string,
@@ -180,33 +203,46 @@ export async function fetchCandles(
   const norm = normalizeSymbol(symbol);
 
   if (!CANDLE_API_WHITELIST.has(norm)) return [];
-  const cacheKey = `${norm}:${interval}:${outputsize}`;
+  const key = makeCacheKey(norm, interval);
 
-  const cached = getCached(cacheKey);
+  const cached = getCached(key, outputsize);
   if (cached) return cached;
 
-  // Return the same promise to any concurrent callers for the same key.
-  const inflight = _inFlight.get(cacheKey);
-  if (inflight) return inflight;
+  // Share the in-flight promise with any concurrent callers for the same key.
+  // We always fetch the STANDARD_SIZE superset upstream, so a 150-bar chart
+  // request and a 20-bar bias request coalesce to one upstream call.
+  const inflight = _inFlight.get(key);
+  if (inflight) {
+    const full = await inflight;
+    return full.slice(0, outputsize);
+  }
 
+  const upstreamSize = Math.max(outputsize, STANDARD_SIZE);
   const priority = _prioritySymbol === norm ? 1 : 0;
 
   const promise = _enqueue(async (): Promise<MarketCandle[]> => {
     // Another request may have populated the cache while we waited in the queue.
-    const cached2 = getCached(cacheKey);
+    const cached2 = getCached(key, upstreamSize);
     if (cached2) return cached2;
 
-    const result = await activeProvider.fetchCandles(norm, interval as TfCode, outputsize);
-    if (result.kind !== "ok") return [];
+    // Retry once on empty/error — Twelve Data rate-limit replies are HTTP 200
+    // with status:"error", so an empty success is the usual rate-limit signal.
+    let result = await activeProvider.fetchCandles(norm, interval as TfCode, upstreamSize);
+    if (result.kind !== "ok" || result.data.length === 0) {
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+      result = await activeProvider.fetchCandles(norm, interval as TfCode, upstreamSize);
+    }
+    if (result.kind !== "ok" || result.data.length === 0) return [];
 
-    setCache(cacheKey, result.data, interval);
+    setCache(key, result.data, interval);
     return result.data;
   }, priority).finally(() => {
-    _inFlight.delete(cacheKey);
+    _inFlight.delete(key);
   });
 
-  _inFlight.set(cacheKey, promise);
-  return promise;
+  _inFlight.set(key, promise);
+  const full = await promise;
+  return full.slice(0, outputsize);
 }
 
 // ── Single-candle helper ─────────────────────────────────────

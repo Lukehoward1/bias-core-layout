@@ -68,9 +68,12 @@ function setCache(sym: string, data: Record<string, unknown>): void {
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
+const NO_STORE = "no-store, no-cache, must-revalidate";
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const rawSymbols = req.query.symbols;
   if (!rawSymbols || typeof rawSymbols !== "string") {
+    res.setHeader("Cache-Control", NO_STORE);
     return res.status(400).json({ error: "Missing ?symbols= query param" });
   }
 
@@ -80,6 +83,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .filter(Boolean);
 
   if (symbols.length === 0) {
+    res.setHeader("Cache-Control", NO_STORE);
     return res.status(400).json({ error: "No valid symbols provided" });
   }
 
@@ -97,6 +101,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Fetch missing symbols from Twelve Data in one batched request
+  let anyUpstreamFailed = missing.length > 0 && !API_KEY;
+
   if (missing.length > 0 && API_KEY) {
     const providerSymbols = missing.map(toProviderSymbol).join(",");
     const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(providerSymbols)}&apikey=${API_KEY}`;
@@ -115,6 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             setCache(sym, q);
             result[sym] = q;
           } else {
+            anyUpstreamFailed = true;
             const stale = getStale(sym);
             if (stale) result[sym] = stale;
           }
@@ -127,6 +134,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               setCache(sym, q);
               result[sym] = q;
             } else {
+              anyUpstreamFailed = true;
               const stale = getStale(sym);
               if (stale) result[sym] = stale;
             }
@@ -134,6 +142,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       } else {
         // HTTP error — fall back to stale cached values
+        anyUpstreamFailed = true;
         for (const sym of missing) {
           const stale = getStale(sym);
           if (stale) result[sym] = stale;
@@ -141,6 +150,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     } catch {
       // Network error — fall back to stale cached values
+      anyUpstreamFailed = true;
       for (const sym of missing) {
         const stale = getStale(sym);
         if (stale) result[sym] = stale;
@@ -148,6 +158,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  res.setHeader("Cache-Control", "s-maxage=10, stale-while-revalidate=60");
+  // Never cache a response that contains a rate-limit / upstream failure —
+  // a stuck 429 at the CDN layer would freeze the UI for 10 s.
+  res.setHeader(
+    "Cache-Control",
+    anyUpstreamFailed ? NO_STORE : "s-maxage=10, stale-while-revalidate=60",
+  );
   return res.status(200).json(result);
 }

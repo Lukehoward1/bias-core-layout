@@ -95,15 +95,19 @@ function setCache(key: string, values: Record<string, string>[], interval: strin
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
+const NO_STORE = "no-store, no-cache, must-revalidate";
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { symbol, interval, outputsize, forming } = req.query;
   // forming=1 → short edge-cache TTL so use-live-candle sees fresh intra-candle data
   const isForming = forming === '1';
 
   if (!symbol || typeof symbol !== "string") {
+    res.setHeader("Cache-Control", NO_STORE);
     return res.status(400).json({ error: "Missing required query param: symbol" });
   }
   if (!interval || typeof interval !== "string") {
+    res.setHeader("Cache-Control", NO_STORE);
     return res.status(400).json({ error: "Missing required query param: interval" });
   }
 
@@ -123,13 +127,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (!API_KEY) {
-    // Return stale if we have it; otherwise 503
+    // Return stale if we have it; otherwise 503. Stale responses must not be
+    // cached by the CDN — a rate-limit error must not stick for the interval.
     const stale = getStale(cacheKey);
     if (stale) {
-      const cc = isForming ? 's-maxage=15, stale-while-revalidate=15' : 's-maxage=30, stale-while-revalidate=60';
-      res.setHeader("Cache-Control", cc);
+      res.setHeader("Cache-Control", NO_STORE);
       return res.status(200).json({ status: "ok", values: stale });
     }
+    res.setHeader("Cache-Control", NO_STORE);
     return res.status(503).json({ error: "API key not configured" });
   }
 
@@ -147,22 +152,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!upstream.ok) {
       const stale = getStale(cacheKey);
       if (stale) {
-        const cc = isForming ? 's-maxage=15, stale-while-revalidate=15' : 's-maxage=30, stale-while-revalidate=60';
-        res.setHeader("Cache-Control", cc);
+        res.setHeader("Cache-Control", NO_STORE);
         return res.status(200).json({ status: "ok", values: stale });
       }
+      res.setHeader("Cache-Control", NO_STORE);
       return res.status(upstream.status).json({ error: "Upstream error" });
     }
 
     const json = await upstream.json() as { status?: string; values?: Record<string, string>[] };
 
     if (json.status === "error" || !Array.isArray(json.values)) {
+      // Twelve Data rate-limit replies land here (HTTP 200, status:"error").
+      // Must not be cached anywhere — a stuck error blocks recovery for the
+      // interval's candle period. Serve stale (no-store) if we have it.
       const stale = getStale(cacheKey);
       if (stale) {
-        const cc = isForming ? 's-maxage=15, stale-while-revalidate=15' : 's-maxage=30, stale-while-revalidate=60';
-        res.setHeader("Cache-Control", cc);
+        res.setHeader("Cache-Control", NO_STORE);
         return res.status(200).json({ status: "ok", values: stale });
       }
+      res.setHeader("Cache-Control", NO_STORE);
       return res.status(200).json({ status: "error", values: [] });
     }
 
@@ -174,13 +182,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader("Cache-Control", cc);
     return res.status(200).json({ status: "ok", values: json.values });
   } catch {
-    // Network/parse error — serve stale if available
+    // Network/parse error — serve stale if available. Errors must never be
+    // cached: edge/CDN or client caching a 429 would block recovery.
     const stale = getStale(cacheKey);
     if (stale) {
-      const cc = isForming ? 's-maxage=15, stale-while-revalidate=15' : 's-maxage=30, stale-while-revalidate=60';
-      res.setHeader("Cache-Control", cc);
+      res.setHeader("Cache-Control", NO_STORE);
       return res.status(200).json({ status: "ok", values: stale });
     }
+    res.setHeader("Cache-Control", NO_STORE);
     return res.status(503).json({ error: "Failed to reach upstream" });
   }
 }

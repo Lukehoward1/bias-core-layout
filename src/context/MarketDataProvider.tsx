@@ -113,26 +113,35 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
 
   // Rebuilds when new assets are registered, traderStyle changes, or live calendar events load.
   // Reads quotes from latestQuotes ref (not state) to avoid re-triggering on every 15s poll.
+  //
+  // Serial (not Promise.all) to pace Twelve Data on the 8-req/min Basic plan.
+  // Each asset triggers up to 3 time_series fetches; firing 5 assets in parallel
+  // dog-piles the shared key. A 250 ms gap between assets lets the client queue
+  // and edge cache catch up without materially slowing first-paint for the
+  // first visible asset.
   useEffect(() => {
     const assets = Array.from(trackedContextAssets.current.values());
     if (assets.length === 0) return;
 
     let cancelled = false;
-    Promise.all(
-      assets.map(async (asset) => {
+    (async () => {
+      for (const asset of assets) {
+        if (cancelled) return;
         const quote = latestQuotes.current[normalizeSymbol(asset.symbol)];
         const relevant = calendarSource.filter((e) => isEventRelevant(asset.symbol, e));
-        const ctx = await buildMarketContext({
-          asset,
-          quote,
-          upcomingRelevantEvents: relevant,
-          resolvedTimeframes: latestResolvedTimeframes.current,
-        });
-        return [asset.symbol, ctx] as const;
-      }),
-    )
-      .then((entries) => { if (!cancelled) setContextMap(Object.fromEntries(entries)); })
-      .catch(() => {});
+        try {
+          const ctx = await buildMarketContext({
+            asset,
+            quote,
+            upcomingRelevantEvents: relevant,
+            resolvedTimeframes: latestResolvedTimeframes.current,
+          });
+          if (cancelled) return;
+          setContextMap((prev) => ({ ...prev, [asset.symbol]: ctx }));
+        } catch { /* skip asset, move on */ }
+        await new Promise((r) => setTimeout(r, 250));
+      }
+    })();
 
     return () => { cancelled = true; };
   }, [contextTrigger, calendarSource]); // quotes intentionally omitted — read from latestQuotes ref

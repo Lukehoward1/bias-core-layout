@@ -213,9 +213,12 @@ export function useLiveCandle({ symbol, timeframe, lastBar }: UseLiveCandleOpts)
       applyFormingCandle(c);
     };
 
-    // Fire once immediately so the forming bar hydrates fast.
+    // Fire quote once immediately so the close-price animates fast. Do NOT
+    // fire tickCandle on mount: the chart already fetched the forming bar as
+    // part of its 150-bar series, and a second upstream call for the same
+    // interval on first paint burns a credit on the shared Twelve Data key.
+    // The first forming refresh arrives after CANDLE_REFETCH_MS.
     tickQuote();
-    tickCandle();
 
     const qId = window.setInterval(tickQuote, QUOTE_POLL_MS);
     const cId = window.setInterval(tickCandle, CANDLE_REFETCH_MS);
