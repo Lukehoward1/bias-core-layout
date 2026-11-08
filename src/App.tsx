@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { SessionLockProvider } from "@/hooks/use-session-lock";
 import { AlertsProvider } from "@/contexts/AlertsContext";
@@ -26,11 +26,8 @@ import ResetPassword from "./pages/ResetPassword";
 import Landing from "./pages/Landing";
 import AuthCallback from "./pages/AuthCallback";
 import Dashboard from "./pages/Dashboard";
-import Markets from "./pages/Markets";
 import Calendar from "./pages/Calendar";
 import Alerts from "./pages/Alerts";
-import RiskTools from "./pages/RiskTools";
-import Journal from "./pages/Journal";
 import Education from "./pages/Education";
 import Settings from "./pages/Settings";
 import ManageSubscription from "./pages/ManageSubscription";
@@ -40,19 +37,17 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import StartTrial from "./pages/StartTrial";
 import NotFound from "./pages/NotFound";
-import AssetDetail from "./pages/AssetDetail";
 import Trade from "./pages/Trade";
+import Review from "./pages/Review";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
-function AssetDetailWithBoundary() {
+function RedirectAssetToTrade() {
   const { symbol } = useParams<{ symbol: string }>();
-  return (
-    <ErrorBoundary key={symbol} fallbackMessage="Failed to load asset">
-      <AssetDetail />
-    </ErrorBoundary>
-  );
+  const [searchParams] = useSearchParams();
+  const from = searchParams.get("from");
+  return <Navigate to={`/trade/${symbol}${from ? `?from=${encodeURIComponent(from)}` : ""}`} replace />;
 }
 
 function TradeWithBoundary() {
@@ -87,19 +82,20 @@ function AppRoutes() {
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/trade" element={<Trade />} />
-            <Route path="/markets" element={<Markets />} />
+            <Route path="/markets" element={<Navigate to="/trade" replace />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/alerts" element={<Alerts />} />
-            <Route path="/risk-tools" element={<RiskTools />} />
-            <Route path="/journal" element={<Journal />} />
+            <Route path="/risk-tools" element={<Navigate to="/review?tab=risk" replace />} />
+            <Route path="/journal" element={<Navigate to="/review?tab=journal" replace />} />
+            <Route path="/review" element={<Review />} />
             <Route path="/education" element={<Education />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/subscription" element={<ManageSubscription />} />
             <Route path="/settings/cancel" element={<CancelSubscription />} />
             <Route path="/billing" element={<Navigate to="/settings" replace />} />
 
-            {!backgroundLocation && <Route path="/markets/:symbol" element={<AssetDetailWithBoundary />} />}
-            {!backgroundLocation && <Route path="/asset/:symbol" element={<AssetDetailWithBoundary />} />}
+            {!backgroundLocation && <Route path="/markets/:symbol" element={<RedirectAssetToTrade />} />}
+            {!backgroundLocation && <Route path="/asset/:symbol" element={<RedirectAssetToTrade />} />}
             {!backgroundLocation && <Route path="/trade/:symbol" element={<TradeWithBoundary />} />}
           </Route>
         </Route>
@@ -109,8 +105,8 @@ function AppRoutes() {
 
       {backgroundLocation && (
         <Routes>
-          <Route path="/markets/:symbol" element={<AssetDetailWithBoundary />} />
-          <Route path="/asset/:symbol" element={<AssetDetailWithBoundary />} />
+          <Route path="/markets/:symbol" element={<RedirectAssetToTrade />} />
+          <Route path="/asset/:symbol" element={<RedirectAssetToTrade />} />
           <Route path="/trade/:symbol" element={<TradeWithBoundary />} />
         </Routes>
       )}

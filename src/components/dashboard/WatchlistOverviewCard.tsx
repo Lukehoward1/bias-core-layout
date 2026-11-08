@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useCallback } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -55,7 +55,6 @@ export function WatchlistOverviewCard({ isEditMode = false }: WatchlistOverviewC
   const { watchlistAssets } = useWatchlist();
   const { traderStyle, resolvedTimeframes } = useTraderStyle();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const displayAssets = useMemo(() => watchlistAssets.slice(0, 5), [watchlistAssets]);
   const symbols = useMemo(() => displayAssets.map((asset) => asset.symbol), [displayAssets]);
@@ -64,15 +63,9 @@ export function WatchlistOverviewCard({ isEditMode = false }: WatchlistOverviewC
   const openAsset = useCallback(
     (symbol: string) => {
       if (isEditMode) return;
-
-      navigate(`/asset/${symbol}`, {
-        state: {
-          backgroundLocation: location,
-          from: `${location.pathname}${location.search}`,
-        },
-      });
+      navigate(`/trade/${symbol}`);
     },
-    [isEditMode, navigate, location],
+    [isEditMode, navigate],
   );
 
   const { contextMap, subscribeContextSymbols } = useMarketData();

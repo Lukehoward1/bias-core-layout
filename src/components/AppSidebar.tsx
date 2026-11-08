@@ -3,7 +3,6 @@ import {
   TrendingUp,
   Calendar,
   Bell,
-  Calculator,
   BookOpen,
   FileText,
   Lightbulb,
@@ -27,11 +26,10 @@ type Item = { title: string; url: string; icon: any };
 
 const mainItems: Item[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Markets", url: "/markets", icon: TrendingUp },
-  { title: "Alerts", url: "/alerts", icon: Bell },
+  { title: "Trade", url: "/trade", icon: TrendingUp },
   { title: "Calendar", url: "/calendar", icon: Calendar },
-  { title: "Risk Tools", url: "/risk-tools", icon: Calculator },
-  { title: "Journal", url: "/journal", icon: BookOpen },
+  { title: "Review", url: "/review", icon: BookOpen },
+  { title: "Alerts", url: "/alerts", icon: Bell },
 ];
 
 const learningItems: Item[] = [

@@ -537,7 +537,7 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
             title: "Price Alert Triggered",
             message: `${alert.assetDisplayName} closed ${alert.direction} ${alert.price} (${alert.timeframe})`,
             relatedAsset: alert.asset,
-            routeTo: "/asset/:symbol",
+            routeTo: "/trade/:symbol",
             routeParams: { symbol },
           });
 
@@ -566,7 +566,7 @@ export function AlertsProvider({ children }: { children: React.ReactNode }) {
           title: "Price Alert Triggered",
           message: `${alert.assetDisplayName} wicked ${alert.direction} ${alert.price}`,
           relatedAsset: alert.asset,
-          routeTo: "/asset/:symbol",
+          routeTo: "/trade/:symbol",
           routeParams: { symbol },
         });
 

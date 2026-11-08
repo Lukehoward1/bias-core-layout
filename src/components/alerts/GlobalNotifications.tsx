@@ -58,9 +58,9 @@ export function GlobalNotifications() {
         case "price":
         case "level":
           if (alert.relatedAsset) {
-            return `/asset/${encodeURIComponent(alert.relatedAsset)}`;
+            return `/trade/${encodeURIComponent(alert.relatedAsset)}`;
           }
-          return "/markets";
+          return "/trade";
 
         case "news":
         case "summary":
@@ -72,7 +72,7 @@ export function GlobalNotifications() {
 
         case "risk":
         case "exposure":
-          return "/risk-tools";
+          return "/review?tab=risk";
 
         case "session":
           return "/alerts";

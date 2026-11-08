@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useSwipeToDismiss } from "@/hooks/use-swipe-to-dismiss";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +40,6 @@ const formatHMS = (seconds: number) => {
 
 export function SessionDetailsModal({ isOpen, onClose, session }: SessionDetailsModalProps) {
   const navigate = useNavigate();
-  const location = useLocation();
   const { getAssetBySymbol } = useAssets();
 
   // keep a ticking counter derived from the incoming session seconds
@@ -96,17 +95,9 @@ export function SessionDetailsModal({ isOpen, onClose, session }: SessionDetails
   const goToAsset = useCallback(
     (symbol: string) => {
       onClose();
-
-      requestAnimationFrame(() => {
-        const state = location.state as { backgroundLocation?: Location } | null;
-        const backgroundLocation = state?.backgroundLocation ?? location;
-
-        navigate(`/asset/${symbol}`, {
-          state: { backgroundLocation },
-        });
-      });
+      navigate(`/trade/${symbol}`);
     },
-    [navigate, location, onClose],
+    [navigate, onClose],
   );
 
   const swipe = useSwipeToDismiss(onClose);

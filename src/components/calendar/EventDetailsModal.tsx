@@ -1,6 +1,6 @@
 import { useMemo, useCallback, useState, useEffect } from "react";
 import { useSwipeToDismiss } from "@/hooks/use-swipe-to-dismiss";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 
 import { Badge } from "@/components/ui/badge";
@@ -156,7 +156,6 @@ const getEventNarrative = (event: CalendarEvent) => {
 
 export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = false }: EventDetailsModalProps) {
   const navigate = useNavigate();
-  const location = useLocation();
   const { getAssetBySymbol } = useAssets();
   const { alerts, recurringSubscriptions, addAlert, scheduleAlert, addRecurringSubscription } = useAlertsContext();
 
@@ -350,17 +349,9 @@ export function EventDetailsModal({ event, isOpen, onClose, openedFromAlert = fa
   const goToAsset = useCallback(
     (symbol: string) => {
       onClose();
-
-      requestAnimationFrame(() => {
-        const state = location.state as { backgroundLocation?: Location } | null;
-        const backgroundLocation = state?.backgroundLocation ?? location;
-
-        navigate(`/asset/${symbol}`, {
-          state: { backgroundLocation },
-        });
-      });
+      navigate(`/trade/${symbol}`);
     },
-    [navigate, location, onClose],
+    [navigate, onClose],
   );
 
   if (!event) {

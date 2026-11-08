@@ -15,7 +15,7 @@ import {
   ChevronDown, User, LogOut, Sparkles, Lock, Menu,
   TrendingUp, TrendingDown, Minus,
   BookOpen, Zap, FileText,
-  LayoutDashboard, BarChart2, BookText, Shield, Calendar as CalendarIcon, Settings as SettingsIcon,
+  LayoutDashboard, BarChart2, BookText, Calendar as CalendarIcon, Settings as SettingsIcon,
 } from "lucide-react";
 import { useSessionLock } from "@/hooks/use-session-lock";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,9 +38,8 @@ type SearchResult = AssetResult | GuideResult | PageResult;
 
 const PAGES: { label: string; path: string }[] = [
   { label: "Dashboard",  path: "/dashboard" },
-  { label: "Markets",    path: "/markets" },
-  { label: "Journal",    path: "/journal" },
-  { label: "Risk Tools", path: "/risk-tools" },
+  { label: "Trade",      path: "/trade" },
+  { label: "Review",     path: "/review" },
   { label: "Calendar",   path: "/calendar" },
   { label: "Settings",   path: "/settings" },
 ];
@@ -48,9 +47,8 @@ const PAGES: { label: string; path: string }[] = [
 function pageIcon(label: string) {
   switch (label) {
     case "Dashboard":  return <LayoutDashboard className="h-3.5 w-3.5" />;
-    case "Markets":    return <BarChart2 className="h-3.5 w-3.5" />;
-    case "Journal":    return <BookText className="h-3.5 w-3.5" />;
-    case "Risk Tools": return <Shield className="h-3.5 w-3.5" />;
+    case "Trade":      return <BarChart2 className="h-3.5 w-3.5" />;
+    case "Review":     return <BookText className="h-3.5 w-3.5" />;
     case "Calendar":   return <CalendarIcon className="h-3.5 w-3.5" />;
     case "Settings":   return <SettingsIcon className="h-3.5 w-3.5" />;
     default:           return <FileText className="h-3.5 w-3.5" />;
@@ -138,7 +136,7 @@ function SmartSearch() {
   function go(result: SearchResult) {
     setQuery("");
     setOpen(false);
-    if (result.kind === "asset")   { navigate(`/asset/${result.symbol}`); return; }
+    if (result.kind === "asset")   { navigate(`/trade/${result.symbol}`); return; }
     if (result.kind === "article") { navigate(`/education?article=${result.id}`); return; }
     if (result.kind === "tip")     { navigate(`/education?view=tips&tip=${result.id}`); return; }
     navigate(result.path);
