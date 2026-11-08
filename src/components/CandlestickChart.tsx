@@ -1,5 +1,14 @@
-import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { createChart, IChartApi, ISeriesApi, CandlestickData, Time, CandlestickSeries, LineSeries, AreaSeries, BarSeries, CrosshairMode, LineData, MouseEventHandler } from 'lightweight-charts';
+// src/components/CandlestickChart.tsx
+// ─────────────────────────────────────────────────────────────
+// Thin stateful wrapper over ChartEngine. Owns: chart style,
+// crosshair toggle, OHLC hover toggle, active indicator list,
+// fullscreen state, toolbars, and the live-candle hook.
+//
+// Same external props + ref API (CandlestickChartRef) as before,
+// so AssetDetail compiles untouched.
+// ─────────────────────────────────────────────────────────────
+
+import { useCallback, useEffect, useMemo, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import { OhlcDataPoint, formatPrice, formatTime } from '@/lib/mockOhlcData';
 import { ChartToolbar } from './ChartToolbar';
 import { ChartVerticalToolbar } from './ChartVerticalToolbar';
@@ -7,6 +16,9 @@ import { ChartStyle } from './chart/ChartStyleSelector';
 import { SavedBacktest } from './chart/SavedBacktestsDropdown';
 import { Button } from '@/components/ui/button';
 import { Maximize2, Minimize2 } from 'lucide-react';
+
+import { ChartEngine, type ChartEngineRef } from './chart/ChartEngine';
+import { useLiveCandle } from '@/hooks/use-live-candle';
 
 interface CandlestickChartProps {
   data: OhlcDataPoint[];
@@ -26,121 +38,45 @@ export interface CandlestickChartRef {
   toggleFullscreen: () => void;
 }
 
-// Calculate Heikin Ashi candles
-function calculateHeikinAshi(data: OhlcDataPoint[]): OhlcDataPoint[] {
-  const result: OhlcDataPoint[] = [];
-  
-  for (let i = 0; i < data.length; i++) {
-    const current = data[i];
-    const prev = result[i - 1];
-    
-    const haClose = (current.open + current.high + current.low + current.close) / 4;
-    const haOpen = prev 
-      ? (prev.open + prev.close) / 2 
-      : (current.open + current.close) / 2;
-    const haHigh = Math.max(current.high, haOpen, haClose);
-    const haLow = Math.min(current.low, haOpen, haClose);
-    
-    result.push({
-      time: current.time,
-      timestamp: current.timestamp,
-      open: haOpen,
-      high: haHigh,
-      low: haLow,
-      close: haClose,
-    });
-  }
-  
-  return result;
-}
-
 export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChartProps>(
   ({ data, pair, timeframe, onTimeframeChange, savedBacktests, onSaveBacktest, onLoadBacktest, onCompareBacktests }, ref) => {
-    const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartWrapperRef = useRef<HTMLDivElement>(null);
-    const chartRef = useRef<IChartApi | null>(null);
-    const mainSeriesRef = useRef<ISeriesApi<'Candlestick'> | ISeriesApi<'Line'> | ISeriesApi<'Area'> | ISeriesApi<'Bar'> | null>(null);
-    const maSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
-    const crosshairHandlerRef = useRef<MouseEventHandler<Time> | null>(null);
-    
+    const engineRef = useRef<ChartEngineRef>(null);
+
     const [crosshairEnabled, setCrosshairEnabled] = useState(true);
     const [ohlcEnabled, setOhlcEnabled] = useState(false);
     const [chartStyle, setChartStyle] = useState<ChartStyle>('candlestick');
     const [activeIndicators, setActiveIndicators] = useState<string[]>([]);
     const [isFullscreen, setIsFullscreen] = useState(false);
-    
-    const [tooltipData, setTooltipData] = useState<{
-      visible: boolean;
-      x: number;
-      y: number;
-      time: string;
-      open: string;
-      high: string;
-      low: string;
-      close: string;
-      isUp: boolean;
-    } | null>(null);
 
-    // Toggle indicator
+    // Live candle: pair wrapper owns the symbol; pass canonical through.
+    const lastBar = data.length > 0 ? data[data.length - 1] : null;
+    const liveBar = useLiveCandle({ symbol: pair.toUpperCase(), timeframe, lastBar });
+
     const handleToggleIndicator = useCallback((id: string) => {
-      setActiveIndicators(prev => 
-        prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+      setActiveIndicators((prev) =>
+        prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
       );
     }, []);
 
     const handleRemoveIndicator = useCallback((id: string) => {
-      setActiveIndicators(prev => prev.filter(i => i !== id));
+      setActiveIndicators((prev) => prev.filter((i) => i !== id));
     }, []);
 
-    // Zoom controls
-    const handleZoomIn = useCallback(() => {
-      if (!chartRef.current) return;
-      const timeScale = chartRef.current.timeScale();
-      const currentRange = timeScale.getVisibleLogicalRange();
-      if (currentRange) {
-        const newRange = {
-          from: currentRange.from + (currentRange.to - currentRange.from) * 0.2,
-          to: currentRange.to - (currentRange.to - currentRange.from) * 0.2,
-        };
-        timeScale.setVisibleLogicalRange(newRange);
-      }
-    }, []);
+    const handleZoomIn = useCallback(() => engineRef.current?.zoomIn(), []);
+    const handleZoomOut = useCallback(() => engineRef.current?.zoomOut(), []);
+    const handleReset = useCallback(() => engineRef.current?.resetView(), []);
+    const handleToggleFullscreen = useCallback(() => setIsFullscreen((p) => !p), []);
 
-    const handleZoomOut = useCallback(() => {
-      if (!chartRef.current) return;
-      const timeScale = chartRef.current.timeScale();
-      const currentRange = timeScale.getVisibleLogicalRange();
-      if (currentRange) {
-        const newRange = {
-          from: currentRange.from - (currentRange.to - currentRange.from) * 0.25,
-          to: currentRange.to + (currentRange.to - currentRange.from) * 0.25,
-        };
-        timeScale.setVisibleLogicalRange(newRange);
-      }
-    }, []);
-
-    const handleReset = useCallback(() => {
-      if (!chartRef.current) return;
-      chartRef.current.timeScale().fitContent();
-    }, []);
-
-    // Fullscreen toggle
-    const handleToggleFullscreen = useCallback(() => {
-      setIsFullscreen(prev => !prev);
-    }, []);
-
-    // Handle ESC key to exit fullscreen
+    // ESC exits fullscreen
     useEffect(() => {
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Escape' && isFullscreen) {
-          setIsFullscreen(false);
-        }
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && isFullscreen) setIsFullscreen(false);
       };
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
+      window.addEventListener('keydown', onKey);
+      return () => window.removeEventListener('keydown', onKey);
     }, [isFullscreen]);
 
-    // Expose methods via ref
     useImperativeHandle(ref, () => ({
       zoomIn: handleZoomIn,
       zoomOut: handleZoomOut,
@@ -148,259 +84,38 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
       toggleFullscreen: handleToggleFullscreen,
     }));
 
-    // Toggle crosshair mode
     const handleCrosshairToggle = useCallback((enabled: boolean) => {
       setCrosshairEnabled(enabled);
-      if (chartRef.current) {
-        chartRef.current.applyOptions({
-          crosshair: {
-            mode: enabled ? CrosshairMode.Normal : CrosshairMode.Hidden,
-          },
-        });
-      }
     }, []);
 
-    // Initialize chart
-    useEffect(() => {
-      if (!chartContainerRef.current) return;
-
-      const chart = createChart(chartContainerRef.current, {
-        layout: {
-          background: { color: 'transparent' },
-          textColor: 'hsl(215, 20%, 55%)',
-          fontFamily: 'Inter, system-ui, sans-serif',
-        },
-        grid: {
-          vertLines: { color: 'hsl(217, 19%, 16%)' },
-          horzLines: { color: 'hsl(217, 19%, 16%)' },
-        },
-        crosshair: {
-          mode: CrosshairMode.Normal,
-          vertLine: {
-            color: 'hsl(215, 20%, 40%)',
-            width: 1,
-            style: 2,
-            labelBackgroundColor: 'hsl(217, 33%, 17%)',
-          },
-          horzLine: {
-            color: 'hsl(215, 20%, 40%)',
-            width: 1,
-            style: 2,
-            labelBackgroundColor: 'hsl(217, 33%, 17%)',
-          },
-        },
-        rightPriceScale: {
-          borderColor: 'hsl(217, 19%, 20%)',
-          scaleMargins: {
-            top: 0.08,
-            bottom: 0.08,
-          },
-        },
-        timeScale: {
-          borderColor: 'hsl(217, 19%, 20%)',
-          timeVisible: true,
-          secondsVisible: false,
-        },
-        handleScroll: {
-          mouseWheel: true,
-          pressedMouseMove: true,
-          horzTouchDrag: true,
-          vertTouchDrag: false,
-        },
-        handleScale: {
-          axisPressedMouseMove: true,
-          mouseWheel: true,
-          pinch: true,
-        },
-      });
-
-      chartRef.current = chart;
-
-      // Handle resize
-      const handleResize = () => {
-        if (chartContainerRef.current && chartRef.current) {
-          chartRef.current.applyOptions({
-            width: chartContainerRef.current.clientWidth,
-            height: chartContainerRef.current.clientHeight,
-          });
-        }
-      };
-
-      window.addEventListener('resize', handleResize);
-      handleResize();
-
-      return () => {
-        window.removeEventListener('resize', handleResize);
-        if (crosshairHandlerRef.current) {
-          try { chart.unsubscribeCrosshairMove(crosshairHandlerRef.current); } catch { /* chart already gone */ }
-          crosshairHandlerRef.current = null;
-        }
-        chart.remove();
-        chartRef.current = null;
-        mainSeriesRef.current = null;
-        maSeriesRef.current = null;
-      };
-    }, []);
-
-    // Update series when chart style changes
-    useEffect(() => {
-      if (!chartRef.current || !data.length) return;
-
-      // Remove existing series
-      if (mainSeriesRef.current) {
-        chartRef.current.removeSeries(mainSeriesRef.current);
-        mainSeriesRef.current = null;
-      }
-      if (maSeriesRef.current) {
-        chartRef.current.removeSeries(maSeriesRef.current);
-        maSeriesRef.current = null;
-      }
-
-      // Drop any prior crosshair handler so we don't stack subscribers on re-runs.
-      if (crosshairHandlerRef.current) {
-        try { chartRef.current.unsubscribeCrosshairMove(crosshairHandlerRef.current); } catch { /* noop */ }
-        crosshairHandlerRef.current = null;
-      }
-
-      // Prepare data based on chart style
-      let processedData = data;
-      if (chartStyle === 'heikin-ashi') {
-        processedData = calculateHeikinAshi(data);
-      }
-
-      // Create appropriate series based on chart style
-      if (chartStyle === 'line') {
-        const series = chartRef.current.addSeries(LineSeries, {
-          color: 'hsl(200, 80%, 60%)',
-          lineWidth: 2,
-          priceLineVisible: true,
-        });
-        const lineData: LineData[] = processedData.map((d) => ({
-          time: d.timestamp as Time,
-          value: d.close,
-        }));
-        series.setData(lineData);
-        mainSeriesRef.current = series;
-      } else if (chartStyle === 'area') {
-        const series = chartRef.current.addSeries(AreaSeries, {
-          topColor: 'hsl(200, 80%, 60%)',
-          bottomColor: 'hsla(200, 80%, 60%, 0.1)',
-          lineColor: 'hsl(200, 80%, 60%)',
-          lineWidth: 2,
-        });
-        const areaData: LineData[] = processedData.map((d) => ({
-          time: d.timestamp as Time,
-          value: d.close,
-        }));
-        series.setData(areaData);
-        mainSeriesRef.current = series;
-      } else if (chartStyle === 'bars') {
-        const series = chartRef.current.addSeries(BarSeries, {
-          upColor: 'hsl(142, 71%, 45%)',
-          downColor: 'hsl(0, 84%, 60%)',
-        });
-        const barData = processedData.map((d) => ({
-          time: d.timestamp as Time,
-          open: d.open,
-          high: d.high,
-          low: d.low,
-          close: d.close,
-        }));
-        series.setData(barData);
-        mainSeriesRef.current = series;
-      } else {
-        // Candlestick (default), heikin-ashi, or hollow candles
-        const isHollow = chartStyle === 'hollow';
-        const series = chartRef.current.addSeries(CandlestickSeries, {
-          upColor: isHollow ? 'transparent' : 'hsl(142, 71%, 45%)',
-          downColor: 'hsl(0, 84%, 60%)',
-          borderUpColor: 'hsl(142, 71%, 45%)',
-          borderDownColor: 'hsl(0, 84%, 60%)',
-          wickUpColor: 'hsl(142, 71%, 45%)',
-          wickDownColor: 'hsl(0, 84%, 60%)',
-        });
-        const candleData: CandlestickData[] = processedData.map((d) => ({
-          time: d.timestamp as Time,
-          open: d.open,
-          high: d.high,
-          low: d.low,
-          close: d.close,
-        }));
-        series.setData(candleData);
-        mainSeriesRef.current = series;
-
-        // Subscribe to crosshair move for tooltip (only for candlestick types).
-        // Stored on a ref so effect re-runs and unmount can unsubscribe the exact handler.
-        const crosshairHandler: MouseEventHandler<Time> = (param) => {
-          if (!param.point || !param.time || !param.seriesData.size) {
-            setTooltipData(null);
-            return;
-          }
-
-          const candleDataPoint = param.seriesData.get(series) as CandlestickData;
-          if (!candleDataPoint) {
-            setTooltipData(null);
-            return;
-          }
-
-          const isUp = candleDataPoint.close >= candleDataPoint.open;
-
-          setTooltipData({
-            visible: true,
-            x: param.point.x,
-            y: param.point.y,
-            time: formatTime(param.time as number, timeframe),
-            open: formatPrice(candleDataPoint.open, pair),
-            high: formatPrice(candleDataPoint.high, pair),
-            low: formatPrice(candleDataPoint.low, pair),
-            close: formatPrice(candleDataPoint.close, pair),
-            isUp,
-          });
-        };
-        chartRef.current.subscribeCrosshairMove(crosshairHandler);
-        crosshairHandlerRef.current = crosshairHandler;
-      }
-
-      // Add MA line if SMA or EMA is active
-      if (activeIndicators.some(id => ['sma', 'ema', 'ma'].includes(id))) {
-        const maSeries = chartRef.current.addSeries(LineSeries, {
-          color: 'hsl(200, 80%, 60%)',
-          lineWidth: 2,
-          priceLineVisible: false,
-          lastValueVisible: false,
-        });
-
-        // Calculate simple MA (20-period)
-        const maPeriod = 20;
-        const maData = data.map((d, i) => {
-          if (i < maPeriod - 1) return null;
-          const slice = data.slice(i - maPeriod + 1, i + 1);
-          const avg = slice.reduce((sum, c) => sum + c.close, 0) / maPeriod;
-          return { time: d.timestamp as Time, value: avg };
-        }).filter(Boolean) as { time: Time; value: number }[];
-
-        maSeries.setData(maData);
-        maSeriesRef.current = maSeries;
-      }
-
-      chartRef.current?.timeScale().fitContent();
-    }, [data, chartStyle, activeIndicators, pair, timeframe]);
-
-    // Toolbar dimensions
     const TOOLBAR_WIDTH = 40;
     const TOOLBAR_HEIGHT = 44;
 
+    const engineProps = useMemo(
+      () => ({
+        bars: data,
+        liveBar,
+        chartStyle,
+        displayInterval: timeframe,
+        pair,
+        ohlcEnabled,
+        crosshairEnabled,
+        activeIndicators,
+        formatPrice,
+        formatTime,
+      }),
+      [data, liveBar, chartStyle, timeframe, pair, ohlcEnabled, crosshairEnabled, activeIndicators],
+    );
+
     return (
-      <div 
+      <div
         ref={chartWrapperRef}
         className={`relative w-full h-full ${
-          isFullscreen 
-            ? 'fixed inset-0 z-[100] bg-[hsl(222,30%,6%)]' 
-            : ''
+          isFullscreen ? 'fixed inset-0 z-[100] bg-[hsl(222,30%,6%)]' : ''
         }`}
       >
         {/* Chart Toolbar - top bar */}
-        <div 
+        <div
           className="absolute top-0 left-0 z-30"
           style={{ right: TOOLBAR_WIDTH, height: TOOLBAR_HEIGHT }}
         >
@@ -425,12 +140,11 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
         </div>
 
         {/* Right-side Vertical Tools Panel */}
-        <div 
+        <div
           className="absolute top-0 right-0 bottom-0 z-30"
           style={{ width: TOOLBAR_WIDTH }}
         >
-          {/* Fullscreen Toggle Button */}
-          <div 
+          <div
             className="flex items-center justify-center border-b border-border/50 bg-background/95"
             style={{ height: TOOLBAR_HEIGHT }}
           >
@@ -441,57 +155,24 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
               onClick={handleToggleFullscreen}
               title={isFullscreen ? 'Exit fullscreen (ESC)' : 'Enter fullscreen'}
             >
-              {isFullscreen ? (
-                <Minimize2 className="h-4 w-4" />
-              ) : (
-                <Maximize2 className="h-4 w-4" />
-              )}
+              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </Button>
           </div>
-          {/* Vertical tools */}
-          <div 
+          <div
             className="absolute right-0 left-0"
             style={{ top: TOOLBAR_HEIGHT, bottom: 0 }}
           >
-            <ChartVerticalToolbar
-              onZoomIn={handleZoomIn}
-              onZoomOut={handleZoomOut}
-              onReset={handleReset}
-            />
+            <ChartVerticalToolbar onZoomIn={handleZoomIn} onZoomOut={handleZoomOut} onReset={handleReset} />
           </div>
         </div>
 
-        {/* Tooltip - only shown when ohlcEnabled */}
-        {ohlcEnabled && tooltipData && tooltipData.visible && (
-          <div
-            className="absolute z-[60] pointer-events-none bg-card/95 backdrop-blur-sm border border-border rounded-lg px-3 py-2 shadow-lg text-sm"
-            style={{
-              left: Math.min(tooltipData.x + 12, (chartContainerRef.current?.clientWidth || 0) - 150),
-              top: Math.max(tooltipData.y - 80, TOOLBAR_HEIGHT + 10),
-            }}
-          >
-            <div className="text-muted-foreground text-xs mb-1">{tooltipData.time}</div>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
-              <span className="text-muted-foreground">O:</span>
-              <span className="text-foreground font-medium">{tooltipData.open}</span>
-              <span className="text-muted-foreground">H:</span>
-              <span className="text-foreground font-medium">{tooltipData.high}</span>
-              <span className="text-muted-foreground">L:</span>
-              <span className="text-foreground font-medium">{tooltipData.low}</span>
-              <span className="text-muted-foreground">C:</span>
-              <span className={`font-medium ${tooltipData.isUp ? 'text-success' : 'text-destructive'}`}>
-                {tooltipData.close}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Chart Container */}
-        <div 
-          ref={chartContainerRef} 
-          className="absolute left-0 bottom-0 bg-[hsl(222,30%,5%)]"
+        {/* Chart engine (chart container + crosshair tooltip) */}
+        <div
+          className="absolute left-0 bottom-0"
           style={{ top: TOOLBAR_HEIGHT, right: TOOLBAR_WIDTH }}
-        />
+        >
+          <ChartEngine ref={engineRef} {...engineProps} />
+        </div>
 
         {/* Live Data Label */}
         <div className="absolute bottom-2 left-2 z-20">
@@ -510,5 +191,5 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
         )}
       </div>
     );
-  }
+  },
 );
