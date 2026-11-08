@@ -21,6 +21,10 @@ import { NotOnPlanState } from "@/components/chart/NotOnPlanState";
 import { PairSelector } from "@/components/trade/PairSelector";
 import { MarketAwarenessPanel } from "@/components/trade/MarketAwarenessPanel";
 import { ReadinessChecklist } from "@/components/trade/ReadinessChecklist";
+import { DynamicRiskCell } from "@/components/trade/DynamicRiskCell";
+import { InATradeButton, type EntryIntent } from "@/components/trade/InATradeButton";
+import { PositionSizeSlideOver } from "@/components/trade/PositionSizeSlideOver";
+import { getSession as getDraSession } from "@/components/risk/DynamicRiskAdvisor";
 
 import { useAssets } from "@/hooks/use-watchlist";
 import { useMarketQuote } from "@/hooks/use-market-quotes";
@@ -118,6 +122,17 @@ function TradeContent({ symbol }: { symbol: string }) {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isEventOpen, setIsEventOpen] = useState(false);
   const [blockingRoles, setBlockingRoles] = useState<TfRole[]>([]);
+  const [tradeEntry, setTradeEntry] = useState<EntryIntent | null>(null);
+  const [slideOverOpen, setSlideOverOpen] = useState(false);
+
+  // Current session (by wall-clock hour) — reuses DynamicRiskAdvisor's getSession
+  // so the "context" matching is consistent with how journalled trades were
+  // bucketed. Recomputed once per render; cheap.
+  const currentSession = useMemo(() => {
+    const d = new Date();
+    const hhmm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    return getDraSession(hhmm);
+  }, [symbol]);
 
   // Persist last-viewed symbol on every change
   useEffect(() => {
@@ -217,6 +232,15 @@ function TradeContent({ symbol }: { symbol: string }) {
   }, []);
 
   const chartBars = chartState.kind === "ok" ? chartState.bars : null;
+  const liveMid = quote?.last ?? null;
+
+  // Stop distance in pips — only well-defined once both prices exist.
+  const stopPips = useMemo(() => {
+    if (!tradeEntry?.stopPrice || !instrument) return undefined;
+    const diff = Math.abs(tradeEntry.entryPrice - tradeEntry.stopPrice);
+    const pips = diff / instrument.pipSize;
+    return Number.isFinite(pips) ? Math.round(pips * 10) / 10 : undefined;
+  }, [tradeEntry, instrument]);
 
   return (
     <div className="p-3 sm:p-6 space-y-4">
@@ -276,8 +300,34 @@ function TradeContent({ symbol }: { symbol: string }) {
             upcomingRelevantEvents={upcomingRelevantEvents}
             onBlockingRolesChange={setBlockingRoles}
           />
+          <DynamicRiskCell
+            symbol={symbol}
+            session={currentSession}
+            onOpenSlideOver={() => setSlideOverOpen(true)}
+          />
+          <InATradeButton
+            symbol={symbol}
+            liveMidPrice={liveMid}
+            active={tradeEntry !== null}
+            entry={tradeEntry}
+            displayDecimals={instrument?.displayDecimals ?? 5}
+            onEnter={setTradeEntry}
+            onExit={() => setTradeEntry(null)}
+          />
         </div>
       </div>
+
+      <PositionSizeSlideOver
+        open={slideOverOpen}
+        onOpenChange={setSlideOverOpen}
+        prefill={{
+          symbol,
+          entryPrice: tradeEntry?.entryPrice ?? liveMid,
+          stopPrice: tradeEntry?.stopPrice ?? null,
+          targetPrice: tradeEntry?.targetPrice ?? null,
+          stopPips,
+        }}
+      />
 
       {selectedEvent && (
         <EventDetailsModal

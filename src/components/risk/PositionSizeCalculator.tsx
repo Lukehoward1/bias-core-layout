@@ -15,11 +15,22 @@ import { RiskToolModeToggle } from "@/components/risk/RiskToolModeToggle";
 import { useHomeCurrency } from "@/hooks/use-home-currency";
 import { currencySymbol } from "@/lib/currency";
 
+export interface PositionSizePrefill {
+  instrument?: string;        // canonical symbol e.g. "EURUSD"
+  entryPrice?: number;
+  stopLoss?: number;
+  takeProfit?: number;
+  riskPercent?: number;
+  accountBalance?: number;
+}
+
 interface PositionSizeCalculatorProps {
   isAdded?: boolean;
   onAdd?: () => void;
   onRemove?: () => void;
   compact?: boolean;
+  /** Optional initial values. Used only on first render; user edits take over after that. */
+  prefill?: PositionSizePrefill;
 }
 
 /** Allow empty inputs visually, but treat empty as 0 for maths */
@@ -51,7 +62,7 @@ const formatPriceNoCommas = (raw: string | number) => {
   return String(n);
 };
 
-export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = false }: PositionSizeCalculatorProps) {
+export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = false, prefill }: PositionSizeCalculatorProps) {
   const navigate = useNavigate();
   // ── Account awareness ────────────────────────────────────────────────────
   const {
@@ -71,15 +82,27 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
 
   const tap = useTapHandler();
   const [assetCategory, setAssetCategory] = useState<"FX" | "Futures">("FX");
-  const [instrument, setInstrument] = useState<string>("EURUSD");
+  const [instrument, setInstrument] = useState<string>(() => prefill?.instrument ?? "EURUSD");
 
-  const [accountBalanceInput, setAccountBalanceInput] = useState<string>("10000");
-  const [riskPercentInput, setRiskPercentInput] = useState<string>("2");
-  const [entryPriceInput, setEntryPriceInput] = useState<string>("1.0850");
-  const [stopLossInput, setStopLossInput] = useState<string>("1.0820");
-  const [takeProfitInput, setTakeProfitInput] = useState<string>("1.0910");
+  const [accountBalanceInput, setAccountBalanceInput] = useState<string>(
+    () => (prefill?.accountBalance !== undefined ? String(prefill.accountBalance) : "10000"),
+  );
+  const [riskPercentInput, setRiskPercentInput] = useState<string>(
+    () => (prefill?.riskPercent !== undefined ? String(prefill.riskPercent) : "2"),
+  );
+  const [entryPriceInput, setEntryPriceInput] = useState<string>(
+    () => (prefill?.entryPrice !== undefined ? String(prefill.entryPrice) : "1.0850"),
+  );
+  const [stopLossInput, setStopLossInput] = useState<string>(
+    () => (prefill?.stopLoss !== undefined ? String(prefill.stopLoss) : "1.0820"),
+  );
+  const [takeProfitInput, setTakeProfitInput] = useState<string>(
+    () => (prefill?.takeProfit !== undefined ? String(prefill.takeProfit) : "1.0910"),
+  );
 
-  const [hasManualEntryEdit, setHasManualEntryEdit] = useState<boolean>(false);
+  // When prefill supplies an entry price, treat it as a user edit so the live-quote
+  // sync effect below doesn't immediately overwrite it.
+  const [hasManualEntryEdit, setHasManualEntryEdit] = useState<boolean>(() => prefill?.entryPrice !== undefined);
 
   // Pre-seed manual input from account balance on first load (useful when user switches to Manual)
   const balanceInitRef = useRef(false);
@@ -109,7 +132,14 @@ export function PositionSizeCalculator({ isAdded, onAdd, onRemove, compact = fal
   const stopLoss = useMemo(() => toNumberOrZero(stopLossInput), [stopLossInput]);
   const takeProfit = useMemo(() => toNumberOrZero(takeProfitInput), [takeProfitInput]);
 
+  // Skip the first run of the assetCategory reset-effect when prefill is present,
+  // so caller-provided values aren't immediately overwritten by the default seed.
+  const skipFirstCategoryResetRef = useRef<boolean>(prefill !== undefined);
   useEffect(() => {
+    if (skipFirstCategoryResetRef.current) {
+      skipFirstCategoryResetRef.current = false;
+      return;
+    }
     const availableInstruments = assetCategory === "FX" ? getFXInstruments() : getFuturesInstruments();
 
     if (availableInstruments.length > 0 && !availableInstruments.find((i) => i.symbol === instrument)) {

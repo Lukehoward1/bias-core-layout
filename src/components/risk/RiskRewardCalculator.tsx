@@ -10,11 +10,19 @@ import { cn } from "@/lib/utils";
 import { useHomeCurrency } from "@/hooks/use-home-currency";
 import { currencySymbol } from "@/lib/currency";
 
+export interface RiskRewardPrefill {
+  stopDistance?: number;      // pips
+  targetDistance?: number;    // pips
+  riskPercent?: number;
+  accountBalance?: number;
+}
+
 interface RiskRewardCalculatorProps {
   isAdded?: boolean;
   onAdd?: () => void;
   onRemove?: () => void;
   compact?: boolean;
+  prefill?: RiskRewardPrefill;
 }
 
 /** Allow empty inputs visually, but treat empty as 0 for maths */
@@ -24,19 +32,25 @@ const toNumberOrZero = (v: string) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-export function RiskRewardCalculator({ isAdded, onAdd, onRemove, compact = false }: RiskRewardCalculatorProps) {
+export function RiskRewardCalculator({ isAdded, onAdd, onRemove, compact = false, prefill }: RiskRewardCalculatorProps) {
   const { homeCurrency } = useHomeCurrency();
   const sym = currencySymbol(homeCurrency);
 
   // ✅ Keep slider values as numbers (sliders can’t be empty)
-  const [stopDistance, setStopDistance] = useState<number>(30);
-  const [targetDistance, setTargetDistance] = useState<number>(60);
-  const [riskPercent, setRiskPercent] = useState<number>(1);
+  const [stopDistance, setStopDistance] = useState<number>(() => prefill?.stopDistance ?? 30);
+  const [targetDistance, setTargetDistance] = useState<number>(() => prefill?.targetDistance ?? 60);
+  const [riskPercent, setRiskPercent] = useState<number>(() => prefill?.riskPercent ?? 1);
 
   // ✅ Inputs that should be allowed to go blank
-  const [stopDistanceInput, setStopDistanceInput] = useState<string>("30");
-  const [targetDistanceInput, setTargetDistanceInput] = useState<string>("60");
-  const [accountBalanceInput, setAccountBalanceInput] = useState<string>("10000");
+  const [stopDistanceInput, setStopDistanceInput] = useState<string>(
+    () => (prefill?.stopDistance !== undefined ? String(prefill.stopDistance) : "30"),
+  );
+  const [targetDistanceInput, setTargetDistanceInput] = useState<string>(
+    () => (prefill?.targetDistance !== undefined ? String(prefill.targetDistance) : "60"),
+  );
+  const [accountBalanceInput, setAccountBalanceInput] = useState<string>(
+    () => (prefill?.accountBalance !== undefined ? String(prefill.accountBalance) : "10000"),
+  );
 
   // Numeric values for calculations (blank => 0)
   const stopDistanceNum = useMemo(() => toNumberOrZero(stopDistanceInput), [stopDistanceInput]);

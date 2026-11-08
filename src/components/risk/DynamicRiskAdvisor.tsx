@@ -20,7 +20,7 @@ import type { Trade } from "@/hooks/use-journal-trades";
 import { useTapHandler } from "@/hooks/use-tap-handler";
 
 const RISK_STORAGE_KEY = "globalRiskPreset";
-const MIN_TRADES = 20;
+export const MIN_TRADES = 20;
 
 const SESSIONS = ["Asia", "London", "London-NY Overlap", "New York"] as const;
 type SessionName = typeof SESSIONS[number];
@@ -28,7 +28,8 @@ type SessionName = typeof SESSIONS[number];
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"] as const;
 type DayName = typeof DAYS[number];
 
-function getSession(entryTime: string | undefined): SessionName | null {
+export type DraSessionName = SessionName;
+export function getSession(entryTime: string | undefined): SessionName | null {
   if (!entryTime) return null;
   const parts = entryTime.split(":");
   const hour = parseInt(parts[0] ?? "", 10);
@@ -42,7 +43,8 @@ function getSession(entryTime: string | undefined): SessionName | null {
   return null;
 }
 
-function getDayName(dateStr: string): DayName | null {
+export type DraDayName = DayName;
+export function getDayName(dateStr: string): DayName | null {
   // Parse as noon local to avoid timezone boundary shifts
   const d = new Date(dateStr + "T12:00:00");
   const dayMap: Record<number, DayName> = {
@@ -55,14 +57,14 @@ function getDayName(dateStr: string): DayName | null {
   return dayMap[d.getDay()] ?? null;
 }
 
-interface SegmentStats {
+export interface SegmentStats {
   count: number;
   profitRate: number; // 0-100
   avgR: number | null;
   profitFactor: number | null; // Infinity when no losses
 }
 
-function computeStats(trades: Trade[]): SegmentStats {
+export function computeStats(trades: Trade[]): SegmentStats {
   const count = trades.length;
   if (count === 0) return { count: 0, profitRate: 0, avgR: null, profitFactor: null };
 
@@ -90,12 +92,12 @@ function computeStats(trades: Trade[]): SegmentStats {
 
 type Direction = "up" | "down" | "same";
 
-interface Recommendation {
+export interface Recommendation {
   pct: number;
   direction: Direction;
 }
 
-function getRecommendation(
+export function getRecommendation(
   seg: SegmentStats,
   overall: SegmentStats,
   baseRisk: number,
@@ -335,7 +337,10 @@ export function DynamicRiskAdvisor({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Brain className="h-4 w-4 text-primary" />
-              <CardTitle className="text-sm font-medium">Dynamic Risk Advisor</CardTitle>
+              <div className="min-w-0">
+                <CardTitle className="text-sm font-medium">Dynamic Risk</CardTitle>
+                <p className="text-xs text-muted-foreground">Based on your own trading history. Not advice.</p>
+              </div>
             </div>
             {onAdd && onRemove && (
               <AddToDashboardButton isAdded={isAdded || false} onAdd={onAdd} onRemove={onRemove} />
@@ -389,9 +394,9 @@ export function DynamicRiskAdvisor({
           <div className="flex flex-wrap items-center gap-3 min-w-0">
             <Brain className="h-5 w-5 text-primary shrink-0" />
             <div className="min-w-0">
-              <CardTitle>Dynamic Risk Advisor</CardTitle>
+              <CardTitle>Dynamic Risk</CardTitle>
               <p className="text-sm text-muted-foreground mt-0.5">
-                Personalised risk recommendations based on your trading history
+                Based on your own trading history. Not advice.
               </p>
             </div>
             <RiskToolModeToggle mode={mode} onChange={setMode} />

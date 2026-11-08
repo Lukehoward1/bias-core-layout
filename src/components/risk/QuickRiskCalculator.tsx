@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,11 +23,19 @@ import { cn } from "@/lib/utils";
 import { useHomeCurrency } from "@/hooks/use-home-currency";
 import { currencySymbol } from "@/lib/currency";
 
+export interface QuickRiskPrefill {
+  instrument?: string;        // canonical symbol
+  stopDistance?: number;      // in pips
+  riskPercent?: number;
+  accountBalance?: number;
+}
+
 interface QuickRiskCalculatorProps {
   isAdded?: boolean;
   onAdd?: () => void;
   onRemove?: () => void;
   compact?: boolean;
+  prefill?: QuickRiskPrefill;
 }
 
 const RISK_PRESETS = [0.5, 1, 1.5, 2];
@@ -56,7 +64,7 @@ const formatPriceNoCommas = (raw: string | number) => {
   return String(n);
 };
 
-export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false }: QuickRiskCalculatorProps) {
+export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false, prefill }: QuickRiskCalculatorProps) {
   const navigate = useNavigate();
 
   const { refreshAccount, isLoading: isAccountLoading } = useLinkedAccounts();
@@ -75,19 +83,23 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
   const { homeCurrency } = useHomeCurrency();
   const sym = currencySymbol(homeCurrency);
 
-  const [manualBalanceInput, setManualBalanceInput] = useState<string>("10000");
-  const [stopDistanceInput, setStopDistanceInput] = useState<string>("30");
+  const [manualBalanceInput, setManualBalanceInput] = useState<string>(
+    () => (prefill?.accountBalance !== undefined ? String(prefill.accountBalance) : "10000"),
+  );
+  const [stopDistanceInput, setStopDistanceInput] = useState<string>(
+    () => (prefill?.stopDistance !== undefined ? String(prefill.stopDistance) : "30"),
+  );
 
   const [includeSpread, setIncludeSpread] = useState<boolean>(false);
   const [spreadInput, setSpreadInput] = useState<string>("");
 
-  const [riskPercent, setRiskPercent] = useState<number>(1);
+  const [riskPercent, setRiskPercent] = useState<number>(() => prefill?.riskPercent ?? 1);
   const [customRiskInput, setCustomRiskInput] = useState<string>("");
   const [isCustomRisk, setIsCustomRisk] = useState<boolean>(false);
 
   const tap = useTapHandler();
   const [assetCategory, setAssetCategory] = useState<"FX" | "Futures">("FX");
-  const [selectedInstrument, setSelectedInstrument] = useState<string>("EURUSD");
+  const [selectedInstrument, setSelectedInstrument] = useState<string>(() => prefill?.instrument ?? "EURUSD");
 
   const quote = useMarketQuote(selectedInstrument);
 
@@ -122,7 +134,14 @@ export function QuickRiskCalculator({ isAdded, onAdd, onRemove, compact = false 
     }
   }, []);
 
+  // Skip the first run of the category-reset effect when prefill is present so
+  // caller-provided values survive mount.
+  const skipFirstCategoryResetRef = useRef<boolean>(prefill !== undefined);
   useEffect(() => {
+    if (skipFirstCategoryResetRef.current) {
+      skipFirstCategoryResetRef.current = false;
+      return;
+    }
     const availableInstruments = assetCategory === "FX" ? getFXInstruments() : getFuturesInstruments();
 
     if (availableInstruments.length > 0 && !availableInstruments.find((i) => i.symbol === selectedInstrument)) {
