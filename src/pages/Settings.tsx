@@ -17,27 +17,14 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useTraderStyle } from "@/context/TraderStyleProvider";
+import { useTraderStyle, type TraderStyle } from "@/context/TraderStyleProvider";
 import { TraderTimeframesPicker } from "@/components/trade/TraderTimeframesPicker";
+import { TF_BY_CODE } from "@/data/timeframes";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 import { useActiveTradingAccount, ACTIVE_ACCOUNT_ALL } from "@/hooks/use-active-trading-account";
 import { ConnectedAccountsList } from "@/components/account/ConnectedAccountsList";
 import { ConnectAccountModal } from "@/components/account/ConnectAccountModal";
-import { useTraderBiasMode, getBiasTimeframesForStyle, type BiasTimeframe } from "@/hooks/use-trader-style";
 import { SUPPORTED_CURRENCIES, currencySymbol } from "@/lib/currency";
-
-type TraderStyle = "scalper" | "intraday" | "swing";
-
-const ALL_TIMEFRAMES: { value: BiasTimeframe; label: string }[] = [
-  { value: "1m", label: "1m" },
-  { value: "5m", label: "5m" },
-  { value: "15m", label: "15m" },
-  { value: "30m", label: "30m" },
-  { value: "1h", label: "1H" },
-  { value: "4h", label: "4H" },
-  { value: "1d", label: "D" },
-  { value: "1w", label: "W" },
-];
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -58,44 +45,9 @@ export default function Settings() {
   const { accounts, primaryAccount } = useLinkedAccounts();
   const { activeAccountId, setActiveAccountId } = useActiveTradingAccount();
 
-  const {
-    traderStyle,
-    setTraderStyle,
-    traderStyleLabel,
-    biasTimeframes,
-    customTimeframes,
-    setCustomTimeframes,
-    clearCustomTimeframes,
-  } = useTraderBiasMode();
-
-  const { traderStyle: tfStyle, setTraderStyle: setTfStyle } = useTraderStyle();
-
-  const [pendingTimeframes, setPendingTimeframes] = useState<BiasTimeframe[]>(
-    () => customTimeframes ?? getBiasTimeframesForStyle(traderStyle),
-  );
-
-  // Keep pending in sync with style defaults when no custom override is active
-  useEffect(() => {
-    if (!customTimeframes) {
-      setPendingTimeframes(getBiasTimeframesForStyle(traderStyle));
-    }
-  }, [traderStyle, customTimeframes]);
-
-  const toggleTimeframe = (tf: BiasTimeframe) => {
-    setPendingTimeframes((prev) => (prev.includes(tf) ? prev.filter((t) => t !== tf) : [...prev, tf]));
-  };
-
-  const handleResetToDefaults = () => {
-    clearCustomTimeframes();
-    setPendingTimeframes(getBiasTimeframesForStyle(traderStyle));
-  };
+  const { traderStyle: tfStyle, setTraderStyle: setTfStyle, resolvedTimeframes } = useTraderStyle();
 
   const handleSave = async () => {
-    if (pendingTimeframes.length === 0) {
-      clearCustomTimeframes();
-    } else {
-      setCustomTimeframes(pendingTimeframes);
-    }
     if (user) {
       const { error } = await supabase
         .from("profiles")
@@ -321,27 +273,6 @@ export default function Settings() {
                 </p>
               </div>
 
-              {/* Trader Style / Bias Mode */}
-              <div className="space-y-2">
-                <Label className="text-sm">Trader Style (bias mode)</Label>
-
-                <Select value={traderStyle} onValueChange={(v) => setTraderStyle(v as TraderStyle)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select trader style" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="scalper">Scalper</SelectItem>
-                    <SelectItem value="intraday">Intraday</SelectItem>
-                    <SelectItem value="swing">Swing</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <p className="text-xs text-muted-foreground">
-                  Current mode: <span className="font-medium text-foreground">{traderStyleLabel}</span> • Timeframes:{" "}
-                  <span className="font-medium text-foreground">{biasTimeframes.join(" / ")}</span>
-                </p>
-              </div>
-
               {/* Home Currency */}
               <div className="space-y-2">
                 <Label className="text-sm">Home Currency</Label>
@@ -361,51 +292,6 @@ export default function Settings() {
 
                 <p className="text-xs text-muted-foreground">
                   Used to display your P&L, balances, and risk calculations across the app.
-                </p>
-              </div>
-
-              {/* Bias Timeframe Override */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label className="text-sm">Bias Timeframe Override</Label>
-                  {customTimeframes && customTimeframes.length > 0 && (
-                    <>
-                      <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/30">
-                        Custom
-                      </Badge>
-                      <button
-                        type="button"
-                        onClick={handleResetToDefaults}
-                        className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
-                      >
-                        Reset to defaults
-                      </button>
-                    </>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {ALL_TIMEFRAMES.map(({ value, label }) => {
-                    const active = pendingTimeframes.includes(value);
-                    return (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => toggleTimeframe(value)}
-                        className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
-                          active
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-transparent text-muted-foreground border-border hover:border-foreground/40 hover:text-foreground"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <p className="text-xs text-muted-foreground">
-                  Default timeframes for your trader style are used when no override is set.
                 </p>
               </div>
 
@@ -439,6 +325,14 @@ export default function Settings() {
                     <SelectItem value="swing">Swing</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Bias{" "}
+                  <span className="font-medium text-foreground">{TF_BY_CODE[resolvedTimeframes.bias].label}</span>
+                  {" · "}Structure{" "}
+                  <span className="font-medium text-foreground">{TF_BY_CODE[resolvedTimeframes.structure].label}</span>
+                  {" · "}Entry{" "}
+                  <span className="font-medium text-foreground">{TF_BY_CODE[resolvedTimeframes.entry].label}</span>
+                </p>
               </div>
               <TraderTimeframesPicker />
             </CardContent>
