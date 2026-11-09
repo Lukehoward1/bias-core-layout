@@ -24,6 +24,7 @@ import { RiskRewardCalculator } from "@/components/risk/RiskRewardCalculator";
 import { DailyRiskLimitTracker } from "@/components/risk/DailyRiskLimitTracker";
 import { MaxDrawdownGuard } from "@/components/risk/MaxDrawdownGuard";
 import { WatchlistOverviewCard } from "@/components/dashboard/WatchlistOverviewCard";
+import { MarketsAtAGlanceCard } from "@/components/dashboard/MarketsAtAGlanceCard";
 import { useAlertsContext } from "@/contexts/AlertsContext";
 import { getAllCalendarEvents, getEventDateTime } from "@/services/calendarData";
 
@@ -1071,6 +1072,7 @@ export const CARD_RENDERERS: Record<string, (ctx: CardRenderContext) => React.Re
 
   "high-impact-events": () => <HighImpactEventsDashboardCard />,
   "watchlist-overview": ({ slotType }) => <WatchlistOverviewCard slotType={normalizeWatchlistSlotType(slotType)} />,
+  "markets-at-a-glance": () => <MarketsAtAGlanceCard />,
   "alerts-summary": () => <AlertsSummaryDashboardCard />,
   "top-news": () => <TopNewsDashboardCard />,
   "session-timers": () => <SessionTimersDashboardCard />,

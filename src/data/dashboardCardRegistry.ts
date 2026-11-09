@@ -69,6 +69,16 @@ export const DASHBOARD_CARD_REGISTRY: DashboardCardDefinition[] = [
     allowedRowTypes: ["wide-narrow", "equal", "hero", "three-equal", "four-equal"],
     dashboardEligible: true,
   },
+  {
+    id: "markets-at-a-glance",
+    title: "Markets at a Glance",
+    description: "Watchlist pairs with combined bias state and confidence",
+    section: "markets",
+    category: "analysis",
+    defaultRowType: "equal",
+    allowedRowTypes: ["equal", "wide-narrow", "hero", "three-equal", "four-equal"],
+    dashboardEligible: true,
+  },
 
   // ============ Dashboard Native Cards ============
   {

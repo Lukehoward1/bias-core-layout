@@ -7,9 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import { Filter, ChevronDown, ChevronUp, CalendarDays, Sparkles, BarChart3, RefreshCw, Clock } from "lucide-react";
+import { Filter, ChevronDown, ChevronUp, CalendarDays, Sparkles, BarChart3, RefreshCw, Clock, Star } from "lucide-react";
 
 import { EventDetailsModal } from "@/components/calendar/EventDetailsModal";
+import { useWatchlist } from "@/hooks/use-watchlist";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
 import { AddToDashboardButton } from "@/components/dashboard/AddToDashboardButton";
 import { toast } from "sonner";
@@ -36,6 +37,7 @@ type CurrencyFilter = "all" | string;
 type VisibleCount = 6 | 10 | 20 | 999;
 
 const CALENDAR_FILTERS_KEY = "cal-filters-v1";
+const MY_PAIRS_ONLY_KEY = "cal-my-pairs-v1";
 type SavedCalendarFilters = {
   dateRange?: CalendarDateRange;
   impactFilter?: ImpactFilter;
@@ -162,18 +164,23 @@ function Calendar() {
   const availableCurrencies = useMemo(() => getAvailableCalendarCurrencies(), []);
 
   const filteredEvents = useMemo(() => {
-    return getFilteredCalendarEvents({
+    const events = getFilteredCalendarEvents({
       dateRange,
       impact: impactFilter,
       currency: currencyFilter,
       sortMode,
     });
-  }, [dateRange, impactFilter, currencyFilter, sortMode]);
+    if (myPairsOnly && watchlistCurrencies.length > 0) {
+      return events.filter((e) => watchlistCurrencies.includes(e.currency));
+    }
+    return events;
+  }, [dateRange, impactFilter, currencyFilter, sortMode, myPairsOnly, watchlistCurrencies]);
 
   const filteredKeyEvents = useMemo(() => {
     return getNextKeyEvents(4).filter((event) => {
       if (impactFilter !== "all" && event.impact !== impactFilter) return false;
       if (currencyFilter !== "all" && event.currency !== currencyFilter) return false;
+      if (myPairsOnly && watchlistCurrencies.length > 0 && !watchlistCurrencies.includes(event.currency)) return false;
 
       if (dateRange === "today") {
         const eventDate = new Date(event.scheduledAt);
@@ -188,7 +195,7 @@ function Calendar() {
 
       return true;
     });
-  }, [dateRange, impactFilter, currencyFilter]);
+  }, [dateRange, impactFilter, currencyFilter, myPairsOnly, watchlistCurrencies]);
 
   const visibleEvents = useMemo(() => {
     if (showAllEvents || visibleCount === 999) {
@@ -200,6 +207,14 @@ function Calendar() {
 
   const counts = useMemo(() => getCalendarCounts(filteredEvents), [filteredEvents]);
   const isMobile = useIsMobile();
+
+  const { watchlistCurrencies } = useWatchlist();
+  const [myPairsOnly, setMyPairsOnly] = useState<boolean>(
+    () => localStorage.getItem(MY_PAIRS_ONLY_KEY) === "1",
+  );
+  useEffect(() => {
+    try { localStorage.setItem(MY_PAIRS_ONLY_KEY, myPairsOnly ? "1" : "0"); } catch { /* noop */ }
+  }, [myPairsOnly]);
 
   useEffect(() => {
     // Always consume the skip flag immediately so it can never go stale across
@@ -366,6 +381,16 @@ function Calendar() {
               <Button variant="outline" size="sm" className="h-9" disabled>
                 <Filter className="h-4 w-4 mr-2" />
                 Filters Active
+              </Button>
+
+              <Button
+                variant={myPairsOnly ? "default" : "outline"}
+                size="sm"
+                className="h-9"
+                onClick={() => setMyPairsOnly((v) => !v)}
+              >
+                <Star className={cn("h-4 w-4 mr-2", myPairsOnly && "fill-current")} />
+                My pairs only
               </Button>
             </div>
 
