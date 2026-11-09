@@ -11,7 +11,10 @@
 // Never reads chartBars except the volume row. When context is null, renders
 // skeleton rows so the UI doesn't go blank between fetches.
 
+import { useState } from "react";
 import { Pencil, TrendingUp, TrendingDown, Minus, AlertTriangle } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { TraderTimeframesPicker } from "@/components/trade/TraderTimeframesPicker";
 import { TF_BY_CODE } from "@/data/timeframes";
 import { computeVolumeRow } from "@/lib/volumeRule";
 import { getEventDateTime } from "@/services/calendarData";
@@ -89,6 +92,7 @@ export function MarketAwarenessPanel({
   onOpenEvent,
   now,
 }: MarketAwarenessPanelProps) {
+  const [pickerOpen, setPickerOpen] = useState(false);
   const nowDate = now ?? new Date();
   const biasLabel = TF_BY_CODE[resolvedTimeframes.bias].label;
   const structureLabel = TF_BY_CODE[resolvedTimeframes.structure].label;
@@ -123,17 +127,21 @@ export function MarketAwarenessPanel({
             <span className="inline-flex items-center rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
               {traderStyleLabel}
             </span>
-            {onOpenPickerPopover && (
-              <button
-                type="button"
-                onClick={onOpenPickerPopover}
-                className="p-1 rounded hover:bg-muted text-muted-foreground"
-                title="Edit timeframes"
-                aria-label="Edit timeframes"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </button>
-            )}
+            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="p-1 rounded hover:bg-muted text-muted-foreground"
+                  title="Edit timeframes"
+                  aria-label="Edit timeframes"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-3" align="end">
+                <TraderTimeframesPicker instrument={instrument} />
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
       </div>

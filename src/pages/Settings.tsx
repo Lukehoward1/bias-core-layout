@@ -17,6 +17,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useTraderStyle } from "@/context/TraderStyleProvider";
+import { TraderTimeframesPicker } from "@/components/trade/TraderTimeframesPicker";
 import { useLinkedAccounts } from "@/hooks/use-linked-accounts";
 import { useActiveTradingAccount, ACTIVE_ACCOUNT_ALL } from "@/hooks/use-active-trading-account";
 import { ConnectedAccountsList } from "@/components/account/ConnectedAccountsList";
@@ -65,6 +67,8 @@ export default function Settings() {
     setCustomTimeframes,
     clearCustomTimeframes,
   } = useTraderBiasMode();
+
+  const { traderStyle: tfStyle, setTraderStyle: setTfStyle } = useTraderStyle();
 
   const [pendingTimeframes, setPendingTimeframes] = useState<BiasTimeframe[]>(
     () => customTimeframes ?? getBiasTimeframesForStyle(traderStyle),
@@ -408,6 +412,35 @@ export default function Settings() {
               <Button className="w-full" onClick={handleSave}>
                 Save Preferences
               </Button>
+            </CardContent>
+          </Card>
+
+          {/* Trading Timeframes */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="h-5 w-5 text-primary" />
+                <CardTitle className="text-base">Trading Timeframes</CardTitle>
+              </div>
+              <CardDescription className="text-xs">
+                Set your three analysis timeframes (Bias / Structure / Entry). Drives the bias engine and Market Awareness panel.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm">Trader Style</Label>
+                <Select value={tfStyle} onValueChange={(v) => setTfStyle(v as TraderStyle)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select style" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="scalper">Scalper</SelectItem>
+                    <SelectItem value="intraday">Intraday</SelectItem>
+                    <SelectItem value="swing">Swing</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <TraderTimeframesPicker />
             </CardContent>
           </Card>
 

@@ -39,7 +39,7 @@ export function MarketsAtAGlanceCard({ isEditMode = false }: MarketsAtAGlanceCar
   const [addQuery, setAddQuery] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const displayAssets = useMemo(() => watchlistAssets.slice(0, 8), [watchlistAssets]);
+  const displayAssets = useMemo(() => watchlistAssets.slice(0, 5), [watchlistAssets]);
 
   useEffect(() => {
     subscribeContextSymbols(displayAssets, resolvedTimeframes);
@@ -98,7 +98,7 @@ export function MarketsAtAGlanceCard({ isEditMode = false }: MarketsAtAGlanceCar
                   <div className="max-h-44 overflow-y-auto">
                     {availableToAdd.length === 0 ? (
                       <div className="text-xs text-muted-foreground px-2 py-1.5">
-                        {watchlist.length >= 8 ? "Max 8 pairs" : "No results"}
+                        {watchlist.length >= 5 ? "Max 5 pairs shown" : "No results"}
                       </div>
                     ) : (
                       availableToAdd.map((inst) => (

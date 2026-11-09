@@ -150,20 +150,32 @@ export function useWatchlist() {
           .filter((s) => s && VALID_SYMBOLS.has(s)),
       ),
     );
+    const prev = watchlistRef.current;
     setWatchlist(cleaned);
     localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(cleaned));
     dispatchWatchlistChange(cleaned);
 
     const currentUser = userRef.current;
     if (currentUser) {
+      const cleanedSet = new Set(cleaned);
+      const prevSet = new Set(prev);
+      const removed = prev.filter((s) => !cleanedSet.has(s));
+      const added = cleaned.filter((s) => !prevSet.has(s));
+
       (async () => {
         try {
-          // Full resync: delete all then re-insert.
-          await supabase.from("watchlist").delete().eq("user_id", currentUser.id);
-          if (cleaned.length > 0) {
+          if (removed.length > 0) {
             const { error } = await supabase
               .from("watchlist")
-              .insert(cleaned.map((symbol) => ({ user_id: currentUser.id, symbol })));
+              .delete()
+              .eq("user_id", currentUser.id)
+              .in("symbol", removed);
+            if (error) warnSupabase(error);
+          }
+          if (added.length > 0) {
+            const { error } = await supabase
+              .from("watchlist")
+              .insert(added.map((symbol) => ({ user_id: currentUser.id, symbol })));
             if (error) warnSupabase(error);
           }
         } catch (err) {

@@ -1,5 +1,5 @@
 import type { TfCode } from '@/data/timeframes';
-import { TF_BY_CODE } from '@/data/timeframes';
+import { TF_BY_CODE, TIMEFRAMES } from '@/data/timeframes';
 import type { TraderStyle } from '@/context/TraderStyleProvider';
 
 export type TfRole = 'bias' | 'structure' | 'entry';
@@ -52,4 +52,21 @@ export function getTraderTimeframes(
 
 export function isCustom(style: TraderStyle, resolved: TraderTimeframes): boolean {
   return !shallowEqual(resolved, PRESETS[style]);
+}
+
+/** Returns true if setting `role` to `candidate` would violate the strict-descending invariant. */
+export function wouldBreakOrder(
+  role: TfRole,
+  candidate: TfCode,
+  current: TraderTimeframes,
+): boolean {
+  const test: TraderTimeframes = { ...current, [role]: candidate };
+  return !isStrictlyDescending(test);
+}
+
+/** All TfCodes the picker should offer, filtered by whether the instrument supports 1-minute bars. */
+export function getPickerCodes(supports1m: boolean): readonly TfCode[] {
+  return TIMEFRAMES
+    .map((t) => t.code)
+    .filter((c) => supports1m || c !== '1min');
 }
