@@ -137,7 +137,15 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
             resolvedTimeframes: latestResolvedTimeframes.current,
           });
           if (cancelled) return;
-          setContextMap((prev) => ({ ...prev, [asset.symbol]: ctx }));
+          // Don't cache a context where every role has zero confidence —
+          // that means all candle fetches failed (rate-limit signal) and
+          // storing it would block the Dashboard until the next contextTrigger.
+          const isTransientFailure =
+            ctx.biasState !== "Bias Unavailable" &&
+            Object.values(ctx.perRole).every((r) => r.confidence === 0);
+          if (!isTransientFailure) {
+            setContextMap((prev) => ({ ...prev, [asset.symbol]: ctx }));
+          }
         } catch { /* skip asset, move on */ }
         await new Promise((r) => setTimeout(r, 250));
       }

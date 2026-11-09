@@ -98,6 +98,17 @@ type ChartState =
   | { kind: "unavailable" }
   | { kind: "not-on-plan" };
 
+// Auto-retry schedule for transient rate-limit failures (8 s, 20 s, 45 s).
+const RETRY_DELAYS_MS = [8_000, 20_000, 45_000];
+
+function isContextInsufficient(ctx: MarketContext): boolean {
+  // "Bias Unavailable" is a permanent gate (symbol not whitelisted); no point retrying.
+  if (ctx.biasState === "Bias Unavailable") return false;
+  // All-zero confidence across all roles means every candle fetch returned empty —
+  // the typical signal for a Twelve Data rate-limit hit.
+  return Object.values(ctx.perRole).every((r) => r.confidence === 0);
+}
+
 export default function Trade() {
   const { symbol: urlSymbol } = useParams<{ symbol: string }>();
   // /trade with no symbol → redirect to /trade/<lastViewedOrDefault>
@@ -158,25 +169,39 @@ function TradeContent({ symbol }: { symbol: string }) {
     };
   }, []);
 
-  // Fetch chart bars
+  // Fetch chart bars — auto-retries up to 3 times on rate-limit empty responses,
+  // staying in "loading" state between attempts (no hard error until exhausted).
   useEffect(() => {
     let cancelled = false;
+    let attempt = 0;
     setChartState({ kind: "loading" });
-    fetchRealOhlcData(symbol, timeframe)
-      .then((bars) => {
-        if (cancelled) return;
-        if (!bars || bars.length === 0) {
-          setChartState({ kind: "unavailable" });
-          return;
-        }
-        setChartState({ kind: "ok", bars });
-      })
-      .catch(() => {
-        if (!cancelled) setChartState({ kind: "unavailable" });
-      });
-    return () => {
-      cancelled = true;
+
+    const run = () => {
+      fetchRealOhlcData(symbol, timeframe)
+        .then((bars) => {
+          if (cancelled) return;
+          if (bars && bars.length > 0) {
+            setChartState({ kind: "ok", bars });
+            return;
+          }
+          if (attempt < RETRY_DELAYS_MS.length) {
+            setTimeout(() => { if (!cancelled) run(); }, RETRY_DELAYS_MS[attempt++]);
+          } else {
+            setChartState({ kind: "unavailable" });
+          }
+        })
+        .catch(() => {
+          if (cancelled) return;
+          if (attempt < RETRY_DELAYS_MS.length) {
+            setTimeout(() => { if (!cancelled) run(); }, RETRY_DELAYS_MS[attempt++]);
+          } else {
+            setChartState({ kind: "unavailable" });
+          }
+        });
     };
+    run();
+
+    return () => { cancelled = true; };
   }, [symbol, timeframe]);
 
   // Relevant upcoming calendar events
@@ -197,26 +222,35 @@ function TradeContent({ symbol }: { symbol: string }) {
       .sort((a, b) => getEventDateTime(a).getTime() - getEventDateTime(b).getTime());
   }, [allEvents, symbol]);
 
-  // Build market context (panel + checklist consumer)
+  // Build market context — auto-retries on all-zero confidence (candle fetch failed).
   useEffect(() => {
     if (!asset) {
       setMarketContext(null);
       return;
     }
     let cancelled = false;
-    buildMarketContext({
-      asset,
-      quote,
-      upcomingRelevantEvents,
-      resolvedTimeframes,
-    })
-      .then((ctx) => {
-        if (!cancelled) setMarketContext(ctx);
+    let attempt = 0;
+
+    const run = () => {
+      buildMarketContext({
+        asset,
+        quote,
+        upcomingRelevantEvents,
+        resolvedTimeframes,
       })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
+        .then((ctx) => {
+          if (cancelled) return;
+          if (isContextInsufficient(ctx) && attempt < RETRY_DELAYS_MS.length) {
+            setTimeout(() => { if (!cancelled) run(); }, RETRY_DELAYS_MS[attempt++]);
+            return;
+          }
+          setMarketContext(ctx);
+        })
+        .catch(() => {});
     };
+    run();
+
+    return () => { cancelled = true; };
   }, [asset, quote, upcomingRelevantEvents, resolvedTimeframes]);
 
   const handleSelectSymbol = useCallback(

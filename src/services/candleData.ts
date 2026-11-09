@@ -122,6 +122,41 @@ function setCache(key: string, data: MarketCandle[], interval: string): void {
   candleCache.set(key, { data, expiresAt: Date.now() + getNextCandleCloseMs(interval) });
 }
 
+// ── Rolling-window rate limiter ───────────────────────────────
+// At most TS_MAX_PER_MIN upstream timeseries calls in any rolling 60 s.
+// Leaves 3 req/min headroom for the quote poller on the 8 req/min Basic plan.
+
+export const TS_MAX_PER_MIN = 5;
+const _callTimestamps: number[] = [];
+
+/**
+ * Pure: returns the ms to wait before the next call can be issued without
+ * exceeding maxPerMin in any rolling 60 s window. Exported for tests.
+ */
+export function msToWait(timestamps: number[], nowMs: number, maxPerMin: number): number {
+  const recent = timestamps.filter((t) => nowMs - t < 60_000);
+  if (recent.length < maxPerMin) return 0;
+  const sorted = [...recent].sort((a, b) => a - b);
+  return Math.max(0, sorted[recent.length - maxPerMin] + 60_000 - nowMs);
+}
+
+/** Claims one rate-limit slot; waits if the rolling window is full. */
+async function waitForSlot(): Promise<void> {
+  for (;;) {
+    const now = Date.now();
+    const wait = msToWait(_callTimestamps, now, TS_MAX_PER_MIN);
+    if (wait <= 0) {
+      _callTimestamps.push(now);
+      // Prune entries older than 2 minutes (safely past the 60 s window)
+      while (_callTimestamps.length > 0 && now - _callTimestamps[0] > 120_000) {
+        _callTimestamps.shift();
+      }
+      return;
+    }
+    await new Promise<void>((r) => setTimeout(r, Math.min(wait + 50, 2_000)));
+  }
+}
+
 // ── Request queue ─────────────────────────────────────────────
 // Limits concurrent Twelve Data fetches to MAX_CONCURRENT. Lower = gentler on
 // the shared 8-req/min Basic key. Higher-priority tasks (currently-viewed
@@ -192,8 +227,8 @@ export function isBiasAvailable(symbol: string): boolean {
 
 // ── Fetch ────────────────────────────────────────────────────
 
-/** Short back-off before retrying once on an empty/error response. */
-const RETRY_DELAY_MS = 1500;
+// Retry backoffs: 8 s then 20 s. Each retry also waits for a free rate-limit slot.
+const RETRY_BACKOFFS_MS = [8_000, 20_000];
 
 export async function fetchCandles(
   symbol: string,
@@ -225,17 +260,20 @@ export async function fetchCandles(
     const cached2 = getCached(key, upstreamSize);
     if (cached2) return cached2;
 
-    // Retry once on empty/error — Twelve Data rate-limit replies are HTTP 200
-    // with status:"error", so an empty success is the usual rate-limit signal.
-    let result = await activeProvider.fetchCandles(norm, interval as TfCode, upstreamSize);
-    if (result.kind !== "ok" || result.data.length === 0) {
-      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
-      result = await activeProvider.fetchCandles(norm, interval as TfCode, upstreamSize);
+    // Up to 3 attempts: attempt 0 fires immediately after claiming a slot;
+    // retries wait at least RETRY_BACKOFFS_MS[i] before claiming the next slot.
+    for (let attempt = 0; attempt <= RETRY_BACKOFFS_MS.length; attempt++) {
+      if (attempt > 0) {
+        await new Promise<void>((r) => setTimeout(r, RETRY_BACKOFFS_MS[attempt - 1]));
+      }
+      await waitForSlot();
+      const result = await activeProvider.fetchCandles(norm, interval as TfCode, upstreamSize);
+      if (result.kind === "ok" && result.data.length > 0) {
+        setCache(key, result.data, interval);
+        return result.data;
+      }
     }
-    if (result.kind !== "ok" || result.data.length === 0) return [];
-
-    setCache(key, result.data, interval);
-    return result.data;
+    return [];
   }, priority).finally(() => {
     _inFlight.delete(key);
   });
