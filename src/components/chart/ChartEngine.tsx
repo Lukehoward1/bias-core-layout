@@ -194,6 +194,11 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
     const baseLastHaRef = useRef<BaseOhlc | null>(null);
 
     const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
+    // Incremented by the structural effect each time it (re)creates the main series.
+    // Adding it to the overlay effect's deps ensures overlays are re-applied after a
+    // series rebuild (e.g. chart style change) even when the overlays array itself
+    // hasn't changed.
+    const [seriesGen, setSeriesGen] = useState(0);
 
     const handleZoomIn = useCallback(() => {
       if (!chartRef.current) return;
@@ -329,6 +334,13 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       if (mainSeriesRef.current) {
         chart.removeSeries(mainSeriesRef.current);
         mainSeriesRef.current = null;
+        // The dead series owns its price lines and markers plugin; reset refs so
+        // the overlay effect never tries to operate on objects from the old series.
+        priceLinesRef.current = [];
+        if (markersPluginRef.current) {
+          try { markersPluginRef.current.detach(); } catch { /* noop */ }
+          markersPluginRef.current = null;
+        }
       }
       if (maSeriesRef.current) {
         chart.removeSeries(maSeriesRef.current);
@@ -473,6 +485,7 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       }
 
       chart.timeScale().fitContent();
+      setSeriesGen((g) => g + 1);
     }, [bars, chartStyle, activeIndicators, pair, displayInterval, formatPrice, formatTime, onCrosshairMove]);
 
     // ── LIVE-UPDATE effect ──────────────────────────────────────
@@ -663,7 +676,7 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
           overlayClickHandlerRef.current = null;
         }
       };
-    }, [overlays, displayInterval]);
+    }, [overlays, displayInterval, seriesGen]);
 
     return (
       <>
