@@ -9,7 +9,7 @@ import type { MarketCandle } from "./marketData";
 import type { BiasState } from "./contextEngine";
 import type { TfCode } from "@/data/timeframes";
 import { TRADE_INSTRUMENTS } from "@/data/tradeInstruments";
-import { activeProvider } from "./activeProvider";
+import { activeProvider, activeProviderName } from "./activeProvider";
 import type { TraderTimeframes, TfRole } from "./traderTimeframes";
 import { ROLE_WEIGHT } from "./traderTimeframes";
 
@@ -123,11 +123,20 @@ function setCache(key: string, data: MarketCandle[], interval: string): void {
 }
 
 // ── Rolling-window rate limiter ───────────────────────────────
-// At most TS_MAX_PER_MIN upstream timeseries calls in any rolling 60 s.
-// Leaves 3 req/min headroom for the quote poller on the 8 req/min Basic plan.
+// At most TS_MAX_PER_MIN (TD) or FMP_MAX_PER_MIN_CANDLE (FMP) upstream
+// timeseries calls in any rolling 60 s window.
 
 export const TS_MAX_PER_MIN = 5;
+export const FMP_MAX_PER_MIN_CANDLE = 240;
 const _callTimestamps: number[] = [];
+
+// Symbols permanently marked restricted by the active provider (e.g. FMP free plan).
+// Set on first restricted result; cleared only on page reload.
+const _restrictedSymbols = new Set<string>();
+
+export function isSymbolRestricted(symbol: string): boolean {
+  return _restrictedSymbols.has(normalizeSymbol(symbol));
+}
 
 /**
  * Pure: returns the ms to wait before the next call can be issued without
@@ -142,9 +151,10 @@ export function msToWait(timestamps: number[], nowMs: number, maxPerMin: number)
 
 /** Claims one rate-limit slot; waits if the rolling window is full. */
 async function waitForSlot(): Promise<void> {
+  const maxPerMin = activeProviderName === 'fmp' ? FMP_MAX_PER_MIN_CANDLE : TS_MAX_PER_MIN;
   for (;;) {
     const now = Date.now();
-    const wait = msToWait(_callTimestamps, now, TS_MAX_PER_MIN);
+    const wait = msToWait(_callTimestamps, now, maxPerMin);
     if (wait <= 0) {
       _callTimestamps.push(now);
       // Prune entries older than 2 minutes (safely past the 60 s window)
@@ -268,6 +278,10 @@ export async function fetchCandles(
       }
       await waitForSlot();
       const result = await activeProvider.fetchCandles(norm, interval as TfCode, upstreamSize);
+      if (result.kind === 'restricted') {
+        _restrictedSymbols.add(norm);
+        return [];
+      }
       if (result.kind === "ok" && result.data.length > 0) {
         setCache(key, result.data, interval);
         return result.data;

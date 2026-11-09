@@ -31,7 +31,7 @@ export interface MarketQuote {
   changePercent: number;
   direction: MarketDirection;
   timestamp: number;
-  source: "twelvedata" | "websocket";
+  source: "twelvedata" | "websocket" | "fmp";
   /**
    * True when this quote is the last-known-good value carried over from an
    * earlier successful poll because the most recent fetch failed. UI must

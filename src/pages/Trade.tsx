@@ -33,7 +33,7 @@ import { useTraderStyle } from "@/context/TraderStyleProvider";
 
 import { buildMarketContext, type MarketContext } from "@/services/contextEngine";
 import type { OverlayDescriptor } from "@/services/overlayBuilder";
-import { setPrioritySymbol } from "@/services/candleData";
+import { setPrioritySymbol, isSymbolRestricted } from "@/services/candleData";
 import { getLiveCalendarEvents } from "@/services/calendarService";
 import { getAllCalendarEvents, getEventDateTime } from "@/services/calendarData";
 import { getEventImpact } from "@/data/eventImpactRules";
@@ -185,6 +185,10 @@ function TradeContent({ symbol }: { symbol: string }) {
           if (cancelled) return;
           if (bars && bars.length > 0) {
             setChartState({ kind: "ok", bars });
+            return;
+          }
+          if (isSymbolRestricted(symbol)) {
+            setChartState({ kind: "not-on-plan" });
             return;
           }
           if (attempt < RETRY_DELAYS_MS.length) {
