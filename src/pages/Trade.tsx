@@ -23,6 +23,7 @@ import { MarketAwarenessPanel } from "@/components/trade/MarketAwarenessPanel";
 import { ReadinessChecklist } from "@/components/trade/ReadinessChecklist";
 import { DynamicRiskCell } from "@/components/trade/DynamicRiskCell";
 import { InATradeButton, type EntryIntent } from "@/components/trade/InATradeButton";
+import { ChartOverlayController } from "@/components/trade/ChartOverlayController";
 import { PositionSizeSlideOver } from "@/components/trade/PositionSizeSlideOver";
 import { getSession as getDraSession } from "@/components/risk/DynamicRiskAdvisor";
 
@@ -31,6 +32,7 @@ import { useMarketQuote } from "@/hooks/use-market-quotes";
 import { useTraderStyle } from "@/context/TraderStyleProvider";
 
 import { buildMarketContext, type MarketContext } from "@/services/contextEngine";
+import type { OverlayDescriptor } from "@/services/overlayBuilder";
 import { setPrioritySymbol } from "@/services/candleData";
 import { getLiveCalendarEvents } from "@/services/calendarService";
 import { getAllCalendarEvents, getEventDateTime } from "@/services/calendarData";
@@ -135,6 +137,7 @@ function TradeContent({ symbol }: { symbol: string }) {
   const [blockingRoles, setBlockingRoles] = useState<TfRole[]>([]);
   const [tradeEntry, setTradeEntry] = useState<EntryIntent | null>(null);
   const [slideOverOpen, setSlideOverOpen] = useState(false);
+  const [chartOverlays, setChartOverlays] = useState<OverlayDescriptor[]>([]);
 
   // Current session (by wall-clock hour) — reuses DynamicRiskAdvisor's getSession
   // so the "context" matching is consistent with how journalled trades were
@@ -293,12 +296,25 @@ function TradeContent({ symbol }: { symbol: string }) {
               </div>
             )}
             {chartState.kind === "ok" && (
-              <CandlestickChart
-                data={chartState.bars}
-                pair={symbol.toLowerCase()}
-                timeframe={timeframe}
-                onTimeframeChange={setTimeframe}
-              />
+              <>
+                <CandlestickChart
+                  data={chartState.bars}
+                  pair={symbol.toLowerCase()}
+                  timeframe={timeframe}
+                  onTimeframeChange={setTimeframe}
+                  overlays={chartOverlays}
+                  onEventMarkerClick={handleOpenEvent}
+                />
+                <ChartOverlayController
+                  symbol={symbol}
+                  bars={chartState.bars}
+                  interval={timeframe}
+                  marketContext={marketContext}
+                  calendarEvents={allEvents}
+                  tradeEntry={tradeEntry}
+                  onOverlaysChange={setChartOverlays}
+                />
+              </>
             )}
             {chartState.kind === "unavailable" && (
               <div className="absolute inset-0 flex items-center justify-center">

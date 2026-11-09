@@ -19,12 +19,16 @@ import { Maximize2, Minimize2 } from 'lucide-react';
 
 import { ChartEngine, type ChartEngineRef } from './chart/ChartEngine';
 import { useLiveCandle } from '@/hooks/use-live-candle';
+import type { OverlayDescriptor } from '@/services/overlayBuilder';
+import type { CalendarEvent } from '@/data/calendarEvents';
 
 interface CandlestickChartProps {
   data: OhlcDataPoint[];
   pair: string;
   timeframe: string;
   onTimeframeChange: (tf: string) => void;
+  overlays?: OverlayDescriptor[];
+  onEventMarkerClick?: (event: CalendarEvent) => void;
   savedBacktests?: SavedBacktest[];
   onSaveBacktest?: () => void;
   onLoadBacktest?: (id: string) => void;
@@ -39,7 +43,7 @@ export interface CandlestickChartRef {
 }
 
 export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChartProps>(
-  ({ data, pair, timeframe, onTimeframeChange, savedBacktests, onSaveBacktest, onLoadBacktest, onCompareBacktests }, ref) => {
+  ({ data, pair, timeframe, onTimeframeChange, overlays, onEventMarkerClick, savedBacktests, onSaveBacktest, onLoadBacktest, onCompareBacktests }, ref) => {
     const chartWrapperRef = useRef<HTMLDivElement>(null);
     const engineRef = useRef<ChartEngineRef>(null);
 
@@ -101,10 +105,12 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
         ohlcEnabled,
         crosshairEnabled,
         activeIndicators,
+        overlays,
+        onEventMarkerClick,
         formatPrice,
         formatTime,
       }),
-      [data, liveBar, chartStyle, timeframe, pair, ohlcEnabled, crosshairEnabled, activeIndicators],
+      [data, liveBar, chartStyle, timeframe, pair, ohlcEnabled, crosshairEnabled, activeIndicators, overlays, onEventMarkerClick],
     );
 
     return (

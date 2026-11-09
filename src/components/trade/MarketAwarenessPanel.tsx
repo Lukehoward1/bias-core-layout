@@ -256,7 +256,7 @@ export function MarketAwarenessPanel({
             <Skeleton width="w-28" />
           </div>
         ) : nearestLevels.length === 0 ? (
-          <span className="text-sm text-muted-foreground">No relevant levels</span>
+          <span className="text-sm text-muted-foreground">Levels unavailable</span>
         ) : (
           <ul className="space-y-1">
             {nearestLevels.map((lvl, i) => {

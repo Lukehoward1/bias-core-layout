@@ -35,11 +35,14 @@ import {
 } from 'react';
 import {
   createChart,
+  createSeriesMarkers,
   type IChartApi,
   type ISeriesApi,
+  type ISeriesMarkersPluginApi,
   type IPriceLine,
   type CandlestickData,
   type LineData,
+  type SeriesMarker,
   type Time,
   type MouseEventHandler,
   CandlestickSeries,
@@ -49,6 +52,8 @@ import {
   CrosshairMode,
   LineStyle,
 } from 'lightweight-charts';
+
+import type { CalendarEvent } from '@/data/calendarEvents';
 
 import type { OhlcDataPoint } from '@/lib/mockOhlcData';
 import type { MarketCandle } from '@/services/marketData';
@@ -73,6 +78,8 @@ export interface ChartEngineProps {
   overlays?: OverlayDescriptor[];
   /** Optional crosshair callback (Stage 4+). */
   onCrosshairMove?: (bar: OhlcDataPoint | null) => void;
+  /** Called when user clicks an event-marker on the chart. */
+  onEventMarkerClick?: (event: CalendarEvent) => void;
   /** Pair string used by the OHLC-hover formatter. */
   pair: string;
   /** True → OHLC tooltip near crosshair. */
@@ -139,6 +146,11 @@ function computeHaBar(raw: BaseOhlc, prevHa: BaseOhlc | null): BaseOhlc {
   return { open: haOpen, high: haHigh, low: haLow, close: haClose };
 }
 
+const INTERVAL_DURATION_SEC: Record<string, number> = {
+  m1: 60, m5: 300, m15: 900, h1: 3600, h4: 14400, d1: 86400,
+  '1min': 60, '5min': 300, '15min': 900, '1h': 3600, '4h': 14400, '1day': 86400,
+};
+
 export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
   function ChartEngine(
     {
@@ -148,6 +160,7 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       displayInterval,
       overlays,
       onCrosshairMove,
+      onEventMarkerClick,
       pair,
       ohlcEnabled = false,
       crosshairEnabled = true,
@@ -166,6 +179,11 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
     const crosshairHandlerRef = useRef<MouseEventHandler<Time> | null>(null);
     const priceLinesRef = useRef<IPriceLine[]>([]);
     const highlightSeriesRef = useRef<ISeriesApi<'Area'>[]>([]);
+    const markersPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
+    const overlayClickHandlerRef = useRef<MouseEventHandler<Time> | null>(null);
+    // Stable ref so the overlay click handler never captures a stale callback.
+    const onEventMarkerClickRef = useRef(onEventMarkerClick);
+    useEffect(() => { onEventMarkerClickRef.current = onEventMarkerClick; });
 
     // State preserved across renders so the live-update effect can derive from it.
     const seriesKindRef = useRef<ChartStyle>(chartStyle);
@@ -535,12 +553,16 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       }
     }, [liveBar, bars]);
 
-    // ── Overlays ────────────────────────────────────────────────
+    // ── OVERLAY effect ─────────────────────────────────────────
+    // Separate from structural and live-update effects: rebuilds only when
+    // overlays or displayInterval change, never on a live price tick.
+    // Reuses/removes only the overlay primitives it created.
     useEffect(() => {
       const chart = chartRef.current;
       const main = mainSeriesRef.current;
       if (!chart || !main) return;
 
+      // Clear price lines
       for (const line of priceLinesRef.current) {
         try { main.removePriceLine(line); } catch { /* noop */ }
       }
@@ -550,7 +572,23 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       }
       highlightSeriesRef.current = [];
 
+      // Clear existing markers plugin
+      if (markersPluginRef.current) {
+        try { markersPluginRef.current.detach(); } catch { /* noop */ }
+        markersPluginRef.current = null;
+      }
+
+      // Clear existing event-marker click handler
+      if (overlayClickHandlerRef.current) {
+        try { chart.unsubscribeClick(overlayClickHandlerRef.current); } catch { /* noop */ }
+        overlayClickHandlerRef.current = null;
+      }
+
       if (!overlays || overlays.length === 0) return;
+
+      const markers: SeriesMarker<Time>[] = [];
+      const eventMarkerData: { timestamp: number; event: CalendarEvent }[] = [];
+      const barDurationSec = INTERVAL_DURATION_SEC[displayInterval] ?? 3600;
 
       for (const o of overlays) {
         if (o.kind === 'price-line') {
@@ -564,27 +602,68 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
           });
           priceLinesRef.current.push(line);
         } else if (o.kind === 'highlight-band') {
-          const top = main.createPriceLine({
-            price: o.to,
-            color: o.color,
-            lineStyle: LineStyle.Dotted,
-            lineWidth: 1,
-            axisLabelVisible: false,
-            title: o.label ?? '',
+          priceLinesRef.current.push(
+            main.createPriceLine({ price: o.to,   color: o.color, lineStyle: LineStyle.Dotted, lineWidth: 1, axisLabelVisible: false, title: o.label ?? '' }),
+            main.createPriceLine({ price: o.from, color: o.color, lineStyle: LineStyle.Dotted, lineWidth: 1, axisLabelVisible: false, title: '' }),
+          );
+        } else if (o.kind === 'event-marker') {
+          markers.push({
+            time: o.timestamp as Time,
+            position: 'belowBar',
+            shape: 'circle',
+            color: 'hsl(45, 90%, 60%)',
+            size: 1,
+            text: o.label.length > 24 ? o.label.slice(0, 24) + '…' : o.label,
           });
-          const bot = main.createPriceLine({
-            price: o.from,
+          eventMarkerData.push({ timestamp: o.timestamp, event: o.event });
+        } else if (o.kind === 'session-line') {
+          markers.push({
+            time: o.timestamp as Time,
+            position: 'aboveBar',
+            shape: 'arrowDown',
             color: o.color,
-            lineStyle: LineStyle.Dotted,
-            lineWidth: 1,
-            axisLabelVisible: false,
-            title: '',
+            size: 1,
+            text: o.label,
           });
-          priceLinesRef.current.push(top, bot);
+        } else if (o.kind === 'swing-marker') {
+          markers.push({
+            time: o.timestamp as Time,
+            position: o.direction === 'high' ? 'aboveBar' : 'belowBar',
+            shape: o.direction === 'high' ? 'arrowDown' : 'arrowUp',
+            color: o.direction === 'high' ? 'hsl(0, 84%, 60%)' : 'hsl(142, 71%, 45%)',
+            size: 1,
+          });
         }
-        // event-marker, session-line, swing-marker → Stage 4
       }
-    }, [overlays]);
+
+      if (markers.length > 0) {
+        // LWC requires markers sorted by time
+        markers.sort((a, b) => (a.time as number) - (b.time as number));
+        markersPluginRef.current = createSeriesMarkers(main as ISeriesApi<'Candlestick'>, markers);
+      }
+
+      if (eventMarkerData.length > 0) {
+        const handler: MouseEventHandler<Time> = (param) => {
+          if (!param.time) return;
+          const ts = param.time as number;
+          for (const em of eventMarkerData) {
+            if (Math.abs(em.timestamp - ts) <= barDurationSec) {
+              onEventMarkerClickRef.current?.(em.event);
+              return;
+            }
+          }
+        };
+        chart.subscribeClick(handler);
+        overlayClickHandlerRef.current = handler;
+      }
+
+      return () => {
+        if (overlayClickHandlerRef.current) {
+          try { chartRef.current?.unsubscribeClick(overlayClickHandlerRef.current); } catch { /* noop */ }
+          overlayClickHandlerRef.current = null;
+        }
+      };
+    }, [overlays, displayInterval]);
 
     return (
       <>
