@@ -7,6 +7,7 @@
 // Do NOT use the VITE_ prefixed version — that one ships to the browser.
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { handleFmp } from "./_lib/fmpProxy";
 
 const API_KEY = process.env.TWELVE_DATA_API_KEY;
 
@@ -98,6 +99,8 @@ function setCache(key: string, values: Record<string, string>[], interval: strin
 const NO_STORE = "no-store, no-cache, must-revalidate";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.query.provider === "fmp") return handleFmp(req, res);
+
   const { symbol, interval, outputsize, forming } = req.query;
   // forming=1 → short edge-cache TTL so use-live-candle sees fresh intra-candle data
   const isForming = forming === '1';

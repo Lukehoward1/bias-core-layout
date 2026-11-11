@@ -1,7 +1,7 @@
-// api/fmp.ts — Vercel serverless function
-// Proxies FMP /stable/historical-price-eod/full — FMP_API_KEY never reaches the browser.
+// api/_lib/fmpProxy.ts — shared helper (NOT a Vercel function; files under _lib are excluded).
+// Called from api/timeseries.ts when req.query.provider === 'fmp'.
 //
-// Response shapes (HTTP 200 for all data/status payloads):
+// Response shapes (always HTTP 200 for data/status payloads):
 //   { status: "ok",           data: [...rows] }  — rows newest-first
 //   { status: "restricted"                     }  — 402 / 403 / non-JSON response
 //   { status: "rate-limited"                   }  — 429
@@ -12,9 +12,6 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 const FMP_BASE = "https://financialmodelingprep.com";
 
-// FMP symbols served by this proxy (free-plan verified, Stage 0).
-// Canonical → FMP mapping lives in src/data/tradeInstruments.ts; this whitelist
-// mirrors only the string values (pending-confirmation instruments have no entry).
 const FMP_SYMBOL_WHITELIST = new Set([
   "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "AUDUSD",
   "USDCAD", "NZDUSD", "EURGBP", "EURJPY", "GBPJPY",
@@ -29,11 +26,12 @@ function ttlSeconds(): number {
   return Math.min(3600, Math.max(60, Math.ceil((midnight.getTime() - now) / 1000)));
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export async function handleFmp(req: VercelRequest, res: VercelResponse): Promise<void> {
   const apiKey = process.env.FMP_API_KEY;
   if (!apiKey) {
     res.setHeader("Cache-Control", "no-store");
-    return res.status(503).json({ error: "FMP key not configured" });
+    res.status(503).json({ error: "FMP key not configured" });
+    return;
   }
 
   const sym = (req.query.symbol as string | undefined)?.toUpperCase();
@@ -41,12 +39,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (kind !== "eod" || !sym) {
     res.setHeader("Cache-Control", "no-store");
-    return res.status(400).json({ error: "Required: kind=eod&symbol=<FMP_SYMBOL>" });
+    res.status(400).json({ error: "Required: kind=eod&symbol=<FMP_SYMBOL>" });
+    return;
   }
 
   if (!FMP_SYMBOL_WHITELIST.has(sym)) {
     res.setHeader("Cache-Control", "no-store");
-    return res.status(400).json({ error: "Symbol not served by this proxy" });
+    res.status(400).json({ error: "Symbol not served by this proxy" });
+    return;
   }
 
   const upstream = `${FMP_BASE}/stable/historical-price-eod/full?symbol=${encodeURIComponent(sym)}&apikey=${apiKey}`;
@@ -57,37 +57,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 402/403 bodies are non-JSON on FMP free plan — NEVER call .json() on them.
     if (r.status === 402 || r.status === 403) {
       res.setHeader("Cache-Control", "no-store");
-      return res.status(200).json({ status: "restricted" });
+      res.status(200).json({ status: "restricted" });
+      return;
     }
 
     if (r.status === 429) {
       res.setHeader("Cache-Control", "no-store");
-      return res.status(200).json({ status: "rate-limited" });
+      res.status(200).json({ status: "rate-limited" });
+      return;
     }
 
     if (!r.ok) {
       res.setHeader("Cache-Control", "no-store");
-      return res.status(502).json({ error: `FMP upstream ${r.status}` });
+      res.status(502).json({ error: `FMP upstream ${r.status}` });
+      return;
     }
 
     const ct = r.headers.get("content-type") ?? "";
     if (!ct.includes("application/json")) {
-      // Guard: if a 200 ever comes back without JSON, treat as restricted rather than crashing.
       res.setHeader("Cache-Control", "no-store");
-      return res.status(200).json({ status: "restricted" });
+      res.status(200).json({ status: "restricted" });
+      return;
     }
 
     const data = (await r.json()) as unknown;
     if (!Array.isArray(data)) {
       res.setHeader("Cache-Control", "no-store");
-      return res.status(502).json({ error: "Unexpected FMP response shape" });
+      res.status(502).json({ error: "Unexpected FMP response shape" });
+      return;
     }
 
     const ttl = ttlSeconds();
     res.setHeader("Cache-Control", `public, s-maxage=${ttl}, stale-while-revalidate=60`);
-    return res.status(200).json({ status: "ok", data });
+    res.status(200).json({ status: "ok", data });
   } catch {
     res.setHeader("Cache-Control", "no-store");
-    return res.status(502).json({ error: "Upstream fetch failed" });
+    res.status(502).json({ error: "Upstream fetch failed" });
   }
 }

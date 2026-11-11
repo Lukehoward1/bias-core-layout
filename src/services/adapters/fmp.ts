@@ -53,7 +53,7 @@ type ProxyResponse = ProxyOkResponse | ProxyStatusResponse;
 
 async function callProxy(fmpSym: string): Promise<ProviderResult<Record<string, unknown>[]>> {
   await acquireFmpSlot();
-  const url = `/api/fmp?kind=eod&symbol=${encodeURIComponent(fmpSym)}`;
+  const url = `/api/timeseries?provider=fmp&kind=eod&symbol=${encodeURIComponent(fmpSym)}`;
   try {
     const r = await fetch(url);
     if (!r.ok) {
