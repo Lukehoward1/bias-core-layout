@@ -28,9 +28,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { OhlcDataPoint } from '@/lib/mockOhlcData';
 import { classifyLiveBarUpdate } from '@/lib/liveBarClassify';
-
-export const QUOTE_POLL_MS = 15_000;
-export const CANDLE_REFETCH_MS = 60_000;
+import { pollIntervals, isUserIdle, getLastActivity } from '@/lib/pollPolicy';
+import { activeProviderName } from '@/services/activeProvider';
 
 // Maps ChartToolbar timeframe keys → TfCode values. Mirrors mockOhlcData.ts.
 const TF_TO_TFCODE: Record<string, string> = {
@@ -199,15 +198,17 @@ export function useLiveCandle({ symbol, timeframe, lastBar }: UseLiveCandleOpts)
       setLiveBar(next);
     };
 
+    const { quoteMs, candleMs } = pollIntervals(activeProviderName);
+
     const tickQuote = async () => {
-      if (document.hidden) return;
+      if (document.hidden || isUserIdle(Date.now(), getLastActivity())) return;
       const close = await fetchQuoteOnce(norm);
       if (cancelled || close === null) return;
       applyQuoteClose(close);
     };
 
     const tickCandle = async () => {
-      if (document.hidden) return;
+      if (document.hidden || isUserIdle(Date.now(), getLastActivity())) return;
       const c = await fetchFormingCandle(norm, interval);
       if (cancelled || !c) return;
       applyFormingCandle(c);
@@ -217,11 +218,11 @@ export function useLiveCandle({ symbol, timeframe, lastBar }: UseLiveCandleOpts)
     // fire tickCandle on mount: the chart already fetched the forming bar as
     // part of its 150-bar series, and a second upstream call for the same
     // interval on first paint burns a credit on the shared Twelve Data key.
-    // The first forming refresh arrives after CANDLE_REFETCH_MS.
+    // The first forming refresh arrives after candleMs.
     tickQuote();
 
-    const qId = window.setInterval(tickQuote, QUOTE_POLL_MS);
-    const cId = window.setInterval(tickCandle, CANDLE_REFETCH_MS);
+    const qId = window.setInterval(tickQuote, quoteMs);
+    const cId = window.setInterval(tickCandle, candleMs);
 
     const onVis = () => {
       if (!document.hidden) {
@@ -231,11 +232,16 @@ export function useLiveCandle({ symbol, timeframe, lastBar }: UseLiveCandleOpts)
     };
     document.addEventListener('visibilitychange', onVis);
 
+    // Catch-up tick when user returns after idle period
+    const onActive = () => { tickQuote(); tickCandle(); };
+    window.addEventListener('user-active', onActive);
+
     return () => {
       cancelled = true;
       window.clearInterval(qId);
       window.clearInterval(cId);
       document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('user-active', onActive);
     };
   }, [symbol, timeframe, lastBar]);
 

@@ -34,6 +34,8 @@ import { useTraderStyle } from "@/context/TraderStyleProvider";
 import { buildMarketContext, type MarketContext } from "@/services/contextEngine";
 import type { OverlayDescriptor } from "@/services/overlayBuilder";
 import { setPrioritySymbol, isSymbolRestricted } from "@/services/candleData";
+import { pollIntervals, isUserIdle, getLastActivity } from "@/lib/pollPolicy";
+import { activeProviderName } from "@/services/activeProvider";
 import { getLiveCalendarEvents } from "@/services/calendarService";
 import { getAllCalendarEvents, getEventDateTime } from "@/services/calendarData";
 import { getEventImpact } from "@/data/eventImpactRules";
@@ -287,16 +289,27 @@ function TradeContent({ symbol }: { symbol: string }) {
     run();
 
     // Periodic refresh so context stays fresh without depending on quote churn.
+    const contextMs = pollIntervals(activeProviderName).contextMs;
     const refreshTimer = setInterval(() => {
+      if (contextBuildSeq.current !== mySeq) return;
+      if (isUserIdle(Date.now(), getLastActivity())) return;
+      attempt = 0;
+      run();
+    }, contextMs);
+
+    // Catch-up rebuild when user returns after idle period
+    const onActive = () => {
       if (contextBuildSeq.current !== mySeq) return;
       attempt = 0;
       run();
-    }, 60_000);
+    };
+    window.addEventListener('user-active', onActive);
 
     return () => {
       contextBuildSeq.current += 1;
       if (retryTimer !== null) clearTimeout(retryTimer);
       clearInterval(refreshTimer);
+      window.removeEventListener('user-active', onActive);
     };
   }, [asset, symbol, upcomingRelevantEvents, resolvedTimeframes]);
 

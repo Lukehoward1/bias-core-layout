@@ -6,6 +6,8 @@ import { calendarEvents as staticCalendarEvents, type CalendarEvent } from "@/da
 import { getLiveCalendarEvents } from "@/services/calendarService";
 import { getEventImpact } from "@/data/eventImpactRules";
 import { PRESETS, type TraderTimeframes } from "@/services/traderTimeframes";
+import { pollIntervals, isUserIdle, getLastActivity } from "@/lib/pollPolicy";
+import { activeProviderName } from "@/services/activeProvider";
 
 type MarketDataContextValue = {
   quotes: Record<string, MarketQuote>;
@@ -16,7 +18,6 @@ type MarketDataContextValue = {
 
 const MarketDataContext = createContext<MarketDataContextValue | null>(null);
 
-const POLL_INTERVAL = 15000;
 
 const normalizeForMatch = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
 const isFxPair = (s: string) => /^[A-Z]{6}$/.test(s);
@@ -81,6 +82,7 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     const poll = async () => {
+      if (document.hidden || isUserIdle(Date.now(), getLastActivity())) return;
       const syms = Array.from(trackedSymbols.current);
       if (syms.length === 0) return;
       try {
@@ -106,9 +108,15 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
       } catch { /* fail silently */ }
     };
 
+    const quoteMs = pollIntervals(activeProviderName).quoteMs;
     poll();
-    const id = window.setInterval(poll, POLL_INTERVAL);
-    return () => window.clearInterval(id);
+    const id = window.setInterval(poll, quoteMs);
+    const onActive = () => { poll(); };
+    window.addEventListener('user-active', onActive);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener('user-active', onActive);
+    };
   }, []);
 
   // Rebuilds when new assets are registered, traderStyle changes, or live calendar events load.
