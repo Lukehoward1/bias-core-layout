@@ -130,12 +130,23 @@ export const TS_MAX_PER_MIN = 5;
 export const FMP_MAX_PER_MIN_CANDLE = 240;
 const _callTimestamps: number[] = [];
 
-// Symbols permanently marked restricted by the active provider (e.g. FMP free plan).
+// (symbol, interval) pairs permanently marked restricted by the active provider.
+// Keyed as "NORM:interval". A symbol-only lookup checks whether ANY interval is restricted.
 // Set on first restricted result; cleared only on page reload.
-const _restrictedSymbols = new Set<string>();
+const _restrictedKeys = new Set<string>();
 
-export function isSymbolRestricted(symbol: string): boolean {
-  return _restrictedSymbols.has(normalizeSymbol(symbol));
+function _restrictedKey(norm: string, interval?: string): string {
+  return interval ? `${norm}:${interval}` : norm;
+}
+
+export function isSymbolRestricted(symbol: string, interval?: string): boolean {
+  const norm = normalizeSymbol(symbol);
+  if (interval) return _restrictedKeys.has(_restrictedKey(norm, interval));
+  // Symbol-only: restricted if any interval is restricted for this symbol
+  for (const k of _restrictedKeys) {
+    if (k === norm || k.startsWith(`${norm}:`)) return true;
+  }
+  return false;
 }
 
 /**
@@ -305,7 +316,7 @@ export async function fetchCandles(
         debugCandles(norm, interval, attempt, slotWaitMs, _queue.length, result.kind, callMs);
 
         if (result.kind === 'restricted') {
-          _restrictedSymbols.add(norm);
+          _restrictedKeys.add(_restrictedKey(norm, interval));
           resolve([]);
           return;
         }

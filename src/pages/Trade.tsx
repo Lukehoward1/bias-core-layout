@@ -219,7 +219,7 @@ function TradeContent({ symbol }: { symbol: string }) {
             setChartState({ kind: "ok", bars });
             return;
           }
-          if (isSymbolRestricted(symbol)) {
+          if (isSymbolRestricted(symbol, timeframe)) {
             setChartState({ kind: "not-on-plan" });
             return;
           }
