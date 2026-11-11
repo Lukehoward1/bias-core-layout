@@ -58,8 +58,8 @@ export function ChartOverlayController({
   );
 
   const sessionOverlays = useMemo(
-    () => buildSessionOverlays(bars, interval),
-    [bars, interval],
+    () => buildSessionOverlays(bars, interval, symbol),
+    [bars, interval, symbol],
   );
 
   const swingOverlays = useMemo(

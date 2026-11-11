@@ -610,7 +610,7 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
             color: o.color,
             lineStyle: o.dash ? LineStyle.Dashed : LineStyle.Solid,
             lineWidth: 1,
-            axisLabelVisible: true,
+            axisLabelVisible: o.axisLabelVisible ?? true,
             title: o.label,
           });
           priceLinesRef.current.push(line);

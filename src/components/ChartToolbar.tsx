@@ -71,9 +71,9 @@ export function ChartToolbar({
   onCompareBacktests,
 }: ChartToolbarProps) {
   return (
-    <div className="flex items-center justify-between px-3 py-2 h-11 bg-background/95 backdrop-blur-sm border-b border-border/50">
+    <div className="flex items-center px-3 py-2 h-11 gap-2 bg-background/95 backdrop-blur-sm border-b border-border/50">
       {/* Left: Timeframe buttons + Chart Style */}
-      <div className="overflow-x-auto min-w-0 flex items-center gap-2">
+      <div className="overflow-x-auto min-w-0 flex items-center gap-2 flex-shrink-0">
         <div className="flex items-center gap-0.5">
           {timeframes.map((tf) => (
             <Button
@@ -113,7 +113,7 @@ export function ChartToolbar({
       </div>
 
       {/* Center: Symbol + Timeframe label */}
-      <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center gap-1.5">
+      <div className="hidden lg:flex flex-1 justify-center items-center gap-1.5 min-w-0 overflow-hidden">
         <span className="text-sm font-semibold text-foreground">
           {pairLabels[pair] || pair.toUpperCase()}
         </span>
@@ -124,7 +124,7 @@ export function ChartToolbar({
       </div>
 
       {/* Right: Icon controls */}
-      <div className="overflow-x-auto min-w-0 flex items-center gap-1">
+      <div className="overflow-x-auto min-w-0 flex items-center gap-1 flex-shrink-0 ml-auto">
         {/* Replay Mode */}
         <ReplayModePanel />
 
