@@ -20,12 +20,14 @@ import { NotOnPlanState } from "@/components/chart/NotOnPlanState";
 
 import { PairSelector } from "@/components/trade/PairSelector";
 import { MarketAwarenessPanel } from "@/components/trade/MarketAwarenessPanel";
-import { ReadinessChecklist } from "@/components/trade/ReadinessChecklist";
+import { ReadinessChecklist, evaluateChecklist } from "@/components/trade/ReadinessChecklist";
 import { DynamicRiskCell } from "@/components/trade/DynamicRiskCell";
 import { InATradeButton, type EntryIntent } from "@/components/trade/InATradeButton";
 import { ChartOverlayController } from "@/components/trade/ChartOverlayController";
 import { PositionSizeSlideOver } from "@/components/trade/PositionSizeSlideOver";
+import { MobileMarketPanel } from "@/components/trade/MobileMarketPanel";
 import { getSession as getDraSession } from "@/components/risk/DynamicRiskAdvisor";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 import { useAssets } from "@/hooks/use-watchlist";
 import { useMarketQuote } from "@/hooks/use-market-quotes";
@@ -155,6 +157,7 @@ function TradeContent({ symbol }: { symbol: string }) {
   const [tradeEntry, setTradeEntry] = useState<EntryIntent | null>(null);
   const [slideOverOpen, setSlideOverOpen] = useState(false);
   const [chartOverlays, setChartOverlays] = useState<OverlayDescriptor[]>([]);
+  const [mobileTradeSheetOpen, setMobileTradeSheetOpen] = useState(false);
 
   // Current session (by wall-clock hour) — reuses DynamicRiskAdvisor's getSession
   // so the "context" matching is consistent with how journalled trades were
@@ -164,6 +167,18 @@ function TradeContent({ symbol }: { symbol: string }) {
     const hhmm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
     return getDraSession(hhmm);
   }, [symbol]);
+
+  // Readiness count for mobile chip row (slightly stale on session boundary but acceptable for a badge)
+  const mobileConditionsMet = useMemo(() => {
+    if (!marketContext) return 0;
+    return evaluateChecklist({
+      context: marketContext,
+      resolvedTimeframes,
+      symbol,
+      upcomingRelevantEvents,
+      now: new Date(),
+    }).metCount;
+  }, [marketContext, resolvedTimeframes, symbol, upcomingRelevantEvents]);
 
   // Persist last-viewed symbol on every change
   useEffect(() => {
@@ -337,16 +352,55 @@ function TradeContent({ symbol }: { symbol: string }) {
   }, [tradeEntry, instrument]);
 
   return (
-    <div className="p-3 sm:p-6 space-y-4">
+    <div className="p-3 sm:p-6 space-y-4 pb-16 lg:pb-6">
       <AppHeader title="Trade" />
 
       <div className="flex items-center gap-3">
         <PairSelector currentSymbol={symbol} onSelect={handleSelectSymbol} />
       </div>
 
+      {/* Mobile chip row — quick-access status and actions below lg */}
+      <div className="lg:hidden overflow-x-auto -mx-3 px-3">
+        <div className="flex items-center gap-2 pb-1 min-w-max">
+          <div className="shrink-0 rounded-full bg-muted/60 px-3 py-1 text-xs text-muted-foreground">
+            {mobileConditionsMet} of 3 conditions
+          </div>
+          <button
+            type="button"
+            onClick={() => setSlideOverOpen(true)}
+            className="shrink-0 rounded-full bg-muted/60 px-3 py-1 text-xs text-foreground hover:bg-muted active:bg-muted/80 transition-colors"
+          >
+            Dynamic Risk
+          </button>
+          {tradeEntry ? (
+            <div className="shrink-0 flex items-center gap-1.5 rounded-full bg-primary/10 border border-primary/40 px-3 py-1 text-xs">
+              <span className="text-foreground">
+                {tradeEntry.direction === "long" ? "Long" : "Short"} @{tradeEntry.entryPrice.toFixed(instrument?.displayDecimals ?? 5)}
+              </span>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setTradeEntry(null); }}
+                className="text-muted-foreground hover:text-foreground"
+                aria-label="Exit trade"
+              >
+                ×
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setMobileTradeSheetOpen(true)}
+              className="shrink-0 rounded-full bg-muted/60 px-3 py-1 text-xs text-foreground hover:bg-muted active:bg-muted/80 transition-colors"
+            >
+              I&apos;m in a trade
+            </button>
+          )}
+        </div>
+      </div>
+
       <div className="flex gap-4">
         <ErrorBoundary key={symbol} fallbackMessage="Failed to load chart">
-          <div className="flex-1 min-w-0 relative h-[600px]">
+          <div className="flex-1 min-w-0 relative min-h-[60vh] lg:h-[600px] lg:min-h-0">
             {chartState.kind === "loading" && (
               <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
                 Loading chart…
@@ -436,6 +490,26 @@ function TradeContent({ symbol }: { symbol: string }) {
         }}
       />
 
+      {/* Mobile trade entry sheet */}
+      <Sheet open={mobileTradeSheetOpen} onOpenChange={setMobileTradeSheetOpen}>
+        <SheetContent side="bottom" className="lg:hidden max-h-[85vh] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Mark trade entry — {symbol}</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4">
+            <InATradeButton
+              symbol={symbol}
+              liveMidPrice={liveMid}
+              active={tradeEntry !== null}
+              entry={tradeEntry}
+              displayDecimals={instrument?.displayDecimals ?? 5}
+              onEnter={(e) => { setTradeEntry(e); setMobileTradeSheetOpen(false); }}
+              onExit={() => { setTradeEntry(null); setMobileTradeSheetOpen(false); }}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
+
       {selectedEvent && (
         <EventDetailsModal
           event={selectedEvent}
@@ -443,6 +517,22 @@ function TradeContent({ symbol }: { symbol: string }) {
           onClose={() => setIsEventOpen(false)}
         />
       )}
+
+      {/* Mobile bottom sheet panel (lg:hidden inside the component) */}
+      <MobileMarketPanel
+        symbol={symbol}
+        instrument={instrument}
+        context={marketContext}
+        resolvedTimeframes={resolvedTimeframes}
+        traderStyleLabel={styleLabel(traderStyle, isCustomTimeframes)}
+        chartBars={chartBars}
+        quote={quote}
+        sentiment={asset?.sentiment ?? null}
+        upcomingRelevantEvents={upcomingRelevantEvents}
+        onOpenEvent={handleOpenEvent}
+        session={currentSession}
+        onOpenSlideOver={() => setSlideOverOpen(true)}
+      />
     </div>
   );
 }

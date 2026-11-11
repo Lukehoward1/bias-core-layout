@@ -191,6 +191,7 @@ export interface ReadinessChecklistProps {
   upcomingRelevantEvents: CalendarEvent[];
   now?: Date;
   onBlockingRolesChange?: (roles: TfRole[]) => void;
+  onConditionsMetChange?: (count: number) => void;
 }
 
 export function ReadinessChecklist({
@@ -200,6 +201,7 @@ export function ReadinessChecklist({
   upcomingRelevantEvents,
   now,
   onBlockingRolesChange,
+  onConditionsMetChange,
 }: ReadinessChecklistProps) {
   const result = evaluateChecklist({
     context,
@@ -209,13 +211,13 @@ export function ReadinessChecklist({
     now: now ?? new Date(),
   });
 
-  // Report blocking roles up so the per-TF panel rows can mark them visually.
-  // String key keeps the effect idempotent across equal arrays.
   const rolesKey = result.blockingRoles.join(",");
+  const metCount = result.metCount;
   useEffect(() => {
     onBlockingRolesChange?.(result.blockingRoles);
+    onConditionsMetChange?.(metCount);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rolesKey]);
+  }, [rolesKey, metCount]);
 
   return (
     <div className="rounded-lg border border-border bg-card/40 p-3 space-y-2">

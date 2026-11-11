@@ -64,7 +64,7 @@ export function PositionSizeSlideOver({ open, onOpenChange, prefill }: PositionS
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-[560px] overflow-y-auto">
+      <SheetContent side="right" className="w-full lg:max-w-[560px] overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Risk tools — {prefill.symbol}</SheetTitle>
         </SheetHeader>

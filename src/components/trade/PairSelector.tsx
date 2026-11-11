@@ -9,7 +9,7 @@
 //   - A bias arrow renders only when a `MarketContext` exists for the symbol
 //     (no per-symbol fetches on open).
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Star, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { TRADE_INSTRUMENTS, type TradeInstrument } from "@/data/tradeInstruments";
 import { useWatchlist } from "@/hooks/use-watchlist";
@@ -19,6 +19,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 
 export interface PairSelectorProps {
@@ -42,6 +48,15 @@ function BiasArrow({ context }: { context: MarketContext | undefined }) {
 export function PairSelector({ currentSymbol, onSelect, getContextForSymbol }: PairSelectorProps) {
   const { isInWatchlist, toggleWatchlist } = useWatchlist();
   const [open, setOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1023px)');
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   const grouped = useMemo(() => {
     const starred: TradeInstrument[] = [];
@@ -96,39 +111,65 @@ export function PairSelector({ currentSymbol, onSelect, getContextForSymbol }: P
     );
   };
 
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" className="h-9 gap-2 px-3">
-          <span className="font-semibold">{current ? current.displayName : currentSymbol ?? "Select pair"}</span>
-          <ChevronDown className="h-4 w-4 opacity-70" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-[320px] p-2">
-        {grouped.starred.length > 0 && (
-          <div className="mb-2">
-            <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-              Watchlist
-            </div>
-            <div className="space-y-0.5">
-              {grouped.starred.map((inst) => (
-                <Row key={inst.symbol} inst={inst} />
-              ))}
-            </div>
+  const triggerButton = (
+    <Button variant="outline" className="h-9 gap-2 px-3" onClick={isMobile ? () => setOpen(true) : undefined}>
+      <span className="font-semibold">{current ? current.displayName : currentSymbol ?? "Select pair"}</span>
+      <ChevronDown className="h-4 w-4 opacity-70" />
+    </Button>
+  );
+
+  const listContent = (
+    <>
+      {grouped.starred.length > 0 && (
+        <div className="mb-2">
+          <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+            Watchlist
           </div>
-        )}
-        <div>
-          {grouped.starred.length > 0 && (
-            <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-              All instruments
-            </div>
-          )}
-          <div className="space-y-0.5 max-h-[320px] overflow-y-auto">
-            {grouped.rest.map((inst) => (
+          <div className="space-y-0.5">
+            {grouped.starred.map((inst) => (
               <Row key={inst.symbol} inst={inst} />
             ))}
           </div>
         </div>
+      )}
+      <div>
+        {grouped.starred.length > 0 && (
+          <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+            All instruments
+          </div>
+        )}
+        <div className="space-y-0.5 max-h-[320px] overflow-y-auto">
+          {grouped.rest.map((inst) => (
+            <Row key={inst.symbol} inst={inst} />
+          ))}
+        </div>
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <>
+        {triggerButton}
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto p-4">
+            <SheetHeader>
+              <SheetTitle>Select instrument</SheetTitle>
+            </SheetHeader>
+            <div className="mt-3">{listContent}</div>
+          </SheetContent>
+        </Sheet>
+      </>
+    );
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        {triggerButton}
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[320px] p-2">
+        {listContent}
       </PopoverContent>
     </Popover>
   );

@@ -41,10 +41,11 @@ export function ChartOverlayController({
   tradeEntry,
   onOverlaysChange,
 }: ChartOverlayControllerProps) {
+  const isMobileInit = typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches;
   const [showLevels,   setShowLevels]   = useState(true);
   const [showNews,     setShowNews]     = useState(true);
-  const [showSessions, setShowSessions] = useState(true);
-  const [showSwings,   setShowSwings]   = useState(true);
+  const [showSessions, setShowSessions] = useState(!isMobileInit);
+  const [showSwings,   setShowSwings]   = useState(!isMobileInit);
 
   const levelOverlays = useMemo(
     () => buildLevelOverlays(marketContext?.levels ?? [], bars),
@@ -94,12 +95,12 @@ export function ChartOverlayController({
   ];
 
   return (
-    <div className="absolute bottom-10 left-2 z-20 flex gap-1 pointer-events-auto">
+    <div className="absolute bottom-10 left-2 z-20 flex gap-1 pointer-events-auto overflow-x-auto max-w-[calc(100vw-4rem)]">
       {toggles.map(({ label, active, set }) => (
         <button
           key={label}
           onClick={() => set(!active)}
-          className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors select-none ${
+          className={`shrink-0 text-[9px] lg:text-[10px] px-1 lg:px-1.5 py-0.5 rounded border transition-colors select-none ${
             active
               ? 'border-border/60 bg-background/80 text-foreground'
               : 'border-transparent bg-transparent text-muted-foreground/40'

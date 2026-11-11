@@ -14,6 +14,7 @@
 import { useState } from "react";
 import { Pencil, TrendingUp, TrendingDown, Minus, AlertTriangle } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TraderTimeframesPicker } from "@/components/trade/TraderTimeframesPicker";
 import { TF_BY_CODE } from "@/data/timeframes";
 import { computeVolumeRow } from "@/lib/volumeRule";
@@ -42,6 +43,8 @@ export interface MarketAwarenessPanelProps {
   onOpenPickerPopover?: () => void;
   onOpenEvent?: (event: CalendarEvent) => void;
   now?: Date;
+  /** When true the timeframes picker opens as a bottom sheet (for mobile bottom-sheet context) */
+  pickerAsSheet?: boolean;
 }
 
 function DirectionIcon({ dir, className }: { dir: TriTimeframeBiasRole["direction"]; className?: string }) {
@@ -91,6 +94,7 @@ export function MarketAwarenessPanel({
   onOpenPickerPopover,
   onOpenEvent,
   now,
+  pickerAsSheet,
 }: MarketAwarenessPanelProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const nowDate = now ?? new Date();
@@ -127,21 +131,45 @@ export function MarketAwarenessPanel({
             <span className="inline-flex items-center rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
               {traderStyleLabel}
             </span>
-            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-              <PopoverTrigger asChild>
+            {pickerAsSheet ? (
+              <>
                 <button
                   type="button"
                   className="p-1 rounded hover:bg-muted text-muted-foreground"
                   title="Edit timeframes"
                   aria-label="Edit timeframes"
+                  onClick={() => setPickerOpen(true)}
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-64 p-3" align="end">
-                <TraderTimeframesPicker instrument={instrument} />
-              </PopoverContent>
-            </Popover>
+                <Sheet open={pickerOpen} onOpenChange={setPickerOpen}>
+                  <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto">
+                    <SheetHeader>
+                      <SheetTitle>Edit timeframes</SheetTitle>
+                    </SheetHeader>
+                    <div className="mt-4">
+                      <TraderTimeframesPicker instrument={instrument} />
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              </>
+            ) : (
+              <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="p-1 rounded hover:bg-muted text-muted-foreground"
+                    title="Edit timeframes"
+                    aria-label="Edit timeframes"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-3" align="end">
+                  <TraderTimeframesPicker instrument={instrument} />
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
         </div>
       </div>
