@@ -7,7 +7,7 @@
 // Do NOT use the VITE_ prefixed version — that one ships to the browser.
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { handleFmp } from "./_lib/fmpProxy";
+import { handleFmp } from "./_lib/fmpProxy.js";
 
 const API_KEY = process.env.TWELVE_DATA_API_KEY;
 

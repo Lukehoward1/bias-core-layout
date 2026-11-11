@@ -163,6 +163,16 @@ function Calendar() {
 
   const availableCurrencies = useMemo(() => getAvailableCalendarCurrencies(), []);
 
+  // Declared BEFORE filteredEvents / filteredKeyEvents, which depend on them
+  // (using a const before its declaration throws a ReferenceError at render).
+  const { watchlistCurrencies } = useWatchlist();
+  const [myPairsOnly, setMyPairsOnly] = useState<boolean>(() => {
+    try { return localStorage.getItem(MY_PAIRS_ONLY_KEY) === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(MY_PAIRS_ONLY_KEY, myPairsOnly ? "1" : "0"); } catch { /* noop */ }
+  }, [myPairsOnly]);
+
   const filteredEvents = useMemo(() => {
     const events = getFilteredCalendarEvents({
       dateRange,
@@ -207,14 +217,6 @@ function Calendar() {
 
   const counts = useMemo(() => getCalendarCounts(filteredEvents), [filteredEvents]);
   const isMobile = useIsMobile();
-
-  const { watchlistCurrencies } = useWatchlist();
-  const [myPairsOnly, setMyPairsOnly] = useState<boolean>(
-    () => localStorage.getItem(MY_PAIRS_ONLY_KEY) === "1",
-  );
-  useEffect(() => {
-    try { localStorage.setItem(MY_PAIRS_ONLY_KEY, myPairsOnly ? "1" : "0"); } catch { /* noop */ }
-  }, [myPairsOnly]);
 
   useEffect(() => {
     // Always consume the skip flag immediately so it can never go stale across
