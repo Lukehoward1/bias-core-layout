@@ -9,7 +9,7 @@
 //   - A chart failure is isolated: side panel still populates from the independent
 //     context fetch; chart slot shows DataUnavailableState / NotOnPlanState
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 
 import { AppHeader } from "@/components/AppHeader";
@@ -103,6 +103,14 @@ type ChartState =
 // Auto-retry schedule for transient rate-limit failures (8 s, 20 s, 45 s).
 const RETRY_DELAYS_MS = [8_000, 20_000, 45_000];
 
+function debugContext(msg: string): void {
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('debugCandles') === '1') {
+      console.debug(msg);
+    }
+  } catch { /* noop */ }
+}
+
 function isContextInsufficient(ctx: MarketContext): boolean {
   // "Bias Unavailable" is a permanent gate (symbol not whitelisted); no point retrying.
   if (ctx.biasState === "Bias Unavailable") return false;
@@ -127,6 +135,13 @@ function TradeContent({ symbol }: { symbol: string }) {
   const instrument = useMemo(() => getInstrument(symbol) ?? null, [symbol]);
   const asset = useMemo(() => getAssetBySymbol(symbol), [symbol, getAssetBySymbol, traderStyle]);
   const quote = useMarketQuote(symbol);
+  // Keep latest quote in a ref so the context-build effect doesn't restart on
+  // every 15 s poll tick — the actual quote value is read at build time.
+  const quoteRef = useRef(quote);
+  useEffect(() => { quoteRef.current = quote; }, [quote]);
+  // Monotonic sequence number: increment on each effect run (and cleanup) so
+  // any in-flight build that completes after a symbol/TF change is discarded.
+  const contextBuildSeq = useRef(0);
 
   const [timeframe, setTimeframe] = useState<string>("h1");
   const [chartState, setChartState] = useState<ChartState>({ kind: "loading" });
@@ -229,36 +244,61 @@ function TradeContent({ symbol }: { symbol: string }) {
       .sort((a, b) => getEventDateTime(a).getTime() - getEventDateTime(b).getTime());
   }, [allEvents, symbol]);
 
-  // Build market context — auto-retries on all-zero confidence (candle fetch failed).
+  // Build market context — survives quote ticks (quote removed from dep array;
+  // read via quoteRef at build time). Retries on all-zero confidence.
+  // Refreshes every 60 s for freshness once context is populated.
   useEffect(() => {
     if (!asset) {
       setMarketContext(null);
       return;
     }
-    let cancelled = false;
+
+    contextBuildSeq.current += 1;
+    const mySeq = contextBuildSeq.current;
     let attempt = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     const run = () => {
+      debugContext(`[context] ${symbol} build start seq=${mySeq} attempt=${attempt}`);
       buildMarketContext({
         asset,
-        quote,
+        quote: quoteRef.current,
         upcomingRelevantEvents,
         resolvedTimeframes,
       })
         .then((ctx) => {
-          if (cancelled) return;
-          if (isContextInsufficient(ctx) && attempt < RETRY_DELAYS_MS.length) {
-            setTimeout(() => { if (!cancelled) run(); }, RETRY_DELAYS_MS[attempt++]);
+          if (contextBuildSeq.current !== mySeq) {
+            debugContext(`[context] ${symbol} build discarded seq=${mySeq}`);
             return;
           }
+          if (isContextInsufficient(ctx) && attempt < RETRY_DELAYS_MS.length) {
+            retryTimer = setTimeout(() => {
+              if (contextBuildSeq.current !== mySeq) return;
+              attempt++;
+              run();
+            }, RETRY_DELAYS_MS[attempt]);
+            return;
+          }
+          debugContext(`[context] ${symbol} build applied seq=${mySeq}`);
           setMarketContext(ctx);
         })
         .catch(() => {});
     };
     run();
 
-    return () => { cancelled = true; };
-  }, [asset, quote, upcomingRelevantEvents, resolvedTimeframes]);
+    // Periodic refresh so context stays fresh without depending on quote churn.
+    const refreshTimer = setInterval(() => {
+      if (contextBuildSeq.current !== mySeq) return;
+      attempt = 0;
+      run();
+    }, 60_000);
+
+    return () => {
+      contextBuildSeq.current += 1;
+      if (retryTimer !== null) clearTimeout(retryTimer);
+      clearInterval(refreshTimer);
+    };
+  }, [asset, symbol, upcomingRelevantEvents, resolvedTimeframes]);
 
   const handleSelectSymbol = useCallback(
     (s: string) => {

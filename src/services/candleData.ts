@@ -237,8 +237,28 @@ export function isBiasAvailable(symbol: string): boolean {
 
 // ── Fetch ────────────────────────────────────────────────────
 
-// Retry backoffs: 8 s then 20 s. Each retry also waits for a free rate-limit slot.
+// Retry backoffs: 8 s then 20 s.
 const RETRY_BACKOFFS_MS = [8_000, 20_000];
+
+/**
+ * Pure: returns the ms delay before retry attempt `n`, or null to stop retrying.
+ * attempt=0 → first retry; attempt >= backoffs.length → stop (exhausted).
+ * Exported for tests.
+ */
+export function retryDelay(attempt: number, backoffs: readonly number[]): number | null {
+  if (attempt < 0 || attempt >= backoffs.length) return null;
+  return backoffs[attempt];
+}
+
+function debugCandles(
+  sym: string, interval: string, attempt: number,
+  slotWaitMs: number, queueLen: number, resultKind: string, callMs: number,
+): void {
+  try {
+    if (typeof localStorage === 'undefined' || localStorage.getItem('debugCandles') !== '1') return;
+  } catch { return; }
+  console.debug(`[candles] ${sym}:${interval} attempt=${attempt} slotWait=${slotWaitMs}ms call=${callMs}ms queue=${queueLen} result=${resultKind}`);
+}
 
 export async function fetchCandles(
   symbol: string,
@@ -265,34 +285,52 @@ export async function fetchCandles(
   const upstreamSize = Math.max(outputsize, STANDARD_SIZE);
   const priority = _prioritySymbol === norm ? 1 : 0;
 
-  const promise = _enqueue(async (): Promise<MarketCandle[]> => {
-    // Another request may have populated the cache while we waited in the queue.
-    const cached2 = getCached(key, upstreamSize);
-    if (cached2) return cached2;
+  // Each attempt is a separate enqueued task so the queue slot is released
+  // during backoff (backoff sleep no longer holds MAX_CONCURRENT slots).
+  // Concurrent callers for the same key still coalesce via _inFlight.
+  const promise = new Promise<MarketCandle[]>((resolve) => {
+    let attempt = 0;
 
-    // Up to 3 attempts: attempt 0 fires immediately after claiming a slot;
-    // retries wait at least RETRY_BACKOFFS_MS[i] before claiming the next slot.
-    for (let attempt = 0; attempt <= RETRY_BACKOFFS_MS.length; attempt++) {
-      if (attempt > 0) {
-        await new Promise<void>((r) => setTimeout(r, RETRY_BACKOFFS_MS[attempt - 1]));
-      }
-      await waitForSlot();
-      const result = await activeProvider.fetchCandles(norm, interval as TfCode, upstreamSize);
-      if (result.kind === 'restricted') {
-        _restrictedSymbols.add(norm);
-        return [];
-      }
-      if (result.kind === "ok" && result.data.length > 0) {
-        setCache(key, result.data, interval);
-        return result.data;
-      }
+    function runAttempt(): void {
+      _enqueue(async (): Promise<void> => {
+        const cached2 = getCached(key, upstreamSize);
+        if (cached2) { resolve(cached2); return; }
+
+        const slotStart = Date.now();
+        await waitForSlot();
+        const slotWaitMs = Date.now() - slotStart;
+        const callStart = Date.now();
+        const result = await activeProvider.fetchCandles(norm, interval as TfCode, upstreamSize);
+        const callMs = Date.now() - callStart;
+        debugCandles(norm, interval, attempt, slotWaitMs, _queue.length, result.kind, callMs);
+
+        if (result.kind === 'restricted') {
+          _restrictedSymbols.add(norm);
+          resolve([]);
+          return;
+        }
+        if (result.kind === 'ok' && result.data.length > 0) {
+          setCache(key, result.data, interval);
+          resolve(result.data);
+          return;
+        }
+
+        const delay = retryDelay(attempt, RETRY_BACKOFFS_MS);
+        if (delay !== null) {
+          attempt++;
+          setTimeout(runAttempt, delay);
+        } else {
+          resolve([]);
+        }
+      }, priority).catch(() => resolve([]));
     }
-    return [];
-  }, priority).finally(() => {
-    _inFlight.delete(key);
+
+    runAttempt();
   });
 
   _inFlight.set(key, promise);
+  promise.finally(() => _inFlight.delete(key));
+
   const full = await promise;
   return full.slice(0, outputsize);
 }
