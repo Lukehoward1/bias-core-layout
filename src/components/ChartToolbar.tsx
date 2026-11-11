@@ -73,7 +73,7 @@ export function ChartToolbar({
   return (
     <div className="flex items-center px-3 py-2 h-11 gap-2 bg-background/95 backdrop-blur-sm border-b border-border/50">
       {/* Left: Timeframe buttons + Chart Style */}
-      <div className="overflow-x-auto min-w-0 flex items-center gap-2 flex-shrink-0">
+      <div className="overflow-x-auto min-w-0 flex items-center gap-2 shrink">
         <div className="flex items-center gap-0.5">
           {timeframes.map((tf) => (
             <Button
