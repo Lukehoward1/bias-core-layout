@@ -292,6 +292,17 @@ export function buildNewsOverlays(
     result.push({ kind: 'event-marker', timestamp: ts, label: shortenNewsLabel(e.event, e.currency), impact: 'high', event: e });
     if (result.length >= MAX_NEWS_MARKERS) break;
   }
+
+  // Only the 2 events nearest to the last bar show a text label; the rest show
+  // just the dot (empty string keeps the click handler working).
+  if (result.length > 2) {
+    const lastBarTs = bars.length > 0 ? bars[bars.length - 1].timestamp : 0;
+    const byDist = [...result].sort(
+      (a, b) => Math.abs(a.timestamp - lastBarTs) - Math.abs(b.timestamp - lastBarTs),
+    );
+    const featured = new Set([byDist[0].timestamp, byDist[1].timestamp]);
+    return result.map((r) => ({ ...r, label: featured.has(r.timestamp) ? r.label : '' }));
+  }
   return result;
 }
 

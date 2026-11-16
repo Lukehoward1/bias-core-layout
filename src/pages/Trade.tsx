@@ -168,18 +168,6 @@ function TradeContent({ symbol }: { symbol: string }) {
     return getDraSession(hhmm);
   }, [symbol]);
 
-  // Readiness count for mobile chip row (slightly stale on session boundary but acceptable for a badge)
-  const mobileConditionsMet = useMemo(() => {
-    if (!marketContext) return 0;
-    return evaluateChecklist({
-      context: marketContext,
-      resolvedTimeframes,
-      symbol,
-      upcomingRelevantEvents,
-      now: new Date(),
-    }).metCount;
-  }, [marketContext, resolvedTimeframes, symbol, upcomingRelevantEvents]);
-
   // Persist last-viewed symbol on every change
   useEffect(() => {
     writeLastSymbol(symbol);
@@ -260,6 +248,19 @@ function TradeContent({ symbol }: { symbol: string }) {
       })
       .sort((a, b) => getEventDateTime(a).getTime() - getEventDateTime(b).getTime());
   }, [allEvents, symbol]);
+
+  // Readiness count for mobile chip row (slightly stale on session boundary but acceptable for a badge).
+  // Must stay BELOW upcomingRelevantEvents: using a const before its declaration throws at render.
+  const mobileConditionsMet = useMemo(() => {
+    if (!marketContext) return 0;
+    return evaluateChecklist({
+      context: marketContext,
+      resolvedTimeframes,
+      symbol,
+      upcomingRelevantEvents,
+      now: new Date(),
+    }).metCount;
+  }, [marketContext, resolvedTimeframes, symbol, upcomingRelevantEvents]);
 
   // Build market context — survives quote ticks (quote removed from dep array;
   // read via quoteRef at build time). Retries on all-zero confidence.
@@ -532,6 +533,7 @@ function TradeContent({ symbol }: { symbol: string }) {
         onOpenEvent={handleOpenEvent}
         session={currentSession}
         onOpenSlideOver={() => setSlideOverOpen(true)}
+        conditionsMet={mobileConditionsMet}
       />
     </div>
   );

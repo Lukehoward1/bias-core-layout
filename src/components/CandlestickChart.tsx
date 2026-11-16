@@ -126,7 +126,6 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
           style={{ right: TOOLBAR_WIDTH, height: TOOLBAR_HEIGHT }}
         >
           <ChartToolbar
-            pair={pair}
             timeframe={timeframe}
             onTimeframeChange={onTimeframeChange}
             crosshairEnabled={crosshairEnabled}
@@ -180,16 +179,16 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
           <ChartEngine ref={engineRef} {...engineProps} />
         </div>
 
-        {/* Live Data Label */}
-        <div className="absolute bottom-2 left-2 z-20">
+        {/* Live Data Label — inside plot area, left of price axis (axis ≈ 76px wide); hidden on mobile to avoid overlap with toggle row */}
+        <div className="absolute bottom-[44px] z-20 hidden lg:block" style={{ right: TOOLBAR_WIDTH + 76 + 8 }}>
           <span className="text-[10px] text-muted-foreground/70 bg-background/50 backdrop-blur-sm border border-border/40 px-1.5 py-0.5 rounded">
             Live Data
           </span>
         </div>
 
-        {/* Fullscreen exit hint */}
+        {/* Fullscreen exit hint — sits above the Live Data badge */}
         {isFullscreen && (
-          <div className="absolute bottom-2 z-20" style={{ right: TOOLBAR_WIDTH + 8 }}>
+          <div className="absolute bottom-[64px] z-20" style={{ right: TOOLBAR_WIDTH + 8 }}>
             <span className="text-[10px] text-muted-foreground/40 bg-background/40 backdrop-blur-sm px-1.5 py-0.5 rounded">
               Press ESC to exit
             </span>

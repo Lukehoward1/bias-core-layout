@@ -7,7 +7,6 @@ import { ReplayModePanel } from './chart/ReplayModePanel';
 import { SavedBacktestsDropdown, SavedBacktest } from './chart/SavedBacktestsDropdown';
 
 interface ChartToolbarProps {
-  pair: string;
   timeframe: string;
   onTimeframeChange: (tf: string) => void;
   crosshairEnabled: boolean;
@@ -34,26 +33,8 @@ const timeframes = [
   { value: 'd1', label: '1D' },
 ];
 
-const pairLabels: Record<string, string> = {
-  eurusd: 'EURUSD',
-  gbpusd: 'GBPUSD',
-  usdjpy: 'USDJPY',
-  xauusd: 'XAUUSD',
-};
-
-const timeframeLabels: Record<string, string> = {
-  m1: '1m',
-  m5: '5m',
-  m15: '15m',
-  h1: '1H',
-  h4: '4H',
-  d1: '1D',
-  w1: '1W',
-  mn1: '1M',
-};
 
 export function ChartToolbar({
-  pair,
   timeframe,
   onTimeframeChange,
   crosshairEnabled,
@@ -71,107 +52,99 @@ export function ChartToolbar({
   onCompareBacktests,
 }: ChartToolbarProps) {
   return (
-    <div className="flex items-center px-3 py-2 h-11 gap-2 bg-background/95 backdrop-blur-sm border-b border-border/50">
-      {/* Left: Timeframe buttons + Chart Style */}
-      <div className="overflow-x-auto min-w-0 flex items-center gap-2 shrink">
-        <div className="flex items-center gap-0.5">
-          {timeframes.map((tf) => (
-            <Button
-              key={tf.value}
-              variant={timeframe === tf.value ? 'default' : 'ghost'}
-              size="sm"
-              className={cn(
-                "h-6 px-2 text-xs font-medium",
-                timeframe === tf.value 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              )}
-              onClick={() => onTimeframeChange(tf.value)}
-            >
-              {tf.label}
-            </Button>
-          ))}
-          
+    <div className="h-11 px-3 bg-background/95 backdrop-blur-sm border-b border-border/50 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex items-center gap-2 h-full min-w-max lg:min-w-0 lg:w-full">
+        {/* Left: Timeframe buttons + Chart Style */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-0.5">
+            {timeframes.map((tf) => (
+              <Button
+                key={tf.value}
+                variant={timeframe === tf.value ? 'default' : 'ghost'}
+                size="sm"
+                className={cn(
+                  "h-6 px-2 text-xs font-medium",
+                  timeframe === tf.value
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                )}
+                onClick={() => onTimeframeChange(tf.value)}
+              >
+                {tf.label}
+              </Button>
+            ))}
+          </div>
+
+          <div className="h-4 w-px bg-border/50" />
+
+          {/* Chart Style Selector */}
+          <ChartStyleSelector value={chartStyle} onChange={onChartStyleChange} />
+
+          <div className="h-4 w-px bg-border/50" />
+
+          {/* Saved Backtests Dropdown */}
+          {onSaveBacktest && (
+            <SavedBacktestsDropdown
+              savedBacktests={savedBacktests}
+              onSave={onSaveBacktest}
+              onLoad={onLoadBacktest || (() => {})}
+              onCompare={onCompareBacktests || (() => {})}
+            />
+          )}
         </div>
 
-        <div className="h-4 w-px bg-border/50" />
+        {/* Spacer — pushes right group to far right on desktop */}
+        <div className="hidden lg:flex flex-1" />
 
-        {/* Chart Style Selector */}
-        <ChartStyleSelector value={chartStyle} onChange={onChartStyleChange} />
+        {/* Right: Icon controls */}
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Replay Mode */}
+          <ReplayModePanel />
 
-        <div className="h-4 w-px bg-border/50" />
+          <div className="h-4 w-px bg-border/50 mx-1" />
 
-        {/* Saved Backtests Dropdown */}
-        {onSaveBacktest && (
-          <SavedBacktestsDropdown
-            savedBacktests={savedBacktests}
-            onSave={onSaveBacktest}
-            onLoad={onLoadBacktest || (() => {})}
-            onCompare={onCompareBacktests || (() => {})}
+          {/* Indicators Button */}
+          <IndicatorSelector
+            activeIndicators={activeIndicators}
+            onToggleIndicator={onToggleIndicator}
+            onRemoveIndicator={onRemoveIndicator}
           />
-        )}
-      </div>
 
-      {/* Center: Symbol + Timeframe label */}
-      <div className="hidden lg:flex flex-1 justify-center items-center gap-1.5 min-w-0 overflow-hidden">
-        <span className="text-sm font-semibold text-foreground">
-          {pairLabels[pair] || pair.toUpperCase()}
-        </span>
-        <span className="text-muted-foreground">·</span>
-        <span className="text-sm text-muted-foreground">
-          {timeframeLabels[timeframe] || timeframe.toUpperCase()}
-        </span>
-      </div>
+          <div className="h-4 w-px bg-border/50 mx-1" />
 
-      {/* Right: Icon controls */}
-      <div className="overflow-x-auto min-w-0 flex items-center gap-1 flex-shrink-0 ml-auto">
-        {/* Replay Mode */}
-        <ReplayModePanel />
+          {/* Crosshair toggle */}
+          <Button
+            variant={crosshairEnabled ? 'default' : 'ghost'}
+            size="sm"
+            className={cn(
+              "h-6 w-6 p-0",
+              crosshairEnabled
+                ? 'bg-primary/20 text-primary border border-primary/30'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+            onClick={() => onCrosshairToggle(!crosshairEnabled)}
+            title="Toggle crosshair"
+          >
+            <Crosshair className="h-3.5 w-3.5" />
+          </Button>
 
-        <div className="h-4 w-px bg-border/50 mx-1" />
-
-        {/* Indicators Button */}
-        <IndicatorSelector
-          activeIndicators={activeIndicators}
-          onToggleIndicator={onToggleIndicator}
-          onRemoveIndicator={onRemoveIndicator}
-        />
-
-        <div className="h-4 w-px bg-border/50 mx-1" />
-
-        {/* Crosshair toggle */}
-        <Button
-          variant={crosshairEnabled ? 'default' : 'ghost'}
-          size="sm"
-          className={cn(
-            "h-6 w-6 p-0",
-            crosshairEnabled 
-              ? 'bg-primary/20 text-primary border border-primary/30' 
-              : 'text-muted-foreground hover:text-foreground'
-          )}
-          onClick={() => onCrosshairToggle(!crosshairEnabled)}
-          title="Toggle crosshair"
-        >
-          <Crosshair className="h-3.5 w-3.5" />
-        </Button>
-
-        {/* OHLC toggle */}
-        <Button
-          variant={ohlcEnabled ? 'default' : 'ghost'}
-          size="sm"
-          className={cn(
-            "h-6 px-1.5 text-xs font-medium gap-1",
-            ohlcEnabled 
-              ? 'bg-primary/20 text-primary border border-primary/30' 
-              : 'text-muted-foreground hover:text-foreground'
-          )}
-          onClick={() => onOhlcToggle(!ohlcEnabled)}
-          title="Show OHLC on Hover"
-        >
-          <Info className="h-3 w-3" />
-          OHLC
-        </Button>
-
+          {/* OHLC toggle */}
+          <Button
+            variant={ohlcEnabled ? 'default' : 'ghost'}
+            size="sm"
+            className={cn(
+              "h-6 px-1.5 text-xs font-medium gap-1",
+              ohlcEnabled
+                ? 'bg-primary/20 text-primary border border-primary/30'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+            onClick={() => onOhlcToggle(!ohlcEnabled)}
+            title="Show OHLC on Hover"
+          >
+            <Info className="h-3 w-3" />
+            OHLC
+          </Button>
+        </div>
       </div>
     </div>
   );

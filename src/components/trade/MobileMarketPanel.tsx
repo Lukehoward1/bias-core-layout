@@ -28,6 +28,8 @@ export interface MobileMarketPanelProps {
   onOpenEvent?: (event: CalendarEvent) => void;
   session: string;
   onOpenSlideOver: () => void;
+  /** Pre-computed count from Trade.tsx so collapsed header stays accurate. */
+  conditionsMet?: number;
 }
 
 function HandleBiasIcon({ biasState }: { biasState: string | undefined }) {
@@ -50,6 +52,7 @@ export function MobileMarketPanel({
   onOpenEvent,
   session,
   onOpenSlideOver,
+  conditionsMet: externalConditionsMet,
 }: MobileMarketPanelProps) {
   const [expanded, setExpanded] = useState(false);
   const [blockingRoles, setBlockingRoles] = useState<TfRole[]>([]);
@@ -108,7 +111,7 @@ export function MobileMarketPanel({
           )}
           <span className="text-muted-foreground/40 text-xs">·</span>
           <span className="text-xs text-muted-foreground">
-            {conditionsMet} of 3
+            {externalConditionsMet ?? conditionsMet} of 3
           </span>
         </div>
 

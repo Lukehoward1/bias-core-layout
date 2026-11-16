@@ -61,6 +61,7 @@ import type { DataClock } from '@/services/dataProvider';
 import type { OverlayDescriptor } from '@/services/overlayBuilder';
 import type { ChartStyle } from '@/components/chart/ChartStyleSelector';
 import { classifyLiveBarUpdate } from '@/lib/liveBarClassify';
+import { pricePrecision } from '@/lib/pricePrecision';
 
 export interface ChartEngineProps {
   /** Oldest-first OHLC points (same shape AssetDetail passes today). */
@@ -484,6 +485,12 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
         maSeriesRef.current = maSeries;
       }
 
+      // Set price-axis decimal precision for the instrument
+      const precision = pricePrecision(pair);
+      mainSeriesRef.current?.applyOptions({
+        priceFormat: { type: 'price', precision, minMove: 1 / 10 ** precision },
+      });
+
       chart.timeScale().fitContent();
       setSeriesGen((g) => g + 1);
     }, [bars, chartStyle, activeIndicators, pair, displayInterval, formatPrice, formatTime, onCrosshairMove]);
@@ -603,6 +610,11 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       const eventMarkerData: { timestamp: number; event: CalendarEvent }[] = [];
       const barDurationSec = INTERVAL_DURATION_SEC[displayInterval] ?? 3600;
 
+      // Collect news timestamps for session-collision suppression
+      const newsTimestamps: number[] = overlays
+        .filter((o): o is Extract<typeof o, { kind: 'event-marker' }> => o.kind === 'event-marker')
+        .map((o) => o.timestamp);
+
       for (const o of overlays) {
         if (o.kind === 'price-line') {
           const line = main.createPriceLine({
@@ -630,13 +642,17 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
           });
           eventMarkerData.push({ timestamp: o.timestamp, event: o.event });
         } else if (o.kind === 'session-line') {
+          // Suppress session text when a news marker sits within 6 bars
+          const nearNews = newsTimestamps.some(
+            (nts) => Math.abs(nts - o.timestamp) <= 6 * barDurationSec,
+          );
           markers.push({
             time: o.timestamp as Time,
             position: 'aboveBar',
             shape: 'arrowDown',
             color: o.color,
             size: 1,
-            text: o.label,
+            text: nearNews ? '' : o.label,
           });
         } else if (o.kind === 'swing-marker') {
           markers.push({
