@@ -728,7 +728,7 @@ export default function Landing() {
                 Icon: BarChart2,
                 step: "2",
                 title: "Connect your markets",
-                desc: "Select the assets you trade. StreamBias starts reading bias and delivering signals immediately.",
+                desc: "Select the assets you trade. StreamBias starts reading bias and delivering market context immediately.",
               },
               {
                 Icon: TrendingUp,
@@ -801,7 +801,7 @@ export default function Landing() {
             </h2>
             <p className="text-muted-foreground leading-relaxed">
               StreamBias reads candle structure across every timeframe and delivers a single verdict —
-              Bullish Active, Bearish Weakening, Neutral — updated in real time. No more conflicting signals.
+              Bullish Active, Bearish Weakening, Neutral — updated in real time. One clear read instead of piecing it together across charts.
             </p>
             <div className="flex flex-wrap gap-2 mt-1">
               <FeaturePill label="Multi-timeframe analysis" />

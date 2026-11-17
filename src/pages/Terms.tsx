@@ -34,7 +34,7 @@ export default function Terms() {
         <section className="mb-8">
           <h2 className="text-xl font-semibold mb-3">2. Not financial advice</h2>
           <p className="text-muted-foreground mb-3">
-            StreamBias provides market bias signals, economic calendar data, journaling tools, and risk-management calculators for informational and educational purposes only.
+            StreamBias provides market bias analysis, economic calendar data, journaling tools, and risk-management calculators for informational and educational purposes only.
           </p>
           <p className="text-muted-foreground mb-3">
             <strong className="text-foreground">Nothing on the Service constitutes financial, investment, trading, or other professional advice.</strong> StreamBias does not recommend that any financial instrument, strategy, or transaction is suitable for you. The bias engine, confidence scores, and any other analytics are generated from historical and live market data using automated technical analysis; they are not predictions of future price movement and carry no guarantee of accuracy.

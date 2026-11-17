@@ -212,7 +212,7 @@ Option 3: Straddle (advanced). Place opposing pending orders above and below the
 THE DEVIATION FORMULA
 What moves markets is the difference between actual and expected. A 200K NFP print when 150K was expected is more bullish than a 250K print when 300K was expected. Always compare actual vs. consensus, not just the absolute number.
 
-Most economic calendars show previous, forecast, and actual values. The "actual vs. forecast" gap is your trading signal — not the number in isolation.`,
+Most economic calendars show previous, forecast, and actual values. The "actual vs. forecast" gap is what matters — not the number in isolation.`,
   },
   {
     id: "a7",
