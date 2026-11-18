@@ -13,6 +13,8 @@
 // swap to FMP happens at the /api/quote layer, not here.
 // ─────────────────────────────────────────────────────────────
 
+import { MOCK_CANDLES_ENABLED, generateMockQuote } from '@/lib/mockCandleGenerator';
+
 // ── Types ───────────────────────────────────────────────────
 
 /** Direction of move vs reference price. */
@@ -31,7 +33,7 @@ export interface MarketQuote {
   changePercent: number;
   direction: MarketDirection;
   timestamp: number;
-  source: "twelvedata" | "websocket" | "fmp";
+  source: "twelvedata" | "websocket" | "fmp" | "mock";
   /**
    * True when this quote is the last-known-good value carried over from an
    * earlier successful poll because the most recent fetch failed. UI must
@@ -244,6 +246,8 @@ async function fetchTwelveDataQuote(symbol: string): Promise<MarketQuote | null>
  */
 export async function getQuote(symbol: string): Promise<MarketQuote | null> {
   const norm = normalizeSymbol(symbol);
+  // ── Mock mode (dev only) ──────────────────────────────────
+  if (MOCK_CANDLES_ENABLED) return generateMockQuote(norm);
   try {
     return await fetchTwelveDataQuote(norm);
   } catch {

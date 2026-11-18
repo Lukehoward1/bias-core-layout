@@ -14,6 +14,7 @@ import type { TraderTimeframes, TfRole } from '@/services/traderTimeframes';
 import type { TradeInstrument } from '@/data/tradeInstruments';
 import type { CalendarEvent } from '@/data/calendarEvents';
 import type { OhlcDataPoint } from '@/lib/mockOhlcData';
+import type { DraSessionName } from '@/components/risk/DynamicRiskAdvisor';
 
 export interface MobileMarketPanelProps {
   symbol: string;
@@ -26,7 +27,7 @@ export interface MobileMarketPanelProps {
   sentiment: number | null;
   upcomingRelevantEvents: CalendarEvent[];
   onOpenEvent?: (event: CalendarEvent) => void;
-  session: string;
+  session: DraSessionName | null;
   onOpenSlideOver: () => void;
   /** Pre-computed count from Trade.tsx so collapsed header stays accurate. */
   conditionsMet?: number;
@@ -78,25 +79,23 @@ export function MobileMarketPanel({
 
   return (
     <div
-      className="fixed bottom-0 inset-x-0 z-30 lg:hidden bg-background border-t border-border"
-      style={{
-        maxHeight: expanded ? '85vh' : '56px',
-        transition: 'max-height 300ms ease-in-out',
-        overflow: 'hidden',
-      }}
+      className={`fixed bottom-0 inset-x-0 z-30 lg:hidden bg-background border-t border-border overflow-hidden transition-[max-height] duration-300 ease-in-out ${
+        expanded
+          ? 'max-h-[85vh]'
+          : 'max-h-14 [@media_(orientation:landscape)_and_(max-height:500px)]:max-h-9'
+      }`}
     >
       {/* Handle bar — tap to toggle, swipe-down to collapse */}
       <div
-        className="relative flex items-center justify-between px-4 cursor-pointer select-none"
-        style={{ height: '56px' }}
+        className="relative flex items-center justify-between px-4 cursor-pointer select-none h-14 [@media_(orientation:landscape)_and_(max-height:500px)]:h-9"
         onClick={() => setExpanded((v) => !v)}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
       >
-        {/* Drag handle pill */}
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-muted-foreground/30" />
+        {/* Drag handle pill — hidden in landscape slim mode */}
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-muted-foreground/30 [@media_(orientation:landscape)_and_(max-height:500px)]:hidden" />
 
         {/* Summary row */}
         <div className="flex items-center gap-2 mt-1">
@@ -109,10 +108,14 @@ export function MobileMarketPanel({
               {Math.round(context.biasConfidence)}%
             </span>
           )}
-          <span className="text-muted-foreground/40 text-xs">·</span>
-          <span className="text-xs text-muted-foreground">
-            {externalConditionsMet ?? conditionsMet} of 3
-          </span>
+          {context !== null && (
+            <>
+              <span className="text-muted-foreground/40 text-xs">·</span>
+              <span className="text-xs text-muted-foreground">
+                {externalConditionsMet ?? conditionsMet} of 3
+              </span>
+            </>
+          )}
         </div>
 
         {expanded ? (
@@ -124,10 +127,7 @@ export function MobileMarketPanel({
 
       {/* Expanded content */}
       {expanded && (
-        <div
-          className="overflow-y-auto px-4 pb-6 space-y-3"
-          style={{ maxHeight: 'calc(85vh - 56px)' }}
-        >
+        <div className="overflow-y-auto px-4 pb-6 space-y-3 max-h-[calc(85vh-56px)] [@media_(orientation:landscape)_and_(max-height:500px)]:max-h-[calc(85vh-36px)]">
           <MarketAwarenessPanel
             symbol={symbol}
             instrument={instrument}

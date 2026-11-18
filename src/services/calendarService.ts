@@ -21,6 +21,55 @@ function _logFixturesNotice() {
   );
 }
 
+// Produces time-relative CalendarEvents so news pills always appear in the
+// chart's visible ~150-bar window. Only reachable when USE_FIXTURES=true;
+// tree-shaken in production builds.
+function generateFixtureEvents(): CalendarEvent[] {
+  const nowMs = Date.now();
+  const H = 3_600_000;
+  const M = 60_000;
+
+  function mk(
+    offsetMs: number,
+    currency: string,
+    name: string,
+    impact: CalendarImpact,
+    previous: string,
+    forecast: string,
+    actual: string,
+  ): CalendarEvent {
+    const ts = new Date(nowMs + offsetMs);
+    const date = ts.toISOString().slice(0, 10);
+    const hh = String(ts.getUTCHours()).padStart(2, "0");
+    const mm = String(ts.getUTCMinutes()).padStart(2, "0");
+    const time = `${hh}:${mm}`;
+    const scheduledAt = `${ts.toISOString().slice(0, 19)}Z`;
+    const eventKey = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    return {
+      id: `fixture-${eventKey}-${date}-${hh}${mm}`,
+      eventKey,
+      date,
+      time,
+      scheduledAt,
+      currency,
+      event: name,
+      previous,
+      forecast,
+      actual,
+      impact,
+    };
+  }
+
+  return [
+    mk(-6 * H,            "USD", "Federal Reserve Chair Speaks",  "high",   "—",     "—",     "Hawkish tone"),
+    mk(-4 * H,            "USD", "Initial Jobless Claims",         "medium", "215K",  "220K",  "218K"),
+    mk(-2 * H,            "USD", "CPI (YoY)",                      "high",   "3.4%",  "3.1%",  "3.2%"),
+    mk(-2 * H + 15 * M,   "EUR", "ECB President Lagarde Speaks",   "high",   "—",     "—",     "Dovish remarks"),
+    mk(+3 * H,            "EUR", "ECB Interest Rate Decision",     "high",   "4.50%", "4.25%", "—"),
+    mk(+24 * H,           "USD", "Non-Farm Payrolls",              "high",   "187K",  "195K",  "—"),
+  ];
+}
+
 // ── FMP response shape ────────────────────────────────────────
 
 interface FmpEconomicEvent {
@@ -185,11 +234,8 @@ export function getLiveCalendarHistoricalEvents(): Promise<CalendarEvent[]> {
 export function getLiveCalendarEvents(): Promise<CalendarEvent[]> {
   if (USE_FIXTURES) {
     _logFixturesNotice();
-    if (!_cache) {
-      _cache = { data: staticCalendarEvents, expiresAt: Date.now() + CACHE_TTL_MS };
-      _lastFetchSucceeded = true;
-    }
-    return Promise.resolve(_cache.data);
+    _lastFetchSucceeded = true;
+    return Promise.resolve(generateFixtureEvents());
   }
 
   if (_cache && Date.now() < _cache.expiresAt) return Promise.resolve(_cache.data);

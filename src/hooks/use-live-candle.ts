@@ -30,6 +30,7 @@ import type { OhlcDataPoint } from '@/lib/mockOhlcData';
 import { classifyLiveBarUpdate } from '@/lib/liveBarClassify';
 import { pollIntervals, isUserIdle, getLastActivity } from '@/lib/pollPolicy';
 import { activeProviderName } from '@/services/activeProvider';
+import { MOCK_CANDLES_ENABLED } from '@/lib/mockCandleGenerator';
 
 // Maps ChartToolbar timeframe keys → TfCode values. Mirrors mockOhlcData.ts.
 const TF_TO_TFCODE: Record<string, string> = {
@@ -143,6 +144,8 @@ export function useLiveCandle({ symbol, timeframe, lastBar }: UseLiveCandleOpts)
 
   useEffect(() => {
     if (!symbol || !lastBar) return;
+    // In mock mode the chart uses the static forming bar; no network polls needed.
+    if (MOCK_CANDLES_ENABLED) return;
 
     const interval = TF_TO_TFCODE[timeframe] ?? '1h';
     const norm = normSym(symbol);

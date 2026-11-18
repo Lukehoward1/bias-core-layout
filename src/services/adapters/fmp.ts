@@ -47,9 +47,10 @@ function fmpSymbol(symbol: string): string | null {
   return fmp;
 }
 
-interface ProxyOkResponse { status: 'ok'; data: Record<string, unknown>[]; }
-interface ProxyStatusResponse { status: 'restricted' | 'rate-limited'; }
-type ProxyResponse = ProxyOkResponse | ProxyStatusResponse;
+interface ProxyOkResponse         { status: 'ok';           data: Record<string, unknown>[]; }
+interface ProxyRestrictedResponse { status: 'restricted';                                   }
+interface ProxyRateLimitedResponse{ status: 'rate-limited';                                 }
+type ProxyResponse = ProxyOkResponse | ProxyRestrictedResponse | ProxyRateLimitedResponse;
 
 async function callProxy(fmpSym: string): Promise<ProviderResult<Record<string, unknown>[]>> {
   await acquireFmpSlot();

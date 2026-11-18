@@ -21,6 +21,7 @@ import { ChartEngine, type ChartEngineRef } from './chart/ChartEngine';
 import { useLiveCandle } from '@/hooks/use-live-candle';
 import type { OverlayDescriptor } from '@/services/overlayBuilder';
 import type { CalendarEvent } from '@/data/calendarEvents';
+import { MOCK_CANDLES_ENABLED } from '@/lib/mockCandleGenerator';
 
 interface CandlestickChartProps {
   data: OhlcDataPoint[];
@@ -179,11 +180,17 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
           <ChartEngine ref={engineRef} {...engineProps} />
         </div>
 
-        {/* Live Data Label — inside plot area, left of price axis (axis ≈ 76px wide); hidden on mobile to avoid overlap with toggle row */}
+        {/* Data source label — inside plot area, left of price axis (axis ≈ 76px wide); hidden on mobile */}
         <div className="absolute bottom-[44px] z-20 hidden lg:block" style={{ right: TOOLBAR_WIDTH + 76 + 8 }}>
-          <span className="text-[10px] text-muted-foreground/70 bg-background/50 backdrop-blur-sm border border-border/40 px-1.5 py-0.5 rounded">
-            Live Data
-          </span>
+          {MOCK_CANDLES_ENABLED ? (
+            <span className="text-[10px] font-semibold text-amber-400 bg-amber-400/10 border border-amber-400/40 px-1.5 py-0.5 rounded">
+              MOCK DATA
+            </span>
+          ) : (
+            <span className="text-[10px] text-muted-foreground/70 bg-background/50 backdrop-blur-sm border border-border/40 px-1.5 py-0.5 rounded">
+              Live Data
+            </span>
+          )}
         </div>
 
         {/* Fullscreen exit hint — sits above the Live Data badge */}

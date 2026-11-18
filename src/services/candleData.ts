@@ -12,6 +12,7 @@ import { TRADE_INSTRUMENTS } from "@/data/tradeInstruments";
 import { activeProvider, activeProviderName } from "./activeProvider";
 import type { TraderTimeframes, TfRole } from "./traderTimeframes";
 import { ROLE_WEIGHT } from "./traderTimeframes";
+import { MOCK_CANDLES_ENABLED, generateMockCandles } from "@/lib/mockCandleGenerator";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -279,6 +280,19 @@ export async function fetchCandles(
   const norm = normalizeSymbol(symbol);
 
   if (!CANDLE_API_WHITELIST.has(norm)) return [];
+
+  // ── Mock mode (dev only) ──────────────────────────────────
+  // Generates deterministic candles without any network calls.
+  // Uses the same cache so repeated calls are free.
+  if (MOCK_CANDLES_ENABLED) {
+    const mockKey = makeCacheKey(norm, interval);
+    const mockCached = getCached(mockKey, outputsize);
+    if (mockCached) return mockCached;
+    const full = generateMockCandles(norm, interval, STANDARD_SIZE);
+    setCache(mockKey, full, interval);
+    return full.slice(0, outputsize);
+  }
+
   const key = makeCacheKey(norm, interval);
 
   const cached = getCached(key, outputsize);

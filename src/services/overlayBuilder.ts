@@ -15,7 +15,9 @@ import { isFxPairSymbol, normalizeMarketSymbol, getSymbolCurrencies, INDEX_CCY }
 
 export type OverlayDescriptor =
   | { kind: 'price-line';     price: number; label: string; color: string; dash?: boolean; axisLabelVisible?: boolean }
-  | { kind: 'event-marker';   timestamp: number; label: string; impact: 'high' | 'medium'; event: CalendarEvent }
+  | { kind: 'event-marker';   timestamp: number; label: string; impact: 'high' | 'medium'; event: CalendarEvent;
+      /** Populated once calendar + candle history are wired up. Pill renders the slot only when present. */
+      moveData?: { direction: 'up' | 'down'; pips: number; minutes: number } }
   | { kind: 'session-line';   timestamp: number; label: string; color: string }
   | { kind: 'swing-marker';   timestamp: number; price: number; direction: 'high' | 'low' }
   | { kind: 'highlight-band'; from: number; to: number; color: string; label?: string };
@@ -179,12 +181,16 @@ export function dedupeLevelsByProximity<T extends { price: number; strength: num
 }
 
 /**
- * Shorten a news event title to 14 chars and append the currency code.
+ * Format a news event label: name truncated at 28 chars, followed by the
+ * event's local start time (HH:mm in the browser timezone).
  * Exported for tests.
  */
-export function shortenNewsLabel(title: string, currency: string): string {
-  const truncated = title.length > 14 ? title.slice(0, 14).trimEnd() + '…' : title;
-  return `${truncated} ${currency}`;
+export function shortenNewsLabel(title: string, scheduledAt: string): string {
+  const truncated = title.length > 28 ? title.slice(0, 28).trimEnd() + '…' : title;
+  const d = new Date(scheduledAt);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${truncated} · ${hh}:${mm}`;
 }
 
 // ── Internal helpers ───────────────────────────────────────────
@@ -210,7 +216,30 @@ function isNewsRelevant(symbol: string, event: CalendarEvent): boolean {
   return getSymbolCurrencies(norm).some((c) => impact.affectedCurrencies.includes(c));
 }
 
+// Stricter check for chart pills only: event.currency must be one of the
+// symbol's direct currencies (no knock-on correlation). E.g. USDCAD shows
+// USD and CAD events; a JPY event is excluded even if it moves risk sentiment.
+function isPillRelevant(symbol: string, event: CalendarEvent): boolean {
+  const ccys = getSymbolCurrencies(normalizeMarketSymbol(symbol));
+  return ccys.includes(event.currency);
+}
+
 // ── Builders ───────────────────────────────────────────────────
+
+// FUTURE: Level state labels ("swept", "held", "broken") on price lines.
+//
+// Honest computation requires inspecting recent candles against the level price:
+//   "broken"  — a candle body closed clearly beyond the level (close > level + ε for resistance;
+//               close < level − ε for support), where ε ≈ 0.15 × avgBarRange.
+//   "swept"   — a candle's wick crossed the level but its body closed on the original side
+//               (high > level for resistance, close < level).
+//   "held"    — price tested the level (came within ε) and candle(s) closed back on origin side;
+//               the level remains unbroken.
+//   Window    — only the most recent 20–30 candles are relevant; older state is stale.
+//
+// When implemented: add `state?: 'swept' | 'held' | 'broken'` to the price-line descriptor and
+// render a small label at the right end of the line (before the price axis).
+// Do NOT ship a default state — no label is better than a fabricated one.
 
 /** Key level price-lines from contextEngine. Sanity-filtered, deduped, capped at 5. */
 export function buildLevelOverlays(
@@ -255,19 +284,13 @@ export function buildLevelOverlays(
   });
   const top5 = deduped.slice(0, 5);
 
-  // Nearest 3 to close get axis labels; the rest hide their axis label
-  const sortedByDist = [...top5].sort(
-    (a, b) => Math.abs(a.price - (lastClose ?? 0)) - Math.abs(b.price - (lastClose ?? 0)),
-  );
-  const axisVisible = new Set(sortedByDist.slice(0, 3).map((l) => l.price));
-
   return top5.map((l) => ({
     kind: 'price-line',
     price: l.price,
     label: l.label,
     color: l.color,
     dash: l.dash,
-    axisLabelVisible: axisVisible.has(l.price),
+    axisLabelVisible: true,
   }));
 }
 
@@ -283,20 +306,21 @@ export function buildNewsOverlays(
   const minTs = bars[0].timestamp;
   const maxTs = bars[bars.length - 1].timestamp;
 
-  const result: OverlayDescriptor[] = [];
+  type EventMarker = Extract<OverlayDescriptor, { kind: 'event-marker' }>;
+  const result: EventMarker[] = [];
   for (const e of events) {
-    if (e.impact !== 'high') continue;
-    if (!isNewsRelevant(symbol, e)) continue;
+    if (e.impact !== 'high' && e.impact !== 'medium') continue;
+    if (!isPillRelevant(symbol, e)) continue;
     const ts = Math.floor(new Date(e.scheduledAt).getTime() / 1000);
     if (!Number.isFinite(ts) || ts < minTs || ts > maxTs) continue;
-    result.push({ kind: 'event-marker', timestamp: ts, label: shortenNewsLabel(e.event, e.currency), impact: 'high', event: e });
+    result.push({ kind: 'event-marker', timestamp: ts, label: shortenNewsLabel(e.event, e.scheduledAt), impact: e.impact, event: e });
     if (result.length >= MAX_NEWS_MARKERS) break;
   }
 
   // Only the 2 events nearest to the last bar show a text label; the rest show
   // just the dot (empty string keeps the click handler working).
   if (result.length > 2) {
-    const lastBarTs = bars.length > 0 ? bars[bars.length - 1].timestamp : 0;
+    const lastBarTs = bars[bars.length - 1].timestamp;
     const byDist = [...result].sort(
       (a, b) => Math.abs(a.timestamp - lastBarTs) - Math.abs(b.timestamp - lastBarTs),
     );

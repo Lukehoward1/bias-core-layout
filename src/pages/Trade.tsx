@@ -353,18 +353,18 @@ function TradeContent({ symbol }: { symbol: string }) {
   }, [tradeEntry, instrument]);
 
   return (
-    <div className="p-3 sm:p-6 space-y-4 pb-16 lg:pb-6">
+    <div className="p-3 sm:p-6 space-y-4 pb-16 lg:pb-6 [@media_(orientation:landscape)_and_(max-height:500px)]:p-2 [@media_(orientation:landscape)_and_(max-height:500px)]:space-y-1 [@media_(orientation:landscape)_and_(max-height:500px)]:pb-10">
       <AppHeader title="Trade" />
 
       <div className="flex items-center gap-3">
         <PairSelector currentSymbol={symbol} onSelect={handleSelectSymbol} />
       </div>
 
-      {/* Mobile chip row — quick-access status and actions below lg */}
-      <div className="lg:hidden overflow-x-auto -mx-3 px-3">
+      {/* Mobile chip row — hidden on landscape phones where vertical space is tight */}
+      <div className="lg:hidden [@media_(orientation:landscape)_and_(max-height:500px)]:hidden overflow-x-auto -mx-3 px-3">
         <div className="flex items-center gap-2 pb-1 min-w-max">
           <div className="shrink-0 rounded-full bg-muted/60 px-3 py-1 text-xs text-muted-foreground">
-            {mobileConditionsMet} of 3 conditions
+            {marketContext === null ? '—' : `${mobileConditionsMet} of 3 conditions`}
           </div>
           <button
             type="button"
@@ -401,7 +401,7 @@ function TradeContent({ symbol }: { symbol: string }) {
 
       <div className="flex gap-4">
         <ErrorBoundary key={symbol} fallbackMessage="Failed to load chart">
-          <div className="flex-1 min-w-0 relative min-h-[60vh] lg:h-[600px] lg:min-h-0">
+          <div className="flex-1 min-w-0 relative min-h-[60vh] lg:h-[600px] lg:min-h-0 [@media_(orientation:landscape)_and_(max-height:500px)]:min-h-[180px]">
             {chartState.kind === "loading" && (
               <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
                 Loading chart…

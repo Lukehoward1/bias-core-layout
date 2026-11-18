@@ -44,6 +44,7 @@ import {
   type LineData,
   type SeriesMarker,
   type Time,
+  type Logical,
   type MouseEventHandler,
   CandlestickSeries,
   LineSeries,
@@ -181,10 +182,12 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
     const priceLinesRef = useRef<IPriceLine[]>([]);
     const highlightSeriesRef = useRef<ISeriesApi<'Area'>[]>([]);
     const markersPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
-    const overlayClickHandlerRef = useRef<MouseEventHandler<Time> | null>(null);
-    // Stable ref so the overlay click handler never captures a stale callback.
+    // Stable ref so the pill click handler never captures a stale callback.
     const onEventMarkerClickRef = useRef(onEventMarkerClick);
     useEffect(() => { onEventMarkerClickRef.current = onEventMarkerClick; });
+    // Ref kept current so the range-change subscription reads fresh overlays.
+    const overlaysRef = useRef(overlays);
+    useEffect(() => { overlaysRef.current = overlays; });
 
     // State preserved across renders so the live-update effect can derive from it.
     const seriesKindRef = useRef<ChartStyle>(chartStyle);
@@ -200,6 +203,89 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
     // series rebuild (e.g. chart style change) even when the overlays array itself
     // hasn't changed.
     const [seriesGen, setSeriesGen] = useState(0);
+
+    // ── News pill positions ────────────────────────────────────
+    // Recomputed from LWC pixel coordinates whenever the chart pans/zooms or overlays change.
+    interface NewsPill {
+      x: number;        // true chart x coordinate (guide line stays here)
+      clampedX: number; // pill left edge after edge clamping
+      row: number;      // -1 = dot mode, 0–2 = pill row (top: 8/34/60px)
+      ts: number;
+      label: string;
+      impact: 'high' | 'medium';
+      event: CalendarEvent;
+      windowEndX: number | null;
+      moveData?: { direction: 'up' | 'down'; pips: number; minutes: number };
+    }
+    const [newsPills, setNewsPills] = useState<NewsPill[]>([]);
+
+    // Stable callback (reads from refs) — safe to pass to LWC subscriptions.
+    const computeNewsPills = useCallback(() => {
+      const chart = chartRef.current;
+      const timeScale = chart?.timeScale();
+      if (!timeScale || !chart || !containerRef.current) return;
+
+      const containerWidth = containerRef.current.clientWidth;
+      const scaleWidth = chart.priceScale('right').width();
+      const plotWidth = containerWidth - scaleWidth;
+      const GAP = 4;
+
+      // Collect raw pill data; skip timestamps outside the plot area.
+      // timeToIndex with findNearest=true snaps sub-bar timestamps to the nearest
+      // bar (required because real events like "13:30 UTC" don't fall on the exact
+      // UTC-hour bar boundaries that mock and live candles use).
+      const raw: Array<{
+        x: number; ts: number; label: string; impact: 'high' | 'medium';
+        event: CalendarEvent; windowEndX: number | null;
+        moveData?: { direction: 'up' | 'down'; pips: number; minutes: number };
+      }> = [];
+      for (const o of (overlaysRef.current ?? [])) {
+        if (o.kind !== 'event-marker') continue;
+        const idx = timeScale.timeToIndex(o.timestamp as Time, true);
+        if (idx === null) continue;
+        const x = timeScale.logicalToCoordinate(idx as unknown as Logical);
+        if (x === null || (x as number) < 0 || (x as number) > plotWidth) continue;
+        const endIdx = timeScale.timeToIndex((o.timestamp + 15 * 60) as Time, true);
+        const windowEndX = endIdx !== null ? timeScale.logicalToCoordinate(endIdx as unknown as Logical) : null;
+        raw.push({
+          x: x as number,
+          ts: o.timestamp,
+          label: o.label,
+          impact: o.impact,
+          event: o.event,
+          windowEndX: windowEndX !== null ? windowEndX as number : null,
+          moveData: o.moveData,
+        });
+      }
+
+      // Sort left-to-right for row assignment.
+      raw.sort((a, b) => a.x - b.x);
+
+      // Per-row right-edge tracker for collision avoidance (3 rows max).
+      const rowRight: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+
+      const pills: NewsPill[] = raw.map((p) => {
+        // Empty label → always a dot; row -1 signals dot rendering.
+        if (p.label === '') return { ...p, row: -1, clampedX: p.x };
+
+        const pillWidth = Math.round(p.label.length * 6.2 + 28);
+        const idealLeft = p.x - pillWidth / 2;
+        const clampedLeft = Math.max(GAP, Math.min(idealLeft, plotWidth - pillWidth - GAP));
+        const rightEdge = clampedLeft + pillWidth;
+
+        let assignedRow = -1; // -1 = overflow → dot fallback
+        for (let r = 0; r < 3; r++) {
+          if (clampedLeft >= rowRight[r]) {
+            rowRight[r] = rightEdge + GAP;
+            assignedRow = r;
+            break;
+          }
+        }
+        return { ...p, row: assignedRow, clampedX: clampedLeft };
+      });
+
+      setNewsPills(pills);
+    }, []); // stable — only reads refs
 
     const handleZoomIn = useCallback(() => {
       if (!chartRef.current) return;
@@ -295,19 +381,25 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       });
       chartRef.current = chart;
 
+      let rafId: number | null = null;
       const handleResize = () => {
-        if (containerRef.current && chartRef.current) {
-          chartRef.current.applyOptions({
-            width: containerRef.current.clientWidth,
-            height: containerRef.current.clientHeight,
-          });
-        }
+        if (!containerRef.current || !chartRef.current) return;
+        chartRef.current.applyOptions({
+          width: containerRef.current.clientWidth,
+          height: containerRef.current.clientHeight,
+        });
+        computeNewsPills();
       };
-      window.addEventListener('resize', handleResize);
+      const resizeObserver = new ResizeObserver(() => {
+        if (rafId !== null) cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(() => { rafId = null; handleResize(); });
+      });
+      if (containerRef.current) resizeObserver.observe(containerRef.current);
       handleResize();
 
       return () => {
-        window.removeEventListener('resize', handleResize);
+        if (rafId !== null) cancelAnimationFrame(rafId);
+        resizeObserver.disconnect();
         if (crosshairHandlerRef.current) {
           try {
             chart.unsubscribeCrosshairMove(crosshairHandlerRef.current);
@@ -323,7 +415,7 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
         priceLinesRef.current = [];
         highlightSeriesRef.current = [];
       };
-    }, []);
+    }, [computeNewsPills]);
 
     // ── STRUCTURAL effect ──────────────────────────────────────
     // Rebuilds series + MA + crosshair on bar/style/indicator/pair/interval change.
@@ -577,6 +669,8 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
     // Separate from structural and live-update effects: rebuilds only when
     // overlays or displayInterval change, never on a live price tick.
     // Reuses/removes only the overlay primitives it created.
+    // News events are NOT rendered as LWC markers here — they appear as
+    // HTML pill callouts computed by computeNewsPills below.
     useEffect(() => {
       const chart = chartRef.current;
       const main = mainSeriesRef.current;
@@ -598,19 +692,12 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
         markersPluginRef.current = null;
       }
 
-      // Clear existing event-marker click handler
-      if (overlayClickHandlerRef.current) {
-        try { chart.unsubscribeClick(overlayClickHandlerRef.current); } catch { /* noop */ }
-        overlayClickHandlerRef.current = null;
-      }
-
       if (!overlays || overlays.length === 0) return;
 
       const markers: SeriesMarker<Time>[] = [];
-      const eventMarkerData: { timestamp: number; event: CalendarEvent }[] = [];
       const barDurationSec = INTERVAL_DURATION_SEC[displayInterval] ?? 3600;
 
-      // Collect news timestamps for session-collision suppression
+      // News timestamps used to suppress session text that would collide with a pill
       const newsTimestamps: number[] = overlays
         .filter((o): o is Extract<typeof o, { kind: 'event-marker' }> => o.kind === 'event-marker')
         .map((o) => o.timestamp);
@@ -631,18 +718,8 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
             main.createPriceLine({ price: o.to,   color: o.color, lineStyle: LineStyle.Dotted, lineWidth: 1, axisLabelVisible: false, title: o.label ?? '' }),
             main.createPriceLine({ price: o.from, color: o.color, lineStyle: LineStyle.Dotted, lineWidth: 1, axisLabelVisible: false, title: '' }),
           );
-        } else if (o.kind === 'event-marker') {
-          markers.push({
-            time: o.timestamp as Time,
-            position: 'belowBar',
-            shape: 'circle',
-            color: 'hsl(45, 90%, 60%)',
-            size: 1,
-            text: o.label.length > 24 ? o.label.slice(0, 24) + '…' : o.label,
-          });
-          eventMarkerData.push({ timestamp: o.timestamp, event: o.event });
         } else if (o.kind === 'session-line') {
-          // Suppress session text when a news marker sits within 6 bars
+          // Suppress session text when a news pill sits within 6 bars
           const nearNews = newsTimestamps.some(
             (nts) => Math.abs(nts - o.timestamp) <= 6 * barDurationSec,
           );
@@ -670,32 +747,28 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
         markers.sort((a, b) => (a.time as number) - (b.time as number));
         markersPluginRef.current = createSeriesMarkers(main as ISeriesApi<'Candlestick'>, markers);
       }
-
-      if (eventMarkerData.length > 0) {
-        const handler: MouseEventHandler<Time> = (param) => {
-          if (!param.time) return;
-          const ts = param.time as number;
-          for (const em of eventMarkerData) {
-            if (Math.abs(em.timestamp - ts) <= barDurationSec) {
-              onEventMarkerClickRef.current?.(em.event);
-              return;
-            }
-          }
-        };
-        chart.subscribeClick(handler);
-        overlayClickHandlerRef.current = handler;
-      }
-
-      return () => {
-        if (overlayClickHandlerRef.current) {
-          try { chartRef.current?.unsubscribeClick(overlayClickHandlerRef.current); } catch { /* noop */ }
-          overlayClickHandlerRef.current = null;
-        }
-      };
     }, [overlays, displayInterval, seriesGen]);
 
+    // ── NEWS PILL position effects ──────────────────────────────
+    // Subscribe to pan/zoom so pills track the chart as the user scrolls.
+    useEffect(() => {
+      const chart = chartRef.current;
+      if (!chart) return;
+      computeNewsPills();
+      chart.timeScale().subscribeVisibleLogicalRangeChange(computeNewsPills);
+      return () => {
+        try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(computeNewsPills); } catch { /* noop */ }
+      };
+    }, [seriesGen, computeNewsPills]);
+
+    // Recompute positions when the overlay set itself changes.
+    useEffect(() => {
+      computeNewsPills();
+    }, [overlays, seriesGen, computeNewsPills]);
+
     return (
-      <>
+      <div className="relative w-full h-full">
+        {/* OHLC hover tooltip */}
         {ohlcEnabled && tooltipData && tooltipData.visible && (
           <div
             className="absolute z-[60] pointer-events-none bg-card/95 backdrop-blur-sm border border-border rounded-lg px-3 py-2 shadow-lg text-sm"
@@ -723,11 +796,135 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
           </div>
         )}
 
-        <div
-          ref={containerRef}
-          className="absolute inset-0 bg-[hsl(222,30%,5%)]"
-        />
-      </>
+        {/* LWC chart canvas */}
+        <div ref={containerRef} className="absolute inset-0 bg-[hsl(222,30%,5%)]" />
+
+        {/* ── News callout layer ──────────────────────────────────
+            Pills float above the candles: pill → dashed guide line → bar.
+            Shade window covers event time to +15 min.
+            Move readout (▲/▼ N pips · N min) renders only when moveData exists;
+            the slot is intentionally absent until calendar + history are connected. */}
+        {newsPills.length > 0 && (
+          <div className="absolute inset-0 pointer-events-none overflow-hidden z-[3]">
+            {/* Layer 1: shade windows (behind guide lines and pills) */}
+            {newsPills.map((pill) =>
+              pill.windowEndX !== null && pill.windowEndX > pill.x ? (
+                <div
+                  key={`shade-${pill.ts}`}
+                  className="absolute top-0 bottom-0 pointer-events-none"
+                  style={{
+                    left: pill.x,
+                    width: pill.windowEndX - pill.x,
+                    background: pill.impact === 'high'
+                      ? 'hsla(0, 84%, 60%, 0.04)'
+                      : 'hsla(45, 90%, 60%, 0.04)',
+                  }}
+                />
+              ) : null,
+            )}
+
+            {/* Layer 2: dashed guide lines — always at true x */}
+            {newsPills.map((pill) => (
+              <div
+                key={`guide-${pill.ts}`}
+                className="absolute pointer-events-none"
+                style={{
+                  left: pill.x,
+                  top: 28,
+                  bottom: 36,
+                  width: 1,
+                  borderLeft: `1px dashed ${pill.impact === 'high' ? 'hsla(0, 84%, 60%, 0.35)' : 'hsla(45, 90%, 60%, 0.35)'}`,
+                }}
+              />
+            ))}
+
+            {/* Layer 3: pills or dot markers */}
+            {newsPills.map((pill) => {
+              const impactColor  = pill.impact === 'high' ? 'hsl(0, 84%, 60%)' : 'hsl(45, 90%, 60%)';
+              const impactFill   = pill.impact === 'high' ? 'hsla(0, 84%, 60%, 0.12)' : 'hsla(45, 90%, 60%, 0.12)';
+              const impactBorder = pill.impact === 'high' ? 'hsla(0, 84%, 60%, 0.4)' : 'hsla(45, 90%, 60%, 0.4)';
+              const impactText   = pill.impact === 'high' ? 'hsl(0, 84%, 80%)' : 'hsl(45, 90%, 75%)';
+              const ariaLabel    = `${pill.impact === 'high' ? 'High' : 'Medium'} impact: ${pill.event.event}`;
+              const handleActivate = () => onEventMarkerClickRef.current?.(pill.event);
+
+              // Dot — empty label or overflow beyond 3 rows (row === -1)
+              if (pill.row === -1) {
+                return (
+                  <button
+                    key={`dot-${pill.ts}`}
+                    type="button"
+                    className="absolute pointer-events-auto flex items-center justify-center"
+                    style={{ left: pill.x - 10, top: 12, width: 20, height: 20 }}
+                    onClick={handleActivate}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleActivate(); } }}
+                    aria-label={ariaLabel}
+                    tabIndex={0}
+                    title={pill.event.event}
+                  >
+                    <span
+                      aria-hidden
+                      style={{ display: 'block', width: 8, height: 8, borderRadius: '50%', background: impactColor }}
+                    />
+                  </button>
+                );
+              }
+
+              // Pill
+              const rowTop = pill.row === 0 ? 8 : pill.row === 1 ? 34 : 60;
+              const pillWidth = Math.round(pill.label.length * 6.2 + 28);
+              const tailLeft = Math.max(4, Math.min(pill.x - pill.clampedX - 1, pillWidth - 6));
+
+              return (
+                <button
+                  key={`pill-${pill.ts}`}
+                  type="button"
+                  className="absolute pointer-events-auto flex items-center gap-1 px-1.5 py-0.5 rounded-full whitespace-nowrap select-none transition-opacity hover:opacity-100"
+                  style={{
+                    left: pill.clampedX,
+                    top: rowTop,
+                    fontSize: 11,
+                    lineHeight: 1,
+                    opacity: 0.9,
+                    color: impactText,
+                    background: impactFill,
+                    border: `1px solid ${impactBorder}`,
+                    backdropFilter: 'blur(4px)',
+                  }}
+                  onClick={handleActivate}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleActivate(); } }}
+                  aria-label={ariaLabel}
+                  tabIndex={0}
+                  title={pill.event.event}
+                >
+                  {/* Impact dot */}
+                  <span aria-hidden style={{ display: 'block', width: 5, height: 5, borderRadius: '50%', background: impactColor, flexShrink: 0 }} />
+                  {pill.label}
+                  {/* Move readout — renders only when measured data exists */}
+                  {pill.moveData && (
+                    <span style={{ marginLeft: 4, color: 'hsl(215, 20%, 55%)' }}>
+                      {pill.moveData.direction === 'up' ? '▲' : '▼'}{' '}
+                      {pill.moveData.pips}p · {pill.moveData.minutes}m
+                    </span>
+                  )}
+                  {/* Tail nub pointing down toward guide line */}
+                  <span
+                    aria-hidden
+                    style={{
+                      position: 'absolute',
+                      bottom: -5,
+                      left: tailLeft,
+                      width: 2,
+                      height: 5,
+                      background: impactBorder,
+                      borderRadius: '0 0 2px 2px',
+                    }}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
     );
   },
 );
