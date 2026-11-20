@@ -1,4 +1,4 @@
-import { fetchCandles } from "@/services/candleData";
+import { fetchCandles, PRIORITY_CHART } from "@/services/candleData";
 
 export interface OhlcDataPoint {
   time: string;
@@ -32,7 +32,7 @@ export async function fetchRealOhlcData(
   timeframe: string,
 ): Promise<OhlcDataPoint[] | null> {
   const interval = TF_TO_TFCODE[timeframe] ?? "1h";
-  const candles = await fetchCandles(symbol, interval, 150);
+  const candles = await fetchCandles(symbol, interval, 150, PRIORITY_CHART);
 
   if (candles.length === 0) return null;
 

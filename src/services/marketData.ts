@@ -14,6 +14,16 @@
 // ─────────────────────────────────────────────────────────────
 
 import { MOCK_CANDLES_ENABLED, generateMockQuote } from '@/lib/mockCandleGenerator';
+import {
+  enqueueApiRequest,
+  waitForSlot,
+  msToWait,
+  _callTimestamps,
+  PRIORITY_CHART,
+  PRIORITY_BIAS,
+  getSlotLimit,
+  getPrioritySymbol,
+} from './apiQueue';
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -192,16 +202,21 @@ export function getFormattedMarketChange(quote: MarketQuote | null | undefined):
 // ── Quote proxy integration ───────────────────────────────────
 // Calls our server-side proxy at /api/quote — the upstream provider API
 // key never reaches the browser. The proxy adds its own cache layer.
+//
+// Quotes share the same rolling-window rate limiter as candle fetches
+// (via apiQueue.ts) so combined outgoing calls stay within REQUESTS_PER_MIN.
 
-async function fetchTwelveDataQuote(symbol: string): Promise<MarketQuote | null> {
+const _RATE_LIMITED = Symbol('rate-limited');
+
+async function _doFetchQuote(symbol: string): Promise<MarketQuote | null | typeof _RATE_LIMITED> {
   const url = `/api/quote?symbols=${encodeURIComponent(symbol)}`;
-
   let res: Response;
   try {
     res = await fetch(url);
   } catch {
     return null;
   }
+  if (res.status === 429) return _RATE_LIMITED;
   if (!res.ok) return null;
 
   const json = await res.json();
@@ -235,6 +250,9 @@ async function fetchTwelveDataQuote(symbol: string): Promise<MarketQuote | null>
   };
 }
 
+// In-flight dedup: one upstream call per symbol at a time.
+const _quoteInFlight = new Map<string, Promise<MarketQuote | null>>();
+
 // ── Public API ──────────────────────────────────────────────
 
 /**
@@ -243,16 +261,41 @@ async function fetchTwelveDataQuote(symbol: string): Promise<MarketQuote | null>
  * Callers must handle null explicitly — this function NEVER fabricates
  * a price. The provider layer decides whether to fall back to a
  * last-known-good stale value or to show unavailable state.
+ *
+ * Routes through the shared apiQueue rate limiter (REQUESTS_PER_MIN) and
+ * deduplicates concurrent callers for the same symbol.
  */
 export async function getQuote(symbol: string): Promise<MarketQuote | null> {
   const norm = normalizeSymbol(symbol);
   // ── Mock mode (dev only) ──────────────────────────────────
   if (MOCK_CANDLES_ENABLED) return generateMockQuote(norm);
-  try {
-    return await fetchTwelveDataQuote(norm);
-  } catch {
-    return null;
-  }
+
+  const inflight = _quoteInFlight.get(norm);
+  if (inflight) return inflight;
+
+  // Quote for the currently-viewed symbol runs at PRIORITY_CHART (2) so it
+  // lands before bias/structure/entry candles. Watchlist / Markets quotes run
+  // at PRIORITY_BIAS (1) — below chart candles but above levels data.
+  const slotLimit = getSlotLimit();
+  const quotePriority = getPrioritySymbol() === norm ? PRIORITY_CHART : PRIORITY_BIAS;
+
+  const promise = enqueueApiRequest(async (): Promise<MarketQuote | null> => {
+    await waitForSlot(slotLimit);
+    const result = await _doFetchQuote(norm);
+    if (result === _RATE_LIMITED) {
+      // Wait for the rolling window to reset, then retry once
+      const windowMs = msToWait(_callTimestamps, Date.now(), slotLimit);
+      await new Promise<void>((r) => setTimeout(r, Math.max(windowMs, 5_000) + 500));
+      await waitForSlot(slotLimit);
+      const retry = await _doFetchQuote(norm);
+      return retry === _RATE_LIMITED ? null : retry;
+    }
+    return result;
+  }, quotePriority).catch(() => null);
+
+  _quoteInFlight.set(norm, promise);
+  promise.finally(() => _quoteInFlight.delete(norm));
+  return promise;
 }
 
 /**

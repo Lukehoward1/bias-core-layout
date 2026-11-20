@@ -5,7 +5,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { 
+import {
   MousePointer2,
   TrendingUp,
   Minus,
@@ -16,10 +16,8 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
-  Settings,
   Crosshair,
   Ruler,
-  Camera,
   Brush,
   ArrowDown,
   ArrowUp,
@@ -177,34 +175,24 @@ export function ChartVerticalToolbar({ onZoomIn, onZoomOut, onReset, onClearDraw
 
   return (
     <div className="w-full h-full flex flex-col items-center py-1.5 px-1 bg-background/95 backdrop-blur-sm border-l border-border/50 overflow-y-auto">
+      {/* hidden until drawing tools are implemented */}
       <div className="flex flex-col gap-0.5">
         {/* Cursor / Selection */}
         <ToolGroup tools={cursorTools} activeTool={activeTool} onSelectTool={setActiveTool} />
-        
+
         {/* Crosshair */}
         <ToolGroup tools={crosshairTools} activeTool={activeTool} onSelectTool={setActiveTool} />
-        
-        <div className="w-5 h-px bg-border/50 mx-auto my-1" />
-        
-        {/* Trendline tools */}
-        <ToolGroup tools={trendlineTools} activeTool={activeTool} onSelectTool={setActiveTool} />
-        
-        {/* Shapes */}
-        <ToolGroup tools={shapeTools} activeTool={activeTool} onSelectTool={setActiveTool} />
-        
-        {/* Brush / Marker */}
-        <ToolGroup tools={brushTools} activeTool={activeTool} onSelectTool={setActiveTool} />
-        
-        {/* Fibonacci */}
-        <ToolGroup tools={fibTools} activeTool={activeTool} onSelectTool={setActiveTool} />
-        
-        <div className="w-5 h-px bg-border/50 mx-auto my-1" />
-        
-        {/* Measure Tool */}
-        <ToolGroup tools={measureTools} activeTool={activeTool} onSelectTool={setActiveTool} />
 
-        {/* Delete Tool */}
+        {/*
+        <div className="w-5 h-px bg-border/50 mx-auto my-1" />
+        <ToolGroup tools={trendlineTools} activeTool={activeTool} onSelectTool={setActiveTool} />
+        <ToolGroup tools={shapeTools} activeTool={activeTool} onSelectTool={setActiveTool} />
+        <ToolGroup tools={brushTools} activeTool={activeTool} onSelectTool={setActiveTool} />
+        <ToolGroup tools={fibTools} activeTool={activeTool} onSelectTool={setActiveTool} />
+        <div className="w-5 h-px bg-border/50 mx-auto my-1" />
+        <ToolGroup tools={measureTools} activeTool={activeTool} onSelectTool={setActiveTool} />
         <ToolGroup tools={deleteTools} activeTool={activeTool} onSelectTool={setActiveTool} />
+        */}
       </div>
 
       <div className="flex-1" />
@@ -239,47 +227,12 @@ export function ChartVerticalToolbar({ onZoomIn, onZoomOut, onReset, onClearDraw
           <RotateCcw className="h-4 w-4" />
         </Button>
 
+        {/*
+        hidden until drawing tools are implemented
         <div className="w-5 h-px bg-border/50 mx-auto my-1" />
-
-        {/* Screenshot */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-              title="Screenshot"
-            >
-              <Camera className="h-4 w-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent side="left" align="end" className="w-48 bg-card border-border p-3 z-[200]">
-            <div className="text-sm font-medium text-foreground mb-2">Screenshot</div>
-            <p className="text-xs text-muted-foreground">
-              Export coming soon.
-            </p>
-          </PopoverContent>
-        </Popover>
-
-        {/* Settings */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-              title="Chart Settings"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent side="left" align="end" className="w-48 bg-card border-border p-3 z-[200]">
-            <div className="text-sm font-medium text-foreground mb-2">Chart Settings</div>
-            <p className="text-xs text-muted-foreground">
-              Preferences coming soon.
-            </p>
-          </PopoverContent>
-        </Popover>
+        <Popover> Screenshot </Popover>
+        <Popover> Settings </Popover>
+        */}
       </div>
     </div>
   );

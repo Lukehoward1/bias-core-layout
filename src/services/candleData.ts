@@ -9,10 +9,26 @@ import type { MarketCandle } from "./marketData";
 import type { BiasState } from "./contextEngine";
 import type { TfCode } from "@/data/timeframes";
 import { TRADE_INSTRUMENTS } from "@/data/tradeInstruments";
-import { activeProvider, activeProviderName } from "./activeProvider";
+import { activeProvider } from "./activeProvider";
 import type { TraderTimeframes, TfRole } from "./traderTimeframes";
 import { ROLE_WEIGHT } from "./traderTimeframes";
 import { MOCK_CANDLES_ENABLED, generateMockCandles } from "@/lib/mockCandleGenerator";
+import {
+  REQUESTS_PER_MIN,
+  PRIORITY_CHART,
+  PRIORITY_BIAS,
+  PRIORITY_LEVELS,
+  _callTimestamps,
+  msToWait,
+  waitForSlot,
+  enqueueApiRequest,
+  getSlotLimit,
+  getPrioritySymbol,
+  setPrioritySymbol,
+} from "./apiQueue";
+
+export { REQUESTS_PER_MIN, PRIORITY_CHART, PRIORITY_BIAS, PRIORITY_LEVELS, setPrioritySymbol };
+/** @deprecated Use REQUESTS_PER_MIN */ export const TS_MAX_PER_MIN = REQUESTS_PER_MIN;
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -123,17 +139,9 @@ function setCache(key: string, data: MarketCandle[], interval: string): void {
   candleCache.set(key, { data, expiresAt: Date.now() + getNextCandleCloseMs(interval) });
 }
 
-// ── Rolling-window rate limiter ───────────────────────────────
-// At most TS_MAX_PER_MIN (TD) or FMP_MAX_PER_MIN_CANDLE (FMP) upstream
-// timeseries calls in any rolling 60 s window.
-
-export const TS_MAX_PER_MIN = 5;
-export const FMP_MAX_PER_MIN_CANDLE = 240;
-const _callTimestamps: number[] = [];
-
+// ── Restricted-symbol tracking ────────────────────────────────
 // (symbol, interval) pairs permanently marked restricted by the active provider.
-// Keyed as "NORM:interval". A symbol-only lookup checks whether ANY interval is restricted.
-// Set on first restricted result; cleared only on page reload.
+// Keyed as "NORM:interval". Set on first restricted result; cleared on page reload.
 const _restrictedKeys = new Set<string>();
 
 function _restrictedKey(norm: string, interval?: string): string {
@@ -143,96 +151,18 @@ function _restrictedKey(norm: string, interval?: string): string {
 export function isSymbolRestricted(symbol: string, interval?: string): boolean {
   const norm = normalizeSymbol(symbol);
   if (interval) return _restrictedKeys.has(_restrictedKey(norm, interval));
-  // Symbol-only: restricted if any interval is restricted for this symbol
   for (const k of _restrictedKeys) {
     if (k === norm || k.startsWith(`${norm}:`)) return true;
   }
   return false;
 }
 
-/**
- * Pure: returns the ms to wait before the next call can be issued without
- * exceeding maxPerMin in any rolling 60 s window. Exported for tests.
- */
-export function msToWait(timestamps: number[], nowMs: number, maxPerMin: number): number {
-  const recent = timestamps.filter((t) => nowMs - t < 60_000);
-  if (recent.length < maxPerMin) return 0;
-  const sorted = [...recent].sort((a, b) => a - b);
-  return Math.max(0, sorted[recent.length - maxPerMin] + 60_000 - nowMs);
-}
+// Re-export for tests (msToWait moved to apiQueue.ts)
+export { msToWait };
 
-/** Claims one rate-limit slot; waits if the rolling window is full. */
-async function waitForSlot(): Promise<void> {
-  const maxPerMin = activeProviderName === 'fmp' ? FMP_MAX_PER_MIN_CANDLE : TS_MAX_PER_MIN;
-  for (;;) {
-    const now = Date.now();
-    const wait = msToWait(_callTimestamps, now, maxPerMin);
-    if (wait <= 0) {
-      _callTimestamps.push(now);
-      // Prune entries older than 2 minutes (safely past the 60 s window)
-      while (_callTimestamps.length > 0 && now - _callTimestamps[0] > 120_000) {
-        _callTimestamps.shift();
-      }
-      return;
-    }
-    await new Promise<void>((r) => setTimeout(r, Math.min(wait + 50, 2_000)));
-  }
-}
-
-// ── Request queue ─────────────────────────────────────────────
-// Limits concurrent Twelve Data fetches to MAX_CONCURRENT. Lower = gentler on
-// the shared 8-req/min Basic key. Higher-priority tasks (currently-viewed
-// asset) are inserted at the front.
-
-const MAX_CONCURRENT = 2;
-let _active = 0;
-let _prioritySymbol: string | null = null;
-
-interface QueueTask<T> {
-  fn: () => Promise<T>;
-  resolve: (value: T) => void;
-  reject: (reason: unknown) => void;
-  priority: number; // higher number = runs first
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const _queue: QueueTask<any>[] = [];
 // In-flight promise resolves to the FULL upstream array (STANDARD_SIZE);
 // callers slice to their requested outputsize. One upstream call serves all.
 const _inFlight = new Map<string, Promise<MarketCandle[]>>();
-
-/** Call when the user navigates to an asset detail view so its fetches run first. */
-export function setPrioritySymbol(symbol: string | null): void {
-  _prioritySymbol = symbol ? normalizeSymbol(symbol) : null;
-}
-
-function _drain(): void {
-  while (_active < MAX_CONCURRENT && _queue.length > 0) {
-    const task = _queue.shift()!;
-    _active++;
-    task
-      .fn()
-      .then(task.resolve, task.reject)
-      .finally(() => {
-        _active--;
-        _drain();
-      });
-  }
-}
-
-function _enqueue<T>(fn: () => Promise<T>, priority: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const task: QueueTask<T> = { fn, resolve, reject, priority };
-    // Maintain descending priority order; equal priorities preserve insertion order.
-    const idx = _queue.findIndex((e) => e.priority < priority);
-    if (idx === -1) {
-      _queue.push(task);
-    } else {
-      _queue.splice(idx, 0, task);
-    }
-    _drain();
-  });
-}
 
 // ── Symbol whitelist ──────────────────────────────────────────
 // Only these symbols are permitted to call the Twelve Data time_series endpoint.
@@ -276,6 +206,7 @@ export async function fetchCandles(
   symbol: string,
   interval: string,
   outputsize: number = 10,
+  priority: number = PRIORITY_BIAS,
 ): Promise<MarketCandle[]> {
   const norm = normalizeSymbol(symbol);
 
@@ -308,26 +239,30 @@ export async function fetchCandles(
   }
 
   const upstreamSize = Math.max(outputsize, STANDARD_SIZE);
-  const priority = _prioritySymbol === norm ? 1 : 0;
+  // getPrioritySymbol() (set by Trade/AssetDetail page) boosts to PRIORITY_CHART;
+  // callers pass their own tier (PRIORITY_BIAS for analysis, PRIORITY_LEVELS for overlays).
+  const effectivePriority = getPrioritySymbol() === norm ? PRIORITY_CHART : priority;
+  const slotLimit = getSlotLimit();
 
   // Each attempt is a separate enqueued task so the queue slot is released
   // during backoff (backoff sleep no longer holds MAX_CONCURRENT slots).
   // Concurrent callers for the same key still coalesce via _inFlight.
   const promise = new Promise<MarketCandle[]>((resolve) => {
     let attempt = 0;
+    let has429Retried = false;
 
     function runAttempt(): void {
-      _enqueue(async (): Promise<void> => {
+      enqueueApiRequest(async (): Promise<void> => {
         const cached2 = getCached(key, upstreamSize);
         if (cached2) { resolve(cached2); return; }
 
         const slotStart = Date.now();
-        await waitForSlot();
+        await waitForSlot(slotLimit);
         const slotWaitMs = Date.now() - slotStart;
         const callStart = Date.now();
         const result = await activeProvider.fetchCandles(norm, interval as TfCode, upstreamSize);
         const callMs = Date.now() - callStart;
-        debugCandles(norm, interval, attempt, slotWaitMs, _queue.length, result.kind, callMs);
+        debugCandles(norm, interval, attempt, slotWaitMs, 0, result.kind, callMs);
 
         if (result.kind === 'restricted') {
           _restrictedKeys.add(_restrictedKey(norm, interval));
@@ -340,6 +275,18 @@ export async function fetchCandles(
           return;
         }
 
+        // 429: wait for the rolling window to reset, then retry once
+        if (result.kind === 'error' && result.httpStatus === 429) {
+          if (!has429Retried) {
+            has429Retried = true;
+            const windowMs = msToWait(_callTimestamps, Date.now(), slotLimit);
+            setTimeout(runAttempt, Math.max(windowMs, 5_000) + 500);
+          } else {
+            resolve([]);
+          }
+          return;
+        }
+
         const delay = retryDelay(attempt, RETRY_BACKOFFS_MS);
         if (delay !== null) {
           attempt++;
@@ -347,7 +294,7 @@ export async function fetchCandles(
         } else {
           resolve([]);
         }
-      }, priority).catch(() => resolve([]));
+      }, effectivePriority).catch(() => resolve([]));
     }
 
     runAttempt();
@@ -501,9 +448,9 @@ export async function getRealLevels(symbol: string, timeframes: TraderTimeframes
   try {
     // All three fetched at outputsize=20 so cache keys match getTriTimeframeBias (sym:tf:20).
     const [biasCandles, structureCandles, entryCandles] = await Promise.all([
-      fetchCandles(symbol, timeframes.bias, 20),
-      fetchCandles(symbol, timeframes.structure, 20),
-      fetchCandles(symbol, timeframes.entry, 20),
+      fetchCandles(symbol, timeframes.bias, 20, PRIORITY_LEVELS),
+      fetchCandles(symbol, timeframes.structure, 20, PRIORITY_LEVELS),
+      fetchCandles(symbol, timeframes.entry, 20, PRIORITY_LEVELS),
     ]);
 
     // Need at least 6 bias-TF candles (index 0 = forming, 1..5 = 5 closed)
