@@ -63,8 +63,13 @@ export function ChartOverlayController({
   );
 
   const swingOverlays = useMemo(
-    () => buildSwingOverlays(bars, interval),
-    [bars, interval],
+    () => {
+      const lp = levelOverlays
+        .filter((o): o is Extract<OverlayDescriptor, { kind: 'price-line' }> => o.kind === 'price-line')
+        .map((o) => o.price);
+      return buildSwingOverlays(bars, interval, lp);
+    },
+    [bars, interval, levelOverlays],
   );
 
   const tradeOverlays = useMemo(

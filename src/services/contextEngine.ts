@@ -21,8 +21,8 @@ export type BiasState =
 export type StructureState = "Trending Up" | "Trending Down" | "Ranging" | "Structure Shifting" | "Consolidating";
 
 export type LevelType =
-  | "Swing High"
-  | "Swing Low"
+  | "Previous High"
+  | "Previous Low"
   | "Liquidity Sweep"
   | "Strong Reaction Zone"
   | "Break and Retest Zone"
@@ -269,11 +269,11 @@ async function buildLevels(
 
     levels.push(
       makeLevel({
-        type: "Swing High",
+        type: "Previous High",
         price: biasHigh,
         decimals,
         tags: ["Tested once", "Possible reaction zone"],
-        reason: `Prior ${biasTfLabel} high — nearest overhead swing area where price may react.`,
+        reason: `Prior ${biasTfLabel} high — overhead reference level from the bias timeframe.`,
         alignedWithBias: isBearish,
         higherTimeframe: false,
       }),
@@ -281,11 +281,11 @@ async function buildLevels(
 
     levels.push(
       makeLevel({
-        type: "Swing Low",
+        type: "Previous Low",
         price: biasLow,
         decimals,
         tags: ["Tested once", "Possible reaction zone"],
-        reason: `Prior ${biasTfLabel} low — nearest downside swing area acting as the closest demand reference.`,
+        reason: `Prior ${biasTfLabel} low — lower reference level from the bias timeframe.`,
         alignedWithBias: isBullish,
         higherTimeframe: false,
       }),

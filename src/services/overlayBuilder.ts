@@ -14,12 +14,12 @@ import { getEventImpact } from '@/data/eventImpactRules';
 import { isFxPairSymbol, normalizeMarketSymbol, getSymbolCurrencies, INDEX_CCY } from '@/lib/symbolCurrencies';
 
 export type OverlayDescriptor =
-  | { kind: 'price-line';     price: number; label: string; color: string; dash?: boolean; axisLabelVisible?: boolean }
+  | { kind: 'price-line';     price: number; label: string; color: string; dash?: boolean; dotted?: boolean; axisLabelVisible?: boolean }
   | { kind: 'event-marker';   timestamp: number; label: string; impact: 'high' | 'medium'; event: CalendarEvent;
       /** Populated once calendar + candle history are wired up. Pill renders the slot only when present. */
       moveData?: { direction: 'up' | 'down'; pips: number; minutes: number } }
   | { kind: 'session-line';   timestamp: number; label: string; color: string }
-  | { kind: 'swing-marker';   timestamp: number; price: number; direction: 'high' | 'low' }
+  | { kind: 'swing-marker';   timestamp: number; price: number; direction: 'high' | 'low'; opacity: number }
   | { kind: 'highlight-band'; from: number; to: number; color: string; label?: string };
 
 // ── Pure helpers (exported for tests) ─────────────────────────
@@ -135,8 +135,8 @@ const SESSION_NAMES_BY_CCY: Record<string, string> = {
 };
 
 const LEVEL_ABBREVS: Record<string, string> = {
-  'Swing High': 'PrevH',
-  'Swing Low': 'PrevL',
+  'Previous High': 'PrevH',
+  'Previous Low': 'PrevL',
   'Liquidity Sweep': 'LiqSwp',
   'Strong Reaction Zone': 'SRZ',
   'Break and Retest Zone': 'BnR',
@@ -377,24 +377,55 @@ export function buildSessionOverlays(
   return result;
 }
 
-const MAX_SWING_MARKERS = 20;
+const SWING_OPACITIES = [1.0, 0.65, 0.4] as const;
 
-/** Pivot-based swing high/low markers. N=3 for sub-hour intervals, N=5 for 1H+. */
+/**
+ * Pivot-based swing high/low markers (latest 3 each direction) + horizontal
+ * dotted lines for the single latest SH and SL.
+ * N=3 for sub-hour intervals, N=5 for 1H+. Confirmed pivots only.
+ * levelPrices: existing level prices used for axis-label collision avoidance.
+ */
 export function buildSwingOverlays(
   bars: OhlcDataPoint[],
   interval: string,
+  levelPrices: number[] = [],
 ): OverlayDescriptor[] {
   const n = intervalMinutes(interval) < 60 ? 3 : 5;
   const pivots = computeSwingPivots(bars, n);
-  const capped = pivots.length > MAX_SWING_MARKERS
-    ? pivots.slice(pivots.length - MAX_SWING_MARKERS)
-    : pivots;
-  return capped.map((p) => ({
-    kind: 'swing-marker' as const,
-    timestamp: p.timestamp,
-    price: p.price,
-    direction: p.direction,
-  }));
+
+  // Latest 3 of each direction, newest first.
+  const highs = pivots.filter((p) => p.direction === 'high').slice(-3).reverse();
+  const lows  = pivots.filter((p) => p.direction === 'low').slice(-3).reverse();
+
+  const result: OverlayDescriptor[] = [];
+
+  for (let i = 0; i < highs.length; i++) {
+    result.push({ kind: 'swing-marker', timestamp: highs[i].timestamp, price: highs[i].price, direction: 'high', opacity: SWING_OPACITIES[i] });
+  }
+  for (let i = 0; i < lows.length; i++) {
+    result.push({ kind: 'swing-marker', timestamp: lows[i].timestamp, price: lows[i].price, direction: 'low', opacity: SWING_OPACITIES[i] });
+  }
+
+  // Swing lines: faint dotted horizontal for the single latest SH and SL.
+  const slice = bars.slice(-Math.min(20, bars.length));
+  const avgRange = slice.length >= 2
+    ? slice.reduce((s, b) => s + (b.high - b.low), 0) / slice.length
+    : 0.001;
+  const proximity = avgRange * 0.5;
+
+  if (highs.length > 0) {
+    const shPrice = highs[0].price;
+    const hasNearby = levelPrices.some((p) => Math.abs(p - shPrice) < proximity);
+    result.push({ kind: 'price-line', price: shPrice, label: 'SH', color: 'hsla(0, 84%, 60%, 0.5)', dotted: true, axisLabelVisible: !hasNearby });
+  }
+
+  if (lows.length > 0) {
+    const slPrice = lows[0].price;
+    const hasNearby = levelPrices.some((p) => Math.abs(p - slPrice) < proximity);
+    result.push({ kind: 'price-line', price: slPrice, label: 'SL', color: 'hsla(142, 71%, 45%, 0.5)', dotted: true, axisLabelVisible: !hasNearby });
+  }
+
+  return result;
 }
 
 /** Entry/stop/target price-lines from InATradeButton state. */

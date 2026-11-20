@@ -206,6 +206,9 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
     // Ref kept current so the range-change subscription reads fresh overlays.
     const overlaysRef = useRef(overlays);
     useEffect(() => { overlaysRef.current = overlays; });
+    // Ref kept current so computeNewsPills can read bar prices without being in its deps.
+    const barsRef = useRef(bars);
+    barsRef.current = bars;
 
     // State preserved across renders so the live-update effect can derive from it.
     const seriesKindRef = useRef<ChartStyle>(chartStyle);
@@ -216,6 +219,8 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
     const baseLastHaRef = useRef<BaseOhlc | null>(null);
     const chartSettingsRef = useRef(chartSettings ?? DEFAULT_SETTINGS);
     chartSettingsRef.current = chartSettings ?? DEFAULT_SETTINGS;
+    const prevScaleTopRef  = useRef<number>(0.08);
+    const prevPillsKeyRef  = useRef<string>('');
 
     const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
     // Incremented by the structural effect each time it (re)creates the main series.
@@ -223,13 +228,22 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
     // series rebuild (e.g. chart style change) even when the overlays array itself
     // hasn't changed.
     const [seriesGen, setSeriesGen] = useState(0);
+    const [hoveredTs, setHoveredTs] = useState<number | null>(null);
 
-    // ── News pill positions ────────────────────────────────────
-    // Recomputed from LWC pixel coordinates whenever the chart pans/zooms or overlays change.
+    // ── News pill positions ─────────────────────────────────────
+    // Candle-safe placement: the horizontal span of each pill is intersected
+    // with all visible bar bounding boxes to find the tallest wick (minYTop)
+    // and lowest wick (maxYBot). Six candidates are tried in order — above
+    // levels 0–2, then below levels 0–2 — accepting the first that stays
+    // inside the plot area and does not overlap an already-placed pill.
+    // Fallback: dot-only marker.
     interface NewsPill {
-      x: number;        // true chart x coordinate (guide line stays here)
-      clampedX: number; // pill left edge after edge clamping
-      row: number;      // -1 = dot mode, 0–2 = pill row (top: 8/34/60px)
+      x: number;         // event-candle center x
+      clampedX: number;  // pill left edge (edge-clamped)
+      level: number;     // 0–2 for pills, -1 = dot fallback
+      above: boolean;
+      yCandle: number;   // anchor: candle high (above) or low (below)
+      stemLength: number;
       ts: number;
       label: string;
       impact: 'high' | 'medium';
@@ -239,72 +253,198 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
     }
     const [newsPills, setNewsPills] = useState<NewsPill[]>([]);
 
-    // Stable callback (reads from refs) — safe to pass to LWC subscriptions.
+    // Stable callback — reads refs only, safe for LWC subscriptions + RAF loop.
     const computeNewsPills = useCallback(() => {
-      const chart = chartRef.current;
-      const timeScale = chart?.timeScale();
-      if (!timeScale || !chart || !containerRef.current) return;
+      const chart      = chartRef.current;
+      const timeScale  = chart?.timeScale();
+      const mainSeries = mainSeriesRef.current;
+      if (!timeScale || !chart || !containerRef.current || !mainSeries) return;
 
-      const containerWidth = containerRef.current.clientWidth;
-      const scaleWidth = chart.priceScale('right').width();
-      const plotWidth = containerWidth - scaleWidth;
-      const GAP = 4;
+      // ── Headroom: widen top margin when event markers are visible
+      const hasEvents = (overlaysRef.current ?? []).some((o) => o.kind === 'event-marker');
+      const desiredScaleTop = hasEvents ? 0.16 : 0.08;
+      if (prevScaleTopRef.current !== desiredScaleTop) {
+        prevScaleTopRef.current = desiredScaleTop;
+        chart.applyOptions({ rightPriceScale: { scaleMargins: { top: desiredScaleTop, bottom: 0.08 } } });
+      }
 
-      // Collect raw pill data; skip timestamps outside the plot area.
-      // timeToIndex with findNearest=true snaps sub-bar timestamps to the nearest
-      // bar (required because real events like "13:30 UTC" don't fall on the exact
-      // UTC-hour bar boundaries that mock and live candles use).
+      const containerWidth  = containerRef.current.clientWidth;
+      const containerHeight = containerRef.current.clientHeight;
+      const scaleWidth  = chart.priceScale('right').width();
+      const plotWidth   = containerWidth - scaleWidth;
+      const TIME_AXIS_H = 28;
+      const plotHeight  = containerHeight - TIME_AXIS_H;
+
+      const rawBars  = barsRef.current;
+      const logRange = timeScale.getVisibleLogicalRange();
+
+      // Derive half-candle-width from spacing between two adjacent visible bars
+      let halfBarW = 4;
+      if (logRange) {
+        const liStart = Math.max(0, Math.floor(logRange.from));
+        const liEnd   = Math.min(rawBars.length - 1, Math.ceil(logRange.to));
+        for (let li = liStart; li < liEnd; li++) {
+          const xa = timeScale.logicalToCoordinate(li as unknown as Logical);
+          const xb = timeScale.logicalToCoordinate((li + 1) as unknown as Logical);
+          if (xa !== null && xb !== null) {
+            halfBarW = Math.abs((xb as number) - (xa as number)) / 2;
+            break;
+          }
+        }
+      }
+
+      // Build pixel bounding boxes for all visible bars
+      type BarPx = { x: number; yTop: number; yBot: number };
+      const visibleBars: BarPx[] = [];
+      {
+        const iFrom = logRange ? Math.max(0, Math.floor(logRange.from)) : 0;
+        const iTo   = logRange ? Math.min(rawBars.length - 1, Math.ceil(logRange.to)) : rawBars.length - 1;
+        for (let i = iFrom; i <= iTo; i++) {
+          const bar = rawBars[i];
+          if (!bar) continue;
+          const xc = timeScale.logicalToCoordinate(i as unknown as Logical);
+          if (xc === null) continue;
+          const yt = mainSeries.priceToCoordinate(bar.high);
+          const yb = mainSeries.priceToCoordinate(bar.low);
+          if (yt === null || yb === null) continue;
+          visibleBars.push({ x: xc as number, yTop: yt as number, yBot: yb as number });
+        }
+      }
+
+      // Min yTop / max yBot of bars whose center x falls within the pill's span
+      const spanStats = (pillLeft: number, pillWidth: number) => {
+        const lo = pillLeft - halfBarW;
+        const hi = pillLeft + pillWidth + halfBarW;
+        let minYTop = Infinity;
+        let maxYBot = -Infinity;
+        for (const b of visibleBars) {
+          if (b.x >= lo && b.x <= hi) {
+            if (b.yTop < minYTop) minYTop = b.yTop;
+            if (b.yBot > maxYBot) maxYBot = b.yBot;
+          }
+        }
+        return { minYTop, maxYBot };
+      };
+
+      const PILL_H     = 22;
+      const PILL_GAP   = 6;        // clearance between pill edge and tallest wick
+      const LEVEL_STEP = PILL_H + 4; // 26 px per stacked level
+      const INTER_PILL = 4;
+      const TOP_BOUND  = 4;
+      const EDGE_GAP   = 4;
+
+      // Collect event-marker overlays in screen-x order
       const raw: Array<{
         x: number; ts: number; label: string; impact: 'high' | 'medium';
         event: CalendarEvent; windowEndX: number | null;
         moveData?: { direction: 'up' | 'down'; pips: number; minutes: number };
+        yEventHigh: number; yEventLow: number;
       }> = [];
+
       for (const o of (overlaysRef.current ?? [])) {
         if (o.kind !== 'event-marker') continue;
         const idx = timeScale.timeToIndex(o.timestamp as Time, true);
         if (idx === null) continue;
-        const x = timeScale.logicalToCoordinate(idx as unknown as Logical);
-        if (x === null || (x as number) < 0 || (x as number) > plotWidth) continue;
-        const endIdx = timeScale.timeToIndex((o.timestamp + 15 * 60) as Time, true);
-        const windowEndX = endIdx !== null ? timeScale.logicalToCoordinate(endIdx as unknown as Logical) : null;
+        const xc = timeScale.logicalToCoordinate(idx as unknown as Logical);
+        if (xc === null) continue;
+        const xNum = xc as number;
+        if (xNum < 0 || xNum > plotWidth) continue;
+        const barIdx = idx as unknown as number;
+        const bar = rawBars[barIdx] ?? rawBars[rawBars.length - 1];
+        if (!bar) continue;
+        const yH = mainSeries.priceToCoordinate(bar.high);
+        const yL = mainSeries.priceToCoordinate(bar.low);
+        if (yH === null || yL === null) continue;
+        const endIdx  = timeScale.timeToIndex((o.timestamp + 15 * 60) as Time, true);
+        const weCoord = endIdx !== null ? timeScale.logicalToCoordinate(endIdx as unknown as Logical) : null;
         raw.push({
-          x: x as number,
-          ts: o.timestamp,
-          label: o.label,
-          impact: o.impact,
-          event: o.event,
-          windowEndX: windowEndX !== null ? windowEndX as number : null,
+          x: xNum, ts: o.timestamp, label: o.label, impact: o.impact, event: o.event,
+          windowEndX: weCoord !== null ? (weCoord as number) : null,
           moveData: o.moveData,
+          yEventHigh: yH as number, yEventLow: yL as number,
         });
       }
 
-      // Sort left-to-right for row assignment.
       raw.sort((a, b) => a.x - b.x);
 
-      // Per-row right-edge tracker for collision avoidance (3 rows max).
-      const rowRight: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+      // Track placed pill rects for inter-pill collision detection
+      const placed: Array<{ left: number; top: number; right: number; bottom: number }> = [];
+      const collides = (l: number, t: number, r: number, b: number): boolean => {
+        for (const p of placed) {
+          if (r + INTER_PILL > p.left && l - INTER_PILL < p.right &&
+              b + INTER_PILL > p.top  && t - INTER_PILL < p.bottom) return true;
+        }
+        return false;
+      };
 
-      const pills: NewsPill[] = raw.map((p) => {
-        // Empty label → always a dot; row -1 signals dot rendering.
-        if (p.label === '') return { ...p, row: -1, clampedX: p.x };
+      const pills: NewsPill[] = [];
+
+      for (const p of raw) {
+        if (p.label === '') {
+          pills.push({ x: p.x, clampedX: p.x, level: -1, above: true,
+            yCandle: p.yEventHigh, stemLength: 0, ts: p.ts, label: '',
+            impact: p.impact, event: p.event, windowEndX: p.windowEndX, moveData: p.moveData });
+          continue;
+        }
 
         const pillWidth = Math.round(p.label.length * 6.2 + 28);
-        const idealLeft = p.x - pillWidth / 2;
-        const clampedLeft = Math.max(GAP, Math.min(idealLeft, plotWidth - pillWidth - GAP));
-        const rightEdge = clampedLeft + pillWidth;
+        const pillLeft  = Math.max(EDGE_GAP, Math.min(p.x - pillWidth / 2, plotWidth - pillWidth - EDGE_GAP));
+        const pillRight = pillLeft + pillWidth;
 
-        let assignedRow = -1; // -1 = overflow → dot fallback
-        for (let r = 0; r < 3; r++) {
-          if (clampedLeft >= rowRight[r]) {
-            rowRight[r] = rightEdge + GAP;
-            assignedRow = r;
-            break;
-          }
+        const { minYTop, maxYBot } = spanStats(pillLeft, pillWidth);
+        const effMinYTop = minYTop === Infinity  ? p.yEventHigh : minYTop;
+        const effMaxYBot = maxYBot === -Infinity ? p.yEventLow  : maxYBot;
+
+        type Cand = { above: boolean; level: number; top: number; bottom: number; stemLen: number; yCandle: number };
+        const candidates: Cand[] = [];
+
+        // Above levels 0–2: pill bottom clears tallest wick in span by PILL_GAP
+        const aboveBase = effMinYTop - PILL_GAP;
+        for (let lv = 0; lv < 3; lv++) {
+          const bottom = aboveBase - lv * LEVEL_STEP;
+          const top    = bottom - PILL_H;
+          candidates.push({ above: true,  level: lv, top, bottom,
+            stemLen: p.yEventHigh - bottom, yCandle: p.yEventHigh });
         }
-        return { ...p, row: assignedRow, clampedX: clampedLeft };
-      });
+        // Below levels 0–2: pill top clears lowest wick in span by PILL_GAP
+        const belowBase = effMaxYBot + PILL_GAP;
+        for (let lv = 0; lv < 3; lv++) {
+          const top    = belowBase + lv * LEVEL_STEP;
+          const bottom = top + PILL_H;
+          candidates.push({ above: false, level: lv, top, bottom,
+            stemLen: top - p.yEventLow, yCandle: p.yEventLow });
+        }
 
-      setNewsPills(pills);
+        let chosen: Cand | null = null;
+        for (const c of candidates) {
+          if (c.top < TOP_BOUND || c.bottom > plotHeight) continue;
+          if (collides(pillLeft, c.top, pillRight, c.bottom)) continue;
+          chosen = c;
+          break;
+        }
+
+        if (!chosen) {
+          pills.push({ x: p.x, clampedX: p.x, level: -1, above: true,
+            yCandle: p.yEventHigh, stemLength: 0, ts: p.ts, label: p.label,
+            impact: p.impact, event: p.event, windowEndX: p.windowEndX, moveData: p.moveData });
+          continue;
+        }
+
+        placed.push({ left: pillLeft, top: chosen.top, right: pillRight, bottom: chosen.bottom });
+        pills.push({ x: p.x, clampedX: pillLeft, level: chosen.level, above: chosen.above,
+          yCandle: chosen.yCandle, stemLength: Math.max(0, chosen.stemLen),
+          ts: p.ts, label: p.label, impact: p.impact, event: p.event,
+          windowEndX: p.windowEndX, moveData: p.moveData });
+      }
+
+      // Skip state update when pill geometry is identical (avoids re-renders during RAF loop)
+      const key = pills.map((p) =>
+        `${p.ts}:${Math.round(p.clampedX)}:${Math.round(p.yCandle)}:${p.level}:${p.above ? 1 : 0}`
+      ).join('|');
+      if (key !== prevPillsKeyRef.current) {
+        prevPillsKeyRef.current = key;
+        setNewsPills(pills);
+      }
     }, []); // stable — only reads refs
 
     const handleZoomIn = useCallback(() => {
@@ -364,6 +504,7 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
         },
         rightPriceScale: { mode: toPsMode(s.priceScaleMode) },
       });
+      computeNewsPills();
       const series = mainSeriesRef.current;
       const kind = seriesKindRef.current;
       if (!series) return;
@@ -391,7 +532,7 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
           wickDownColor: s.downColor,
         });
       }
-    }, [chartSettings]);
+    }, [chartSettings, computeNewsPills]);
 
     // ── Init chart (once) ──────────────────────────────────────
     useEffect(() => {
@@ -447,6 +588,29 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       });
       chartRef.current = chart;
 
+      // ── Vertical-axis rescale: LWC has no price-scale-change subscription,
+      // so we run a RAF loop while the pointer is held or wheel is active.
+      let vRafId: number | null = null;
+      let vStopTimer: ReturnType<typeof setTimeout> | null = null;
+      const stopVLoop = () => { if (vRafId !== null) { cancelAnimationFrame(vRafId); vRafId = null; } };
+      const scheduleVStop = () => {
+        if (vStopTimer) clearTimeout(vStopTimer);
+        vStopTimer = setTimeout(() => { stopVLoop(); vStopTimer = null; }, 300);
+      };
+      const startVLoop = () => {
+        stopVLoop();
+        if (vStopTimer) { clearTimeout(vStopTimer); vStopTimer = null; }
+        const tick = () => { computeNewsPills(); vRafId = requestAnimationFrame(tick); };
+        vRafId = requestAnimationFrame(tick);
+      };
+      const onVDown  = () => startVLoop();
+      const onVUp    = () => { stopVLoop(); scheduleVStop(); computeNewsPills(); };
+      const onVWheel = () => { computeNewsPills(); startVLoop(); scheduleVStop(); };
+      const chartEl = containerRef.current!;
+      chartEl.addEventListener('pointerdown', onVDown);
+      window.addEventListener('pointerup', onVUp);
+      chartEl.addEventListener('wheel', onVWheel, { passive: true });
+
       let rafId: number | null = null;
       const handleResize = () => {
         if (!containerRef.current || !chartRef.current) return;
@@ -474,6 +638,11 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
           }
           crosshairHandlerRef.current = null;
         }
+        chartEl.removeEventListener('pointerdown', onVDown);
+        window.removeEventListener('pointerup', onVUp);
+        chartEl.removeEventListener('wheel', onVWheel);
+        stopVLoop();
+        if (vStopTimer) clearTimeout(vStopTimer);
         chart.remove();
         chartRef.current = null;
         mainSeriesRef.current = null;
@@ -774,7 +943,7 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
           const line = main.createPriceLine({
             price: o.price,
             color: o.color,
-            lineStyle: o.dash ? LineStyle.Dashed : LineStyle.Solid,
+            lineStyle: o.dotted ? LineStyle.Dotted : o.dash ? LineStyle.Dashed : LineStyle.Solid,
             lineWidth: 1,
             axisLabelVisible: o.axisLabelVisible ?? true,
             title: o.label,
@@ -799,11 +968,14 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
             text: nearNews ? '' : o.label,
           });
         } else if (o.kind === 'swing-marker') {
+          const opacity = o.opacity ?? 1.0;
           markers.push({
             time: o.timestamp as Time,
             position: o.direction === 'high' ? 'aboveBar' : 'belowBar',
             shape: 'circle',
-            color: o.direction === 'high' ? 'hsl(0, 84%, 60%)' : 'hsl(142, 71%, 45%)',
+            color: o.direction === 'high'
+              ? `hsla(0, 84%, 60%, ${opacity})`
+              : `hsla(142, 71%, 45%, ${opacity})`,
             size: 0,
             text: o.direction === 'high' ? 'SH' : 'SL',
           });
@@ -868,13 +1040,13 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
         <div ref={containerRef} className="absolute inset-0 bg-[hsl(222,30%,5%)]" />
 
         {/* ── News callout layer ──────────────────────────────────
-            Pills float above the candles: pill → dashed guide line → bar.
-            Shade window covers event time to +15 min.
-            Move readout (▲/▼ N pips · N min) renders only when moveData exists;
-            the slot is intentionally absent until calendar + history are connected. */}
+            Pills are anchored to the candle they belong to via
+            priceToCoordinate. A short stem + dot connects each pill
+            to the candle high (or low when near the chart top).
+            Shade window covers event time to +15 min. */}
         {newsPills.length > 0 && (
           <div className="absolute inset-0 pointer-events-none overflow-hidden z-[3]">
-            {/* Layer 1: shade windows (behind guide lines and pills) */}
+            {/* Layer 1: shade windows */}
             {newsPills.map((pill) =>
               pill.windowEndX !== null && pill.windowEndX > pill.x ? (
                 <div
@@ -891,22 +1063,53 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
               ) : null,
             )}
 
-            {/* Layer 2: dashed guide lines — always at true x */}
-            {newsPills.map((pill) => (
-              <div
-                key={`guide-${pill.ts}`}
-                className="absolute pointer-events-none"
-                style={{
-                  left: pill.x,
-                  top: 28,
-                  bottom: 36,
-                  width: 1,
-                  borderLeft: `1px dashed ${pill.impact === 'high' ? 'hsla(0, 84%, 60%, 0.35)' : 'hsla(45, 90%, 60%, 0.35)'}`,
-                }}
-              />
-            ))}
+            {/* Layer 2: stems — vertical line from candle anchor to pill */}
+            {newsPills.map((pill) => {
+              if (pill.level < 0) return null;
+              const isHovered = hoveredTs === pill.ts;
+              const color = pill.impact === 'high'
+                ? `hsla(0, 84%, 60%, ${isHovered ? 0.7 : 0.4})`
+                : `hsla(45, 90%, 60%, ${isHovered ? 0.7 : 0.4})`;
+              const stemTop = pill.above ? pill.yCandle - pill.stemLength : pill.yCandle;
+              return (
+                <div
+                  key={`stem-${pill.ts}`}
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: pill.x - 0.5,
+                    top: stemTop,
+                    width: 1,
+                    height: pill.stemLength,
+                    background: color,
+                  }}
+                />
+              );
+            })}
 
-            {/* Layer 3: pills or dot markers */}
+            {/* Layer 3: anchor dots at candle high or low */}
+            {newsPills.map((pill) => {
+              if (pill.level < 0) return null;
+              const isHovered = hoveredTs === pill.ts;
+              const color = pill.impact === 'high'
+                ? `hsla(0, 84%, 60%, ${isHovered ? 1 : 0.7})`
+                : `hsla(45, 90%, 60%, ${isHovered ? 1 : 0.7})`;
+              return (
+                <div
+                  key={`anchorDot-${pill.ts}`}
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: pill.x - 2,
+                    top: pill.yCandle - 2,
+                    width: 4,
+                    height: 4,
+                    borderRadius: '50%',
+                    background: color,
+                  }}
+                />
+              );
+            })}
+
+            {/* Layer 4: pills or dot fallback buttons */}
             {newsPills.map((pill) => {
               const impactColor  = pill.impact === 'high' ? 'hsl(0, 84%, 60%)' : 'hsl(45, 90%, 60%)';
               const impactFill   = pill.impact === 'high' ? 'hsla(0, 84%, 60%, 0.12)' : 'hsla(45, 90%, 60%, 0.12)';
@@ -914,15 +1117,16 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
               const impactText   = pill.impact === 'high' ? 'hsl(0, 84%, 80%)' : 'hsl(45, 90%, 75%)';
               const ariaLabel    = `${pill.impact === 'high' ? 'High' : 'Medium'} impact: ${pill.event.event}`;
               const handleActivate = () => onEventMarkerClickRef.current?.(pill.event);
+              const isHovered = hoveredTs === pill.ts;
 
-              // Dot — empty label or overflow beyond 3 rows (row === -1)
-              if (pill.row === -1) {
+              // Dot fallback — empty label or all 3 levels full
+              if (pill.level === -1) {
                 return (
                   <button
-                    key={`dot-${pill.ts}`}
+                    key={`dot-btn-${pill.ts}`}
                     type="button"
                     className="absolute pointer-events-auto flex items-center justify-center"
-                    style={{ left: pill.x - 10, top: 12, width: 20, height: 20 }}
+                    style={{ left: pill.x - 10, top: pill.yCandle - 10, width: 20, height: 20 }}
                     onClick={handleActivate}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleActivate(); } }}
                     aria-label={ariaLabel}
@@ -937,56 +1141,43 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
                 );
               }
 
-              // Pill
-              const rowTop = pill.row === 0 ? 8 : pill.row === 1 ? 34 : 60;
-              const pillWidth = Math.round(pill.label.length * 6.2 + 28);
-              const tailLeft = Math.max(4, Math.min(pill.x - pill.clampedX - 1, pillWidth - 6));
+              const pillTop = pill.above
+                ? pill.yCandle - pill.stemLength
+                : pill.yCandle + pill.stemLength;
 
               return (
                 <button
                   key={`pill-${pill.ts}`}
                   type="button"
-                  className="absolute pointer-events-auto flex items-center gap-1 px-1.5 py-0.5 rounded-full whitespace-nowrap select-none transition-opacity hover:opacity-100"
+                  className="absolute pointer-events-auto flex items-center gap-1 px-1.5 py-0.5 rounded-full whitespace-nowrap select-none transition-opacity"
                   style={{
                     left: pill.clampedX,
-                    top: rowTop,
+                    top: pillTop,
+                    transform: pill.above ? 'translateY(-100%)' : undefined,
                     fontSize: 11,
                     lineHeight: 1,
-                    opacity: 0.9,
+                    opacity: isHovered ? 1 : 0.9,
                     color: impactText,
                     background: impactFill,
-                    border: `1px solid ${impactBorder}`,
+                    border: `1px solid ${isHovered ? impactColor : impactBorder}`,
                     backdropFilter: 'blur(4px)',
                   }}
+                  onMouseEnter={() => setHoveredTs(pill.ts)}
+                  onMouseLeave={() => setHoveredTs(null)}
                   onClick={handleActivate}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleActivate(); } }}
                   aria-label={ariaLabel}
                   tabIndex={0}
                   title={pill.event.event}
                 >
-                  {/* Impact dot */}
                   <span aria-hidden style={{ display: 'block', width: 5, height: 5, borderRadius: '50%', background: impactColor, flexShrink: 0 }} />
                   {pill.label}
-                  {/* Move readout — renders only when measured data exists */}
                   {pill.moveData && (
                     <span style={{ marginLeft: 4, color: 'hsl(215, 20%, 55%)' }}>
                       {pill.moveData.direction === 'up' ? '▲' : '▼'}{' '}
                       {pill.moveData.pips}p · {pill.moveData.minutes}m
                     </span>
                   )}
-                  {/* Tail nub pointing down toward guide line */}
-                  <span
-                    aria-hidden
-                    style={{
-                      position: 'absolute',
-                      bottom: -5,
-                      left: tailLeft,
-                      width: 2,
-                      height: 5,
-                      background: impactBorder,
-                      borderRadius: '0 0 2px 2px',
-                    }}
-                  />
                 </button>
               );
             })}
