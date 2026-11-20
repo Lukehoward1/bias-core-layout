@@ -87,19 +87,20 @@ export function ChartOverlayController({
     onOverlaysChange(combined);
   }, [combined, onOverlaysChange]);
 
-  const toggles: { label: string; active: boolean; set: (v: boolean) => void }[] = [
+  const toggles: { label: string; active: boolean; set: (v: boolean) => void; title?: string }[] = [
     { label: 'Levels',   active: showLevels,   set: setShowLevels   },
     { label: 'News',     active: showNews,     set: setShowNews     },
     { label: 'Sessions', active: showSessions, set: setShowSessions },
-    { label: 'Swings',   active: showSwings,   set: setShowSwings   },
+    { label: 'Swings',   active: showSwings,   set: setShowSwings,  title: 'SH = swing high · SL = swing low (this timeframe)' },
   ];
 
   return (
     <div className="absolute bottom-[52px] left-2 z-20 flex gap-1 pointer-events-auto overflow-x-auto max-w-[calc(100vw-4rem)]">
-      {toggles.map(({ label, active, set }) => (
+      {toggles.map(({ label, active, set, title }) => (
         <button
           key={label}
           onClick={() => set(!active)}
+          title={title}
           className={`shrink-0 text-[9px] lg:text-[10px] px-1 lg:px-1.5 py-0.5 rounded border transition-colors select-none ${
             active
               ? 'border-border/60 bg-background/80 text-foreground'

@@ -22,6 +22,7 @@ import { useLiveCandle } from '@/hooks/use-live-candle';
 import type { OverlayDescriptor } from '@/services/overlayBuilder';
 import type { CalendarEvent } from '@/data/calendarEvents';
 import { MOCK_CANDLES_ENABLED } from '@/lib/mockCandleGenerator';
+import { loadSettings, saveSettings, type ChartSettings } from '@/components/chart/ChartSettingsPopover';
 
 interface CandlestickChartProps {
   data: OhlcDataPoint[];
@@ -53,6 +54,11 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
     const [chartStyle, setChartStyle] = useState<ChartStyle>('candlestick');
     const [activeIndicators, setActiveIndicators] = useState<string[]>([]);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [chartSettings, setChartSettings] = useState<ChartSettings>(loadSettings);
+
+    useEffect(() => {
+      saveSettings(chartSettings);
+    }, [chartSettings]);
 
     // Live candle: pair wrapper owns the symbol; pass canonical through.
     const lastBar = data.length > 0 ? data[data.length - 1] : null;
@@ -110,8 +116,9 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
         onEventMarkerClick,
         formatPrice,
         formatTime,
+        chartSettings,
       }),
-      [data, liveBar, chartStyle, timeframe, pair, ohlcEnabled, crosshairEnabled, activeIndicators, overlays, onEventMarkerClick],
+      [data, liveBar, chartStyle, timeframe, pair, ohlcEnabled, crosshairEnabled, activeIndicators, overlays, onEventMarkerClick, chartSettings],
     );
 
     return (
@@ -142,6 +149,8 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
             onSaveBacktest={onSaveBacktest}
             onLoadBacktest={onLoadBacktest}
             onCompareBacktests={onCompareBacktests}
+            chartSettings={chartSettings}
+            onChartSettingsChange={setChartSettings}
           />
         </div>
 

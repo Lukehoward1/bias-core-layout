@@ -52,6 +52,7 @@ import {
   BarSeries,
   CrosshairMode,
   LineStyle,
+  PriceScaleMode,
 } from 'lightweight-charts';
 
 import type { CalendarEvent } from '@/data/calendarEvents';
@@ -63,6 +64,7 @@ import type { OverlayDescriptor } from '@/services/overlayBuilder';
 import type { ChartStyle } from '@/components/chart/ChartStyleSelector';
 import { classifyLiveBarUpdate } from '@/lib/liveBarClassify';
 import { pricePrecision } from '@/lib/pricePrecision';
+import { DEFAULT_SETTINGS, type ChartSettings } from '@/components/chart/ChartSettingsPopover';
 
 export interface ChartEngineProps {
   /** Oldest-first OHLC points (same shape AssetDetail passes today). */
@@ -94,6 +96,7 @@ export interface ChartEngineProps {
   formatPrice: (price: number, pair: string) => string;
   /** Formatter for the tooltip's time field. */
   formatTime: (timestamp: number, timeframe: string) => string;
+  chartSettings?: ChartSettings;
 }
 
 export interface ChartEngineRef {
@@ -153,6 +156,20 @@ const INTERVAL_DURATION_SEC: Record<string, number> = {
   '1min': 60, '5min': 300, '15min': 900, '1h': 3600, '4h': 14400, '1day': 86400,
 };
 
+const GRID_COLOR = 'hsl(217, 19%, 16%)';
+
+function toCrosshairLineStyle(s: string): LineStyle {
+  if (s === 'normal') return LineStyle.Solid;
+  if (s === 'dotted') return LineStyle.Dotted;
+  return LineStyle.Dashed;
+}
+
+function toPsMode(m: string): PriceScaleMode {
+  if (m === 'logarithmic') return PriceScaleMode.Logarithmic;
+  if (m === 'percentage') return PriceScaleMode.Percentage;
+  return PriceScaleMode.Normal;
+}
+
 export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
   function ChartEngine(
     {
@@ -169,6 +186,7 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       activeIndicators = [],
       formatPrice,
       formatTime,
+      chartSettings,
     },
     ref,
   ) {
@@ -196,6 +214,8 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
     // Set only in the structural effect (never touched by the live-update effect) so
     // rollover ticks always compute against the stable base HA, not a tick-mutated value.
     const baseLastHaRef = useRef<BaseOhlc | null>(null);
+    const chartSettingsRef = useRef(chartSettings ?? DEFAULT_SETTINGS);
+    chartSettingsRef.current = chartSettings ?? DEFAULT_SETTINGS;
 
     const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
     // Incremented by the structural effect each time it (re)creates the main series.
@@ -329,9 +349,54 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       });
     }, [crosshairEnabled]);
 
+    useEffect(() => {
+      const chart = chartRef.current;
+      if (!chart) return;
+      const s = chartSettings ?? DEFAULT_SETTINGS;
+      chart.applyOptions({
+        grid: {
+          vertLines: { color: s.gridVertical ? GRID_COLOR : 'transparent' },
+          horzLines: { color: s.gridHorizontal ? GRID_COLOR : 'transparent' },
+        },
+        crosshair: {
+          vertLine: { style: toCrosshairLineStyle(s.crosshairStyle) },
+          horzLine: { style: toCrosshairLineStyle(s.crosshairStyle) },
+        },
+        rightPriceScale: { mode: toPsMode(s.priceScaleMode) },
+      });
+      const series = mainSeriesRef.current;
+      const kind = seriesKindRef.current;
+      if (!series) return;
+      if (kind === 'bars') {
+        (series as ISeriesApi<'Bar'>).applyOptions({
+          upColor: s.upColor,
+          downColor: s.downColor,
+        });
+      } else if (kind === 'candlestick' || kind === 'heikin-ashi') {
+        (series as ISeriesApi<'Candlestick'>).applyOptions({
+          upColor: s.upColor,
+          downColor: s.downColor,
+          borderUpColor: s.upColor,
+          borderDownColor: s.downColor,
+          wickUpColor: s.upColor,
+          wickDownColor: s.downColor,
+        });
+      } else if (kind === 'hollow') {
+        (series as ISeriesApi<'Candlestick'>).applyOptions({
+          upColor: 'transparent',
+          downColor: s.downColor,
+          borderUpColor: s.upColor,
+          borderDownColor: s.downColor,
+          wickUpColor: s.upColor,
+          wickDownColor: s.downColor,
+        });
+      }
+    }, [chartSettings]);
+
     // ── Init chart (once) ──────────────────────────────────────
     useEffect(() => {
       if (!containerRef.current) return;
+      const initS = chartSettingsRef.current;
 
       const chart = createChart(containerRef.current, {
         layout: {
@@ -340,27 +405,28 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
           fontFamily: 'Inter, system-ui, sans-serif',
         },
         grid: {
-          vertLines: { color: 'hsl(217, 19%, 16%)' },
-          horzLines: { color: 'hsl(217, 19%, 16%)' },
+          vertLines: { color: initS.gridVertical ? GRID_COLOR : 'transparent' },
+          horzLines: { color: initS.gridHorizontal ? GRID_COLOR : 'transparent' },
         },
         crosshair: {
           mode: CrosshairMode.Normal,
           vertLine: {
             color: 'hsl(215, 20%, 40%)',
             width: 1,
-            style: 2,
+            style: toCrosshairLineStyle(initS.crosshairStyle),
             labelBackgroundColor: 'hsl(217, 33%, 17%)',
           },
           horzLine: {
             color: 'hsl(215, 20%, 40%)',
             width: 1,
-            style: 2,
+            style: toCrosshairLineStyle(initS.crosshairStyle),
             labelBackgroundColor: 'hsl(217, 33%, 17%)',
           },
         },
         rightPriceScale: {
           borderColor: 'hsl(217, 19%, 20%)',
           scaleMargins: { top: 0.08, bottom: 0.08 },
+          mode: toPsMode(initS.priceScaleMode),
         },
         timeScale: {
           borderColor: 'hsl(217, 19%, 20%)',
@@ -485,8 +551,8 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
         mainSeriesRef.current = series;
       } else if (chartStyle === 'bars') {
         const series = chart.addSeries(BarSeries, {
-          upColor: 'hsl(142, 71%, 45%)',
-          downColor: 'hsl(0, 84%, 60%)',
+          upColor: chartSettingsRef.current.upColor,
+          downColor: chartSettingsRef.current.downColor,
         });
         series.setData(
           processed.map((d) => ({
@@ -500,13 +566,14 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
         mainSeriesRef.current = series;
       } else {
         const isHollow = chartStyle === 'hollow';
+        const cs = chartSettingsRef.current;
         const series = chart.addSeries(CandlestickSeries, {
-          upColor: isHollow ? 'transparent' : 'hsl(142, 71%, 45%)',
-          downColor: 'hsl(0, 84%, 60%)',
-          borderUpColor: 'hsl(142, 71%, 45%)',
-          borderDownColor: 'hsl(0, 84%, 60%)',
-          wickUpColor: 'hsl(142, 71%, 45%)',
-          wickDownColor: 'hsl(0, 84%, 60%)',
+          upColor: isHollow ? 'transparent' : cs.upColor,
+          downColor: cs.downColor,
+          borderUpColor: cs.upColor,
+          borderDownColor: cs.downColor,
+          wickUpColor: cs.upColor,
+          wickDownColor: cs.downColor,
         });
         series.setData(
           processed.map((d): CandlestickData => ({
@@ -735,9 +802,10 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
           markers.push({
             time: o.timestamp as Time,
             position: o.direction === 'high' ? 'aboveBar' : 'belowBar',
-            shape: o.direction === 'high' ? 'arrowDown' : 'arrowUp',
+            shape: 'circle',
             color: o.direction === 'high' ? 'hsl(0, 84%, 60%)' : 'hsl(142, 71%, 45%)',
-            size: 1,
+            size: 0,
+            text: o.direction === 'high' ? 'SH' : 'SL',
           });
         }
       }

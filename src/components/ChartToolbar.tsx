@@ -5,6 +5,7 @@ import { IndicatorSelector } from './chart/IndicatorSelector';
 import { ChartStyleSelector, ChartStyle } from './chart/ChartStyleSelector';
 import { ReplayModePanel } from './chart/ReplayModePanel';
 import { SavedBacktestsDropdown, SavedBacktest } from './chart/SavedBacktestsDropdown';
+import { ChartSettingsPopover, type ChartSettings } from './chart/ChartSettingsPopover';
 
 interface ChartToolbarProps {
   timeframe: string;
@@ -22,6 +23,8 @@ interface ChartToolbarProps {
   onSaveBacktest?: () => void;
   onLoadBacktest?: (id: string) => void;
   onCompareBacktests?: (ids: string[]) => void;
+  chartSettings: ChartSettings;
+  onChartSettingsChange: (s: ChartSettings) => void;
 }
 
 const timeframes = [
@@ -50,6 +53,8 @@ export function ChartToolbar({
   onSaveBacktest,
   onLoadBacktest,
   onCompareBacktests,
+  chartSettings,
+  onChartSettingsChange,
 }: ChartToolbarProps) {
   return (
     <div className="h-11 px-3 bg-background/95 backdrop-blur-sm border-b border-border/50 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -144,6 +149,11 @@ export function ChartToolbar({
             <Info className="h-3 w-3" />
             OHLC
           </Button>
+
+          <div className="h-4 w-px bg-border/50 mx-1" />
+
+          {/* Chart settings gear */}
+          <ChartSettingsPopover value={chartSettings} onChange={onChartSettingsChange} />
         </div>
       </div>
     </div>

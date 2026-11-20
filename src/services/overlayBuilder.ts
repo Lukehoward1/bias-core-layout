@@ -135,8 +135,8 @@ const SESSION_NAMES_BY_CCY: Record<string, string> = {
 };
 
 const LEVEL_ABBREVS: Record<string, string> = {
-  'Swing High': 'SwHigh',
-  'Swing Low': 'SwLow',
+  'Swing High': 'PrevH',
+  'Swing Low': 'PrevL',
   'Liquidity Sweep': 'LiqSwp',
   'Strong Reaction Zone': 'SRZ',
   'Break and Retest Zone': 'BnR',
