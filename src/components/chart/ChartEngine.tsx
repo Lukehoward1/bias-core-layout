@@ -40,6 +40,10 @@ import {
   type ISeriesApi,
   type ISeriesMarkersPluginApi,
   type IPriceLine,
+  type ISeriesPrimitive,
+  type IPrimitivePaneView,
+  type IPrimitivePaneRenderer,
+  type SeriesAttachedParameter,
   type CandlestickData,
   type LineData,
   type SeriesMarker,
@@ -54,8 +58,106 @@ import {
   LineStyle,
   PriceScaleMode,
 } from 'lightweight-charts';
+import type { CanvasRenderingTarget2D } from 'fancy-canvas';
 
 import type { CalendarEvent } from '@/data/calendarEvents';
+
+// ── Swing segment primitive ────────────────────────────────────
+// Short horizontal lines from the swing candle to 4 bars past the last bar.
+// Drawn as a native LWC ISeriesPrimitive so they re-render automatically on
+// pan / zoom / rescale without any RAF loop.
+
+interface SwingSegData {
+  barIndex: number;
+  price: number;
+  direction: 'high' | 'low';
+  opacity: number;
+}
+
+class SwingSegmentRenderer implements IPrimitivePaneRenderer {
+  private readonly _segments: SwingSegData[];
+  private readonly _lastBarIdx: number;
+  private readonly _chart: IChartApi | null;
+  private readonly _series: ISeriesApi<'Candlestick', Time> | null;
+
+  constructor(
+    segments: SwingSegData[],
+    lastBarIdx: number,
+    chart: IChartApi | null,
+    series: ISeriesApi<'Candlestick', Time> | null,
+  ) {
+    this._segments = segments;
+    this._lastBarIdx = lastBarIdx;
+    this._chart = chart;
+    this._series = series;
+  }
+
+  draw(target: CanvasRenderingTarget2D): void {
+    const chart = this._chart;
+    const series = this._series;
+    if (!chart || !series || this._segments.length === 0) return;
+    const timeScale = chart.timeScale();
+    target.useBitmapCoordinateSpace(({ context: ctx, horizontalPixelRatio, verticalPixelRatio }) => {
+      ctx.save();
+      ctx.lineWidth = horizontalPixelRatio;
+      ctx.setLineDash([Math.round(2 * horizontalPixelRatio), Math.round(3 * horizontalPixelRatio)]);
+      for (const seg of this._segments) {
+        const y = series.priceToCoordinate(seg.price);
+        if (y === null) continue;
+        const x1 = timeScale.logicalToCoordinate(seg.barIndex as unknown as Logical);
+        const x2 = timeScale.logicalToCoordinate((this._lastBarIdx + 4) as unknown as Logical);
+        if (x1 === null || x2 === null) continue;
+        ctx.strokeStyle = seg.direction === 'high'
+          ? `hsla(0, 84%, 60%, ${seg.opacity * 0.5})`
+          : `hsla(142, 71%, 45%, ${seg.opacity * 0.5})`;
+        ctx.beginPath();
+        ctx.moveTo((x1 as number) * horizontalPixelRatio, (y as number) * verticalPixelRatio);
+        ctx.lineTo((x2 as number) * horizontalPixelRatio, (y as number) * verticalPixelRatio);
+        ctx.stroke();
+      }
+      ctx.restore();
+    });
+  }
+}
+
+class SwingSegmentView implements IPrimitivePaneView {
+  private readonly _renderer: SwingSegmentRenderer;
+  constructor(renderer: SwingSegmentRenderer) { this._renderer = renderer; }
+  renderer(): IPrimitivePaneRenderer { return this._renderer; }
+}
+
+class SwingSegmentPrimitive implements ISeriesPrimitive<Time> {
+  private _segments: SwingSegData[] = [];
+  private _lastBarIdx = 0;
+  private _chart: IChartApi | null = null;
+  private _series: ISeriesApi<'Candlestick', Time> | null = null;
+  private _requestUpdate: (() => void) | null = null;
+
+  attached(param: SeriesAttachedParameter<Time>): void {
+    this._chart = param.chart as unknown as IChartApi;
+    this._series = param.series as unknown as ISeriesApi<'Candlestick', Time>;
+    this._requestUpdate = param.requestUpdate;
+  }
+
+  detached(): void {
+    this._chart = null;
+    this._series = null;
+    this._requestUpdate = null;
+  }
+
+  update(segments: SwingSegData[], lastBarIdx: number): void {
+    this._segments = segments;
+    this._lastBarIdx = lastBarIdx;
+    this._requestUpdate?.();
+  }
+
+  paneViews(): readonly IPrimitivePaneView[] {
+    return [new SwingSegmentView(new SwingSegmentRenderer(
+      this._segments, this._lastBarIdx, this._chart, this._series,
+    ))];
+  }
+}
+// ──────────────────────────────────────────────────────────────
 
 import type { OhlcDataPoint } from '@/lib/mockOhlcData';
 import type { MarketCandle } from '@/services/marketData';
@@ -221,6 +323,8 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
     chartSettingsRef.current = chartSettings ?? DEFAULT_SETTINGS;
     const prevScaleTopRef  = useRef<number>(0.08);
     const prevPillsKeyRef  = useRef<string>('');
+    const swingSegPrimRef  = useRef<SwingSegmentPrimitive | null>(null);
+    if (swingSegPrimRef.current === null) swingSegPrimRef.current = new SwingSegmentPrimitive();
 
     const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
     // Incremented by the structural effect each time it (re)creates the main series.
@@ -643,6 +747,9 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
         chartEl.removeEventListener('wheel', onVWheel);
         stopVLoop();
         if (vStopTimer) clearTimeout(vStopTimer);
+        if (mainSeriesRef.current && swingSegPrimRef.current) {
+          try { mainSeriesRef.current.detachPrimitive(swingSegPrimRef.current); } catch { /* noop */ }
+        }
         chart.remove();
         chartRef.current = null;
         mainSeriesRef.current = null;
@@ -660,6 +767,9 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       if (!chart || !bars.length) return;
 
       if (mainSeriesRef.current) {
+        if (swingSegPrimRef.current) {
+          try { mainSeriesRef.current.detachPrimitive(swingSegPrimRef.current); } catch { /* noop */ }
+        }
         chart.removeSeries(mainSeriesRef.current);
         mainSeriesRef.current = null;
         // The dead series owns its price lines and markers plugin; reset refs so
@@ -818,6 +928,10 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       mainSeriesRef.current?.applyOptions({
         priceFormat: { type: 'price', precision, minMove: 1 / 10 ** precision },
       });
+
+      if (mainSeriesRef.current && swingSegPrimRef.current) {
+        mainSeriesRef.current.attachPrimitive(swingSegPrimRef.current);
+      }
 
       chart.timeScale().fitContent();
       setSeriesGen((g) => g + 1);
@@ -986,6 +1100,14 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
         // LWC requires markers sorted by time
         markers.sort((a, b) => (a.time as number) - (b.time as number));
         markersPluginRef.current = createSeriesMarkers(main as ISeriesApi<'Candlestick'>, markers);
+      }
+
+      // Swing segment primitive — short canvas lines for unbroken swings
+      if (swingSegPrimRef.current) {
+        const segs = (overlays ?? [])
+          .filter((o): o is Extract<OverlayDescriptor, { kind: 'swing-segment' }> => o.kind === 'swing-segment')
+          .map((o) => ({ barIndex: o.barIndex, price: o.price, direction: o.direction, opacity: o.opacity }));
+        swingSegPrimRef.current.update(segs, Math.max(0, barsRef.current.length - 1));
       }
     }, [overlays, displayInterval, seriesGen]);
 

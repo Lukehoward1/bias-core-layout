@@ -20,6 +20,7 @@ export type OverlayDescriptor =
       moveData?: { direction: 'up' | 'down'; pips: number; minutes: number } }
   | { kind: 'session-line';   timestamp: number; label: string; color: string }
   | { kind: 'swing-marker';   timestamp: number; price: number; direction: 'high' | 'low'; opacity: number }
+  | { kind: 'swing-segment';  barIndex: number;  price: number; direction: 'high' | 'low'; opacity: number }
   | { kind: 'highlight-band'; from: number; to: number; color: string; label?: string };
 
 // ── Pure helpers (exported for tests) ─────────────────────────
@@ -379,18 +380,35 @@ export function buildSessionOverlays(
 
 const SWING_OPACITIES = [1.0, 0.65, 0.4] as const;
 
+/** Pivot lookback N for confirmed swing detection. */
+export const SWING_CONFIRM_BARS = { subHour: 3, hourPlus: 5 } as const;
+/** Break detection rule for swing segment lines. */
+export const BREAK_RULE = 'wick' as const;
+
+function isSwingBroken(
+  bars: OhlcDataPoint[],
+  swingIdx: number,
+  price: number,
+  direction: 'high' | 'low',
+): boolean {
+  for (let i = swingIdx + 1; i < bars.length; i++) {
+    if (direction === 'high' && bars[i].high >= price) return true;
+    if (direction === 'low'  && bars[i].low  <= price) return true;
+  }
+  return false;
+}
+
 /**
- * Pivot-based swing high/low markers (latest 3 each direction) + horizontal
- * dotted lines for the single latest SH and SL.
+ * Pivot-based swing high/low markers (latest 3 each direction) plus short
+ * segment lines for unbroken swings. Segments run from the swing candle to
+ * 4 bars beyond the last bar and disappear once broken (wick rule).
  * N=3 for sub-hour intervals, N=5 for 1H+. Confirmed pivots only.
- * levelPrices: existing level prices used for axis-label collision avoidance.
  */
 export function buildSwingOverlays(
   bars: OhlcDataPoint[],
   interval: string,
-  levelPrices: number[] = [],
 ): OverlayDescriptor[] {
-  const n = intervalMinutes(interval) < 60 ? 3 : 5;
+  const n = intervalMinutes(interval) < 60 ? SWING_CONFIRM_BARS.subHour : SWING_CONFIRM_BARS.hourPlus;
   const pivots = computeSwingPivots(bars, n);
 
   // Latest 3 of each direction, newest first.
@@ -406,23 +424,42 @@ export function buildSwingOverlays(
     result.push({ kind: 'swing-marker', timestamp: lows[i].timestamp, price: lows[i].price, direction: 'low', opacity: SWING_OPACITIES[i] });
   }
 
-  // Swing lines: faint dotted horizontal for the single latest SH and SL.
-  const slice = bars.slice(-Math.min(20, bars.length));
-  const avgRange = slice.length >= 2
-    ? slice.reduce((s, b) => s + (b.high - b.low), 0) / slice.length
-    : 0.001;
-  const proximity = avgRange * 0.5;
+  // Swing segment line: one per direction — the nearest unbroken swing above/below price.
+  const lastClose = bars.length > 0 ? bars[bars.length - 1].close : null;
+  const tsToIdx = new Map(bars.map((b, idx) => [b.timestamp, idx]));
 
-  if (highs.length > 0) {
-    const shPrice = highs[0].price;
-    const hasNearby = levelPrices.some((p) => Math.abs(p - shPrice) < proximity);
-    result.push({ kind: 'price-line', price: shPrice, label: 'SH', color: 'hsla(0, 84%, 60%, 0.5)', dotted: true, axisLabelVisible: !hasNearby });
-  }
+  if (lastClose !== null) {
+    // Nearest unbroken high strictly above the last close (lowest price among candidates).
+    let bestHigh: { barIndex: number; price: number; opacity: number } | null = null;
+    for (let i = 0; i < highs.length; i++) {
+      const h = highs[i];
+      if (h.price <= lastClose) continue;
+      const barIndex = tsToIdx.get(h.timestamp);
+      if (barIndex === undefined) continue;
+      if (isSwingBroken(bars, barIndex, h.price, 'high')) continue;
+      if (bestHigh === null || h.price < bestHigh.price) {
+        bestHigh = { barIndex, price: h.price, opacity: SWING_OPACITIES[i] };
+      }
+    }
+    if (bestHigh !== null) {
+      result.push({ kind: 'swing-segment', barIndex: bestHigh.barIndex, price: bestHigh.price, direction: 'high', opacity: bestHigh.opacity });
+    }
 
-  if (lows.length > 0) {
-    const slPrice = lows[0].price;
-    const hasNearby = levelPrices.some((p) => Math.abs(p - slPrice) < proximity);
-    result.push({ kind: 'price-line', price: slPrice, label: 'SL', color: 'hsla(142, 71%, 45%, 0.5)', dotted: true, axisLabelVisible: !hasNearby });
+    // Nearest unbroken low strictly below the last close (highest price among candidates).
+    let bestLow: { barIndex: number; price: number; opacity: number } | null = null;
+    for (let i = 0; i < lows.length; i++) {
+      const l = lows[i];
+      if (l.price >= lastClose) continue;
+      const barIndex = tsToIdx.get(l.timestamp);
+      if (barIndex === undefined) continue;
+      if (isSwingBroken(bars, barIndex, l.price, 'low')) continue;
+      if (bestLow === null || l.price > bestLow.price) {
+        bestLow = { barIndex, price: l.price, opacity: SWING_OPACITIES[i] };
+      }
+    }
+    if (bestLow !== null) {
+      result.push({ kind: 'swing-segment', barIndex: bestLow.barIndex, price: bestLow.price, direction: 'low', opacity: bestLow.opacity });
+    }
   }
 
   return result;
