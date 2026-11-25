@@ -21,6 +21,26 @@ import {
   buildTradeOverlays,
 } from '@/services/overlayBuilder';
 
+const INTERVAL_SECONDS: Record<string, number> = {
+  m1: 60, m5: 300, m15: 900, h1: 3600, h4: 14400, d1: 86400,
+  '1min': 60, '5min': 300, '15min': 900, '1h': 3600, '4h': 14400, '1day': 86400,
+};
+
+/** Returns false when the last few bar spacings don't match the requested interval.
+ *  Guards against stale swings/sessions flashing on new bars during a TF switch. */
+function barsMatchInterval(bars: OhlcDataPoint[], interval: string): boolean {
+  if (bars.length < 3) return true;
+  const expected = INTERVAL_SECONDS[interval];
+  if (!expected) return true;
+  const spacings: number[] = [];
+  for (let i = Math.max(1, bars.length - 5); i < bars.length; i++) {
+    spacings.push(bars[i].timestamp - bars[i - 1].timestamp);
+  }
+  spacings.sort((a, b) => a - b);
+  const median = spacings[Math.floor(spacings.length / 2)];
+  return median > 0 && Math.abs(median - expected) <= expected * 0.5;
+}
+
 interface ChartOverlayControllerProps {
   symbol: string;
   bars: OhlcDataPoint[];
@@ -58,12 +78,12 @@ export function ChartOverlayController({
   );
 
   const sessionOverlays = useMemo(
-    () => buildSessionOverlays(bars, interval, symbol),
+    () => barsMatchInterval(bars, interval) ? buildSessionOverlays(bars, interval, symbol) : [],
     [bars, interval, symbol],
   );
 
   const swingOverlays = useMemo(
-    () => buildSwingOverlays(bars, interval),
+    () => barsMatchInterval(bars, interval) ? buildSwingOverlays(bars, interval) : [],
     [bars, interval],
   );
 
@@ -87,10 +107,12 @@ export function ChartOverlayController({
     onOverlaysChange(combined);
   }, [combined, onOverlaysChange]);
 
+  const sessionsUnavailable = (INTERVAL_SECONDS[interval] ?? 0) >= 14400;
+
   const toggles: { label: string; active: boolean; set: (v: boolean) => void; title?: string }[] = [
     { label: 'Levels',   active: showLevels,   set: setShowLevels   },
     { label: 'News',     active: showNews,     set: setShowNews     },
-    { label: 'Sessions', active: showSessions, set: setShowSessions },
+    { label: 'Sessions', active: showSessions, set: setShowSessions, title: sessionsUnavailable ? 'Sessions are shown on 1H and below' : undefined },
     { label: 'Swings',   active: showSwings,   set: setShowSwings,  title: 'SH = swing high · SL = swing low (this timeframe)' },
   ];
 

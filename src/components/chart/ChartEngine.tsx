@@ -321,9 +321,11 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
     const baseLastHaRef = useRef<BaseOhlc | null>(null);
     const chartSettingsRef = useRef(chartSettings ?? DEFAULT_SETTINGS);
     chartSettingsRef.current = chartSettings ?? DEFAULT_SETTINGS;
-    const prevScaleTopRef  = useRef<number>(0.08);
-    const prevPillsKeyRef  = useRef<string>('');
-    const swingSegPrimRef  = useRef<SwingSegmentPrimitive | null>(null);
+    const prevScaleTopRef        = useRef<number>(0.08);
+    const prevScaleBotRef        = useRef<number>(0.08);
+    const prevPillsKeyRef        = useRef<string>('');
+    const prevSessionLinesKeyRef = useRef<string>('');
+    const swingSegPrimRef        = useRef<SwingSegmentPrimitive | null>(null);
     if (swingSegPrimRef.current === null) swingSegPrimRef.current = new SwingSegmentPrimitive();
 
     const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
@@ -357,6 +359,10 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
     }
     const [newsPills, setNewsPills] = useState<NewsPill[]>([]);
 
+    // ── Session hairline positions ──────────────────────────────
+    interface SessionLine { x: number; label: string; color: string }
+    const [sessionLines, setSessionLines] = useState<SessionLine[]>([]);
+
     // Stable callback — reads refs only, safe for LWC subscriptions + RAF loop.
     const computeNewsPills = useCallback(() => {
       const chart      = chartRef.current;
@@ -364,12 +370,17 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       const mainSeries = mainSeriesRef.current;
       if (!timeScale || !chart || !containerRef.current || !mainSeries) return;
 
-      // ── Headroom: widen top margin when event markers are visible
-      const hasEvents = (overlaysRef.current ?? []).some((o) => o.kind === 'event-marker');
-      const desiredScaleTop = hasEvents ? 0.16 : 0.08;
-      if (prevScaleTopRef.current !== desiredScaleTop) {
+      // ── Scale margins: single owner — top (news headroom) + bottom (swing room).
+      const curOverlays   = overlaysRef.current ?? [];
+      const hasEvents     = curOverlays.some((o) => o.kind === 'event-marker');
+      const hasSwings     = curOverlays.some((o) => o.kind === 'swing-marker');
+      const hasSessions   = curOverlays.some((o) => o.kind === 'session-line');
+      const desiredScaleTop = hasEvents  ? 0.16 : 0.08;
+      const desiredScaleBot = hasSwings  ? 0.12 : 0.08;
+      if (prevScaleTopRef.current !== desiredScaleTop || prevScaleBotRef.current !== desiredScaleBot) {
         prevScaleTopRef.current = desiredScaleTop;
-        chart.applyOptions({ rightPriceScale: { scaleMargins: { top: desiredScaleTop, bottom: 0.08 } } });
+        prevScaleBotRef.current = desiredScaleBot;
+        chart.applyOptions({ rightPriceScale: { scaleMargins: { top: desiredScaleTop, bottom: desiredScaleBot } } });
       }
 
       const containerWidth  = containerRef.current.clientWidth;
@@ -434,8 +445,35 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       const PILL_GAP   = 6;        // clearance between pill edge and tallest wick
       const LEVEL_STEP = PILL_H + 4; // 26 px per stacked level
       const INTER_PILL = 4;
-      const TOP_BOUND  = 4;
+      // Reserve the top 14 px strip for session labels when sessions are showing.
+      const TOP_BOUND  = hasSessions ? 18 : 4;
       const EDGE_GAP   = 4;
+
+      // Keep-out zone on the right where level price-line tags are rendered.
+      const hasLevels      = curOverlays.some((o) => o.kind === 'price-line');
+      const RIGHT_KEEP_OUT = hasLevels ? 90 : EDGE_GAP;
+
+      // Build swing-marker obstacle rects (SH/SL text labels ≈22×14px).
+      type PillRect = { left: number; top: number; right: number; bottom: number };
+      const swingObstacles: PillRect[] = [];
+      for (const o of curOverlays) {
+        if (o.kind !== 'swing-marker') continue;
+        const idx = timeScale.timeToIndex(o.timestamp as Time, true);
+        if (idx === null) continue;
+        const xc = timeScale.logicalToCoordinate(idx as unknown as Logical);
+        if (xc === null) continue;
+        const yc = mainSeries.priceToCoordinate(o.price);
+        if (yc === null) continue;
+        const cx = xc as number;
+        const cy = yc as number;
+        // SH label is above the candle high; SL label is below the candle low.
+        const LABEL_W = 22; const LABEL_H = 14;
+        if (o.direction === 'high') {
+          swingObstacles.push({ left: cx - LABEL_W / 2, top: cy - LABEL_H, right: cx + LABEL_W / 2, bottom: cy });
+        } else {
+          swingObstacles.push({ left: cx - LABEL_W / 2, top: cy, right: cx + LABEL_W / 2, bottom: cy + LABEL_H });
+        }
+      }
 
       // Collect event-marker overlays in screen-x order
       const raw: Array<{
@@ -472,11 +510,15 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       raw.sort((a, b) => a.x - b.x);
 
       // Track placed pill rects for inter-pill collision detection
-      const placed: Array<{ left: number; top: number; right: number; bottom: number }> = [];
+      const placed: PillRect[] = [];
       const collides = (l: number, t: number, r: number, b: number): boolean => {
         for (const p of placed) {
           if (r + INTER_PILL > p.left && l - INTER_PILL < p.right &&
               b + INTER_PILL > p.top  && t - INTER_PILL < p.bottom) return true;
+        }
+        for (const s of swingObstacles) {
+          if (r + INTER_PILL > s.left && l - INTER_PILL < s.right &&
+              b + INTER_PILL > s.top  && t - INTER_PILL < s.bottom) return true;
         }
         return false;
       };
@@ -492,7 +534,7 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
         }
 
         const pillWidth = Math.round(p.label.length * 6.2 + 28);
-        const pillLeft  = Math.max(EDGE_GAP, Math.min(p.x - pillWidth / 2, plotWidth - pillWidth - EDGE_GAP));
+        const pillLeft  = Math.max(EDGE_GAP, Math.min(p.x - pillWidth / 2, plotWidth - pillWidth - RIGHT_KEEP_OUT));
         const pillRight = pillLeft + pillWidth;
 
         const { minYTop, maxYBot } = spanStats(pillLeft, pillWidth);
@@ -548,6 +590,36 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       if (key !== prevPillsKeyRef.current) {
         prevPillsKeyRef.current = key;
         setNewsPills(pills);
+      }
+    }, []); // stable — only reads refs
+
+    // Session hairlines: x-coordinate for each session-line descriptor.
+    // Not affected by vertical rescale, so not included in the RAF loop.
+    const computeSessionLines = useCallback(() => {
+      const chart     = chartRef.current;
+      const timeScale = chart?.timeScale();
+      if (!timeScale || !chart || !containerRef.current) return;
+
+      const containerWidth = containerRef.current.clientWidth;
+      const scaleWidth     = chart.priceScale('right').width();
+      const plotWidth      = containerWidth - scaleWidth;
+
+      const lines: SessionLine[] = [];
+      for (const o of (overlaysRef.current ?? [])) {
+        if (o.kind !== 'session-line') continue;
+        const idx = timeScale.timeToIndex(o.timestamp as Time, true);
+        if (idx === null) continue;
+        const xc = timeScale.logicalToCoordinate(idx as unknown as Logical);
+        if (xc === null) continue;
+        const x = xc as number;
+        if (x < 0 || x > plotWidth) continue;
+        lines.push({ x, label: o.label, color: o.color });
+      }
+
+      const key = lines.map((l) => `${Math.round(l.x)}:${l.label}`).join('|');
+      if (key !== prevSessionLinesKeyRef.current) {
+        prevSessionLinesKeyRef.current = key;
+        setSessionLines(lines);
       }
     }, []); // stable — only reads refs
 
@@ -677,6 +749,7 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
           borderColor: 'hsl(217, 19%, 20%)',
           timeVisible: true,
           secondsVisible: false,
+          rightOffset: 8,
         },
         handleScroll: {
           mouseWheel: true,
@@ -1045,12 +1118,6 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       if (!overlays || overlays.length === 0) return;
 
       const markers: SeriesMarker<Time>[] = [];
-      const barDurationSec = INTERVAL_DURATION_SEC[displayInterval] ?? 3600;
-
-      // News timestamps used to suppress session text that would collide with a pill
-      const newsTimestamps: number[] = overlays
-        .filter((o): o is Extract<typeof o, { kind: 'event-marker' }> => o.kind === 'event-marker')
-        .map((o) => o.timestamp);
 
       for (const o of overlays) {
         if (o.kind === 'price-line') {
@@ -1068,20 +1135,8 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
             main.createPriceLine({ price: o.to,   color: o.color, lineStyle: LineStyle.Dotted, lineWidth: 1, axisLabelVisible: false, title: o.label ?? '' }),
             main.createPriceLine({ price: o.from, color: o.color, lineStyle: LineStyle.Dotted, lineWidth: 1, axisLabelVisible: false, title: '' }),
           );
-        } else if (o.kind === 'session-line') {
-          // Suppress session text when a news pill sits within 6 bars
-          const nearNews = newsTimestamps.some(
-            (nts) => Math.abs(nts - o.timestamp) <= 6 * barDurationSec,
-          );
-          markers.push({
-            time: o.timestamp as Time,
-            position: 'aboveBar',
-            shape: 'arrowDown',
-            color: o.color,
-            size: 1,
-            text: nearNews ? '' : o.label,
-          });
         } else if (o.kind === 'swing-marker') {
+          // 'session-line' descriptors are rendered as HTML hairlines by computeSessionLines
           const opacity = o.opacity ?? 1.0;
           markers.push({
             time: o.timestamp as Time,
@@ -1111,22 +1166,26 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       }
     }, [overlays, displayInterval, seriesGen]);
 
-    // ── NEWS PILL position effects ──────────────────────────────
-    // Subscribe to pan/zoom so pills track the chart as the user scrolls.
+    // ── News pill + session line position effects ───────────────
+    // Subscribe to pan/zoom so pills and session hairlines track the chart.
     useEffect(() => {
       const chart = chartRef.current;
       if (!chart) return;
       computeNewsPills();
+      computeSessionLines();
       chart.timeScale().subscribeVisibleLogicalRangeChange(computeNewsPills);
+      chart.timeScale().subscribeVisibleLogicalRangeChange(computeSessionLines);
       return () => {
         try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(computeNewsPills); } catch { /* noop */ }
+        try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(computeSessionLines); } catch { /* noop */ }
       };
-    }, [seriesGen, computeNewsPills]);
+    }, [seriesGen, computeNewsPills, computeSessionLines]);
 
     // Recompute positions when the overlay set itself changes.
     useEffect(() => {
       computeNewsPills();
-    }, [overlays, seriesGen, computeNewsPills]);
+      computeSessionLines();
+    }, [overlays, seriesGen, computeNewsPills, computeSessionLines]);
 
     return (
       <div className="relative w-full h-full">
@@ -1160,6 +1219,32 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
 
         {/* LWC chart canvas */}
         <div ref={containerRef} className="absolute inset-0 bg-[hsl(222,30%,5%)]" />
+
+        {/* ── Session open hairlines ─────────────────────────────
+            Thin dashed verticals + 14-px top-strip label per session open.
+            Non-interactive; rendered below the news layer (z-[2]). */}
+        {sessionLines.length > 0 && (
+          <div className="absolute inset-0 pointer-events-none overflow-hidden z-[2]">
+            {sessionLines.map((line) => (
+              <div
+                key={`sess-${Math.round(line.x)}-${line.label}`}
+                className="absolute inset-y-0 pointer-events-none"
+                style={{ left: line.x }}
+              >
+                <div
+                  className="absolute inset-y-0 pointer-events-none"
+                  style={{ width: 0, borderLeft: `1px dashed ${line.color}`, opacity: 0.2 }}
+                />
+                <div
+                  className="absolute pointer-events-none text-[9px] leading-[12px] whitespace-nowrap select-none"
+                  style={{ top: 2, left: 3, color: line.color, opacity: 0.55 }}
+                >
+                  {line.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* ── News callout layer ──────────────────────────────────
             Pills are anchored to the candle they belong to via

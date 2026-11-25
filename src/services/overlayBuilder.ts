@@ -334,10 +334,11 @@ export function buildNewsOverlays(
 /** Session open timestamps within the loaded bar range (DST-correct IANA). */
 export function buildSessionOverlays(
   bars: OhlcDataPoint[],
-  _interval: string,
+  interval: string,
   symbol = '',
 ): OverlayDescriptor[] {
   if (bars.length === 0) return [];
+  if (intervalMinutes(interval) >= 240) return [];
   const minTs = bars[0].timestamp;
   const maxTs = bars[bars.length - 1].timestamp;
 
