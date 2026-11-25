@@ -1115,6 +1115,14 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
         markersPluginRef.current = null;
       }
 
+      // Swing segment primitive must be cleared even when overlay list is empty.
+      if (swingSegPrimRef.current) {
+        const segs = (overlays ?? [])
+          .filter((o): o is Extract<OverlayDescriptor, { kind: 'swing-segment' }> => o.kind === 'swing-segment')
+          .map((o) => ({ barIndex: o.barIndex, price: o.price, direction: o.direction, opacity: o.opacity }));
+        swingSegPrimRef.current.update(segs, Math.max(0, barsRef.current.length - 1));
+      }
+
       if (!overlays || overlays.length === 0) return;
 
       const markers: SeriesMarker<Time>[] = [];
@@ -1155,14 +1163,6 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
         // LWC requires markers sorted by time
         markers.sort((a, b) => (a.time as number) - (b.time as number));
         markersPluginRef.current = createSeriesMarkers(main as ISeriesApi<'Candlestick'>, markers);
-      }
-
-      // Swing segment primitive — short canvas lines for unbroken swings
-      if (swingSegPrimRef.current) {
-        const segs = (overlays ?? [])
-          .filter((o): o is Extract<OverlayDescriptor, { kind: 'swing-segment' }> => o.kind === 'swing-segment')
-          .map((o) => ({ barIndex: o.barIndex, price: o.price, direction: o.direction, opacity: o.opacity }));
-        swingSegPrimRef.current.update(segs, Math.max(0, barsRef.current.length - 1));
       }
     }, [overlays, displayInterval, seriesGen]);
 
