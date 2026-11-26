@@ -24,6 +24,7 @@ import { Resend } from "resend";
 import { PRICE_IDS } from "../src/lib/stripe.js";
 import { requireSubscriber, blockFoundingMember, type CallerProfile } from "./_lib/subscription-auth.js";
 import { sendCancellationAlertEmail } from "./_lib/cancellation-alert-email.js";
+import { renderLifecycleEmail, escapeHtml, APP_URL } from "./_lib/lifecycle-email-template.js";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -159,7 +160,9 @@ async function handleSupport(req: VercelRequest, res: VercelResponse): Promise<V
   try {
     await resend.emails.send({
       from: "BIAS Alerts <alerts@streambias.com>",
-      to: "support@streambias.com",
+      // Sent straight to the founder's inbox (same as the cancellation alert),
+      // so it does not depend on the support@ mailbox/inbound forwarding.
+      to: "luke@hfx-capital.com",
       replyTo: userEmail,
       subject: `[${priorityTag}] ${topicLabel} – ${userEmail}`,
       html: `
@@ -212,19 +215,43 @@ async function handleSupport(req: VercelRequest, res: VercelResponse): Promise<V
   // User confirmation — best-effort.
   if (userEmail) {
     try {
+      const msgPreview = message.length > 300 ? message.slice(0, 300) + "…" : message;
+      const priorityLine = isPriority
+        ? `<p style="font-size:13px;color:#9a9a9a;margin:0 0 20px;">Pro and Founding Member requests are prioritised.</p>`
+        : `<div style="height:20px;"></div>`;
+      const contentHtml = `        <div style="margin:0 0 16px;padding:16px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;">
+          <p style="font-size:12px;color:#9a9a9a;font-weight:500;text-transform:uppercase;letter-spacing:0.04em;margin:0 0 8px;">Your message</p>
+          <p style="font-size:13px;color:#0a0a0a;margin:0 0 10px;font-weight:500;">${escapeHtml(topicLabel)}</p>
+          <p style="font-size:13px;color:#4a4a4a;margin:0;white-space:pre-wrap;line-height:1.6;">${escapeHtml(msgPreview)}</p>
+        </div>
+${priorityLine}`;
+
       await resend.emails.send({
         from: "StreamBias <team@streambias.com>",
         to: userEmail,
         replyTo: "support@streambias.com",
         subject: "We received your support request",
+        html: renderLifecycleEmail({
+          eyebrow: "Support",
+          headline: "We've got your message",
+          greetingHtml: "Hi,",
+          introHtml: `Thanks for getting in touch. We've received your ${escapeHtml(topicLabel.toLowerCase())} request and will reply to this email address.`,
+          contentHtml,
+          ctaLabel: "Back to StreamBias",
+          ctaHref: APP_URL,
+        }),
         text: [
           "Hi,",
           "",
-          `We've received your ${topicLabel.toLowerCase()} request and will reply to this email address.`,
+          `Thanks for getting in touch. We've received your ${topicLabel.toLowerCase()} request and will reply to this email address.`,
           "",
-          "You can also reach us any time at support@streambias.com.",
+          `Topic: ${topicLabel}`,
+          `Message: ${msgPreview}`,
           "",
-          "— The StreamBias team",
+          ...(isPriority ? ["Pro and Founding Member requests are prioritised.", ""] : []),
+          `Back to StreamBias: ${APP_URL}`,
+          "",
+          "You can also reach us at support@streambias.com.",
         ].join("\n"),
       });
     } catch (err) {
