@@ -22,7 +22,8 @@ import { useLiveCandle } from '@/hooks/use-live-candle';
 import type { OverlayDescriptor } from '@/services/overlayBuilder';
 import type { CalendarEvent } from '@/data/calendarEvents';
 import { MOCK_CANDLES_ENABLED } from '@/lib/mockCandleGenerator';
-import { loadSettings, saveSettings, type ChartSettings } from '@/components/chart/ChartSettingsPopover';
+import { loadSettings, saveSettings, type ChartSettings, resolveChartBackground } from '@/components/chart/ChartSettingsPopover';
+import { useTheme } from '@/hooks/use-theme';
 
 interface CandlestickChartProps {
   data: OhlcDataPoint[];
@@ -48,6 +49,8 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
   ({ data, pair, timeframe, onTimeframeChange, overlays, onEventMarkerClick, savedBacktests, onSaveBacktest, onLoadBacktest, onCompareBacktests }, ref) => {
     const chartWrapperRef = useRef<HTMLDivElement>(null);
     const engineRef = useRef<ChartEngineRef>(null);
+
+    const { theme: appTheme } = useTheme();
 
     const [crosshairEnabled, setCrosshairEnabled] = useState(true);
     const [ohlcEnabled, setOhlcEnabled] = useState(false);
@@ -124,9 +127,8 @@ export const CandlestickChart = forwardRef<CandlestickChartRef, CandlestickChart
     return (
       <div
         ref={chartWrapperRef}
-        className={`relative w-full h-full ${
-          isFullscreen ? 'fixed inset-0 z-[100] bg-[hsl(222,30%,6%)]' : ''
-        }`}
+        className={`relative w-full h-full ${isFullscreen ? 'fixed inset-0 z-[100]' : ''}`}
+        style={isFullscreen ? { background: resolveChartBackground(chartSettings, appTheme) } : undefined}
       >
         {/* Chart Toolbar - top bar */}
         <div

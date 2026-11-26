@@ -161,7 +161,7 @@ export function ChartOverlayController({
           className={`shrink-0 text-[9px] lg:text-[10px] px-1 lg:px-1.5 py-0.5 rounded border transition-colors select-none ${
             active
               ? 'border-border/60 bg-background/80 text-foreground'
-              : 'border-transparent bg-transparent text-muted-foreground/40'
+              : 'border-border/20 bg-background/50 text-muted-foreground/60'
           }`}
         >
           {label}

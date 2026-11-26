@@ -74,22 +74,68 @@ interface SwingSegData {
   opacity: number;
 }
 
+/** Convert 6-digit hex + alpha to rgba() string. Falls back to the hex on parse failure. */
+function hexWithOpacity(hex: string, alpha: number): string {
+  const m = /^#([0-9a-fA-F]{6})$/.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  return `rgba(${(n >> 16) & 0xff}, ${(n >> 8) & 0xff}, ${n & 0xff}, ${alpha})`;
+}
+
+/** Mix a 6-digit hex colour toward black by `amount` (0–1). Falls back unchanged on parse failure. */
+function darkenHex(hex: string, amount: number): string {
+  const m = /^#([0-9a-fA-F]{6})$/.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  const factor = 1 - amount;
+  const r = Math.round(((n >> 16) & 0xff) * factor);
+  const g = Math.round(((n >> 8)  & 0xff) * factor);
+  const b = Math.round((n & 0xff)          * factor);
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+/** Derive readable chart colours from background luminance. */
+function deriveChartColors(isDark: boolean) {
+  if (isDark) {
+    return {
+      textColor:       'hsl(215, 20%, 55%)',
+      gridColor:       'hsl(217, 19%, 16%)',
+      crosshairColor:  'hsl(215, 20%, 40%)',
+      labelBgColor:    'hsl(217, 33%, 17%)',
+      axisBorderColor: 'hsl(217, 19%, 20%)',
+    };
+  }
+  return {
+    textColor:       'hsl(217, 19%, 25%)',
+    gridColor:       'hsl(218, 18%, 82%)',
+    crosshairColor:  'hsl(218, 12%, 55%)',
+    labelBgColor:    'hsl(218, 20%, 88%)',
+    axisBorderColor: 'hsl(218, 16%, 78%)',
+  };
+}
+
 class SwingSegmentRenderer implements IPrimitivePaneRenderer {
   private readonly _segments: SwingSegData[];
   private readonly _lastBarIdx: number;
   private readonly _chart: IChartApi | null;
   private readonly _series: ISeriesApi<'Candlestick', Time> | null;
+  private readonly _highColor: string;
+  private readonly _lowColor: string;
 
   constructor(
     segments: SwingSegData[],
     lastBarIdx: number,
     chart: IChartApi | null,
     series: ISeriesApi<'Candlestick', Time> | null,
+    highColor: string,
+    lowColor: string,
   ) {
     this._segments = segments;
     this._lastBarIdx = lastBarIdx;
     this._chart = chart;
     this._series = series;
+    this._highColor = highColor;
+    this._lowColor = lowColor;
   }
 
   draw(target: CanvasRenderingTarget2D): void {
@@ -107,9 +153,10 @@ class SwingSegmentRenderer implements IPrimitivePaneRenderer {
         const x1 = timeScale.logicalToCoordinate(seg.barIndex as unknown as Logical);
         const x2 = timeScale.logicalToCoordinate((this._lastBarIdx + 4) as unknown as Logical);
         if (x1 === null || x2 === null) continue;
-        ctx.strokeStyle = seg.direction === 'high'
-          ? `hsla(0, 84%, 60%, ${seg.opacity * 0.5})`
-          : `hsla(142, 71%, 45%, ${seg.opacity * 0.5})`;
+        ctx.strokeStyle = hexWithOpacity(
+          seg.direction === 'high' ? this._highColor : this._lowColor,
+          seg.opacity * 0.5,
+        );
         ctx.beginPath();
         ctx.moveTo((x1 as number) * horizontalPixelRatio, (y as number) * verticalPixelRatio);
         ctx.lineTo((x2 as number) * horizontalPixelRatio, (y as number) * verticalPixelRatio);
@@ -129,6 +176,8 @@ class SwingSegmentView implements IPrimitivePaneView {
 class SwingSegmentPrimitive implements ISeriesPrimitive<Time> {
   private _segments: SwingSegData[] = [];
   private _lastBarIdx = 0;
+  private _highColor = '#ef4444';
+  private _lowColor  = '#22c55e';
   private _chart: IChartApi | null = null;
   private _series: ISeriesApi<'Candlestick', Time> | null = null;
   private _requestUpdate: (() => void) | null = null;
@@ -145,15 +194,23 @@ class SwingSegmentPrimitive implements ISeriesPrimitive<Time> {
     this._requestUpdate = null;
   }
 
-  update(segments: SwingSegData[], lastBarIdx: number): void {
+  update(
+    segments: SwingSegData[],
+    lastBarIdx: number,
+    highColor?: string,
+    lowColor?: string,
+  ): void {
     this._segments = segments;
     this._lastBarIdx = lastBarIdx;
+    if (highColor !== undefined) this._highColor = highColor;
+    if (lowColor  !== undefined) this._lowColor  = lowColor;
     this._requestUpdate?.();
   }
 
   paneViews(): readonly IPrimitivePaneView[] {
     return [new SwingSegmentView(new SwingSegmentRenderer(
       this._segments, this._lastBarIdx, this._chart, this._series,
+      this._highColor, this._lowColor,
     ))];
   }
 }
@@ -166,7 +223,13 @@ import type { OverlayDescriptor } from '@/services/overlayBuilder';
 import type { ChartStyle } from '@/components/chart/ChartStyleSelector';
 import { classifyLiveBarUpdate } from '@/lib/liveBarClassify';
 import { pricePrecision } from '@/lib/pricePrecision';
-import { DEFAULT_SETTINGS, type ChartSettings } from '@/components/chart/ChartSettingsPopover';
+import {
+  DEFAULT_SETTINGS,
+  type ChartSettings,
+  resolveChartBackground,
+  isDarkHex,
+} from '@/components/chart/ChartSettingsPopover';
+import { useTheme } from '@/hooks/use-theme';
 
 export interface ChartEngineProps {
   /** Oldest-first OHLC points (same shape AssetDetail passes today). */
@@ -258,7 +321,6 @@ const INTERVAL_DURATION_SEC: Record<string, number> = {
   '1min': 60, '5min': 300, '15min': 900, '1h': 3600, '4h': 14400, '1day': 86400,
 };
 
-const GRID_COLOR = 'hsl(217, 19%, 16%)';
 
 function toCrosshairLineStyle(s: string): LineStyle {
   if (s === 'normal') return LineStyle.Solid;
@@ -292,6 +354,16 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
     },
     ref,
   ) {
+    const { theme: appTheme } = useTheme();
+    // Stable ref so the init-chart effect (which runs once) can read the initial theme
+    // without adding appTheme to its deps (which would re-create the chart on toggle).
+    const appThemeRef = useRef(appTheme);
+    useEffect(() => { appThemeRef.current = appTheme; }, [appTheme]);
+
+    // Computed on every render — cheap and always in-sync with settings + app theme.
+    const resolvedBg  = resolveChartBackground(chartSettings ?? DEFAULT_SETTINGS, appTheme);
+    const isDarkChart = isDarkHex(resolvedBg);
+
     const containerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
     const mainSeriesRef = useRef<
@@ -613,7 +685,8 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
         if (xc === null) continue;
         const x = xc as number;
         if (x < 0 || x > plotWidth) continue;
-        lines.push({ x, label: o.label, color: o.color });
+        const sessionOverride = chartSettingsRef.current.sessionColor;
+        lines.push({ x, label: o.label, color: sessionOverride ?? o.color });
       }
 
       const key = lines.map((l) => `${Math.round(l.x)}:${l.label}`).join('|');
@@ -668,21 +741,41 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
     useEffect(() => {
       const chart = chartRef.current;
       if (!chart) return;
-      const s = chartSettings ?? DEFAULT_SETTINGS;
+      const s   = chartSettings ?? DEFAULT_SETTINGS;
+      const bg  = resolveChartBackground(s, appTheme);
+      const dark = isDarkHex(bg);
+      const c   = deriveChartColors(dark);
+      const gridColor      = s.gridColor      ?? c.gridColor;
+      const crosshairColor = s.crosshairColor ?? c.crosshairColor;
+
       chart.applyOptions({
+        layout: {
+          background: { color: bg },
+          textColor: c.textColor,
+        },
         grid: {
-          vertLines: { color: s.gridVertical ? GRID_COLOR : 'transparent' },
-          horzLines: { color: s.gridHorizontal ? GRID_COLOR : 'transparent' },
+          vertLines: { color: s.gridVertical ? gridColor : 'transparent' },
+          horzLines: { color: s.gridHorizontal ? gridColor : 'transparent' },
         },
         crosshair: {
-          vertLine: { style: toCrosshairLineStyle(s.crosshairStyle) },
-          horzLine: { style: toCrosshairLineStyle(s.crosshairStyle) },
+          vertLine: {
+            color: crosshairColor,
+            style: toCrosshairLineStyle(s.crosshairStyle),
+            labelBackgroundColor: c.labelBgColor,
+          },
+          horzLine: {
+            color: crosshairColor,
+            style: toCrosshairLineStyle(s.crosshairStyle),
+            labelBackgroundColor: c.labelBgColor,
+          },
         },
-        rightPriceScale: { mode: toPsMode(s.priceScaleMode) },
+        rightPriceScale: { borderColor: c.axisBorderColor, mode: toPsMode(s.priceScaleMode) },
+        timeScale: { borderColor: c.axisBorderColor },
       });
       computeNewsPills();
+
       const series = mainSeriesRef.current;
-      const kind = seriesKindRef.current;
+      const kind   = seriesKindRef.current;
       if (!series) return;
       if (kind === 'bars') {
         (series as ISeriesApi<'Bar'>).applyOptions({
@@ -708,45 +801,50 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
           wickDownColor: s.downColor,
         });
       }
-    }, [chartSettings, computeNewsPills]);
+    }, [chartSettings, appTheme, computeNewsPills]);
 
     // ── Init chart (once) ──────────────────────────────────────
     useEffect(() => {
       if (!containerRef.current) return;
       const initS = chartSettingsRef.current;
+      const initBg            = resolveChartBackground(initS, appThemeRef.current);
+      const initDark          = isDarkHex(initBg);
+      const initC             = deriveChartColors(initDark);
+      const initGridColor     = initS.gridColor     ?? initC.gridColor;
+      const initCrosshairColor = initS.crosshairColor ?? initC.crosshairColor;
 
       const chart = createChart(containerRef.current, {
         layout: {
-          background: { color: 'transparent' },
-          textColor: 'hsl(215, 20%, 55%)',
+          background: { color: initBg },
+          textColor: initC.textColor,
           fontFamily: 'Inter, system-ui, sans-serif',
         },
         grid: {
-          vertLines: { color: initS.gridVertical ? GRID_COLOR : 'transparent' },
-          horzLines: { color: initS.gridHorizontal ? GRID_COLOR : 'transparent' },
+          vertLines: { color: initS.gridVertical ? initGridColor : 'transparent' },
+          horzLines: { color: initS.gridHorizontal ? initGridColor : 'transparent' },
         },
         crosshair: {
           mode: CrosshairMode.Normal,
           vertLine: {
-            color: 'hsl(215, 20%, 40%)',
+            color: initCrosshairColor,
             width: 1,
             style: toCrosshairLineStyle(initS.crosshairStyle),
-            labelBackgroundColor: 'hsl(217, 33%, 17%)',
+            labelBackgroundColor: initC.labelBgColor,
           },
           horzLine: {
-            color: 'hsl(215, 20%, 40%)',
+            color: initCrosshairColor,
             width: 1,
             style: toCrosshairLineStyle(initS.crosshairStyle),
-            labelBackgroundColor: 'hsl(217, 33%, 17%)',
+            labelBackgroundColor: initC.labelBgColor,
           },
         },
         rightPriceScale: {
-          borderColor: 'hsl(217, 19%, 20%)',
+          borderColor: initC.axisBorderColor,
           scaleMargins: { top: 0.08, bottom: 0.08 },
           mode: toPsMode(initS.priceScaleMode),
         },
         timeScale: {
-          borderColor: 'hsl(217, 19%, 20%)',
+          borderColor: initC.axisBorderColor,
           timeVisible: true,
           secondsVisible: false,
           rightOffset: 8,
@@ -1117,21 +1215,29 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
 
       // Swing segment primitive must be cleared even when overlay list is empty.
       if (swingSegPrimRef.current) {
+        const cs = chartSettingsRef.current;
         const segs = (overlays ?? [])
           .filter((o): o is Extract<OverlayDescriptor, { kind: 'swing-segment' }> => o.kind === 'swing-segment')
           .map((o) => ({ barIndex: o.barIndex, price: o.price, direction: o.direction, opacity: o.opacity }));
-        swingSegPrimRef.current.update(segs, Math.max(0, barsRef.current.length - 1));
+        swingSegPrimRef.current.update(
+          segs,
+          Math.max(0, barsRef.current.length - 1),
+          cs.swingHighColor,
+          cs.swingLowColor,
+        );
       }
 
       if (!overlays || overlays.length === 0) return;
 
+      const cs = chartSettingsRef.current;
       const markers: SeriesMarker<Time>[] = [];
 
       for (const o of overlays) {
         if (o.kind === 'price-line') {
+          const lineColor = cs.levelColor ?? o.color;
           const line = main.createPriceLine({
             price: o.price,
-            color: o.color,
+            color: lineColor,
             lineStyle: o.dotted ? LineStyle.Dotted : o.dash ? LineStyle.Dashed : LineStyle.Solid,
             lineWidth: 1,
             axisLabelVisible: o.axisLabelVisible ?? true,
@@ -1146,13 +1252,15 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
         } else if (o.kind === 'swing-marker') {
           // 'session-line' descriptors are rendered as HTML hairlines by computeSessionLines
           const opacity = o.opacity ?? 1.0;
+          const swingColor = o.direction === 'high' ? cs.swingHighColor : cs.swingLowColor;
+          // On light charts darken the colour ~27% toward black so faded older swings remain legible.
+          const effectiveColor = isDarkChart ? swingColor : darkenHex(swingColor, 0.27);
+          const effectiveOpacity = isDarkChart ? opacity : Math.max(0.70, opacity);
           markers.push({
             time: o.timestamp as Time,
             position: o.direction === 'high' ? 'aboveBar' : 'belowBar',
             shape: 'circle',
-            color: o.direction === 'high'
-              ? `hsla(0, 84%, 60%, ${opacity})`
-              : `hsla(142, 71%, 45%, ${opacity})`,
+            color: hexWithOpacity(effectiveColor, effectiveOpacity),
             size: 0,
             text: o.direction === 'high' ? 'SH' : 'SL',
           });
@@ -1164,7 +1272,7 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
         markers.sort((a, b) => (a.time as number) - (b.time as number));
         markersPluginRef.current = createSeriesMarkers(main as ISeriesApi<'Candlestick'>, markers);
       }
-    }, [overlays, displayInterval, seriesGen]);
+    }, [overlays, displayInterval, seriesGen, chartSettings, isDarkChart]);
 
     // ── News pill + session line position effects ───────────────
     // Subscribe to pan/zoom so pills and session hairlines track the chart.
@@ -1186,6 +1294,11 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       computeNewsPills();
       computeSessionLines();
     }, [overlays, seriesGen, computeNewsPills, computeSessionLines]);
+
+    // Re-run session lines when sessionColor changes (overlays themselves didn't change).
+    useEffect(() => {
+      computeSessionLines();
+    }, [chartSettings?.sessionColor, computeSessionLines]);
 
     return (
       <div className="relative w-full h-full">
@@ -1217,8 +1330,8 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
           </div>
         )}
 
-        {/* LWC chart canvas */}
-        <div ref={containerRef} className="absolute inset-0 bg-[hsl(222,30%,5%)]" />
+        {/* LWC chart canvas — background is owned by LWC via layout.background.color */}
+        <div ref={containerRef} className="absolute inset-0" />
 
         {/* ── Session open hairlines ─────────────────────────────
             Thin dashed verticals + 14-px top-strip label per session open.
@@ -1233,11 +1346,16 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
               >
                 <div
                   className="absolute inset-y-0 pointer-events-none"
-                  style={{ width: 0, borderLeft: `1px dashed ${line.color}`, opacity: 0.2 }}
+                  style={{ width: 0, borderLeft: `1px dashed ${line.color}`, opacity: isDarkChart ? 0.2 : 0.4 }}
                 />
                 <div
                   className="absolute pointer-events-none text-[9px] leading-[12px] whitespace-nowrap select-none"
-                  style={{ top: 2, left: 3, color: line.color, opacity: 0.55 }}
+                  style={{
+                    top: 2,
+                    left: 3,
+                    color: isDarkChart ? line.color : 'hsl(0, 0%, 20%)',
+                    opacity: isDarkChart ? 0.55 : 0.70,
+                  }}
                 >
                   {line.label}
                 </div>
@@ -1254,41 +1372,36 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
         {newsPills.length > 0 && (
           <div className="absolute inset-0 pointer-events-none overflow-hidden z-[3]">
             {/* Layer 1: shade windows */}
-            {newsPills.map((pill) =>
-              pill.windowEndX !== null && pill.windowEndX > pill.x ? (
+            {newsPills.map((pill) => {
+              const pillCustom = chartSettings?.newsPillColor ?? null;
+              const shadeColor = pillCustom
+                ? hexWithOpacity(pillCustom, 0.04)
+                : (pill.impact === 'high' ? 'hsla(0, 84%, 60%, 0.04)' : 'hsla(45, 90%, 60%, 0.04)');
+              return pill.windowEndX !== null && pill.windowEndX > pill.x ? (
                 <div
                   key={`shade-${pill.ts}`}
                   className="absolute top-0 bottom-0 pointer-events-none"
-                  style={{
-                    left: pill.x,
-                    width: pill.windowEndX - pill.x,
-                    background: pill.impact === 'high'
-                      ? 'hsla(0, 84%, 60%, 0.04)'
-                      : 'hsla(45, 90%, 60%, 0.04)',
-                  }}
+                  style={{ left: pill.x, width: pill.windowEndX - pill.x, background: shadeColor }}
                 />
-              ) : null,
-            )}
+              ) : null;
+            })}
 
             {/* Layer 2: stems — vertical line from candle anchor to pill */}
             {newsPills.map((pill) => {
               if (pill.level < 0) return null;
               const isHovered = hoveredTs === pill.ts;
-              const color = pill.impact === 'high'
-                ? `hsla(0, 84%, 60%, ${isHovered ? 0.7 : 0.4})`
-                : `hsla(45, 90%, 60%, ${isHovered ? 0.7 : 0.4})`;
+              const pillCustom = chartSettings?.newsPillColor ?? null;
+              const color = pillCustom
+                ? hexWithOpacity(pillCustom, isHovered ? 0.7 : 0.4)
+                : (pill.impact === 'high'
+                    ? `hsla(0, 84%, 60%, ${isHovered ? 0.7 : 0.4})`
+                    : `hsla(45, 90%, 60%, ${isHovered ? 0.7 : 0.4})`);
               const stemTop = pill.above ? pill.yCandle - pill.stemLength : pill.yCandle;
               return (
                 <div
                   key={`stem-${pill.ts}`}
                   className="absolute pointer-events-none"
-                  style={{
-                    left: pill.x - 0.5,
-                    top: stemTop,
-                    width: 1,
-                    height: pill.stemLength,
-                    background: color,
-                  }}
+                  style={{ left: pill.x - 0.5, top: stemTop, width: 1, height: pill.stemLength, background: color }}
                 />
               );
             })}
@@ -1297,9 +1410,12 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
             {newsPills.map((pill) => {
               if (pill.level < 0) return null;
               const isHovered = hoveredTs === pill.ts;
-              const color = pill.impact === 'high'
-                ? `hsla(0, 84%, 60%, ${isHovered ? 1 : 0.7})`
-                : `hsla(45, 90%, 60%, ${isHovered ? 1 : 0.7})`;
+              const pillCustom = chartSettings?.newsPillColor ?? null;
+              const color = pillCustom
+                ? hexWithOpacity(pillCustom, isHovered ? 1 : 0.7)
+                : (pill.impact === 'high'
+                    ? `hsla(0, 84%, 60%, ${isHovered ? 1 : 0.7})`
+                    : `hsla(45, 90%, 60%, ${isHovered ? 1 : 0.7})`);
               return (
                 <div
                   key={`anchorDot-${pill.ts}`}
@@ -1318,10 +1434,25 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
 
             {/* Layer 4: pills or dot fallback buttons */}
             {newsPills.map((pill) => {
-              const impactColor  = pill.impact === 'high' ? 'hsl(0, 84%, 60%)' : 'hsl(45, 90%, 60%)';
-              const impactFill   = pill.impact === 'high' ? 'hsla(0, 84%, 60%, 0.12)' : 'hsla(45, 90%, 60%, 0.12)';
-              const impactBorder = pill.impact === 'high' ? 'hsla(0, 84%, 60%, 0.4)' : 'hsla(45, 90%, 60%, 0.4)';
-              const impactText   = pill.impact === 'high' ? 'hsl(0, 84%, 80%)' : 'hsl(45, 90%, 75%)';
+              const pillCustom = chartSettings?.newsPillColor ?? null;
+              // Base accent colour: custom override or impact-based defaults
+              const rawHigh = pillCustom ?? 'hsl(0, 84%, 60%)';
+              const rawMed  = pillCustom ?? 'hsl(45, 90%, 60%)';
+              const rawColor = pill.impact === 'high' ? rawHigh : rawMed;
+              // Build colour variants — handle both hex and HSL strings
+              const impactColor = rawColor;
+              const impactFill  = pillCustom
+                ? hexWithOpacity(pillCustom, 0.12)
+                : (pill.impact === 'high' ? 'hsla(0, 84%, 60%, 0.12)' : 'hsla(45, 90%, 60%, 0.12)');
+              const impactBorder = pillCustom
+                ? hexWithOpacity(pillCustom, 0.4)
+                : (pill.impact === 'high' ? 'hsla(0, 84%, 60%, 0.4)' : 'hsla(45, 90%, 60%, 0.4)');
+              // Text colour: for defaults adapt to chart luminance; for custom use as-is
+              const impactText = pillCustom
+                ? pillCustom
+                : pill.impact === 'high'
+                  ? (isDarkChart ? 'hsl(0, 84%, 80%)' : 'hsl(0, 84%, 35%)')
+                  : (isDarkChart ? 'hsl(45, 90%, 75%)' : 'hsl(45, 90%, 30%)');
               const ariaLabel    = `${pill.impact === 'high' ? 'High' : 'Medium'} impact: ${pill.event.event}`;
               const handleActivate = () => onEventMarkerClickRef.current?.(pill.event);
               const isHovered = hoveredTs === pill.ts;
@@ -1380,7 +1511,7 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
                   <span aria-hidden style={{ display: 'block', width: 5, height: 5, borderRadius: '50%', background: impactColor, flexShrink: 0 }} />
                   {pill.label}
                   {pill.moveData && (
-                    <span style={{ marginLeft: 4, color: 'hsl(215, 20%, 55%)' }}>
+                    <span style={{ marginLeft: 4, color: isDarkChart ? 'hsl(215, 20%, 55%)' : 'hsl(215, 10%, 40%)' }}>
                       {pill.moveData.direction === 'up' ? '▲' : '▼'}{' '}
                       {pill.moveData.pips}p · {pill.moveData.minutes}m
                     </span>
