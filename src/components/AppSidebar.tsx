@@ -232,7 +232,19 @@ export function AppSidebar() {
         <WithCollapsedTooltip label="Support">
           <button
             type="button"
-            onClick={() => setSupportOpen(true)}
+            onPointerDown={(e) => {
+              // Same pattern as Theme/Upgrade/nav buttons: this sidebar's helper
+              // components remount on re-render, which can swallow a plain click.
+              e.preventDefault();
+              e.stopPropagation();
+              setSupportOpen(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setSupportOpen(true);
+              }
+            }}
             className={[
               navBtnBase,
               collapsed && !isMobile ? "justify-center mx-1 px-0" : "justify-start",
