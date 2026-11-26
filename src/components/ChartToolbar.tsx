@@ -3,7 +3,6 @@ import { Crosshair, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IndicatorSelector } from './chart/IndicatorSelector';
 import { ChartStyleSelector, ChartStyle } from './chart/ChartStyleSelector';
-import { ReplayModePanel } from './chart/ReplayModePanel';
 import { SavedBacktestsDropdown, SavedBacktest } from './chart/SavedBacktestsDropdown';
 import { ChartSettingsPopover, type ChartSettings } from './chart/ChartSettingsPopover';
 
@@ -103,11 +102,6 @@ export function ChartToolbar({
 
         {/* Right: Icon controls */}
         <div className="flex items-center gap-1 shrink-0">
-          {/* Replay Mode */}
-          <ReplayModePanel />
-
-          <div className="h-4 w-px bg-border/50 mx-1" />
-
           {/* Indicators Button */}
           <IndicatorSelector
             activeIndicators={activeIndicators}

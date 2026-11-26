@@ -1,77 +1,95 @@
 # StreamBias — Project Status
+_Last updated: 2026-11-26_
 
-## Completed
+## Live now
 
-### Data & Architecture
-- Server-side caching proxy at /api/quote and /api/timeseries — Twelve Data API key server-side only
-- Demo seed data: 90 trades Dec 2025–May 2026, £140k demo account, entry/exit times for session analysis
-- Live FMP calendar wired across all components — live primary, static fallback
-- All hardcoded dashboard cards replaced with live data
+### Auth & Payments
+- Supabase auth: sign-up, sign-in, email confirmation, password reset, auth callback
+- Terms/Privacy checkbox on sign-up; protected routes gate all app pages
+- Stripe: Standard (£29/mo · £299/yr), Pro (£45/mo · £495/yr), Founding Member (£299/yr, 100 spots, no trial)
+- 7-day free trial, card required; Stripe checkout + customer portal + webhook handler
+- Subscription status stored in Supabase `profiles`; paywall in ProtectedRoute
+- Trial banner, cancel flow, downgrade grace flow
 
-### Dashboard & Reports
-- All dashboard cards live: active-trades, next-session, performance-overview, risk-snapshot, all KPI cards, equity curves
-- Trading sessions use real UTC market hours with live countdown
-- Reports: Sessions, Psychology (hold-time), Risk all calculate from real trade data
+### Trade Screen (centrepiece)
+- Full interactive chart: 1m 5m 15m 1H 4H 1D, candlestick + other styles, zoom, crosshair, OHLC readout, fullscreen
+- Overlay toggles (Levels, News, Sessions, Swings) with localStorage persistence
+- Levels: key reference price-lines with axis labels (Previous High/Low, Strong Reaction Zone, BRT, Liq Sweep, Nearby Target)
+- Sessions: London + NY open hairlines, intraday TFs only (hidden on 4H+)
+- Swings: SH/SL markers + short canvas segment lines for nearest unbroken swings
+- News markers: rendered as HTML pill callouts; pill placement avoids level tags and swing labels
+- Swing segment lines cleared correctly when overlay list empties
+- Pair selector with watchlist stars; Scalper / Intraday / Swing / Custom TF presets
+- Always-on side panel: Combined Bias + confidence, per-TF bias + reason, Volume, Next High-Impact News, Nearest Levels, 3-of-3 checklist, Dynamic Risk, I'm in a Trade
+- I'm in a Trade: draws entry / stop / target as chart lines
+- Mobile: swipe-up market panel, quick-status chip row, pair sheet
+- Tab-refocus no longer remounts the app (same-user Supabase token refresh handled without re-fetching)
 
-### Journal & Risk Tools
-- Add Trade dialog: pair selector, Long/Short toggle, SL/TP, date, notes, rating, actualR
-- Trade timestamps added to data model and form
-- Risk tools (Position Size, Daily Risk, Max Drawdown) account-aware with GBP currency
+### Bias Engine
+- Three user-chosen timeframes (Bias 50%, Structure 30%, Entry 20%)
+- Reads last closed candle vs previous: bullish / bearish / rejection / neutral
+- Verdict: Active / Weakening / Neutral-Ranging with confidence score
+- Presets: Scalper 1H/15m/5m · Intraday 4H/1H/15m · Swing 1W/1D/4H
 
-### Education & Smart Search
-- Guides and Trading Tips as separate sidebar items
-- Reader modal with proper formatting, calculated read times, level filter
-- Smart Search: assets, education articles, page shortcuts with keyboard navigation
+### Dashboard
+- Customisable cards: drag, add, remove
+- Markets at a Glance, Watchlist Overview, performance KPIs, equity curve, session countdown, risk snapshot
+- Asset overlay from Dashboard (AssetDetailContent)
 
-### Auth (Supabase)
-- Login, Register, Forgot Password, Reset Password pages
-- Protected routes — all app routes require authentication
-- Email confirmation flow with Resend SMTP (hfx-capital.com domain verified)
-- AuthCallback page handles email confirmation redirect
-- Card-required trial flow: register → confirm email → Stripe checkout → dashboard
+### Review (Journal + Risk)
+- Manual trade entry, CSV import, MT4/MT5 broker sync (Pro; live status unconfirmed)
+- Tags (16 defaults + custom), star rating, notes, session planning
+- Auto P&L, profit rate, R:R, profit factor, session/weekday breakdowns
+- 8 reports: Overview, Performance, Psychology, Risk Management, Sessions, Setup Quality, Assets, Trade Log
+- Psychology report: keyword sentiment, emotional triggers, hold-time, improvement focus
+- Dynamic Risk: session/setup/weekday splits vs overall record (needs ≥20 trades per split)
 
-### Payments (Stripe)
-- Three products: Standard (£19/mo, £190/yr), Pro (£29/mo, £290/yr), Founding Member (£197/yr)
-- 7-day trial, card required upfront
-- Checkout session serverless function (/api/create-checkout-session)
-- Customer portal serverless function (/api/create-portal-session)
-- Webhook handler (/api/webhook) — processes checkout.session.completed, subscription.updated, subscription.deleted
-- Profiles table in Supabase stores subscription status, tier, trial dates
-- Paywall in ProtectedRoute — redirects inactive users to /pricing
-- Trial banner showing days remaining with cancel option
-- Billing section in Settings
+### Risk Tools
+- Position Size Calculator, R/R Calculator, Quick Risk Calculator, Daily Risk Limit Tracker, Max Drawdown Guard
+- Dynamic Risk (also in Trade side panel)
 
-### Landing Page
-- Hero with mouse-tracking gradient orbs
-- How it Works, Bias Engine, Journal (calendar/equity/analytics mockups), Risk, Calendar/Alerts, Education sections
-- Founding Member section (£197/yr, 100 spots)
-- Testimonials (3 placeholder cards)
-- Demo video placeholder with email capture → Supabase demo_leads table
-- 7-day trial messaging with card-required copy throughout
-- Footer with nav links
+### Alerts
+- Price alerts (wick or close, 1m–1W); calendar-event alerts
+- Run only while StreamBias is open; device-local storage; no push/email/SMS delivery
+- Session-reminder / bias-flip / summary toggles exist in UI but do not generate alerts yet
 
-### Infrastructure
-- Deployed on Vercel with auto-deploy on push to main
-- Custom SMTP via Resend (hfx-capital.com)
-- Supabase: auth, profiles table, demo_leads table, RLS policies
+### Education
+- ~18–20 guides + Trading Tips (count unconfirmed)
+- Reader modal with formatting, read time, level filter
 
-## In Progress
-- Post-payment redirect flow: after Stripe checkout → login page → retry profile check → dashboard
-- Currently testing the retry loop (waitForProfile) to handle webhook timing delay
-- NEXT TEST: register with fresh email, complete Stripe checkout, sign in, verify lands on /dashboard
+### Other
+- Smart Search: assets, guides, page shortcuts
+- Settings: subscription management, trader timeframes, PIN session lock, broker connections, home currency, password change
+- Support link: sidebar, Settings, 404 page (support@streambias.com)
+- Vercel deploy; Supabase; Resend SMTP (hfx-capital.com)
 
-## Remaining — Pre-Launch
-- Verify post-payment redirect works end to end ← NEXT SESSION START
-- Remove debug logging from webhook once flow confirmed working
-- Custom domain (streambias.com — not yet purchased)
-- Terms of Service and Privacy Policy pages
-- Switch Stripe from sandbox to live mode before launch
-- Update Supabase Site URL when custom domain is set
+---
 
-## Remaining — Post-Launch
-- Community page (needs auth + database backend)
-- Real broker integration
-- Courses section in Education (SHOW_COURSES = false)
-- Automated Strategy Lab, Backtesting (simulation logic stubbed)
-- Affiliate/partner programme dashboard
-- Email marketing sequences (Resend — trial day 4, day 6, day 7 expiry)
+## Built, not yet live
+
+- **Economic Calendar**: page shows "Coming Soon"; FMP live feed not connected. Once connected, news markers appear on Trade chart.
+- **Replay Mode**: toolbar button removed (placeholder). Candle-step engine exists but no UI.
+
+---
+
+## Open / unconfirmed at launch
+
+- Live Stripe keys status
+- Gold (XAUUSD) and NAS100 live data
+- Founding Member exact feature set and remaining spots
+- Broker sync (MT4/MT5) working on live site
+- Standard plan — whether "1 broker account" means sync or manual
+- Which lifecycle emails (trial day 4/6/7) are live in Resend
+
+---
+
+## Roadmap (not built)
+
+- Live economic calendar + news markers on chart
+- Replay / simulator UI
+- Post-release news markers showing 5/15/60-min price move after event
+- Ask StreamBias (AI search box, finance-only, daily limits)
+- Journal trade overlays on event charts
+- Crypto and stocks
+- Affiliate/partner dashboard
+- Community page

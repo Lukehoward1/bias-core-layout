@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Zap,
   X,
+  Mail,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -222,6 +223,20 @@ export function AppSidebar() {
             <Zap className="h-[18px] w-[18px]" />
             {(!collapsed || isMobile) && <span className="text-sm font-semibold ml-3">Upgrade</span>}
           </button>
+        </WithCollapsedTooltip>
+
+        <WithCollapsedTooltip label="Support">
+          <a
+            href="mailto:support@streambias.com"
+            className={[
+              navBtnBase,
+              collapsed && !isMobile ? "justify-center mx-1 px-0" : "justify-start",
+            ].join(" ")}
+            title={collapsed && !isMobile ? "Support" : undefined}
+          >
+            <Mail className="h-[18px] w-[18px] flex-shrink-0" />
+            {(!collapsed || isMobile) && <span className="text-sm font-medium ml-3">Support</span>}
+          </a>
         </WithCollapsedTooltip>
       </div>
     </>

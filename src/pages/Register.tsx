@@ -177,11 +177,16 @@ export default function Register() {
                 />
                 <Label htmlFor="agree-terms" className="text-sm text-muted-foreground font-normal cursor-pointer leading-snug">
                   I agree to the{" "}
-                  <Link to="/terms" className="text-primary hover:underline font-medium">Terms of Service</Link>
+                  <Link to="/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">Terms of Service</Link>
                   {" "}and{" "}
-                  <Link to="/privacy" className="text-primary hover:underline font-medium">Privacy Policy</Link>
+                  <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">Privacy Policy</Link>
                 </Label>
               </div>
+              {!agreedToTerms && (
+                <p className="text-xs text-muted-foreground">
+                  You must agree to the Terms of Service and Privacy Policy to create an account.
+                </p>
+              )}
 
               {error && (
                 <p className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">{error}</p>
