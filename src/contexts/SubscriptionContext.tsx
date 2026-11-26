@@ -58,7 +58,11 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       .maybeSingle();
     setProfile(data as Profile | null);
     setIsLoading(false);
-  }, [user]);
+  // Depend on user.id (a string) rather than the user object so that a focus-triggered
+  // token refresh — which replaces the session but keeps the same user ID — does not
+  // recreate this callback, trigger the effect below, and call setIsLoading(true).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, authLoading]);
 
   useEffect(() => {
     fetchProfile(true);

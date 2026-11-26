@@ -9,9 +9,15 @@ export function useBrokerSync() {
   const { session } = useAuth();
   const { accounts } = useLinkedAccounts();
   const isSyncing = useRef(false);
+  // Keep session in a ref so syncAll always uses the latest token without
+  // needing session?.access_token as a dep. Without this, every token refresh
+  // recreates syncAll, which fires the mount-effect again and double-calls
+  // broker-sync alongside the focus listener.
+  const sessionRef = useRef(session);
+  useEffect(() => { sessionRef.current = session; }, [session]);
 
   const syncAll = useCallback(async () => {
-    if (isSyncing.current || !session?.access_token) return;
+    if (isSyncing.current || !sessionRef.current?.access_token) return;
     const connected = accounts.filter((a) => a.isConnected && UUID_RE.test(a.id));
     if (connected.length === 0) return;
 
@@ -23,7 +29,7 @@ export function useBrokerSync() {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${session.access_token}`,
+              Authorization: `Bearer ${sessionRef.current?.access_token}`,
             },
             body: JSON.stringify({ linkedAccountId: a.id }),
           });
@@ -43,7 +49,7 @@ export function useBrokerSync() {
     } finally {
       isSyncing.current = false;
     }
-  }, [accounts, session?.access_token]);
+  }, [accounts]);
 
   useEffect(() => {
     syncAll();

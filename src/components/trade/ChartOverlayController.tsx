@@ -21,6 +21,35 @@ import {
   buildTradeOverlays,
 } from '@/services/overlayBuilder';
 
+const OVERLAY_PREFS_KEY = 'streambias.chartOverlays.v1';
+
+interface OverlayPrefs { levels: boolean; news: boolean; sessions: boolean; swings: boolean }
+
+function readOverlayPrefs(isMobile: boolean): OverlayPrefs {
+  try {
+    const raw = localStorage.getItem(OVERLAY_PREFS_KEY);
+    if (raw) {
+      const p = JSON.parse(raw) as unknown;
+      if (p && typeof p === 'object') {
+        const o = p as Record<string, unknown>;
+        return {
+          levels:   typeof o.levels   === 'boolean' ? o.levels   : true,
+          news:     typeof o.news     === 'boolean' ? o.news     : true,
+          sessions: typeof o.sessions === 'boolean' ? o.sessions : !isMobile,
+          swings:   typeof o.swings   === 'boolean' ? o.swings   : !isMobile,
+        };
+      }
+    }
+  } catch { /* localStorage unavailable */ }
+  return { levels: true, news: true, sessions: !isMobile, swings: !isMobile };
+}
+
+function writeOverlayPrefs(prefs: OverlayPrefs): void {
+  try {
+    localStorage.setItem(OVERLAY_PREFS_KEY, JSON.stringify(prefs));
+  } catch { /* noop */ }
+}
+
 const INTERVAL_SECONDS: Record<string, number> = {
   m1: 60, m5: 300, m15: 900, h1: 3600, h4: 14400, d1: 86400,
   '1min': 60, '5min': 300, '15min': 900, '1h': 3600, '4h': 14400, '1day': 86400,
@@ -62,10 +91,12 @@ export function ChartOverlayController({
   onOverlaysChange,
 }: ChartOverlayControllerProps) {
   const isMobileInit = typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches;
-  const [showLevels,   setShowLevels]   = useState(true);
-  const [showNews,     setShowNews]     = useState(true);
-  const [showSessions, setShowSessions] = useState(!isMobileInit);
-  const [showSwings,   setShowSwings]   = useState(!isMobileInit);
+  // Lazy initialisers read from localStorage once on mount so toggle choices
+  // survive remounts (tab refocus, auth token refresh) and full page reloads.
+  const [showLevels,   setShowLevels]   = useState(() => readOverlayPrefs(isMobileInit).levels);
+  const [showNews,     setShowNews]     = useState(() => readOverlayPrefs(isMobileInit).news);
+  const [showSessions, setShowSessions] = useState(() => readOverlayPrefs(isMobileInit).sessions);
+  const [showSwings,   setShowSwings]   = useState(() => readOverlayPrefs(isMobileInit).swings);
 
   const levelOverlays = useMemo(
     () => buildLevelOverlays(marketContext?.levels ?? [], bars),
@@ -106,6 +137,10 @@ export function ChartOverlayController({
   useEffect(() => {
     onOverlaysChange(combined);
   }, [combined, onOverlaysChange]);
+
+  useEffect(() => {
+    writeOverlayPrefs({ levels: showLevels, news: showNews, sessions: showSessions, swings: showSwings });
+  }, [showLevels, showNews, showSessions, showSwings]);
 
   const sessionsUnavailable = (INTERVAL_SECONDS[interval] ?? 0) >= 14400;
 
