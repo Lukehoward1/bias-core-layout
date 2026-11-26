@@ -26,8 +26,10 @@ export function renderLifecycleEmail(opts: {
   contentHtml?: string;
   ctaLabel: string;
   ctaHref: string;
+  /** When provided, replaces the standard footer text. Omit to keep the default (byte-identical output). */
+  footerHtml?: string;
 }): string {
-  const { eyebrow, headline, greetingHtml, introHtml, contentHtml = "", ctaLabel, ctaHref } = opts;
+  const { eyebrow, headline, greetingHtml, introHtml, contentHtml = "", ctaLabel, ctaHref, footerHtml } = opts;
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -50,7 +52,7 @@ ${contentHtml}
         <a href="${ctaHref}" style="display:inline-block;background:linear-gradient(135deg,#01477e,#0092ce);color:#ffffff;font-size:14px;font-weight:500;padding:13px 26px;border-radius:6px;text-decoration:none;">${ctaLabel}</a>
       </div>
       <div style="padding:20px 32px;background:#fafafa;border-top:1px solid #efefef;">
-        <p style="font-size:12px;color:#9a9a9a;margin:0;line-height:1.6;">Questions? Reply to this email — a real person reads it.<br>StreamBias, sent from team@streambias.com</p>
+        <p style="font-size:12px;color:#9a9a9a;margin:0;line-height:1.6;">${footerHtml ?? `Questions? Reply to this email — a real person reads it.<br>StreamBias, sent from team@streambias.com`}</p>
       </div>
     </div>
   </div>

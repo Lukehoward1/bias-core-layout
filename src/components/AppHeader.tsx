@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useSessionLock } from "@/hooks/use-session-lock";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useAppSidebar } from "@/hooks/use-app-sidebar";
 import { Button } from "@/components/ui/button";
 import { WHITELIST_SYMBOLS } from "@/services/candleData";
@@ -289,8 +290,12 @@ interface AppHeaderProps {
 export function AppHeader({ title, rightContent }: AppHeaderProps) {
   const { lock } = useSessionLock();
   const { user, signOut } = useAuth();
+  const { subscriptionTier, isFoundingMember, isTrial, isLoading } = useSubscription();
   const { setMobileOpen } = useAppSidebar();
   const navigate = useNavigate();
+
+  const tierName = isFoundingMember ? "Founding" : subscriptionTier === "pro" ? "Pro" : subscriptionTier === "standard" ? "Standard" : null;
+  const badgeLabel = !isLoading && tierName ? (isTrial ? `${tierName} · Trial` : tierName) : null;
 
   const userEmail = user?.email ?? "";
   const avatarInitials = userEmail ? userEmail.slice(0, 2).toUpperCase() : "?";
@@ -328,9 +333,11 @@ export function AppHeader({ title, rightContent }: AppHeaderProps) {
 
       <div className="flex items-center gap-4 shrink-0">
         {rightContent}
-        <Badge variant="secondary" className="text-xs font-medium h-6 px-2.5">
-          Pro
-        </Badge>
+        {badgeLabel && (
+          <Badge variant="secondary" className="text-xs font-medium h-6 px-2.5">
+            {badgeLabel}
+          </Badge>
+        )}
 
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 hover:opacity-80 transition-opacity">

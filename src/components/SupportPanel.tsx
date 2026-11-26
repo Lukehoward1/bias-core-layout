@@ -112,6 +112,11 @@ export function SupportPanel({ open, onClose }: SupportPanelProps) {
           topic,
           message: message.trim(),
           page: includePage ? location.pathname : undefined,
+          client: {
+            userAgent: navigator.userAgent,
+            screen: `${window.screen.width}x${window.screen.height}`,
+            tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          },
         }),
       });
 
