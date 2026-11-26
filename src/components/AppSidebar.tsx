@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   LayoutDashboard,
   TrendingUp,
@@ -16,6 +17,7 @@ import {
   Mail,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { SupportPanel } from "@/components/SupportPanel";
 import { Button } from "@/components/ui/button";
 import { useAppSidebar } from "@/hooks/use-app-sidebar";
 import { useTheme } from "@/hooks/use-theme";
@@ -48,6 +50,7 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const [supportOpen, setSupportOpen] = useState(false);
 
   const currentPath = location.pathname;
 
@@ -149,6 +152,7 @@ export function AppSidebar() {
 
   const sidebarContent = (
     <>
+      <SupportPanel open={supportOpen} onClose={() => setSupportOpen(false)} />
       <div className="flex-shrink-0">
         <div className={`h-14 ${collapsed && !isMobile ? "px-3" : "px-4"} flex items-center justify-between`}>
           <div className={`flex items-center ${collapsed && !isMobile ? "justify-center" : "gap-3"}`}>
@@ -226,8 +230,9 @@ export function AppSidebar() {
         </WithCollapsedTooltip>
 
         <WithCollapsedTooltip label="Support">
-          <a
-            href="mailto:support@streambias.com"
+          <button
+            type="button"
+            onClick={() => setSupportOpen(true)}
             className={[
               navBtnBase,
               collapsed && !isMobile ? "justify-center mx-1 px-0" : "justify-start",
@@ -236,7 +241,7 @@ export function AppSidebar() {
           >
             <Mail className="h-[18px] w-[18px] flex-shrink-0" />
             {(!collapsed || isMobile) && <span className="text-sm font-medium ml-3">Support</span>}
-          </a>
+          </button>
         </WithCollapsedTooltip>
       </div>
     </>

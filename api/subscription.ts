@@ -8,6 +8,7 @@
 //   POST /api/subscription  { action: "cancel_scheduled" }
 //   POST /api/subscription  { action: "reactivate" }
 //   POST /api/subscription  { action: "cancel", reason, feedback_text? }
+//   POST /api/subscription  { action: "support", topic, message, page? }
 //
 // Uses the canonical Stripe Subscription Schedules primitive for plan
 // changes (create schedule with two phases: phase 0 mirrors current
@@ -18,6 +19,8 @@
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import Stripe from "stripe";
+import { createClient } from "@supabase/supabase-js";
+import { Resend } from "resend";
 import { PRICE_IDS } from "../src/lib/stripe.js";
 import { requireSubscriber, blockFoundingMember, type CallerProfile } from "./_lib/subscription-auth.js";
 import { sendCancellationAlertEmail } from "./_lib/cancellation-alert-email.js";
@@ -73,9 +76,176 @@ const ALLOWED_REASONS = new Set<string>([
   "other",
 ]);
 
+// ── Support submission helpers (defined above handler to satisfy no-use-before-define) ──
+
+const SUPPORT_TOPICS = new Set(["billing", "bug", "data", "question", "other"]);
+const SUPPORT_TOPIC_LABELS: Record<string, string> = {
+  billing:  "Billing",
+  bug:      "Bug",
+  data:     "Data / prices",
+  question: "Question",
+  other:    "Other",
+};
+
+function escapeHtmlSupport(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+async function handleSupport(req: VercelRequest, res: VercelResponse): Promise<VercelResponse> {
+  const token = req.headers.authorization?.startsWith("Bearer ")
+    ? req.headers.authorization.slice(7)
+    : null;
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
+
+  const supabase = createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+
+  const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+  if (authErr || !user) return res.status(401).json({ error: "Unauthorized" });
+
+  const body = req.body as { topic?: string; message?: string; page?: string };
+  const topic   = body.topic?.trim() ?? "";
+  const message = body.message?.trim() ?? "";
+  const page    = typeof body.page === "string" ? body.page.trim().slice(0, 200) : null;
+
+  if (!SUPPORT_TOPICS.has(topic)) {
+    return res.status(400).json({ error: "Please select a valid topic." });
+  }
+  if (message.length < 10 || message.length > 2000) {
+    return res.status(400).json({ error: "Message must be 10–2000 characters." });
+  }
+
+  // Derive priority for email subject (trigger is authoritative for the DB row).
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("subscription_tier, subscription_status, is_founding_member")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const isPriority =
+    (profile?.is_founding_member === true || profile?.subscription_tier === "pro") &&
+    (profile?.subscription_status === "active" || profile?.subscription_status === "trialing");
+
+  const priorityTag  = isPriority ? "PRO" : "STANDARD";
+  const topicLabel   = SUPPORT_TOPIC_LABELS[topic] ?? topic;
+  const userEmail    = user.email ?? "";
+  const planLabel    = profile?.subscription_tier ?? "unknown";
+  const pageDisplay  = page ?? "(not provided)";
+  const timestamp    = new Date().toUTCString();
+
+  // Insert — trigger enriches email/plan/priority and enforces rate limit.
+  const { error: insertErr } = await supabase
+    .from("support_requests")
+    .insert({ user_id: user.id, topic, message, page });
+
+  if (insertErr) {
+    if (insertErr.message === "rate_limit_exceeded") {
+      return res.status(429).json({ error: "rate_limit_exceeded" });
+    }
+    console.error("[api/subscription support] insert failed:", insertErr.message);
+    return res.status(500).json({ error: "Failed to submit request. Please try again." });
+  }
+
+  const resend = new Resend(process.env.RESEND_API_KEY!);
+
+  // Admin notification — best-effort.
+  try {
+    await resend.emails.send({
+      from: "BIAS Alerts <alerts@streambias.com>",
+      to: "support@streambias.com",
+      replyTo: userEmail,
+      subject: `[${priorityTag}] ${topicLabel} – ${userEmail}`,
+      html: `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#e5e5e5">
+  <div style="max-width:560px;margin:40px auto;padding:0 16px">
+    <div style="background:#141414;border:1px solid #262626;border-radius:12px;padding:32px">
+      <h1 style="margin:0 0 4px;font-size:18px;font-weight:600;color:#fafafa">Support request</h1>
+      <p style="margin:0 0 24px;font-size:13px;color:#525252">${escapeHtmlSupport(timestamp)}</p>
+      <table style="width:100%;border-collapse:collapse;margin:0 0 20px">
+        <tbody>
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#737373;width:100px">From</td>
+            <td style="padding:6px 0;font-size:13px;color:#fafafa">${escapeHtmlSupport(userEmail)}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#737373">Topic</td>
+            <td style="padding:6px 0;font-size:13px;color:#e5e5e5">${escapeHtmlSupport(topicLabel)}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#737373">Plan</td>
+            <td style="padding:6px 0;font-size:13px;color:#e5e5e5">${escapeHtmlSupport(planLabel)}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#737373">Priority</td>
+            <td style="padding:6px 0;font-size:13px;color:#e5e5e5">${escapeHtmlSupport(priorityTag)}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#737373">Page</td>
+            <td style="padding:6px 0;font-size:13px;color:#e5e5e5">${escapeHtmlSupport(pageDisplay)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <h2 style="margin:0 0 8px;font-size:12px;font-weight:600;color:#a3a3a3;text-transform:uppercase;letter-spacing:0.05em">Message</h2>
+      <div style="padding:12px 16px;background:#0f0f0f;border:1px solid #262626;border-radius:6px;font-size:13px;color:#e5e5e5;line-height:1.6;white-space:pre-wrap">${escapeHtmlSupport(message)}</div>
+    </div>
+  </div>
+</body>
+</html>`.trim(),
+    });
+  } catch (err) {
+    console.error(
+      "[api/subscription support] admin email failed:",
+      err instanceof Error ? err.message : err,
+    );
+  }
+
+  // User confirmation — best-effort.
+  if (userEmail) {
+    try {
+      await resend.emails.send({
+        from: "StreamBias <team@streambias.com>",
+        to: userEmail,
+        replyTo: "support@streambias.com",
+        subject: "We received your support request",
+        text: [
+          "Hi,",
+          "",
+          `We've received your ${topicLabel.toLowerCase()} request and will reply to this email address.`,
+          "",
+          "You can also reach us any time at support@streambias.com.",
+          "",
+          "— The StreamBias team",
+        ].join("\n"),
+      });
+    } catch (err) {
+      console.error(
+        "[api/subscription support] user confirmation failed:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
+  return res.status(200).json({ ok: true });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Support submission: JWT-only auth — no Stripe subscription required.
+  if (req.method === "POST" && (req.body as { action?: string })?.action === "support") {
+    return handleSupport(req, res);
+  }
+
   const ctx = await requireSubscriber(req, res);
   if (!ctx) return;
 
