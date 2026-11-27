@@ -87,18 +87,18 @@ export function MobileMarketPanel({
     >
       {/* Handle bar — tap to toggle, swipe-down to collapse */}
       <div
-        className="relative flex items-center justify-between px-4 cursor-pointer select-none h-14 [@media_(orientation:landscape)_and_(max-height:500px)]:h-9"
+        className="flex items-center justify-between px-4 cursor-pointer select-none h-14 [@media_(orientation:landscape)_and_(max-height:500px)]:h-9"
+        role="button"
+        aria-expanded={expanded}
+        aria-label={expanded ? 'Collapse market details' : 'Expand market details'}
         onClick={() => setExpanded((v) => !v)}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerCancel}
       >
-        {/* Drag handle pill — hidden in landscape slim mode */}
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-muted-foreground/30 [@media_(orientation:landscape)_and_(max-height:500px)]:hidden" />
-
         {/* Summary row */}
-        <div className="flex items-center gap-2 mt-1">
+        <div className="flex items-center gap-2">
           <HandleBiasIcon biasState={context?.biasState} />
           <span className="text-sm font-semibold text-foreground leading-none">
             {context?.biasState ?? '—'}
@@ -118,11 +118,14 @@ export function MobileMarketPanel({
           )}
         </div>
 
-        {expanded ? (
-          <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0 mt-1" />
-        ) : (
-          <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0 mt-1" />
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="text-[11px] text-muted-foreground">Details</span>
+          {expanded ? (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          )}
+        </div>
       </div>
 
       {/* Expanded content */}

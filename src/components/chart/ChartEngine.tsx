@@ -235,7 +235,7 @@ export interface ChartEngineProps {
   /** Oldest-first OHLC points (same shape AssetDetail passes today). */
   bars: OhlcDataPoint[];
   /** Live-updating forming bar (or a new rollover bar). Must include timestamp. */
-  liveBar?: Partial<OhlcDataPoint> & { timestamp: number };
+  liveBar?: Partial<OhlcDataPoint> & { timestamp: number; symbol?: string; timeframe?: string };
   chartStyle: ChartStyle;
   /** LiveClock in prod, ReplayClock in replay. Unused in Stage 2 live path. */
   clock?: DataClock;
@@ -399,6 +399,9 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
     const prevSessionLinesKeyRef = useRef<string>('');
     const swingSegPrimRef        = useRef<SwingSegmentPrimitive | null>(null);
     if (swingSegPrimRef.current === null) swingSegPrimRef.current = new SwingSegmentPrimitive();
+    // Tracks the last timestamp written to the series via update(); reset by setData.
+    // Guards against stale liveBars being applied after a bars reload or TF switch.
+    const lastAppliedTimeRef = useRef<number | null>(null);
 
     const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
     // Incremented by the structural effect each time it (re)creates the main series.
@@ -1105,6 +1108,7 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       }
 
       chart.timeScale().fitContent();
+      lastAppliedTimeRef.current = null;
       setSeriesGen((g) => g + 1);
     }, [bars, chartStyle, activeIndicators, pair, displayInterval, formatPrice, formatTime, onCrosshairMove]);
 
@@ -1117,6 +1121,12 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       if (!series) return;
       const lastBase = bars.length > 0 ? bars[bars.length - 1] : null;
       if (!lastBase) return;
+
+      // Guard: ignore liveBar tagged for a different symbol or timeframe.
+      if (liveBar.symbol !== undefined && liveBar.symbol !== pair.toUpperCase().replace(/[/ ]/g, '')) return;
+      if (liveBar.timeframe !== undefined && liveBar.timeframe !== displayInterval) return;
+      // Guard: ignore liveBar older than the last time successfully applied to this series.
+      if (lastAppliedTimeRef.current !== null && liveBar.timestamp < lastAppliedTimeRef.current) return;
 
       const kind = classifyLiveBarUpdate(lastBase.timestamp, liveBar.timestamp);
       if (kind === 'older') return;
@@ -1134,57 +1144,72 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
       const style = seriesKindRef.current;
       const timeArg = liveBar.timestamp as Time;
 
-      if (style === 'line' || style === 'area') {
-        (series as ISeriesApi<'Line'> | ISeriesApi<'Area'>).update({ time: timeArg, value: liveClose });
-      } else if (style === 'heikin-ashi') {
-        // HA recompute: 'same' uses prevHaBarRef (HA at N-2); 'newer' uses baseLastHaRef (HA at N-1
-        // of the base set, frozen by the structural effect — never mutated by live ticks).
-        const priorHa = sameBar ? prevHaBarRef.current : baseLastHaRef.current;
-        const ha = computeHaBar({ open: liveOpen, high: liveHigh, low: liveLow, close: liveClose }, priorHa);
-        (series as ISeriesApi<'Candlestick'>).update({
-          time: timeArg,
-          open: ha.open,
-          high: ha.high,
-          low: ha.low,
-          close: ha.close,
-        });
-        lastHaBarRef.current = ha;
-        if (kind === 'newer') {
-          prevHaBarRef.current = priorHa; // the HA that was last before this new bar
+      let applied = false;
+      try {
+        if (style === 'line' || style === 'area') {
+          (series as ISeriesApi<'Line'> | ISeriesApi<'Area'>).update({ time: timeArg, value: liveClose });
+          applied = true;
+        } else if (style === 'heikin-ashi') {
+          // HA recompute: 'same' uses prevHaBarRef (HA at N-2); 'newer' uses baseLastHaRef (HA at N-1
+          // of the base set, frozen by the structural effect — never mutated by live ticks).
+          const priorHa = sameBar ? prevHaBarRef.current : baseLastHaRef.current;
+          const ha = computeHaBar({ open: liveOpen, high: liveHigh, low: liveLow, close: liveClose }, priorHa);
+          (series as ISeriesApi<'Candlestick'>).update({
+            time: timeArg,
+            open: ha.open,
+            high: ha.high,
+            low: ha.low,
+            close: ha.close,
+          });
+          lastHaBarRef.current = ha;
+          if (kind === 'newer') {
+            prevHaBarRef.current = priorHa; // the HA that was last before this new bar
+          }
+          applied = true;
+        } else {
+          // candlestick, hollow, bars
+          (series as ISeriesApi<'Candlestick'> | ISeriesApi<'Bar'>).update({
+            time: timeArg,
+            open: liveOpen,
+            high: liveHigh,
+            low: liveLow,
+            close: liveClose,
+          });
+          applied = true;
         }
-      } else {
-        // candlestick, hollow, bars
-        (series as ISeriesApi<'Candlestick'> | ISeriesApi<'Bar'>).update({
-          time: timeArg,
-          open: liveOpen,
-          high: liveHigh,
-          low: liveLow,
-          close: liveClose,
-        });
+      } catch (err) {
+        console.warn('[ChartEngine] live update skipped:', (err as Error).message);
+      }
+      if (applied) {
+        lastAppliedTimeRef.current = liveBar.timestamp;
       }
 
       // MA last-point update (never shifts earlier values; never calls fitContent).
       const ma = maSeriesRef.current;
       if (ma) {
         const maPeriod = 20;
-        let window: number[] | null = null;
+        let maWindow: number[] | null = null;
         if (kind === 'newer') {
           // New bar's window = last (maPeriod - 1) base closes + liveClose
           if (bars.length >= maPeriod - 1) {
-            window = bars.slice(bars.length - (maPeriod - 1)).map((b) => b.close).concat(liveClose);
+            maWindow = bars.slice(bars.length - (maPeriod - 1)).map((b) => b.close).concat(liveClose);
           }
         } else {
           // Same bar: window = (maPeriod - 1) bars ending at the one before last + liveClose
           if (bars.length >= maPeriod) {
-            window = bars.slice(bars.length - maPeriod, bars.length - 1).map((b) => b.close).concat(liveClose);
+            maWindow = bars.slice(bars.length - maPeriod, bars.length - 1).map((b) => b.close).concat(liveClose);
           }
         }
-        if (window && window.length === maPeriod) {
-          const avg = window.reduce((s, c) => s + c, 0) / maPeriod;
-          ma.update({ time: timeArg, value: avg });
+        if (maWindow && maWindow.length === maPeriod) {
+          const avg = maWindow.reduce((s, c) => s + c, 0) / maPeriod;
+          try {
+            ma.update({ time: timeArg, value: avg });
+          } catch (err) {
+            console.warn('[ChartEngine] MA live update skipped:', (err as Error).message);
+          }
         }
       }
-    }, [liveBar, bars]);
+    }, [liveBar, bars, pair, displayInterval]);
 
     // ── OVERLAY effect ─────────────────────────────────────────
     // Separate from structural and live-update effects: rebuilds only when

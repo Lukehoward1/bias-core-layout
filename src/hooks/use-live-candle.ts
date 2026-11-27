@@ -42,7 +42,7 @@ const TF_TO_TFCODE: Record<string, string> = {
   d1: '1day',
 };
 
-export type LiveBar = Partial<OhlcDataPoint> & { timestamp: number };
+export type LiveBar = Partial<OhlcDataPoint> & { timestamp: number; symbol: string; timeframe: string };
 
 export interface UseLiveCandleOpts {
   symbol: string | null | undefined;
@@ -127,6 +127,7 @@ async function fetchFormingCandle(
 
 export function useLiveCandle({ symbol, timeframe, lastBar }: UseLiveCandleOpts): LiveBar | undefined {
   const [liveBar, setLiveBar] = useState<LiveBar | undefined>(undefined);
+  const [liveBarKey, setLiveBarKey] = useState<string>('');
   const lastBarRef = useRef<OhlcDataPoint | null>(lastBar);
   const liveBarRef = useRef<LiveBar | undefined>(undefined);
 
@@ -137,10 +138,19 @@ export function useLiveCandle({ symbol, timeframe, lastBar }: UseLiveCandleOpts)
     liveBarRef.current = liveBar;
   }, [liveBar]);
 
-  // Reset when the underlying bar or symbol changes — previous overlay no longer applies.
+  // Synchronous derived-state reset: clear liveBar the instant symbol or timeframe
+  // changes so stale data never reaches ChartEngine even for one committed render.
+  // React discards the in-progress render and immediately re-renders with undefined.
+  const currentKey = `${symbol ?? ''}::${timeframe}`;
+  if (currentKey !== liveBarKey) {
+    setLiveBarKey(currentKey);
+    setLiveBar(undefined);
+  }
+
+  // Also reset when the base bar set itself changes (new bars loaded, same TF).
   useEffect(() => {
     setLiveBar(undefined);
-  }, [symbol, timeframe, lastBar?.timestamp]);
+  }, [lastBar?.timestamp]);
 
   useEffect(() => {
     if (!symbol || !lastBar) return;
@@ -169,6 +179,8 @@ export function useLiveCandle({ symbol, timeframe, lastBar }: UseLiveCandleOpts)
             close: base.close,
           };
       const next: LiveBar = {
+        symbol: norm,
+        timeframe,
         timestamp: baseline.timestamp,
         open: baseline.open,
         high: Math.max(baseline.high ?? -Infinity, close),
@@ -192,6 +204,8 @@ export function useLiveCandle({ symbol, timeframe, lastBar }: UseLiveCandleOpts)
       // For 'same' or 'newer' we write the provider's authoritative OHLC under
       // the provider's timestamp. 'newer' is a candle rollover.
       const next: LiveBar = {
+        symbol: norm,
+        timeframe,
         timestamp: c.timestampSec,
         open: c.open,
         high: c.high,
