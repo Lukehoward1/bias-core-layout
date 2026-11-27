@@ -152,7 +152,7 @@ export function ChartOverlayController({
   ];
 
   return (
-    <div className="absolute bottom-[52px] left-2 z-20 flex gap-1 pointer-events-auto overflow-x-auto max-w-[calc(100vw-4rem)]">
+    <div className="absolute top-11 left-2 z-20 flex gap-1 pointer-events-auto overflow-x-auto max-w-[calc(100vw-4rem)]">
       {toggles.map(({ label, active, set, title }) => (
         <button
           key={label}

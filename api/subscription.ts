@@ -267,7 +267,7 @@ async function handleSupport(req: VercelRequest, res: VercelResponse): Promise<V
     ].filter(Boolean).join("\n");
 
     await resend.emails.send({
-      from: "BIAS Alerts <alerts@streambias.com>",
+      from: "StreamBias Support <alerts@streambias.com>",
       to: "luke@hfx-capital.com",
       replyTo: userEmail,
       subject: `[${priorityTag}] ${ref} ${topicLabel} – ${userEmail}`,

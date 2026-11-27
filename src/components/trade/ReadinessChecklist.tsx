@@ -228,7 +228,7 @@ export function ReadinessChecklist({
         {result.conditions.map((c) => (
           <li key={c.label} className="flex items-start gap-2 text-xs">
             <span
-              className={`mt-0.5 inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+              className={`mt-0.5 inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
                 c.ok ? "bg-success/20 text-success" : "bg-muted text-muted-foreground"
               }`}
               aria-hidden
@@ -238,7 +238,7 @@ export function ReadinessChecklist({
             <span className="flex-1">
               <span className={c.ok ? "text-foreground" : "text-muted-foreground"}>{c.label}</span>
               {!c.ok && c.reason && (
-                <span className="block text-muted-foreground/80 mt-0.5">{c.reason}</span>
+                <span className="block text-muted-foreground mt-0.5">{c.reason}</span>
               )}
             </span>
           </li>

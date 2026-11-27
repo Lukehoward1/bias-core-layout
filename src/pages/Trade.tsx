@@ -24,6 +24,7 @@ import { ReadinessChecklist, evaluateChecklist } from "@/components/trade/Readin
 import { DynamicRiskCell } from "@/components/trade/DynamicRiskCell";
 import { InATradeButton, type EntryIntent } from "@/components/trade/InATradeButton";
 import { ChartOverlayController } from "@/components/trade/ChartOverlayController";
+import { BiasStrip } from "@/components/trade/BiasStrip";
 import { PositionSizeSlideOver } from "@/components/trade/PositionSizeSlideOver";
 import { MobileMarketPanel } from "@/components/trade/MobileMarketPanel";
 import { getSession as getDraSession } from "@/components/risk/DynamicRiskAdvisor";
@@ -82,6 +83,44 @@ function styleLabel(style: string, isCustom: boolean): string {
   if (style === "scalper") return "Scalper";
   if (style === "swing") return "Swing";
   return "Intraday";
+}
+
+function PriceTicker({
+  quote,
+  instrument,
+  session,
+}: {
+  quote: { last: number; change: number; changePercent: number; direction: string; stale?: boolean } | null;
+  instrument: { displayDecimals: number } | null;
+  session: string | null;
+}) {
+  if (!instrument) return null;
+  if (!quote) {
+    return (
+      <div className="hidden lg:flex items-center gap-2">
+        <span className="inline-block h-4 w-24 bg-muted/40 rounded animate-pulse" />
+      </div>
+    );
+  }
+  const priceStr = quote.last.toFixed(instrument.displayDecimals);
+  const absStr = Math.abs(quote.change).toFixed(instrument.displayDecimals);
+  const sign = quote.change > 0 ? "+" : quote.change < 0 ? "−" : "";
+  const pctStr = (quote.change > 0 ? "+" : quote.change < 0 ? "−" : "") + Math.abs(quote.changePercent).toFixed(2) + "%";
+  const changeColor = quote.direction === "up" ? "text-success" : quote.direction === "down" ? "text-destructive" : "text-muted-foreground";
+
+  return (
+    <div className={`hidden lg:flex items-baseline gap-2.5${quote.stale ? " opacity-50" : ""}`}>
+      <span className="text-sm font-semibold tabular-nums text-foreground">{priceStr}</span>
+      <span className={`text-xs tabular-nums ${changeColor}`}>
+        {sign}{absStr} ({pctStr})
+      </span>
+      {session && (
+        <span className="text-[11px] text-muted-foreground/90 border border-border/50 rounded px-1.5 py-0.5 leading-none">
+          {session}
+        </span>
+      )}
+    </div>
+  );
 }
 
 function isEventRelevantToSymbol(symbol: string, event: CalendarEvent): boolean {
@@ -353,11 +392,12 @@ function TradeContent({ symbol }: { symbol: string }) {
   }, [tradeEntry, instrument]);
 
   return (
-    <div className="p-3 sm:p-6 space-y-4 pb-16 lg:pb-6 [@media_(orientation:landscape)_and_(max-height:500px)]:p-2 [@media_(orientation:landscape)_and_(max-height:500px)]:space-y-1 [@media_(orientation:landscape)_and_(max-height:500px)]:pb-10">
+    <div className="p-3 sm:p-6 space-y-4 pb-16 lg:p-0 lg:space-y-0 lg:pb-0 lg:h-full lg:overflow-hidden lg:flex lg:flex-col [@media_(orientation:landscape)_and_(max-height:500px)]:p-2 [@media_(orientation:landscape)_and_(max-height:500px)]:space-y-1 [@media_(orientation:landscape)_and_(max-height:500px)]:pb-10">
       <AppHeader title="Trade" />
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 lg:px-4 lg:py-2 lg:shrink-0">
         <PairSelector currentSymbol={symbol} onSelect={handleSelectSymbol} />
+        <PriceTicker quote={quote} instrument={instrument} session={currentSession} />
       </div>
 
       {/* Mobile chip row — hidden on landscape phones where vertical space is tight */}
@@ -399,49 +439,57 @@ function TradeContent({ symbol }: { symbol: string }) {
         </div>
       </div>
 
-      <div className="flex gap-4">
-        <ErrorBoundary key={symbol} fallbackMessage="Failed to load chart">
-          <div className="flex-1 min-w-0 relative min-h-[60vh] lg:h-[600px] lg:min-h-0 [@media_(orientation:landscape)_and_(max-height:500px)]:min-h-[180px]">
-            {chartState.kind === "loading" && (
-              <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-                Loading chart…
-              </div>
-            )}
-            {chartState.kind === "ok" && (
-              <>
-                <CandlestickChart
-                  data={chartState.bars}
-                  pair={symbol.toLowerCase()}
-                  timeframe={timeframe}
-                  onTimeframeChange={setTimeframe}
-                  overlays={chartOverlays}
-                  onEventMarkerClick={handleOpenEvent}
-                />
-                <ChartOverlayController
-                  symbol={symbol}
-                  bars={chartState.bars}
-                  interval={timeframe}
-                  marketContext={marketContext}
-                  calendarEvents={allEvents}
-                  tradeEntry={tradeEntry}
-                  onOverlaysChange={setChartOverlays}
-                />
-              </>
-            )}
-            {chartState.kind === "unavailable" && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <DataUnavailableState />
-              </div>
-            )}
-            {chartState.kind === "not-on-plan" && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <NotOnPlanState name={instrument?.displayName ?? symbol} />
-              </div>
-            )}
-          </div>
-        </ErrorBoundary>
+      <div className="flex gap-4 lg:flex-1 lg:min-h-0 lg:overflow-hidden lg:px-4 lg:pb-3">
+        <div className="flex-1 min-w-0 flex flex-col lg:min-h-0">
+          <ErrorBoundary key={symbol} fallbackMessage="Failed to load chart">
+            <div className="relative min-h-[60vh] lg:flex-1 lg:min-h-[320px] [@media_(orientation:landscape)_and_(max-height:500px)]:min-h-[180px]">
+              {chartState.kind === "loading" && (
+                <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
+                  Loading chart…
+                </div>
+              )}
+              {chartState.kind === "ok" && (
+                <>
+                  <CandlestickChart
+                    data={chartState.bars}
+                    pair={symbol.toLowerCase()}
+                    timeframe={timeframe}
+                    onTimeframeChange={setTimeframe}
+                    overlays={chartOverlays}
+                    onEventMarkerClick={handleOpenEvent}
+                  />
+                  <ChartOverlayController
+                    symbol={symbol}
+                    bars={chartState.bars}
+                    interval={timeframe}
+                    marketContext={marketContext}
+                    calendarEvents={allEvents}
+                    tradeEntry={tradeEntry}
+                    onOverlaysChange={setChartOverlays}
+                  />
+                </>
+              )}
+              {chartState.kind === "unavailable" && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <DataUnavailableState />
+                </div>
+              )}
+              {chartState.kind === "not-on-plan" && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <NotOnPlanState name={instrument?.displayName ?? symbol} />
+                </div>
+              )}
+            </div>
+          </ErrorBoundary>
+          <BiasStrip
+            context={marketContext}
+            resolvedTimeframes={resolvedTimeframes}
+            blockingRoles={blockingRoles}
+            conditionsMet={mobileConditionsMet}
+          />
+        </div>
 
-        <div className="hidden lg:flex lg:flex-col gap-3 w-[360px] shrink-0">
+        <div className="hidden lg:flex lg:flex-col gap-3 w-[360px] shrink-0 overflow-y-auto min-h-0 py-3">
           <MarketAwarenessPanel
             symbol={symbol}
             instrument={instrument}

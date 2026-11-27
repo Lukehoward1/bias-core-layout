@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { SupportPanel } from "@/components/SupportPanel";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { Button } from "@/components/ui/button";
 import { useAppSidebar } from "@/hooks/use-app-sidebar";
 import { useTheme } from "@/hooks/use-theme";
@@ -51,6 +52,8 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [supportOpen, setSupportOpen] = useState(false);
+  const { subscriptionTier, isFoundingMember } = useSubscription();
+  const showUpgrade = !isFoundingMember && subscriptionTier !== "pro";
 
   const currentPath = location.pathname;
 
@@ -209,25 +212,27 @@ export function AppSidebar() {
           </button>
         </WithCollapsedTooltip>
 
-        <WithCollapsedTooltip label="Upgrade">
-          <button
-            type="button"
-            onPointerDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              go("/pricing");
-            }}
-            className={[
-              navBtnBase,
-              "bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground hover:text-primary-foreground",
-              collapsed && !isMobile ? "justify-center mx-1 px-0" : "justify-start",
-            ].join(" ")}
-            title={collapsed && !isMobile ? "Upgrade" : undefined}
-          >
-            <Zap className="h-[18px] w-[18px]" />
-            {(!collapsed || isMobile) && <span className="text-sm font-semibold ml-3">Upgrade</span>}
-          </button>
-        </WithCollapsedTooltip>
+        {showUpgrade && (
+          <WithCollapsedTooltip label="Upgrade">
+            <button
+              type="button"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                go("/pricing");
+              }}
+              className={[
+                navBtnBase,
+                "bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground hover:text-primary-foreground",
+                collapsed && !isMobile ? "justify-center mx-1 px-0" : "justify-start",
+              ].join(" ")}
+              title={collapsed && !isMobile ? "Upgrade" : undefined}
+            >
+              <Zap className="h-[18px] w-[18px]" />
+              {(!collapsed || isMobile) && <span className="text-sm font-semibold ml-3">Upgrade</span>}
+            </button>
+          </WithCollapsedTooltip>
+        )}
 
         <WithCollapsedTooltip label="Support">
           <button

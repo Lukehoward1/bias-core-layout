@@ -1,10 +1,9 @@
 // src/components/trade/MarketAwarenessPanel.tsx
 // Persistent side panel (plan §2.4). Rows:
 //   - Header: Bias/Structure/Entry labelled with each resolved TF + pencil + style chip
-//   - 3 per-TF bias rows (direction, confidence, reason)
-//   - Combined role-weighted bias + confidence
-//   - Sentiment
-//   - Volume (provider-aware rule §2.5)
+//   - 3 per-TF bias rows (direction, confidence, reason) — hidden lg:+ (shown in BiasStrip)
+//   - Combined role-weighted bias + confidence — hidden lg:+
+//   - Sentiment + Volume (side by side on lg:+)
 //   - Next high-impact news (countdown)
 //   - Nearest key level(s)
 //
@@ -12,16 +11,16 @@
 // skeleton rows so the UI doesn't go blank between fetches.
 
 import { useState } from "react";
-import { Pencil, TrendingUp, TrendingDown, Minus, AlertTriangle } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TraderTimeframesPicker } from "@/components/trade/TraderTimeframesPicker";
+import { BiasRoleCard, BiasRoleSkeleton } from "@/components/trade/BiasRoleCard";
 import { TF_BY_CODE } from "@/data/timeframes";
 import { computeVolumeRow } from "@/lib/volumeRule";
 import { getEventDateTime } from "@/services/calendarData";
 import type { MarketContext, KeyLevel } from "@/services/contextEngine";
 import type { TraderTimeframes, TfRole } from "@/services/traderTimeframes";
-import type { TriTimeframeBiasRole } from "@/services/candleData";
 import type { TradeInstrument } from "@/data/tradeInstruments";
 import type { MarketQuote } from "@/services/marketData";
 import type { CalendarEvent } from "@/data/calendarEvents";
@@ -34,23 +33,16 @@ export interface MarketAwarenessPanelProps {
   instrument: TradeInstrument | null;
   context: MarketContext | null;
   resolvedTimeframes: TraderTimeframes;
-  traderStyleLabel: string; // "Scalper" | "Intraday" | "Swing" | "Custom"
+  traderStyleLabel: string;
   chartBars: OhlcDataPoint[] | null;
   quote: MarketQuote | null;
   sentiment: number | null;
   upcomingRelevantEvents: CalendarEvent[];
-  blockingRoles: readonly TfRole[]; // filled by ReadinessChecklist
+  blockingRoles: readonly TfRole[];
   onOpenPickerPopover?: () => void;
   onOpenEvent?: (event: CalendarEvent) => void;
   now?: Date;
-  /** When true the timeframes picker opens as a bottom sheet (for mobile bottom-sheet context) */
   pickerAsSheet?: boolean;
-}
-
-function DirectionIcon({ dir, className }: { dir: TriTimeframeBiasRole["direction"]; className?: string }) {
-  if (dir === "bullish") return <TrendingUp className={className ?? "h-3.5 w-3.5 text-success"} />;
-  if (dir === "bearish") return <TrendingDown className={className ?? "h-3.5 w-3.5 text-destructive"} />;
-  return <Minus className={className ?? "h-3.5 w-3.5 text-muted-foreground"} />;
 }
 
 function Skeleton({ width = "w-24" }: { width?: string }) {
@@ -81,7 +73,7 @@ function parsePrice(s: string): number {
 }
 
 export function MarketAwarenessPanel({
-  symbol,
+  symbol: _symbol,
   instrument,
   context,
   resolvedTimeframes,
@@ -91,7 +83,7 @@ export function MarketAwarenessPanel({
   sentiment,
   upcomingRelevantEvents,
   blockingRoles,
-  onOpenPickerPopover,
+  onOpenPickerPopover: _onOpenPickerPopover,
   onOpenEvent,
   now,
   pickerAsSheet,
@@ -117,7 +109,7 @@ export function MarketAwarenessPanel({
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Header */}
+      {/* Header — always visible */}
       <div className="rounded-lg border border-border bg-card/40 p-3">
         <div className="flex items-center justify-between gap-2">
           <div className="text-xs text-muted-foreground">
@@ -174,45 +166,25 @@ export function MarketAwarenessPanel({
         </div>
       </div>
 
-      {/* Per-TF bias rows */}
-      <div className="rounded-lg border border-border bg-card/40 p-3 space-y-2">
-        {ROLES.map((role) => {
-          const tfLabel = TF_BY_CODE[resolvedTimeframes[role]].label;
-          const roleData = context?.perRole[role];
-          const blocking = isBlocking(role);
-          return (
-            <div
-              key={role}
-              className={`flex items-start gap-2 text-xs ${blocking ? "rounded-md bg-amber-500/10 px-2 py-1 -mx-2" : ""}`}
-            >
-              {roleData ? <DirectionIcon dir={roleData.direction} /> : <Skeleton width="w-3" />}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-muted-foreground w-[72px] shrink-0">
-                    {role === "bias" ? "Bias" : role === "structure" ? "Structure" : "Entry"} ({tfLabel})
-                  </span>
-                  {roleData ? (
-                    <span className="text-foreground font-medium capitalize">{roleData.direction}</span>
-                  ) : (
-                    <Skeleton width="w-14" />
-                  )}
-                  {roleData && roleData.direction !== "neutral" && (
-                    <span className="text-muted-foreground">{Math.round(roleData.confidence)}</span>
-                  )}
-                  {blocking && <AlertTriangle className="h-3 w-3 text-amber-500 ml-auto" />}
-                </div>
-                {roleData?.reason && (
-                  <div className="text-muted-foreground/70 text-[10px] mt-0.5 line-clamp-2">{roleData.reason}</div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+      {/* Per-TF bias rows — hidden on desktop (shown in BiasStrip instead) */}
+      <div className="lg:hidden rounded-lg border border-border bg-card/40 p-3 space-y-2">
+        {ROLES.map((role) => (
+          <BiasRoleCard
+            key={role}
+            role={role}
+            tfLabel={TF_BY_CODE[resolvedTimeframes[role]].label}
+            roleData={context?.perRole[role]}
+            blocking={isBlocking(role)}
+            variant="row"
+          />
+        ))}
       </div>
 
-      {/* Combined bias */}
-      <div className="rounded-lg border border-border bg-card/40 p-3">
-        <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Combined bias</div>
+      {/* Combined bias — hidden on desktop (shown in BiasStrip instead) */}
+      <div className="lg:hidden rounded-lg border border-border bg-card/40 p-3">
+        <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+          Combined bias
+        </div>
         {context ? (
           <div className="flex items-center justify-between">
             <span className="text-sm font-semibold text-foreground">{context.biasState}</span>
@@ -225,46 +197,65 @@ export function MarketAwarenessPanel({
         )}
       </div>
 
-      {/* Sentiment */}
-      <div className="rounded-lg border border-border bg-card/40 p-3">
-        <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Sentiment</div>
-        {sentiment === null ? (
-          <Skeleton width="w-20" />
-        ) : (
-          <span
-            className={`text-sm font-semibold ${
-              sentiment > 0 ? "text-success" : sentiment < 0 ? "text-destructive" : "text-muted-foreground"
-            }`}
-          >
-            {sentiment > 0 ? "+" : ""}
-            {sentiment}
-          </span>
-        )}
-      </div>
-
-      {/* Volume */}
-      <div className="rounded-lg border border-border bg-card/40 p-3">
-        <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Volume</div>
-        {vol.kind === "unavailable" && <span className="text-sm text-muted-foreground">—</span>}
-        {vol.kind === "tick" && (
-          <div>
-            <span className="text-sm font-semibold text-foreground">{vol.lastVolume.toLocaleString()}</span>
-            <div className="text-[10px] text-muted-foreground/80 mt-0.5">{vol.label}</div>
+      {/* Sentiment + Volume — side by side on lg:+, stacked below */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="rounded-lg border border-border bg-card/40 p-3">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+            Sentiment
           </div>
-        )}
-        {vol.kind === "activity" && (
-          <div>
-            <span className="text-sm font-semibold text-foreground">{vol.level}</span>
-            <div className="text-[10px] text-muted-foreground/80 mt-0.5">
-              Last bar {vol.ratio.toFixed(2)}× 20-bar average range
+          {sentiment === null ? (
+            <span className="text-sm text-muted-foreground">No data</span>
+          ) : (
+            <div className="flex items-baseline gap-1.5">
+              <span
+                className={`text-sm font-semibold ${
+                  sentiment > 0
+                    ? "text-success"
+                    : sentiment < 0
+                    ? "text-destructive"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {sentiment > 0 ? "Bullish" : sentiment < 0 ? "Bearish" : "Neutral"}
+              </span>
+              <span className="text-[11px] text-muted-foreground tabular-nums">
+                {sentiment > 0 ? "+" : ""}{sentiment}
+              </span>
             </div>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-border bg-card/40 p-3">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+            Volume
           </div>
-        )}
+          {vol.kind === "unavailable" && (
+            <span className="text-sm text-muted-foreground">—</span>
+          )}
+          {vol.kind === "tick" && (
+            <div>
+              <span className="text-sm font-semibold text-foreground">
+                {vol.lastVolume.toLocaleString()}
+              </span>
+              <div className="text-[11px] text-muted-foreground mt-0.5">{vol.label}</div>
+            </div>
+          )}
+          {vol.kind === "activity" && (
+            <div>
+              <span className="text-sm font-semibold text-foreground">{vol.level}</span>
+              <div className="text-[11px] text-muted-foreground mt-0.5">
+                Last bar {vol.ratio.toFixed(2)}× 20-bar average range
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Next high-impact news */}
       <div className="rounded-lg border border-border bg-card/40 p-3">
-        <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Next high-impact news</div>
+        <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+          Next high-impact news
+        </div>
         {nextHighImpact ? (
           <button
             type="button"
@@ -274,7 +265,7 @@ export function MarketAwarenessPanel({
             <div className="text-sm font-medium text-foreground group-hover:text-primary line-clamp-2">
               {nextHighImpact.event}
             </div>
-            <div className="text-[10px] text-muted-foreground/80 mt-0.5">
+            <div className="text-[11px] text-muted-foreground mt-0.5">
               {nextHighImpact.currency} · {formatMinsUntil(getEventDateTime(nextHighImpact), nowDate)}
             </div>
           </button>
@@ -285,7 +276,9 @@ export function MarketAwarenessPanel({
 
       {/* Nearest levels */}
       <div className="rounded-lg border border-border bg-card/40 p-3">
-        <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Nearest levels</div>
+        <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+          Nearest levels
+        </div>
         {!context ? (
           <div className="space-y-1.5">
             <Skeleton width="w-32" />

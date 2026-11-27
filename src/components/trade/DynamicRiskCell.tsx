@@ -134,14 +134,14 @@ export function DynamicRiskCell({ symbol, session, onOpenSlideOver }: DynamicRis
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symbol, session, baseRisk, trades]);
 
+  const isDown = result.kind !== "empty" && result.rec.direction === "down";
   const Icon = result.kind === "empty" ? Brain
     : result.rec.direction === "up" ? TrendingUp
       : result.rec.direction === "down" ? TrendingDown
         : Minus;
-  const iconColour = result.kind === "empty" ? "text-muted-foreground"
-    : result.rec.direction === "up" ? "text-emerald-500"
-      : result.rec.direction === "down" ? "text-destructive"
-        : "text-muted-foreground";
+  const iconColour = isDown ? "text-amber-500" : "text-muted-foreground";
+  const numberColour = isDown ? "text-amber-500" : "text-foreground";
+  const downTitle = "Performance in this context is below your overall trading average";
 
   return (
     <button
@@ -153,21 +153,21 @@ export function DynamicRiskCell({ symbol, session, onOpenSlideOver }: DynamicRis
       <div className="flex items-start gap-2">
         <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${iconColour}`} />
         <div className="min-w-0 flex-1">
-          <div className="text-xs text-muted-foreground mb-0.5">Dynamic Risk</div>
+          <div className="text-[11px] text-muted-foreground mb-0.5">Journal-adjusted risk</div>
           {result.kind === "empty" ? (
             <div className="text-sm font-medium text-foreground">Not enough data yet</div>
-          ) : result.kind === "context" ? (
-            <div className="text-sm font-medium text-foreground">
-              Risk <span className={iconColour}>{fmtPct(result.rec.pct)}</span>
-              <span className="text-muted-foreground font-normal"> · {result.label}</span>
-            </div>
           ) : (
             <div className="text-sm font-medium text-foreground">
-              <span className="font-semibold">{result.label}</span>{" "}
-              <span className={iconColour}>{fmtPct(result.rec.pct)}</span>
+              {result.label} ·{" "}
+              <span
+                className={numberColour}
+                title={isDown ? downTitle : undefined}
+              >
+                {fmtPct(result.rec.pct)} per trade
+              </span>
             </div>
           )}
-          <div className="text-[10px] text-muted-foreground mt-0.5">
+          <div className="text-[11px] text-muted-foreground mt-0.5">
             Based on your own trading history. Not advice.
           </div>
         </div>

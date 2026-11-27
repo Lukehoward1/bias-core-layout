@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import {
   Select,
   SelectContent,
@@ -28,18 +27,8 @@ export function ChartStyleSelector({ value, onChange }: ChartStyleSelectorProps)
   const isMobile = useIsMobile();
   const currentStyle = chartStyles.find((s) => s.value === value);
 
-  const [isBelowXl, setIsBelowXl] = useState(
-    typeof window !== 'undefined' ? window.matchMedia('(max-width: 1279px)').matches : false,
-  );
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 1279px)');
-    const handler = (e: MediaQueryListEvent) => setIsBelowXl(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
-
-  const triggerLabel = isBelowXl ? currentStyle?.shortLabel : currentStyle?.label;
-  const triggerWidth = isMobile ? 'w-9' : isBelowXl ? 'w-[90px]' : 'w-[160px]';
+  const triggerLabel = currentStyle?.shortLabel;
+  const triggerWidth = isMobile ? 'w-9' : 'w-[120px]';
 
   return (
     <Select value={value} onValueChange={(v) => onChange(v as ChartStyle)}>

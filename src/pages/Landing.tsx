@@ -850,7 +850,7 @@ export default function Landing() {
                 </div>
               </div>
               <div className="absolute bottom-4 right-4 bg-background/80 backdrop-blur-sm border border-border rounded-lg px-3 py-1.5">
-                <p className="text-xs text-muted-foreground">60-second overview · Coming soon</p>
+                <p className="text-xs text-muted-foreground">Product tour · drop your email below and we'll send it when it's ready</p>
               </div>
             </div>
           </AnimatedSection>
