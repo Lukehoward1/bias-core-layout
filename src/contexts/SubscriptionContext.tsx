@@ -38,35 +38,58 @@ const SubscriptionContext = createContext<SubscriptionContextValue | null>(null)
 export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
   const { user, isLoading: authLoading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Track which user ID the current profile was fetched for. Lets us derive
+  // isLoading synchronously on the render where user first becomes non-null,
+  // before any useEffect has had a chance to run.
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const [fetching, setFetching] = useState(false);
   const [devTierOverride, setDevTierOverride] = useState<string | null>(null);
 
   const fetchProfile = useCallback(async (showLoading = true) => {
-    if (showLoading) setIsLoading(true);
+    // Auth not settled yet — isLoading already true via authLoading; wait for next call.
     if (authLoading) return;
     if (!user) {
       setProfile(null);
-      setIsLoading(false);
+      setProfileUserId(null);
+      setFetching(false);
       return;
     }
-    const { data } = await supabase
-      .from("profiles")
-      .select(
-        "subscription_status,subscription_tier,is_founding_member,trial_ends_at,current_period_end,stripe_customer_id,downgrade_grace_end_at,downgrade_new_max",
-      )
-      .eq("id", user.id)
-      .maybeSingle();
+    if (showLoading) setFetching(true);
+    let data: unknown = null;
+    try {
+      const res = await supabase
+        .from("profiles")
+        .select(
+          "subscription_status,subscription_tier,is_founding_member,trial_ends_at,current_period_end,stripe_customer_id,downgrade_grace_end_at,downgrade_new_max",
+        )
+        .eq("id", user.id)
+        .maybeSingle();
+      data = res.data;
+    } catch (err) {
+      // A thrown network error must not leave the app on a permanent spinner.
+      console.warn("[SubscriptionContext] profile fetch failed:", (err as Error).message);
+    }
     setProfile(data as Profile | null);
-    setIsLoading(false);
+    setProfileUserId(user.id);
+    setFetching(false);
   // Depend on user.id (a string) rather than the user object so that a focus-triggered
   // token refresh — which replaces the session but keeps the same user ID — does not
-  // recreate this callback, trigger the effect below, and call setIsLoading(true).
+  // recreate this callback, trigger the effect below, and re-fetch the profile.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, authLoading]);
 
   useEffect(() => {
     fetchProfile(true);
   }, [fetchProfile]);
+
+  // isLoading is true in three situations:
+  //   1. Auth hasn't resolved yet (we don't know who the user is).
+  //   2. A profile fetch is in-flight.
+  //   3. A signed-in user is present but their profile hasn't been fetched yet —
+  //      the one-render window between user becoming non-null and the first effect firing.
+  //      This is what prevents ProtectedRoute from seeing (user=X, isActive=false) and
+  //      prematurely redirecting to /pricing on sign-in.
+  const isLoading = authLoading || fetching || (user !== null && profileUserId !== user.id);
 
   const realStatus = profile?.subscription_status ?? null;
   const realTier = profile?.subscription_tier ?? null;
