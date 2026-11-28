@@ -87,38 +87,66 @@ function styleLabel(style: string, isCustom: boolean): string {
 
 function PriceTicker({
   quote,
+  bars,
   instrument,
   session,
 }: {
   quote: { last: number; change: number; changePercent: number; direction: string; stale?: boolean } | null;
+  bars: OhlcDataPoint[] | null;
   instrument: { displayDecimals: number } | null;
   session: string | null;
 }) {
+  // After 5 s with neither quote nor bars, hide the skeleton entirely.
+  const [showSkeleton, setShowSkeleton] = useState(true);
+  useEffect(() => {
+    const hasData = quote !== null || (bars !== null && bars.length > 0);
+    if (hasData) { setShowSkeleton(true); return; }
+    const t = setTimeout(() => setShowSkeleton(false), 5000);
+    return () => clearTimeout(t);
+  }, [quote, bars]);
+
   if (!instrument) return null;
-  if (!quote) {
+
+  // Live quote — full price, change, session badge
+  if (quote !== null) {
+    const priceStr = quote.last.toFixed(instrument.displayDecimals);
+    const absStr = Math.abs(quote.change).toFixed(instrument.displayDecimals);
+    const sign = quote.change > 0 ? "+" : quote.change < 0 ? "−" : "";
+    const pctStr = (quote.change > 0 ? "+" : quote.change < 0 ? "−" : "") + Math.abs(quote.changePercent).toFixed(2) + "%";
+    const changeColor = quote.direction === "up" ? "text-success" : quote.direction === "down" ? "text-destructive" : "text-muted-foreground";
     return (
-      <div className="hidden lg:flex items-center gap-2">
-        <span className="inline-block h-4 w-24 bg-muted/40 rounded animate-pulse" />
+      <div className={`hidden lg:flex items-baseline gap-2.5${quote.stale ? " opacity-50" : ""}`}>
+        <span className="text-sm font-semibold tabular-nums text-foreground">{priceStr}</span>
+        <span className={`text-xs tabular-nums ${changeColor}`}>
+          {sign}{absStr} ({pctStr})
+        </span>
+        {session && (
+          <span className="text-[11px] text-muted-foreground/90 border border-border/50 rounded px-1.5 py-0.5 leading-none">
+            {session}
+          </span>
+        )}
       </div>
     );
   }
-  const priceStr = quote.last.toFixed(instrument.displayDecimals);
-  const absStr = Math.abs(quote.change).toFixed(instrument.displayDecimals);
-  const sign = quote.change > 0 ? "+" : quote.change < 0 ? "−" : "";
-  const pctStr = (quote.change > 0 ? "+" : quote.change < 0 ? "−" : "") + Math.abs(quote.changePercent).toFixed(2) + "%";
-  const changeColor = quote.direction === "up" ? "text-success" : quote.direction === "down" ? "text-destructive" : "text-muted-foreground";
 
-  return (
-    <div className={`hidden lg:flex items-baseline gap-2.5${quote.stale ? " opacity-50" : ""}`}>
-      <span className="text-sm font-semibold tabular-nums text-foreground">{priceStr}</span>
-      <span className={`text-xs tabular-nums ${changeColor}`}>
-        {sign}{absStr} ({pctStr})
-      </span>
-      {session && (
-        <span className="text-[11px] text-muted-foreground/90 border border-border/50 rounded px-1.5 py-0.5 leading-none">
-          {session}
+  // Fallback: last candle close from chart bars while quote is in-flight
+  const lastClose = bars && bars.length > 0 ? bars[bars.length - 1].close : null;
+  if (lastClose !== null) {
+    return (
+      <div className="hidden lg:flex items-baseline gap-2">
+        <span className="text-sm font-semibold tabular-nums text-foreground">
+          {lastClose.toFixed(instrument.displayDecimals)}
         </span>
-      )}
+        <span className="text-[11px] text-muted-foreground">last close</span>
+      </div>
+    );
+  }
+
+  // No data yet — show skeleton, or nothing after 5 s
+  if (!showSkeleton) return null;
+  return (
+    <div className="hidden lg:flex items-center gap-2">
+      <span className="inline-block h-4 w-24 bg-muted/40 rounded animate-pulse" />
     </div>
   );
 }
@@ -397,7 +425,7 @@ function TradeContent({ symbol }: { symbol: string }) {
 
       <div className="flex items-center gap-3 lg:px-4 lg:py-2 lg:shrink-0">
         <PairSelector currentSymbol={symbol} onSelect={handleSelectSymbol} />
-        <PriceTicker quote={quote} instrument={instrument} session={currentSession} />
+        <PriceTicker quote={quote} bars={chartBars} instrument={instrument} session={currentSession} />
       </div>
 
       {/* Mobile chip row — hidden on landscape phones where vertical space is tight */}

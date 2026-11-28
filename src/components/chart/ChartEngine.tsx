@@ -94,6 +94,63 @@ function darkenHex(hex: string, amount: number): string {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
+/**
+ * Returns the target maximum lightness (%) for a hue when adapting for a light
+ * chart background. Returns null for hues that do not need adjustment.
+ * Thresholds are chosen to deliver roughly WCAG 3:1 contrast against #e9edf3.
+ */
+function lightChartLightnessTarget(hue: number): number | null {
+  if (hue >= 25  && hue <= 70)  return 36; // amber / orange / yellow
+  if (hue >= 100 && hue <= 162) return 34; // green / lime
+  if (hue >  162 && hue <= 200) return 40; // teal / cyan
+  if (hue >  200 && hue <= 250) return 42; // blue / indigo
+  if (hue >= 345 || hue <= 15)  return 47; // red
+  return null; // purple, magenta, etc. — leave unchanged
+}
+
+/**
+ * Adapts an HSL, HSLA, or 6-digit hex colour for a light chart background.
+ * Caps lightness to maintain roughly WCAG 3:1 contrast against ~#e9edf3.
+ * Returns the input unchanged when the colour is already dark enough, the hue
+ * falls outside a known light-chart range, or the string cannot be parsed.
+ * Pure and idempotent — exported so it can be unit-tested independently.
+ */
+export function adaptColourForLightChart(colour: string): string {
+  // Parse hsl(...) or hsla(...)
+  const hslM = /^hsla?\(\s*([\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%/.exec(colour);
+  if (hslM) {
+    const h = parseFloat(hslM[1]);
+    const s = parseFloat(hslM[2]);
+    const l = parseFloat(hslM[3]);
+    const target = lightChartLightnessTarget(h);
+    if (target === null || l <= target) return colour;
+    return `hsl(${h}, ${s}%, ${target}%)`;
+  }
+  // Parse 6-digit hex → convert to HSL → cap → return as hsl()
+  const hexM = /^#([0-9a-fA-F]{6})$/.exec(colour);
+  if (hexM) {
+    const n  = parseInt(hexM[1], 16);
+    const r  = ((n >> 16) & 0xff) / 255;
+    const g  = ((n >> 8)  & 0xff) / 255;
+    const b  = (n & 0xff)         / 255;
+    const mx = Math.max(r, g, b);
+    const mn = Math.min(r, g, b);
+    const lv = (mx + mn) / 2;
+    if (mx === mn) return colour; // achromatic
+    const d  = mx - mn;
+    const s  = lv > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+    let h: number;
+    if (mx === r)      h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+    else if (mx === g) h = ((b - r) / d + 2) * 60;
+    else               h = ((r - g) / d + 4) * 60;
+    const lPct  = lv * 100;
+    const target = lightChartLightnessTarget(h);
+    if (target === null || lPct <= target) return colour;
+    return `hsl(${Math.round(h)}, ${Math.round(s * 100)}%, ${target}%)`;
+  }
+  return colour;
+}
+
 /** Derive readable chart colours from background luminance. */
 function deriveChartColors(isDark: boolean) {
   if (isDark) {
@@ -1259,7 +1316,8 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
 
       for (const o of overlays) {
         if (o.kind === 'price-line') {
-          const lineColor = cs.levelColor ?? o.color;
+          // User levelColor override wins; otherwise adapt default colours on a light chart.
+          const lineColor = cs.levelColor ?? (!isDarkChart ? adaptColourForLightChart(o.color) : o.color);
           const line = main.createPriceLine({
             price: o.price,
             color: lineColor,
@@ -1270,9 +1328,10 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
           });
           priceLinesRef.current.push(line);
         } else if (o.kind === 'highlight-band') {
+          const bandColor = !isDarkChart ? adaptColourForLightChart(o.color) : o.color;
           priceLinesRef.current.push(
-            main.createPriceLine({ price: o.to,   color: o.color, lineStyle: LineStyle.Dotted, lineWidth: 1, axisLabelVisible: false, title: o.label ?? '' }),
-            main.createPriceLine({ price: o.from, color: o.color, lineStyle: LineStyle.Dotted, lineWidth: 1, axisLabelVisible: false, title: '' }),
+            main.createPriceLine({ price: o.to,   color: bandColor, lineStyle: LineStyle.Dotted, lineWidth: 1, axisLabelVisible: false, title: o.label ?? '' }),
+            main.createPriceLine({ price: o.from, color: bandColor, lineStyle: LineStyle.Dotted, lineWidth: 1, axisLabelVisible: false, title: '' }),
           );
         } else if (o.kind === 'swing-marker') {
           // 'session-line' descriptors are rendered as HTML hairlines by computeSessionLines
@@ -1363,29 +1422,37 @@ export const ChartEngine = forwardRef<ChartEngineRef, ChartEngineProps>(
             Non-interactive; rendered below the news layer (z-[2]). */}
         {sessionLines.length > 0 && (
           <div className="absolute inset-0 pointer-events-none overflow-hidden z-[2]">
-            {sessionLines.map((line) => (
-              <div
-                key={`sess-${Math.round(line.x)}-${line.label}`}
-                className="absolute inset-y-0 pointer-events-none"
-                style={{ left: line.x }}
-              >
+            {sessionLines.map((line) => {
+              // Adapt the hairline colour for light chart backgrounds unless the user
+              // has set a sessionColor override (override is already baked into line.color
+              // by computeSessionLines; check chartSettings to know which case we're in).
+              const hairlineColor = !isDarkChart && !chartSettings?.sessionColor
+                ? adaptColourForLightChart(line.color)
+                : line.color;
+              return (
                 <div
+                  key={`sess-${Math.round(line.x)}-${line.label}`}
                   className="absolute inset-y-0 pointer-events-none"
-                  style={{ width: 0, borderLeft: `1px dashed ${line.color}`, opacity: isDarkChart ? 0.2 : 0.4 }}
-                />
-                <div
-                  className="absolute pointer-events-none text-[9px] leading-[12px] whitespace-nowrap select-none"
-                  style={{
-                    top: 2,
-                    left: 3,
-                    color: isDarkChart ? line.color : 'hsl(0, 0%, 20%)',
-                    opacity: isDarkChart ? 0.55 : 0.70,
-                  }}
+                  style={{ left: line.x }}
                 >
-                  {line.label}
+                  <div
+                    className="absolute inset-y-0 pointer-events-none"
+                    style={{ width: 0, borderLeft: `1px dashed ${hairlineColor}`, opacity: isDarkChart ? 0.2 : 0.45 }}
+                  />
+                  <div
+                    className="absolute pointer-events-none text-[9px] leading-[12px] whitespace-nowrap select-none"
+                    style={{
+                      top: 2,
+                      left: 3,
+                      color: isDarkChart ? line.color : 'hsl(0, 0%, 20%)',
+                      opacity: isDarkChart ? 0.55 : 0.70,
+                    }}
+                  >
+                    {line.label}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
